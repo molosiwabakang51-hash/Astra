@@ -2898,20 +2898,25 @@ class MainActivity :
                     // Explicit multi-step workflows are locally simulated first.
                     // Neither LLM output nor Wikipedia text can execute actions.
                     // Every plan is previewed; only 'confirm workflow' commits.
-                    val workflow = workflowSession.handle(
-                        normalized,
-                        AstraWorkflow.Snapshot(
-                            tasks.toList(),
-                            completed.toList(),
-                            notes.toList(),
-                            AstraWorkflow.decodeItems(
-                                storage.getString("astra_shopping_items", "")
-                            ),
-                            AstraWorkflow.decodeItems(
-                                storage.getString("astra_habits", "")
-                            )
+                    // Preserve literal newlines inside workflow plans. The
+                    // general natural-language normalizer collapses whitespace,
+                    // so try unmodified input before the normalized wake phrase.
+                    val workflowSnapshot = AstraWorkflow.Snapshot(
+                        tasks.toList(),
+                        completed.toList(),
+                        notes.toList(),
+                        AstraWorkflow.decodeItems(
+                            storage.getString("astra_shopping_items", "")
+                        ),
+                        AstraWorkflow.decodeItems(
+                            storage.getString("astra_habits", "")
                         )
                     )
+                    val workflow = workflowSession.handle(
+                        message, workflowSnapshot
+                    ) ?: if (message != normalized) {
+                        workflowSession.handle(normalized, workflowSnapshot)
+                    } else null
                     if (workflow != null) {
                         var reply = workflow.text
                         val result = workflow.apply
