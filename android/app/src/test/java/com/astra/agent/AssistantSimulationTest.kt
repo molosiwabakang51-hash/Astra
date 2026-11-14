@@ -35,7 +35,7 @@ class AssistantSimulationTest {
                 2 -> {
                     assertTrue(tutor.respond("skip russian question")!!.contains("Skipped"))
                     assertTrue(tutor.respond("answer")!!.contains("no active"))
-                    continue@repeat
+                    return@repeat
                 }
             }
             val index = state["russian_pending_question"]!! - 1
