@@ -49,6 +49,7 @@ jobs:
           python3 scripts/harden_native_inference.py --verify
           python3 scripts/fix_native_prompt_error.py --verify
           python3 scripts/fix_native_generation_budget.py --verify
+          python3 scripts/fix_native_chat_continuity.py --verify
 
       - name: Run tests and build debug APK
         working-directory: android
@@ -76,15 +77,15 @@ jobs:
           [[ "$package" == *"name='com.astra.agent'"* ]] || {
             echo "Unexpected package ID in APK"; exit 1;
           }
-          [[ "$package" == *"versionCode='26'"* ]] || {
+          [[ "$package" == *"versionCode='27'"* ]] || {
             echo "Unexpected versionCode in APK"; exit 1;
           }
-          [[ "$package" == *"versionName='0.11.9'"* ]] || {
+          [[ "$package" == *"versionName='0.12.0'"* ]] || {
             echo "Unexpected versionName in APK"; exit 1;
           }
           mkdir -p ../dist
-          cp "$apk" "../dist/Astra-v0.11.9-FULL-offline-arm64-debug.apk"
-          echo "Verified installable FULL APK identity: Astra v0.11.9 (26), offline ARM64"
+          cp "$apk" "../dist/Astra-v0.12.0-FULL-offline-arm64-debug.apk"
+          echo "Verified installable FULL APK identity: Astra v0.12.0 (27), offline ARM64"
 
       - name: Inspect debug APK composition
         working-directory: android
@@ -215,11 +216,11 @@ jobs:
           package="$("$aapt" dump badging "$apk" | head -n 1)"
           echo "$package"
           [[ "$package" == *"name='com.astra.agent'"* &&
-             "$package" == *"versionCode='26'"* &&
-             "$package" == *"versionName='0.11.9'"* ]] || {
+             "$package" == *"versionCode='27'"* &&
+             "$package" == *"versionName='0.12.0'"* ]] || {
             echo "Lightweight APK identity mismatch"; exit 1;
           }
-          cp "$apk" ../dist/Astra-v0.11.9-LITE-offline-arm64-debug.apk
+          cp "$apk" ../dist/Astra-v0.12.0-LITE-offline-arm64-debug.apk
           printf "# Lite APK\n\nSize: %s bytes\n\n" "$(wc -c < "$apk")" > ../dist/LITE-size-report.md
           echo "LITE APK ready; existing model can be imported from previous APK/ZIP."
 
@@ -227,7 +228,7 @@ jobs:
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: Astra-v0.11.9-Sizes
+          name: Astra-v0.12.0-Sizes
           retention-days: 7
           path: dist/*-size-report.md
           if-no-files-found: error
@@ -236,16 +237,16 @@ jobs:
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: Astra-v0.11.9-LITE-Offline-APK
+          name: Astra-v0.12.0-LITE-Offline-APK
           retention-days: 7
-          path: dist/Astra-v0.11.9-LITE-offline-arm64-debug.apk
+          path: dist/Astra-v0.12.0-LITE-offline-arm64-debug.apk
           if-no-files-found: error
 
       - name: Publish self-contained full APK (first installs only)
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: Astra-v0.11.9-FULL-Offline-APK
+          name: Astra-v0.12.0-FULL-Offline-APK
           retention-days: 7
-          path: dist/Astra-v0.11.9-FULL-offline-arm64-debug.apk
+          path: dist/Astra-v0.12.0-FULL-offline-arm64-debug.apk
           if-no-files-found: error

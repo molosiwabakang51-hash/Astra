@@ -65,16 +65,38 @@ AFTER = (
     return 0;"""
 )
 
+# The v0.12.0 continuity patch replaces the positional budget with a
+# countdown but must preserve this precise correction to truncated prompt
+# accounting. Accept that *fully reviewed* downstream result, not arbitrary
+# text that happens to contain a new counter name.
+AFTER_CONTINUITY = AFTER.replace(
+    "    stop_generation_position = current_position + n_predict;",
+    "    // Bound assistant tokens, not absolute positions after a shifting context.\n"
+    "    remaining_generation_tokens = std::max(0, static_cast<int>(n_predict));",
+)
+
+
 def hardened(source: str) -> str:
-    original_count, patched_count = source.count(BEFORE), source.count(AFTER)
-    if original_count == 1 and patched_count == 0:
+    original_count = source.count(BEFORE)
+    patched_count = source.count(AFTER)
+    continuity_count = source.count(AFTER_CONTINUITY)
+    if (original_count, patched_count, continuity_count) == (1, 0, 0):
         out = source.replace(BEFORE, AFTER, 1)
-    elif original_count == 0 and patched_count == 1:
+    elif (original_count, patched_count, continuity_count) == (0, 1, 0):
         out = source
+    elif (original_count, patched_count, continuity_count) == (0, 0, 1):
+        # Recheck the rest of the native chat patch as well. A build must not
+        # accept a partial or tampered migration from positional to counted
+        # generation limits.
+        from fix_native_chat_continuity import hardened as verify_continuity
+        if verify_continuity(source) != source:
+            raise RuntimeError("Native chat continuity patch is incomplete")
+        return source
     else:
         raise RuntimeError(
             "Pinned native generation-budget source drift or duplicated blocks; "
-            f"original={original_count}, patched={patched_count}. Review upstream."
+            f"original={original_count}, patched={patched_count}, "
+            f"continuity={continuity_count}. Review upstream."
         )
     if "stop_generation_position = current_position + user_prompt_size + n_predict;" in out:
         raise RuntimeError("Native generation still double counts the user prompt")

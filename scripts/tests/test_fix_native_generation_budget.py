@@ -52,6 +52,26 @@ class NativeGenerationBudgetTest(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "duplicated blocks"):
             hardened(BEFORE + "\n" + BEFORE)
 
+    def test_final_count_based_patch_preserves_truncated_prompt_accounting(self):
+        from fix_native_chat_continuity import REWRITES, hardened as complete
+        source = "\n\n".join(
+            AFTER if i == 2 else before
+            for i, (before, _) in enumerate(REWRITES)
+        ) + (
+            "\nchat_add_and_format(ROLE_ASSISTANT, assistant_ss.str());\n"
+        )
+        final = complete(source)
+        self.assertEqual(hardened(final), final)
+        self.assertNotIn("stop_generation_position", final)
+        # Do not merely accept a token-counter marker if a downstream change
+        # reverses the fix for oversized prompt position accounting.
+        bad = final.replace(
+            "const int user_prompt_size = (int) user_tokens.size();",
+            "const int user_prompt_size = original_user_prompt_size;"
+        )
+        with self.assertRaisesRegex(RuntimeError, "source drift"):
+            hardened(bad)
+
     def test_verify_only_fails_until_correction_is_installed(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / CPP
