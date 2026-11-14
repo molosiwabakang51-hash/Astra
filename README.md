@@ -2,6 +2,8 @@
 
 Astra is a **local-first Android/Kotlin Jetpack Compose assistant** with a futuristic dark interface. It is being developed directly in this repository. The original **Astra-AI** repository is kept separately as a backup.
 
+**Release status: EXPERIMENTAL.** Compilation and APK checks pass, but stable status requires on-phone offline inference, one-time model import, chat/Stop usability, data-preserving same-key updates and privacy checks. See the [stable-release acceptance checklist](docs/stable-release-acceptance.md). Owner-signed builds remain GitHub **pre-releases** until those mandatory checks pass.
+
 ## Working capabilities
 
 - Chat interface with **multiple persistent conversations**, an animated compact navigation dock, notes, tasks and completion tracking.
