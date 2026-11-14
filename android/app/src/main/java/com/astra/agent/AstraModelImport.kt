@@ -97,7 +97,9 @@ internal object AstraModelImport {
         }
     }
 
-    private suspend fun copyFromArchive(
+    // Exposed within the module so JVM tests can validate nested APK ZIP
+    // extraction with small fixtures, without a 462 MiB test model.
+    internal suspend fun copyFromArchive(
         zip: ZipInputStream,
         out: OutputStream,
         digest: MessageDigest,
