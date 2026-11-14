@@ -3381,9 +3381,10 @@ class MainActivity :
                         text = {
                             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                                 Text(
-                                    "Search saved notes, open tasks and your own messages " +
-                                        "across conversations. Results identify their sources " +
-                                        "and stay entirely on this phone.",
+                                    "Recall exact excerpts, or ask the on-device AI to " +
+                                        "interpret matching evidence. Both run locally. " +
+                                        "AI interpretations can be wrong, so original " +
+                                        "source excerpts are always attached.",
                                     style = MaterialTheme.typography.bodySmall
                                 )
                                 OutlinedTextField(
@@ -3397,16 +3398,29 @@ class MainActivity :
                             }
                         },
                         confirmButton = {
-                            TextButton(
-                                enabled = memorySearchQuery.trim().length >= 2,
-                                onClick = {
-                                    val query = memorySearchQuery.trim()
-                                    showMemorySearch = false
-                                    tab = 0
-                                    submit("recall " + query)
+                            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                TextButton(
+                                    enabled = memorySearchQuery.trim().length >= 2,
+                                    onClick = {
+                                        val query = memorySearchQuery.trim()
+                                        showMemorySearch = false
+                                        tab = 0
+                                        submit("recall " + query)
+                                    }
+                                ) {
+                                    Text("Find sources")
                                 }
-                            ) {
-                                Text("Recall")
+                                TextButton(
+                                    enabled = memorySearchQuery.trim().length >= 3,
+                                    onClick = {
+                                        val query = memorySearchQuery.trim()
+                                        showMemorySearch = false
+                                        tab = 0
+                                        submit("ask my memory " + query)
+                                    }
+                                ) {
+                                    Text("Ask with evidence")
+                                }
                             }
                         },
                         dismissButton = {
