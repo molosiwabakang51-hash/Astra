@@ -42,7 +42,9 @@ import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 import org.json.JSONArray
 import org.json.JSONObject
@@ -2319,6 +2321,10 @@ class MainActivity :
                     mutableStateOf(false)
                 }
 
+                var pendingBackupRestore by remember {
+                    mutableStateOf<AstraBackupCodec.Payload?>(null)
+                }
+
                 var selectedMessage by remember {
                     mutableStateOf<ChatMessage?>(null)
                 }
@@ -2639,6 +2645,63 @@ class MainActivity :
                         }
                     }
 
+                val exportBackupLauncher =
+                    rememberLauncherForActivityResult(
+                        ActivityResultContracts.CreateDocument("application/json")
+                    ) { uri ->
+                        if (uri != null) {
+                            researchScope.launch {
+                                try {
+                                    withContext(Dispatchers.IO) {
+                                        val backup = storage.exportBackup()
+                                        val output = contentResolver.openOutputStream(uri)
+                                            ?: throw IllegalStateException("Cannot write the selected file.")
+                                        output.use {
+                                            it.write(backup.toByteArray(Charsets.UTF_8))
+                                        }
+                                    }
+                                    Toast.makeText(
+                                        this@MainActivity,
+                                        "Astra backup exported.",
+                                        Toast.LENGTH_SHORT
+                                    ).show()
+                                } catch (error: Exception) {
+                                    Toast.makeText(
+                                        this@MainActivity,
+                                        error.message ?: "Could not export backup.",
+                                        Toast.LENGTH_LONG
+                                    ).show()
+                                }
+                            }
+                        }
+                    }
+
+                val importBackupLauncher =
+                    rememberLauncherForActivityResult(
+                        ActivityResultContracts.OpenDocument()
+                    ) { uri ->
+                        if (uri != null) {
+                            researchScope.launch {
+                                try {
+                                    pendingBackupRestore = withContext(Dispatchers.IO) {
+                                        val source = contentResolver.openInputStream(uri)
+                                            ?: throw IllegalStateException("Cannot open selected file.")
+                                        val contents = source.use {
+                                            AstraBackupCodec.readLimited(it)
+                                        }
+                                        AstraBackupCodec.parse(contents)
+                                    }
+                                } catch (error: Exception) {
+                                    Toast.makeText(
+                                        this@MainActivity,
+                                        error.message ?: "Could not read backup.",
+                                        Toast.LENGTH_LONG
+                                    ).show()
+                                }
+                            }
+                        }
+                    }
+
                 val microphonePermission =
                     rememberLauncherForActivityResult(
                         ActivityResultContracts.RequestPermission()
@@ -2756,6 +2819,71 @@ class MainActivity :
                             history.lastIndex
                         )
                     }
+                }
+
+                val restoreToConfirm = pendingBackupRestore
+                if (restoreToConfirm != null) {
+                    AlertDialog(
+                        onDismissRequest = { pendingBackupRestore = null },
+                        title = { Text("Restore Astra data?") },
+                        text = {
+                            Text(
+                                restoreToConfirm.preview() +
+                                "\n\nRestoring replaces existing saved chat, notes, tasks, habits, " +
+                                "shopping lists and preferences. This action cannot be undone. " +
+                                "Ensure the source file is trustworthy."
+                            )
+                        },
+                        confirmButton = {
+                            TextButton(
+                                onClick = {
+                                    pendingBackupRestore = null
+                                    researchScope.launch {
+                                        try {
+                                            withContext(Dispatchers.IO) {
+                                                storage.restoreBackup(restoreToConfirm)
+                                            }
+                                            history.clear()
+                                            history.addAll(storage.loadHistory())
+                                            if (history.isEmpty()) {
+                                                history.add(ChatMessage("Astra", WELCOME))
+                                            }
+                                            notes.clear()
+                                            notes.addAll(storage.loadNotes())
+                                            tasks.clear()
+                                            tasks.addAll(storage.loadTasks())
+                                            completed.clear()
+                                            completed.addAll(storage.loadCompletedTasks())
+                                            autoSendVoice = storage.getBoolean("auto_send_voice")
+                                            speakResponses = storage.getBoolean("speak_responses")
+                                            localOnlyTts = storage.getBoolean("local_only_tts", true)
+                                            allowSystemSpeech = storage.getBoolean("allow_system_speech")
+                                            speechLanguage = SpeechLanguage.fromTag(
+                                                storage.getString("speech_language", "en-US")
+                                            )
+                                            tab = 4
+                                            Toast.makeText(
+                                                this@MainActivity,
+                                                "Astra data restored.",
+                                                Toast.LENGTH_LONG
+                                            ).show()
+                                        } catch (error: Exception) {
+                                            Toast.makeText(
+                                                this@MainActivity,
+                                                error.message ?: "Could not restore backup.",
+                                                Toast.LENGTH_LONG
+                                            ).show()
+                                        }
+                                    }
+                                }
+                            ) { Text("Restore data") }
+                        },
+                        dismissButton = {
+                            TextButton(
+                                onClick = { pendingBackupRestore = null }
+                            ) { Text("Cancel") }
+                        }
+                    )
                 }
 
                 if (showClearDialog) {
