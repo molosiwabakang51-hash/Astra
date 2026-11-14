@@ -77,7 +77,7 @@ jobs:
           }
           mkdir -p ../dist
           cp "$apk" "../dist/Astra-v0.11.1-FULL-offline-arm64-debug.apk"
-          echo "Verified installable FULL APK identity: Astra v0.11.1 (17), offline ARM64"
+          echo "Verified installable FULL APK identity: Astra v0.11.1 (18), offline ARM64"
 
       - name: Inspect debug APK composition
         working-directory: android
