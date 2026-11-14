@@ -39,6 +39,7 @@ internal object AstraDeck {
     val prompts = listOf(
         "Mission control",
         "What's next",
+        "Memory overview",
         "Show tasks",
         "Plan my day",
         "Russian quiz",
