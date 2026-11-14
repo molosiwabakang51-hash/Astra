@@ -33,6 +33,11 @@ import androidx.compose.material3.*
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.ui.platform.LocalContentColor
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.draw.alpha
 import androidx.compose.runtime.*
@@ -150,6 +155,35 @@ private class AstraStorage(
             "astra",
             Context.MODE_PRIVATE
         )
+
+    // Archived chats are stored separately so legacy "history" stays compatible.
+    // Each archived entry contains an immutable snapshot of its messages.
+    fun loadChatArchive(): List<Pair<String, List<ChatMessage>>> = try {
+        val array = JSONArray(prefs.getString("chat_archive", "[]"))
+        (0 until array.length()).map { index ->
+            val item = array.getJSONObject(index)
+            val messages = item.getJSONArray("messages")
+            item.optString("title", "Conversation") to
+                (0 until messages.length()).map { messageIndex ->
+                    val message = messages.getJSONObject(messageIndex)
+                    ChatMessage(message.optString("role"), message.optString("text"))
+                }
+        }
+    } catch (_: Exception) {
+        emptyList()
+    }
+
+    fun saveChatArchive(chats: List<Pair<String, List<ChatMessage>>>) {
+        val array = JSONArray()
+        chats.takeLast(60).forEach { (title, messages) ->
+            val entries = JSONArray()
+            messages.takeLast(MAX_HISTORY).forEach { message ->
+                entries.put(JSONObject().put("role", message.role).put("text", message.text))
+            }
+            array.put(JSONObject().put("title", title.take(100)).put("messages", entries))
+        }
+        prefs.edit().putString("chat_archive", array.toString()).apply()
+    }
 
     fun loadHistory(): List<ChatMessage> {
 
@@ -2282,6 +2316,14 @@ class MainActivity :
                     }
                 }
 
+                val archivedChats = remember {
+                    mutableStateListOf<Pair<String, List<ChatMessage>>>().apply {
+                        addAll(storage.loadChatArchive())
+                    }
+                }
+                var showChatSwitcher by remember { mutableStateOf(false) }
+                var dockExpanded by remember { mutableStateOf(false) }
+
                 val notes = remember {
 
                     mutableStateListOf<String>().apply {
@@ -2434,6 +2476,26 @@ class MainActivity :
                         tasks.toList(),
                         completed.toList()
                     )
+                }
+
+                fun archiveCurrentChat() {
+                    if (history.any { it.role == "You" }) {
+                        val title = history.firstOrNull { it.role == "You" }
+                            ?.text?.take(45)?.ifBlank { "Conversation" } ?: "Conversation"
+                        archivedChats.add(0, title to history.toList())
+                        while (archivedChats.size > 60) archivedChats.removeAt(archivedChats.lastIndex)
+                        storage.saveChatArchive(archivedChats.toList())
+                    }
+                }
+
+                fun beginNewChat() {
+                    archiveCurrentChat()
+                    history.clear()
+                    history.add(ChatMessage("Astra", WELCOME))
+                    dialogue.reset()
+                    dialogueAwaiting = false
+                    persist()
+                    tab = 0
                 }
 
                 fun copyText(
@@ -2906,6 +2968,45 @@ class MainActivity :
                     )
                 }
 
+                if (showChatSwitcher) {
+                    AlertDialog(
+                        onDismissRequest = { showChatSwitcher = false },
+                        title = { Text("Conversations") },
+                        text = {
+                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Text("Switch between saved conversations without deleting them.")
+                                TextButton(onClick = {
+                                    showChatSwitcher = false
+                                    beginNewChat()
+                                }) { Text("＋ New conversation") }
+                                archivedChats.take(30).forEachIndexed { index, chat ->
+                                    OutlinedButton(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        onClick = {
+                                            archiveCurrentChat()
+                                            val selected = archivedChats.getOrNull(index)
+                                            if (selected != null) {
+                                                archivedChats.removeAt(index)
+                                                history.clear()
+                                                history.addAll(selected.second)
+                                                storage.saveChatArchive(archivedChats.toList())
+                                                dialogue.reset()
+                                                dialogueAwaiting = false
+                                                persist()
+                                                tab = 0
+                                            }
+                                            showChatSwitcher = false
+                                        }
+                                    ) { Text(chat.first, maxLines = 1) }
+                                }
+                            }
+                        },
+                        confirmButton = {
+                            TextButton(onClick = { showChatSwitcher = false }) { Text("Close") }
+                        }
+                    )
+                }
+
                 if (showClearDialog) {
 
                     AlertDialog(
@@ -3207,7 +3308,14 @@ class MainActivity :
 
                                                 showMenu = false
 
-                                                showClearDialog = true
+                                                beginNewChat()
+                                            }
+                                        )
+                                        DropdownMenuItem(
+                                            text = { Text("Switch conversations") },
+                                            onClick = {
+                                                showMenu = false
+                                                showChatSwitcher = true
                                             }
                                         )
                                     }
@@ -3218,37 +3326,40 @@ class MainActivity :
 
                     bottomBar = {
 
-                        NavigationBar {
-
-                            listOf(
-                                "Chat",
-                                "Tasks",
-                                "Notes",
-                                "Tools",
-                                "Settings"
-                            ).forEachIndexed { index, title ->
-
-                                NavigationBarItem(
-                                    selected = tab == index,
-                                    onClick = {
-                                        tab = index
-                                    },
-                                    icon = {
-                                        Text(
-                                            listOf(
-                                                "✦",
-                                                "✓",
-                                                "▤",
-                                                "⌘",
-                                                "⚙"
-                                            )[index]
-                                        )
-                                    },
-                                    label = {
-                                        Text(title)
-                                    }
-                                )
-                            }
+                        val dockHeight by animateDpAsState(
+                            targetValue = if (dockExpanded) 92.dp else 58.dp,
+                            animationSpec = tween(260),
+                            label = "dockHeight"
+                        )
+                        NavigationBar(
+                            modifier = Modifier.height(dockHeight),
+                            containerColor = Color(0xFF151B29)
+                        ) {
+                            listOf("Chat", "Tasks", "Notes", "Tools", "Settings")
+                                .forEachIndexed { index, title ->
+                                    NavigationBarItem(
+                                        selected = tab == index,
+                                        onClick = {
+                                            if (tab == index) dockExpanded = !dockExpanded
+                                            else {
+                                                tab = index
+                                                dockExpanded = true
+                                            }
+                                        },
+                                        icon = {
+                                            Text(
+                                                listOf("✦", "✓", "▤", "⌘", "⚙")[index],
+                                                style = MaterialTheme.typography.titleLarge
+                                            )
+                                        },
+                                        label = {
+                                            androidx.compose.animation.AnimatedVisibility(
+                                                visible = dockExpanded
+                                            ) { Text(title) }
+                                        },
+                                        alwaysShowLabel = false
+                                    )
+                                }
                         }
                     }
 
