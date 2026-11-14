@@ -2517,6 +2517,7 @@ class MainActivity :
                 }
 
                 fun startNewConversation() {
+                    interruptOfflineForTransition()
                     val nextArchive = AstraChatLibrary.archive(
                         archivedChats.toList(), currentArchiveRecord()
                     )
@@ -2529,7 +2530,6 @@ class MainActivity :
                     storage.saveArchivedChats(nextArchive)
                     archivedChats.clear()
                     archivedChats.addAll(nextArchive)
-                    interruptOfflineForTransition()
                     chatGeneration++
                     activeChatTitle = ""
                     storage.setString("astra_active_chat_title", "")
@@ -2545,6 +2545,7 @@ class MainActivity :
                 }
 
                 fun switchToConversation(chat: AstraChatArchive.Chat) {
+                    interruptOfflineForTransition()
                     val next = AstraChatLibrary.activate(
                         archivedChats.toList(), chat.id, currentArchiveRecord()
                     ) ?: return
@@ -2553,7 +2554,6 @@ class MainActivity :
                     storage.saveArchivedChats(next.archived)
                     archivedChats.clear()
                     archivedChats.addAll(next.archived)
-                    interruptOfflineForTransition()
                     chatGeneration++
                     activeChatTitle = next.active.title
                     storage.setString("astra_active_chat_title", activeChatTitle)
@@ -3221,6 +3221,7 @@ class MainActivity :
                             TextButton(
                                 onClick = {
                                     pendingBackupRestore = null
+                                    interruptOfflineForTransition()
                                     researchScope.launch {
                                         try {
                                             withContext(Dispatchers.IO) {
@@ -3249,8 +3250,7 @@ class MainActivity :
                                             speechLanguage = SpeechLanguage.fromTag(
                                                 storage.getString("speech_language", "en-US")
                                             )
-                                            interruptOfflineForTransition()
-                    chatGeneration++
+                                            chatGeneration++
                                             dialogue.reset()
                                             dialogueAwaiting = false
                                             tab = 4
@@ -3577,7 +3577,7 @@ class MainActivity :
 
                             TextButton(
                                 onClick = {
-
+                                    interruptOfflineForTransition()
                                     history.clear()
 
                                     history.add(
@@ -3591,8 +3591,7 @@ class MainActivity :
 
                                     persist()
 
-                                    interruptOfflineForTransition()
-                    chatGeneration++
+                                    chatGeneration++
                                     dialogue.reset()
                                     dialogueAwaiting = false
                                     showClearDialog = false
