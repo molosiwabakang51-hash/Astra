@@ -152,7 +152,7 @@ internal class AstraOnDeviceBrain(private val context: Context) {
         verifiedFile?.takeIf { it.isFile }?.let { return it }
         val dir = File(context.noBackupFilesDir, "offline-models")
         require(dir.isDirectory || dir.mkdirs()) { "Cannot create private model storage." }
-        val target = File(dir, ASSET_NAME)
+        val target = AstraModelStorage.activeModel(dir, ASSET_NAME)
         if (target.exists() && target.length() >= MIN_SIZE_BYTES &&
             sha256(target).equals(MODEL_SHA256, ignoreCase = true)
         ) {
@@ -168,7 +168,8 @@ internal class AstraOnDeviceBrain(private val context: Context) {
                     "Use Wi-Fi once for the model; future app updates are small."
             )
         }
-        if (target.exists()) target.delete()
+        // Keep any existing (even damaged) file until the bundled
+        // replacement passes its SHA-256 check.
         val free = StatFs(dir.absolutePath).availableBytes
         require(free >= MIN_SIZE_BYTES + DISK_HEADROOM_BYTES) {
             "Not enough free phone storage for Astra's bundled offline model."
@@ -193,7 +194,7 @@ internal class AstraOnDeviceBrain(private val context: Context) {
             require(temp.length() >= MIN_SIZE_BYTES &&
                 sha256(temp).equals(MODEL_SHA256, ignoreCase = true)
             ) { "The bundled model failed its integrity check." }
-            require(temp.renameTo(target)) { "Could not prepare the bundled model." }
+            AstraModelStorage.installVerified(temp, target)
             verifiedFile = target
             return target
         } finally {
