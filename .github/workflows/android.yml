@@ -42,6 +42,83 @@ jobs:
             gradle --no-daemon testDebugUnitTest assembleDebug
           fi
 
+      - name: Inspect debug APK composition
+        working-directory: android
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from collections import defaultdict
+          from pathlib import Path
+          from zipfile import ZipFile
+          import os
+
+          apk = Path("app/build/outputs/apk/debug/app-debug.apk")
+          if not apk.is_file():
+              raise SystemExit("Expected debug APK is missing: " + str(apk))
+
+          total = apk.stat().st_size
+          with ZipFile(apk) as archive:
+              files = [entry for entry in archive.infolist() if not entry.is_dir()]
+
+          groups = defaultdict(int)
+          for entry in files:
+              name = entry.filename
+              if name.endswith(".dex"):
+                  group = "DEX bytecode"
+              elif name.startswith("lib/"):
+                  group = "Native libraries"
+              elif name.startswith(("res/", "resources.arsc")):
+                  group = "Android resources"
+              elif name.startswith("assets/"):
+                  group = "Bundled assets"
+              elif name.startswith("META-INF/"):
+                  group = "Signing metadata"
+              else:
+                  group = "Manifest and other"
+              groups[group] += entry.compress_size
+
+          fmt = lambda n: f"{n / (1024 * 1024):.2f} MiB"
+          lines = [
+              "# Astra debug APK size analysis",
+              "",
+              f"APK: `{apk.name}`",
+              f"APK file size: **{fmt(total)}** ({total:,} bytes)",
+              "",
+              "## Compressed size by category",
+              "",
+              "| Category | Size |",
+              "| --- | ---: |",
+          ]
+          for group, size in sorted(groups.items(), key=lambda item: -item[1]):
+              lines.append(f"| {group} | {fmt(size)} |")
+          lines += [
+              "",
+              "## 15 largest entries in the APK",
+              "",
+              "| Entry | Compressed size |",
+              "| --- | ---: |",
+          ]
+          for entry in sorted(files, key=lambda item: -item.compress_size)[:15]:
+              lines.append(f"| `{entry.filename}` | {fmt(entry.compress_size)} |")
+
+          lines += [
+              "",
+              "This is the **debug** build. Its size does not indicate whether",
+              "a neural language model is included. Astra currently connects",
+              "to an optional model hosted outside the APK.",
+              "",
+          ]
+          report = "\n".join(lines) + "\n"
+          output = Path("app/build/reports/apk-size-report.md")
+          output.parent.mkdir(parents=True, exist_ok=True)
+          output.write_text(report, encoding="utf-8")
+          print(report)
+          if os.environ.get("GITHUB_STEP_SUMMARY"):
+              with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as summary:
+                  summary.write(report)
+          PY
+
       - name: Smoke test release signing with disposable CI-only key
         working-directory: android
         shell: bash
@@ -73,6 +150,14 @@ jobs:
           "$signer" verify "$signed"
           # Never distribute this throwaway-key release APK.
           rm -f "$signed" "$RUNNER_TEMP/astra-ci-test.jks"
+
+      - name: Publish APK size analysis
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Astra-APK-Size-Report
+          path: android/app/build/reports/apk-size-report.md
+          if-no-files-found: error
 
       - name: Publish debug APK
         if: success()
