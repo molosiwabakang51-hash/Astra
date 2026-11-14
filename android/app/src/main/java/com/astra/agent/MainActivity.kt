@@ -2638,6 +2638,7 @@ class MainActivity :
                     activeResearchCount++
 
                     val job = researchScope.launch {
+                        val runningJob = coroutineContext[kotlinx.coroutines.Job]
                         fun stillActiveBubble(): Boolean =
                             chatGeneration == generation &&
                                 target in history.indices &&
@@ -2683,7 +2684,8 @@ class MainActivity :
                             }
                             throw cancel
                         } finally {
-                            offlineJob = null
+                            // A cancelled old chat must not clear a newer job.
+                            if (offlineJob === runningJob) offlineJob = null
                             activeResearchCount = (activeResearchCount - 1).coerceAtLeast(0)
                         }
                     }
