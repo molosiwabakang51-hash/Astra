@@ -99,6 +99,15 @@ class AstraWorkflowTest {
         }
     }
 
+    @Test fun unrelatedConversationExpiresOldPendingPreview() {
+        val old = before()
+        val session = AstraWorkflowSession()
+        assertTrue(session.handle("workflow: add task a", old)!!.text.contains("PREVIEW"))
+        assertNull(session.handle("russian", old))
+        assertNull(session.handle("confirm workflow", old)!!.apply)
+        assertEquals(before(), old)
+    }
+
     @Test fun cancelledAndStalePlansCannotMakeChanges() {
         val session = AstraWorkflowSession()
         val old = before()
