@@ -3487,7 +3487,7 @@ class MainActivity :
                                 }
                             }
                         }
-                    },
+                    }
 
                 ) { padding ->
 
