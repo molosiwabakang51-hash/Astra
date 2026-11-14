@@ -137,6 +137,7 @@ class AstraDialogueTest {
         val notes = mutableListOf<String>()
         val done = mutableListOf<String>()
         var confirmed = 0
+        var created = 25
         repeat(20_000) { step ->
             when (random.nextInt(5)) {
                 0 -> {
@@ -161,16 +162,17 @@ class AstraDialogueTest {
                     dialogue.respond("add task", tasks, notes, done)
                     assertTrue(dialogue.respond("New item $step", tasks, notes, done)!!
                         .contains("Task added"))
+                    created++
                 }
                 3 -> {
                     dialogue.respond("remember", tasks, notes, done)
-                    dialogue.respond("Note $step", tasks, notes, done)
+                    dialogue.respond("Observation $step", tasks, notes, done)
                 }
                 else -> {
                     dialogue.respond("show tasks", tasks, notes, done)
                 }
             }
-            assertEquals(step.toString(), 25 + (tasks.size - 25) + confirmed - confirmed, tasks.size - done.size + done.size + 25 - 25) // same value sanity
+            assertEquals("step=$step", created, tasks.size + done.size)
             assertEquals("step=$step", confirmed, done.size)
         }
         assertTrue(notes.isNotEmpty())
