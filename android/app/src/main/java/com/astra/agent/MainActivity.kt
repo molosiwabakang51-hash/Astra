@@ -1680,6 +1680,10 @@ private class AstraProcessor(
             )
         }
 
+        BondAnalytics.respond(clean)?.let {
+            return AssistantResult(it)
+        }
+
         FinanceEngine.process(clean)?.let {
 
             return AssistantResult(it)
@@ -1746,6 +1750,9 @@ private class AstraProcessor(
                 combinations 5 3
 
                 FINANCE
+                bond analyze 1000 5 6 10 2
+                Bond inputs: face, annual coupon %, YTM %, years, frequency
+                Output: price, duration, convexity, DV01
                 simple interest 10000 10 2
                 compound interest 10000 10 2 12
                 present value 10000 10 5

@@ -44,6 +44,7 @@ internal object AstraDeck {
         "Plan my day",
         "Russian quiz",
         "Show notes",
+        "Bond analyze 1000 5 6 10 2",
         "Research the solar system",
         "Help"
     )
