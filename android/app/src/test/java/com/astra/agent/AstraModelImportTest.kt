@@ -58,6 +58,14 @@ class AstraModelImportTest {
         assertEquals(gguf.size.toLong(), count)
     }
 
+    @Test fun acceptsAdvancedQwen3ModelFromLocalArchive() = runBlocking {
+        val gguf = "GGUF advanced fixture".toByteArray()
+        val archive = zip("Qwen3-1.7B-Q4_K_M.gguf" to gguf)
+        val (output, count) = extract(archive)
+        assertArrayEquals(gguf, output)
+        assertEquals(gguf.size.toLong(), count)
+    }
+
     @Test fun archiveWithoutAstraModelIsRejected() = runBlocking {
         val archive = zip("assets/wrong.gguf" to byteArrayOf(1, 2, 3))
         val error = runCatching { extract(archive) }.exceptionOrNull()
