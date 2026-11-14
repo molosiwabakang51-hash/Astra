@@ -7,5 +7,6 @@ internal object AstraHelp {
             "Try 'russian', 'explain bond duration', 'calculate 12 * 5', " +
             "'add milk to shopping list', or 'what should I do next'. " +
             "With a local Qwen3 model installed, you can also ask open-ended " +
-            "questions naturally. Type 'commands' for the full reference."
+            "questions naturally. Type 'workflow help' to plan several actions " +
+            "together, or 'commands' for the full reference."
 }
