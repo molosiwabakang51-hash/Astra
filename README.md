@@ -28,6 +28,9 @@ Qwen3 0.6B (Q4_K_M) is **approximately 484 MB**. The final debug APK should ther
 - **First message:** The built-in model is verified and copied once into Astra's private no-backup storage because the Android engine loads models from a file path. Leave at least **1 GB additional storage** available for this extraction and installation. Later requests do not require a model download.
 - **Privacy:** The model runs on the same phone even in airplane mode. Explicit Wikipedia research and Android's optional speech services are separate, and may use network access. No AI chat text is transmitted to an external model service.
 - **Quality:** A 0.6B model is substantially less capable than large hosted models; local command handling and deterministic calculators retain priority.
+- **On-phone self-test:** Open the Astra-logo menu → Settings → **Test on-device AI**. With airplane mode enabled, the test prompts the packaged Qwen3 model without using the network and shows a response or the actual error and elapsed time. This is a practical device-level acceptance check, not a benchmark.
+- **Open-source notices:** Model Apache 2.0 license and native inference MIT/dependency licenses are bundled inside the APK under `assets/open_source_licenses/`.
+
 
 ### Reproducible offline APK build
 
