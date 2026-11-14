@@ -2344,6 +2344,7 @@ class MainActivity :
                 var dialogueAwaiting by remember {
                     mutableStateOf(false)
                 }
+                var chatGeneration by remember { mutableIntStateOf(0) }
                 var cloudEnabled by remember {
                     mutableStateOf(storage.getBoolean("cloud_ai_enabled"))
                 }
@@ -2488,6 +2489,7 @@ class MainActivity :
                 }
 
                 fun startNewConversation() {
+                    chatGeneration++
                     archiveCurrentConversation()
                     history.clear()
                     history.add(ChatMessage("Astra", WELCOME))
@@ -2501,6 +2503,7 @@ class MainActivity :
                 }
 
                 fun switchToConversation(chat: AstraChatArchive.Chat) {
+                    chatGeneration++
                     archiveCurrentConversation()
                     archivedChats.removeAll { it.id == chat.id }
                     storage.saveArchivedChats(archivedChats)
@@ -2606,6 +2609,7 @@ class MainActivity :
                             history.add(ChatMessage("You", message))
                             history.add(ChatMessage("Astra", placeholder))
                             val target = history.lastIndex
+                            val requestGeneration = chatGeneration
                             persist()
                             activeResearchCount++
                             researchScope.launch {
@@ -2615,7 +2619,8 @@ class MainActivity :
                                     "Cloud AI unavailable: " + (error.message ?: "Network error") +
                                         ". Offline commands remain available."
                                 }
-                                if (target in history.indices &&
+                                if (chatGeneration == requestGeneration &&
+                                    target in history.indices &&
                                     history[target].text == placeholder) {
                                     history[target] = ChatMessage("Astra", response)
                                     persist()
@@ -2640,6 +2645,7 @@ class MainActivity :
                             history.removeAt(0)
                         }
                         val placeholderIndex = history.lastIndex
+                        val researchGeneration = chatGeneration
                         persist()
                         input = ""
                         keyboard?.hide()
@@ -2650,6 +2656,7 @@ class MainActivity :
                                 val answer = research.search(researchTopic)
                                 // Don't restore results after a conversation clear.
                                 if (
+                                    chatGeneration == researchGeneration &&
                                     placeholderIndex in history.indices &&
                                     history[placeholderIndex].role == "Astra" &&
                                     history[placeholderIndex].text == placeholder
@@ -2673,6 +2680,55 @@ class MainActivity :
                             completed
                         )
                     dialogueAwaiting = dialogue.awaitingResponse
+
+                    if (AstraAiRouting.shouldUseCloud(
+                            enabled = cloudEnabled,
+                            endpointValid = AstraCloudBrain.isSafeEndpoint(cloudEndpoint),
+                            assistantText = result.text,
+                            sensitive = result.sensitive,
+                            hasAction = result.action != AssistantAction.NONE
+                        )
+                    ) {
+                        val context = history.takeLast(14).mapNotNull {
+                            val role = when (it.role) {
+                                "You" -> "user"
+                                "Astra" -> "assistant"
+                                else -> null
+                            }
+                            role?.let { r -> AstraCloudBrain.Turn(r, it.text) }
+                        } + AstraCloudBrain.Turn("user", message)
+                        val placeholder = "ASTRA // THINKING..."
+                        history.add(ChatMessage("You", message))
+                        history.add(ChatMessage("Astra", placeholder))
+                        val target = history.lastIndex
+                        val requestGeneration = chatGeneration
+                        val endpointSnapshot = cloudEndpoint
+                        persist()
+                        activeResearchCount++
+                        researchScope.launch {
+                            try {
+                                val response = try {
+                                    cloudBrain.reply(endpointSnapshot, context)
+                                } catch (error: Exception) {
+                                    "Cloud AI unavailable: " +
+                                        (error.message ?: "Network error") +
+                                        ". Offline commands remain available."
+                                }
+                                if (chatGeneration == requestGeneration &&
+                                    target in history.indices &&
+                                    history[target].text == placeholder) {
+                                    history[target] = ChatMessage("Astra", response)
+                                    persist()
+                                }
+                            } finally {
+                                activeResearchCount =
+                                    (activeResearchCount - 1).coerceAtLeast(0)
+                            }
+                        }
+                        input = ""
+                        keyboard?.hide()
+                        return
+                    }
 
                     if (!result.sensitive) {
 
@@ -3014,6 +3070,7 @@ class MainActivity :
                                             speechLanguage = SpeechLanguage.fromTag(
                                                 storage.getString("speech_language", "en-US")
                                             )
+                                            chatGeneration++
                                             dialogue.reset()
                                             dialogueAwaiting = false
                                             tab = 4
@@ -3116,6 +3173,7 @@ class MainActivity :
 
                                     persist()
 
+                                    chatGeneration++
                                     dialogue.reset()
                                     dialogueAwaiting = false
                                     showClearDialog = false
@@ -3930,9 +3988,11 @@ class MainActivity :
                                             modifier = Modifier.fillMaxWidth(),
                                             singleLine = true
                                         )
-                                        Text("Use: ask ai explain bond convexity. " +
-                                            "Other commands remain offline. " +
-                                            "Gateway deployment and authentication are required.")
+                                        Text("When enabled, unsupported open-ended questions " +
+                                            "automatically use the configured AI gateway. " +
+                                            "You can also use: ask ai explain bond convexity. " +
+                                            "Offline tools stay local. Gateway authentication " +
+                                            "and deployment are required.")
                                         HorizontalDivider()
                                     }
 
