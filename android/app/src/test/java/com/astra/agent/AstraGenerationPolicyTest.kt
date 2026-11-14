@@ -29,7 +29,7 @@ class AstraGenerationPolicyTest {
 
     @Test fun limitsAreAlwaysBoundedAcrossTenThousandUntrustedQuestions() {
         val rng = Random(17171)
-        val alphabet = "abc?!@#$中文Привет 12345\n\t🚀"
+        val alphabet = "abc?!@#\$中文Привет 12345\n\t🚀"
         repeat(10_000) {
             val input = buildString {
                 repeat(rng.nextInt(2500)) { append(alphabet[rng.nextInt(alphabet.length)]) }
