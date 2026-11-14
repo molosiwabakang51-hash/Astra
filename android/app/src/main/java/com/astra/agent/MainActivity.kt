@@ -2908,6 +2908,16 @@ class MainActivity :
                 }
 
                 Scaffold(
+                    modifier = Modifier.background(
+                        androidx.compose.ui.graphics.Brush.verticalGradient(
+                            listOf(
+                                Color(0xFF080E19),
+                                Color(0xFF0A1424),
+                                Color(0xFF070B13)
+                            )
+                        )
+                    ),
+                    containerColor = Color.Transparent,
 
                     topBar = {
 
@@ -2925,17 +2935,19 @@ class MainActivity :
                                 Arrangement.SpaceBetween
                         ) {
 
-                            Text(
-                                when (tab) {
-                                    0 -> "Astra"
-                                    1 -> "Tasks"
-                                    2 -> "Notes"
-                                    3 -> "Tools"
-                                    else -> "Settings"
-                                },
-                                style =
-                                    MaterialTheme.typography.titleLarge
-                            )
+                            if (tab == 0) {
+                                AstraBrand(listening = listening)
+                            } else {
+                                Text(
+                                    when (tab) {
+                                        1 -> "Tasks"
+                                        2 -> "Notes"
+                                        3 -> "Tools"
+                                        else -> "Settings"
+                                    },
+                                    style = MaterialTheme.typography.titleLarge
+                                )
+                            }
 
                             if (tab == 0) {
 
