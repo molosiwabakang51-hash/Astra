@@ -79,30 +79,56 @@ internal class AstraOnDeviceBrain(private val context: Context) {
                 if (verifiedFile == null) {
                     onPartial("Verifying the local offline model...")
                 }
-                val modelPath = when (AstraModelChoice.choose(
+                val candidates = AstraModelChoice.candidates(
                     advancedAvailable = AstraModelImport.advancedInstalled(context) ||
                         isBundled(AstraModelImport.ADVANCED_NAME),
                     compactAvailable = AstraModelImport.modelFile(context).isFile ||
                         isBundled(ASSET_NAME)
-                )) {
-                    AstraModelChoice.Variant.ADVANCED -> ensureModel(
-                        AstraModelImport.ADVANCED_NAME,
-                        AstraModelImport.ADVANCED_SHA256,
-                        1_150_000_000L
-                    )
-                    AstraModelChoice.Variant.COMPACT -> ensureModel(
-                        ASSET_NAME, MODEL_SHA256, MIN_SIZE_BYTES
-                    )
-                    AstraModelChoice.Variant.NONE -> error(
-                        "No local language model installed. Open Settings to get the " +
-                            "free Qwen3 1.7B model and import it once."
+                )
+                if (candidates.isEmpty()) {
+                    error(
+                        "No local language model installed. Open Settings to import " +
+                            "the free Qwen3 1.7B model once."
                     )
                 }
-                var current = engine
-                if (current == null) {
-                    current = AiChat.getInferenceEngine(context.applicationContext)
-                    engine = current
+                // A model file's size alone cannot prove integrity. If the
+                // preferred local file is truncated or corrupted, try the
+                // compact GGUF instead of disabling chat.
+                var selected: File? = null
+                var lastPreparationError: Exception? = null
+                for (candidate in candidates) {
+                    try {
+                        selected = when (candidate) {
+                            AstraModelChoice.Variant.ADVANCED -> ensureModel(
+                                AstraModelImport.ADVANCED_NAME,
+                                AstraModelImport.ADVANCED_SHA256,
+                                1_150_000_000L
+                            )
+                            AstraModelChoice.Variant.COMPACT -> ensureModel(
+                                ASSET_NAME, MODEL_SHA256, MIN_SIZE_BYTES
+                            )
+                            AstraModelChoice.Variant.NONE -> null
+                        }
+                        if (selected != null) break
+                    } catch (cancel: kotlinx.coroutines.CancellationException) {
+                        throw cancel
+                    } catch (failure: Exception) {
+                        lastPreparationError = failure
+                        if (candidate == AstraModelChoice.Variant.ADVANCED &&
+                            AstraModelChoice.Variant.COMPACT in candidates
+                        ) {
+                            onPartial("Advanced model unavailable. Checking compact offline fallback...")
+                        }
+                    }
                 }
+                var modelPath = selected ?: throw IllegalStateException(
+                    "No verified local language model could be prepared. " +
+                        "Re-import a model from Settings.",
+                    lastPreparationError
+                )
+                val current = engine ?: AiChat.getInferenceEngine(
+                    context.applicationContext
+                ).also { engine = it }
                 // Upstream initializes JNI asynchronously. Wait for the engine
                 // to be ready instead of racing model loading against init.
                 val initialized = withTimeout(30_000L) {
@@ -125,19 +151,37 @@ internal class AstraOnDeviceBrain(private val context: Context) {
                     ) || loadedModelPath != modelPath.absolutePath
                 ) {
                     onPartial("Loading the language model on this phone...")
-                    // The native engine retains chat context. Always unload
-                    // between conversations, including activity recreation.
-                    if (current.state.value is InferenceEngine.State.ModelReady) {
-                        current.cleanUp()
+                    suspend fun loadPreparedModel(path: File) {
+                        // Unload stale native KV-cache when changing conversations
+                        // or switching model weights. No network call is involved.
+                        if (current.state.value is InferenceEngine.State.ModelReady) {
+                            current.cleanUp()
+                        }
+                        current.loadModel(path.absolutePath)
+                        current.setSystemPrompt(AstraConversationContext.systemPrompt())
+                        loadedModelPath = path.absolutePath
+                        restoringConversation = true
+                        session.markLoaded(conversationGeneration)
                     }
-                    current.loadModel(modelPath.absolutePath)
-                    // Never place previous user text or model replies inside the
-                    // higher-priority system prompt. Reloaded sessions receive
-                    // quoted history once through a bounded user-level prompt.
-                    current.setSystemPrompt(AstraConversationContext.systemPrompt())
-                    loadedModelPath = modelPath.absolutePath
-                    restoringConversation = true
-                    session.markLoaded(conversationGeneration)
+                    try {
+                        loadPreparedModel(modelPath)
+                    } catch (cancel: kotlinx.coroutines.CancellationException) {
+                        throw cancel
+                    } catch (loadError: Exception) {
+                        // Native model load may fail without crashing Android.
+                        // A valid compact GGUF can then recover conversation.
+                        session.invalidate()
+                        loadedModelPath = null
+                        if (modelPath.name != AstraModelImport.ADVANCED_NAME ||
+                            AstraModelChoice.Variant.COMPACT !in candidates
+                        ) throw loadError
+                        onPartial("Advanced model failed to load. Trying compact offline fallback...")
+                        // JNI's Error state is resettable, but a process-level
+                        // native crash cannot be recovered from Kotlin.
+                        current.cleanUp()
+                        modelPath = ensureModel(ASSET_NAME, MODEL_SHA256, MIN_SIZE_BYTES)
+                        loadPreparedModel(modelPath)
+                    }
                 }
 
                 val answer = StringBuilder()

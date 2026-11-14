@@ -15,10 +15,16 @@ internal object AstraModelChoice {
             else -> null
         }
 
-    fun choose(advancedAvailable: Boolean, compactAvailable: Boolean): Variant =
-        when {
-            advancedAvailable -> Variant.ADVANCED
-            compactAvailable -> Variant.COMPACT
-            else -> Variant.NONE
+    /**
+     * Preference order, not a guarantee that a file is valid. A candidate
+     * can fail the checksum or JNI load check and a later candidate can work.
+     */
+    fun candidates(advancedAvailable: Boolean, compactAvailable: Boolean): List<Variant> =
+        buildList {
+            if (advancedAvailable) add(Variant.ADVANCED)
+            if (compactAvailable) add(Variant.COMPACT)
         }
+
+    fun choose(advancedAvailable: Boolean, compactAvailable: Boolean): Variant =
+        candidates(advancedAvailable, compactAvailable).firstOrNull() ?: Variant.NONE
 }

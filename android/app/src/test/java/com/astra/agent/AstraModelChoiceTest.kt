@@ -40,4 +40,25 @@ class AstraModelChoiceTest {
             AstraModelChoice.choose(advancedAvailable = false, compactAvailable = false)
         )
     }
+    @Test fun preferredModelIsFollowedByOfflineRecoveryCandidate() {
+        assertEquals(
+            listOf(AstraModelChoice.Variant.ADVANCED, AstraModelChoice.Variant.COMPACT),
+            AstraModelChoice.candidates(advancedAvailable = true, compactAvailable = true)
+        )
+    }
+
+    @Test fun candidateListNeverContainsUnavailableModels() {
+        assertEquals(
+            listOf(AstraModelChoice.Variant.COMPACT),
+            AstraModelChoice.candidates(advancedAvailable = false, compactAvailable = true)
+        )
+        assertEquals(
+            listOf(AstraModelChoice.Variant.ADVANCED),
+            AstraModelChoice.candidates(advancedAvailable = true, compactAvailable = false)
+        )
+        assertEquals(
+            emptyList<AstraModelChoice.Variant>(),
+            AstraModelChoice.candidates(advancedAvailable = false, compactAvailable = false)
+        )
+    }
 }
