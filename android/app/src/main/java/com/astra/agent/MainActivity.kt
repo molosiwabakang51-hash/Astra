@@ -2409,6 +2409,10 @@ class MainActivity :
                 var offlineModelTestRunning by remember { mutableStateOf(false) }
                 var modelImportRunning by remember { mutableStateOf(false) }
                 var modelImportStatus by remember { mutableStateOf("") }
+                var confirmOneTimeModelDownload by remember { mutableStateOf(false) }
+                var modelDownloadJob by remember {
+                    mutableStateOf<kotlinx.coroutines.Job?>(null)
+                }
 
                 var tab by remember {
                     mutableIntStateOf(0)
@@ -4090,6 +4094,75 @@ class MainActivity :
                     )
                 }
 
+                if (confirmOneTimeModelDownload) {
+                    AlertDialog(
+                        onDismissRequest = { confirmOneTimeModelDownload = false },
+                        title = { Text("Download free offline AI model?") },
+                        text = {
+                            Text(
+                                "Qwen3 1.7B requires a one-time download of about " +
+                                    "1.28 GB. Use Wi-Fi to avoid mobile data charges. " +
+                                    "The download is resumable, verified with SHA-256, " +
+                                    "and stays on your phone. Afterwards, inference " +
+                                    "is entirely offline; there is no subscription."
+                            )
+                        },
+                        dismissButton = {
+                            TextButton(onClick = {
+                                confirmOneTimeModelDownload = false
+                            }) { Text("Cancel") }
+                        },
+                        confirmButton = {
+                            TextButton(onClick = {
+                                confirmOneTimeModelDownload = false
+                                if (!modelImportRunning &&
+                                    offlineJob?.isActive != true &&
+                                    !offlineModelTestRunning
+                                ) {
+                                    modelImportRunning = true
+                                    modelImportStatus =
+                                        "Downloading free offline model; progress is saved..."
+                                    modelDownloadJob = researchScope.launch {
+                                        try {
+                                            val count = AstraModelDownload.download(
+                                                applicationContext
+                                            ) { received, expected ->
+                                                withContext(Dispatchers.Main.immediate) {
+                                                    modelImportStatus =
+                                                        "Downloading Qwen3 1.7B: " +
+                                                            (received / 1048576L) + " / " +
+                                                            (expected / 1048576L) +
+                                                            " MiB · resumable"
+                                                }
+                                            }
+                                            modelImportStatus =
+                                                "QWEN3 1.7B READY · " +
+                                                    (count / 1048576L) +
+                                                    " MiB verified on this phone. " +
+                                                    "No paid API or server is needed."
+                                        } catch (cancel: CancellationException) {
+                                            modelImportStatus =
+                                                "Download paused. Tap Get free model " +
+                                                    "again to resume from saved bytes."
+                                            throw cancel
+                                        } catch (error: Exception) {
+                                            modelImportStatus =
+                                                "Download interrupted: " +
+                                                    (error.message ?: "Check connection.") +
+                                                    " Tap Get free model to retry."
+                                        } finally {
+                                            modelImportRunning = false
+                                            modelDownloadJob = null
+                                        }
+                                    }
+                                }
+                            }) {
+                                Text("Download once")
+                            }
+                        }
+                    )
+                }
+
                 Scaffold(
                     modifier = Modifier.background(
                         androidx.compose.ui.graphics.Brush.verticalGradient(
@@ -4824,27 +4897,20 @@ class MainActivity :
                                             style = MaterialTheme.typography.bodySmall
                                         )
                                         OutlinedButton(
-                                            onClick = {
-                                                try {
-                                                    startActivity(
-                                                        Intent(
-                                                            Intent.ACTION_VIEW,
-                                                            Uri.parse(
-                                                                "https://huggingface.co/ggml-org/" +
-                                                                    "Qwen3-1.7B-GGUF/resolve/main/" +
-                                                                    "Qwen3-1.7B-Q4_K_M.gguf"
-                                                            )
-                                                        )
-                                                    )
-                                                } catch (error: Exception) {
-                                                    Toast.makeText(
-                                                        applicationContext,
-                                                        "No browser available for the model download.",
-                                                        Toast.LENGTH_LONG
-                                                    ).show()
-                                                }
+                                            enabled = !modelImportRunning &&
+                                                offlineJob?.isActive != true &&
+                                                !offlineModelTestRunning,
+                                            onClick = { confirmOneTimeModelDownload = true }
+                                        ) {
+                                            Text("Get free Qwen3 1.7B model")
+                                        }
+                                        if (modelDownloadJob?.isActive == true) {
+                                            TextButton(
+                                                onClick = { modelDownloadJob?.cancel() }
+                                            ) {
+                                                Text("Pause model download")
                                             }
-                                        ) { Text("Get free Qwen3 1.7B model") }
+                                        }
                                         OutlinedButton(
                                             enabled = !modelImportRunning &&
                                                 offlineJob?.isActive != true &&
