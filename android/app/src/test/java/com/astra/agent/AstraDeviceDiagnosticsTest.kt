@@ -8,7 +8,7 @@ import org.junit.Test
 class AstraDeviceDiagnosticsTest {
     @Test fun passStatusIncludesDurationButNotModelGeneratedText() {
         val summary = AstraDeviceDiagnostics.summarizeSelfTest(
-            "MODEL RESPONDED OFFLINE in 1337 ms: an arbitrary model response"
+            "OFFLINE TEST VERIFIED in 1337 ms: ASTRA OFFLINE"
         )
         assertEquals("PASS (1337 ms)", summary)
         assertFalse(summary.contains("arbitrary"))
@@ -26,6 +26,13 @@ class AstraDeviceDiagnosticsTest {
                 "OFFLINE TEST FAILED: private key = should_not_share"
             )
         )
+    }
+
+    @Test fun unverifiedModelOutputIsNotReportedAsPass() {
+        val summary = AstraDeviceDiagnostics.summarizeSelfTest(
+            "OFFLINE TEST UNVERIFIED: Model generated text in 500 ms but did not follow challenge."
+        )
+        assertEquals("UNVERIFIED (challenge not followed)", summary)
     }
 
     @Test fun testNotRunOrInProgressIsExplicit() {
