@@ -1,4 +1,4 @@
-# Astra — Android personal assistant (v0.9.5)
+# Astra — Android personal assistant (v0.9.6)
 
 Astra is a **local-first Android/Kotlin Jetpack Compose assistant** with a futuristic dark interface. It is being developed directly in this repository. The original **Astra-AI** repository is kept separately as a backup.
 
@@ -34,9 +34,9 @@ The generated **debug APK is for development/testing**. GitHub runners may use d
 
 ## Conversation management and privacy
 
-- Tap the **ASTRA** logo to navigate between Chat, Tasks, Notes, Tools and Settings.
-- In Chat's three-dot menu, choose **Find in chat** to search the current conversation locally and jump directly to matching messages.
-- In Chat's three-dot menu, choose **New conversation** to archive the current thread without deleting it, **Conversations** to find and switch between previous threads, or **Rename current chat** to give the active thread a custom title. In the conversation picker, search **saved chat titles and message text** with local-only matching excerpts, rename saved chats, or individually delete unwanted conversations with confirmation.
+- Tap the **ASTRA** logo for navigation and all chat options in one menu. Mission Control is shown only when requested; microphone dictation is beside the message field, so the chat takes more screen space.
+- In the Astra-logo menu, choose **Find in chat** to search the current conversation locally and jump directly to matching messages.
+- In the Astra-logo menu, choose **New conversation** to archive the current thread without deleting it, **Conversations** to find and switch between previous threads, or **Rename current chat** to give the active thread a custom title. In the conversation picker, search **saved chat titles and message text** with local-only matching excerpts, rename saved chats, or individually delete unwanted conversations with confirmation.
 - Typed or spoken `new chat` / `new conversation` now opens another conversation **without deleting the old one**. `switch chat` opens the conversation picker. `clear chat` still requires confirmation before it deletes the active history.
 - Astra keeps local conversations in app-private storage. Automatic Android system backup and device-transfer restore are disabled to reduce unintended copies of private data.
 - Astra's current local conversation archive supports **up to 40 saved threads**. When it is full, Astra does **not** delete old chats automatically. It shows a storage-management prompt instead. Switching between existing chats continues to work at capacity without dropping an unrelated conversation.
