@@ -27,6 +27,7 @@ def main():
         "Qwen is installed on device": 'AstraOnDeviceBrain(applicationContext)',
         "Unhandled chat routes to model": 'AstraOfflinePolicy.shouldUseModel(',
         "Finance explanations are wired into chat": 'AstraFinanceEducation.respond(clean)',
+        "Natural finance computations are deterministic": 'AstraNaturalFinance.respond(clean)',
         "Cross-chat memory is in local submit handler": 'AstraMemoryRecall.parse(message)',
         "Grounded Q&A stays explicitly opt-in": 'AstraGroundedMemory.parse(message)',
         "On-phone source extraction is integrated": 'AstraGroundedMemory.retrieve(',
@@ -55,8 +56,8 @@ def main():
     if "AstraModelStorage.installVerified(" not in importer or "AstraModelStorage.installVerified(" not in brain:
         raise RuntimeError("FULL and LITE model updates must use crash-safe storage")
 
-    if '?: "0.11.6"' not in config or "?: 23" not in config:
-        raise RuntimeError("Release identity is not Astra 0.11.6 (versionCode 23)")
+    if '?: "0.11.7"' not in config or "?: 24" not in config:
+        raise RuntimeError("Release identity is not Astra 0.11.7 (versionCode 24)")
     print("PASS: Astra icon menu, compact chat, offline model, version stamp")
     print("PASS: no legacy bottom tabs, top-right overflow, or obsolete fallback")
 
