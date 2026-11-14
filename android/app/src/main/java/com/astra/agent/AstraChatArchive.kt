@@ -9,7 +9,7 @@ import org.json.JSONObject
  * This preserves upgrades from all earlier Astra versions.
  */
 internal object AstraChatArchive {
-    private const val MAX_CHATS = 40
+    internal const val MAX_CHATS = 40
     private const val MAX_MESSAGES = 2_000
 
     data class Message(val role: String, val text: String)

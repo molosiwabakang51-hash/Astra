@@ -2387,6 +2387,7 @@ class MainActivity :
                     }
                 }
                 var showChatSwitcher by remember { mutableStateOf(false) }
+                var showArchiveFullDialog by remember { mutableStateOf(false) }
                 var activeChatTitle by remember {
                     mutableStateOf(storage.getString("astra_active_chat_title", ""))
                 }
@@ -2489,27 +2490,32 @@ class MainActivity :
 
                 val researchScope = rememberCoroutineScope()
 
-                fun archiveCurrentConversation() {
-                    if (history.any { it.role == "You" }) {
-                        val messages = history.map {
-                            AstraChatArchive.Message(it.role, it.text)
-                        }
-                        archivedChats.add(
-                            0,
-                            AstraChatArchive.Chat(
-                                java.util.UUID.randomUUID().toString(),
-                                activeChatTitle.ifBlank { AstraChatArchive.title(messages) },
-                                messages
-                            )
-                        )
-                        while (archivedChats.size > 40) archivedChats.removeAt(archivedChats.lastIndex)
-                        storage.saveArchivedChats(archivedChats)
+                fun currentArchiveRecord(): AstraChatArchive.Chat? {
+                    if (history.none { it.role == "You" }) return null
+                    val messages = history.map {
+                        AstraChatArchive.Message(it.role, it.text)
                     }
+                    return AstraChatArchive.Chat(
+                        java.util.UUID.randomUUID().toString(),
+                        activeChatTitle.ifBlank { AstraChatArchive.title(messages) },
+                        messages
+                    )
                 }
 
                 fun startNewConversation() {
+                    val nextArchive = AstraChatLibrary.archive(
+                        archivedChats.toList(), currentArchiveRecord()
+                    )
+                    if (nextArchive == null) {
+                        // Ask the user to manage storage; never evict history
+                        // simply because they started another conversation.
+                        showArchiveFullDialog = true
+                        return
+                    }
+                    storage.saveArchivedChats(nextArchive)
+                    archivedChats.clear()
+                    archivedChats.addAll(nextArchive)
                     chatGeneration++
-                    archiveCurrentConversation()
                     activeChatTitle = ""
                     storage.setString("astra_active_chat_title", "")
                     history.clear()
@@ -2524,15 +2530,22 @@ class MainActivity :
                 }
 
                 fun switchToConversation(chat: AstraChatArchive.Chat) {
+                    val next = AstraChatLibrary.activate(
+                        archivedChats.toList(), chat.id, currentArchiveRecord()
+                    ) ?: return
+                    // Persist the complete swap before replacing the current
+                    // transcript. No unrelated saved thread is discarded.
+                    storage.saveArchivedChats(next.archived)
+                    archivedChats.clear()
+                    archivedChats.addAll(next.archived)
                     chatGeneration++
-                    archiveCurrentConversation()
-                    archivedChats.removeAll { it.id == chat.id }
-                    storage.saveArchivedChats(archivedChats)
-                    activeChatTitle = chat.title
+                    activeChatTitle = next.active.title
                     storage.setString("astra_active_chat_title", activeChatTitle)
                     chatSearchQuery = ""
                     history.clear()
-                    history.addAll(chat.messages.map { ChatMessage(it.role, it.text) })
+                    history.addAll(next.active.messages.map {
+                        ChatMessage(it.role, it.text)
+                    })
                     if (history.isEmpty()) history.add(ChatMessage("Astra", WELCOME))
                     dialogue.reset()
                     dialogueAwaiting = false
@@ -3149,6 +3162,35 @@ class MainActivity :
                             TextButton(
                                 onClick = { pendingBackupRestore = null }
                             ) { Text("Cancel") }
+                        }
+                    )
+                }
+
+                if (showArchiveFullDialog) {
+                    AlertDialog(
+                        onDismissRequest = { showArchiveFullDialog = false },
+                        title = { Text("Conversation archive is full") },
+                        text = {
+                            Text(
+                                "You have ${AstraChatArchive.MAX_CHATS} saved conversations. " +
+                                "Astra will not delete older chats automatically. " +
+                                "Export a manual backup and delete an unwanted saved " +
+                                "conversation to make room, or switch to an existing one."
+                            )
+                        },
+                        confirmButton = {
+                            TextButton(
+                                onClick = {
+                                    showArchiveFullDialog = false
+                                    chatSearchQuery = ""
+                                    showChatSwitcher = true
+                                }
+                            ) { Text("Manage conversations") }
+                        },
+                        dismissButton = {
+                            TextButton(
+                                onClick = { showArchiveFullDialog = false }
+                            ) { Text("Stay here") }
                         }
                     )
                 }
