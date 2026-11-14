@@ -2360,6 +2360,7 @@ class MainActivity :
                 var chatGeneration by remember { mutableIntStateOf(0) }
                 val onDeviceBrain = remember { AstraOnDeviceBrain(applicationContext) }
                 var offlineJob by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
+                var offlineAnswerMessageIndex by remember { mutableIntStateOf(-1) }
                 var offlineModelTestStatus by remember { mutableStateOf("") }
                 var offlineModelTestRunning by remember { mutableStateOf(false) }
 
@@ -2495,6 +2496,26 @@ class MainActivity :
                     )
                 }
 
+                // Stop native generation before archiving or replacing the
+                // active transcript, preserving the text already generated.
+                fun interruptOfflineForTransition() {
+                    if (offlineJob?.isActive == true) {
+                        offlineJob?.cancel()
+                        val messageIndex = offlineAnswerMessageIndex
+                        if (messageIndex in history.indices &&
+                            history[messageIndex].role == "Astra"
+                        ) {
+                            val existing = history[messageIndex].text
+                            val updated = if (existing == "ASTRA // THINKING OFFLINE...")
+                                "Offline response interrupted."
+                            else existing + "\n\n[Response interrupted]"
+                            history[messageIndex] = ChatMessage("Astra", updated)
+                        }
+                    }
+                    offlineJob = null
+                    offlineAnswerMessageIndex = -1
+                }
+
                 fun startNewConversation() {
                     val nextArchive = AstraChatLibrary.archive(
                         archivedChats.toList(), currentArchiveRecord()
@@ -2508,8 +2529,7 @@ class MainActivity :
                     storage.saveArchivedChats(nextArchive)
                     archivedChats.clear()
                     archivedChats.addAll(nextArchive)
-                    offlineJob?.cancel()
-                    offlineJob = null
+                    interruptOfflineForTransition()
                     chatGeneration++
                     activeChatTitle = ""
                     storage.setString("astra_active_chat_title", "")
@@ -2533,8 +2553,7 @@ class MainActivity :
                     storage.saveArchivedChats(next.archived)
                     archivedChats.clear()
                     archivedChats.addAll(next.archived)
-                    offlineJob?.cancel()
-                    offlineJob = null
+                    interruptOfflineForTransition()
                     chatGeneration++
                     activeChatTitle = next.active.title
                     storage.setString("astra_active_chat_title", activeChatTitle)
@@ -2634,6 +2653,7 @@ class MainActivity :
                     history.add(ChatMessage("Astra", placeholder))
                     while (history.size > MAX_HISTORY) history.removeAt(0)
                     val target = history.lastIndex
+                    offlineAnswerMessageIndex = target
                     persist()
                     activeResearchCount++
 
@@ -2685,7 +2705,10 @@ class MainActivity :
                             throw cancel
                         } finally {
                             // A cancelled old chat must not clear a newer job.
-                            if (offlineJob === runningJob) offlineJob = null
+                            if (offlineJob === runningJob) {
+                                offlineJob = null
+                                offlineAnswerMessageIndex = -1
+                            }
                             activeResearchCount = (activeResearchCount - 1).coerceAtLeast(0)
                         }
                     }
@@ -3226,8 +3249,7 @@ class MainActivity :
                                             speechLanguage = SpeechLanguage.fromTag(
                                                 storage.getString("speech_language", "en-US")
                                             )
-                                            offlineJob?.cancel()
-                    offlineJob = null
+                                            interruptOfflineForTransition()
                     chatGeneration++
                                             dialogue.reset()
                                             dialogueAwaiting = false
@@ -3569,8 +3591,7 @@ class MainActivity :
 
                                     persist()
 
-                                    offlineJob?.cancel()
-                    offlineJob = null
+                                    interruptOfflineForTransition()
                     chatGeneration++
                                     dialogue.reset()
                                     dialogueAwaiting = false
