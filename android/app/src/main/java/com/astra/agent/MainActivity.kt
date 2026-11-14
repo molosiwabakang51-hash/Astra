@@ -2737,9 +2737,10 @@ class MainActivity :
 
                     // Native offline inference handles unsupported free-form requests.
                     // Actions and sensitive built-in outputs never enter the model path.
-                    if (!result.sensitive && result.action == AssistantAction.NONE &&
-                        result.text.startsWith(
-                            "I cannot answer that reliably with Astra's current offline tools."
+                    if (AstraOfflinePolicy.shouldUseModel(
+                            assistantText = result.text,
+                            sensitive = result.sensitive,
+                            hasAction = result.action != AssistantAction.NONE
                         )
                     ) {
                         enqueueOffline(message, message)
