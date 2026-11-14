@@ -55,8 +55,8 @@ def main():
     if "AstraModelStorage.installVerified(" not in importer or "AstraModelStorage.installVerified(" not in brain:
         raise RuntimeError("FULL and LITE model updates must use crash-safe storage")
 
-    if '?: "0.11.5"' not in config or "?: 22" not in config:
-        raise RuntimeError("Release identity is not Astra 0.11.5 (versionCode 22)")
+    if '?: "0.11.6"' not in config or "?: 23" not in config:
+        raise RuntimeError("Release identity is not Astra 0.11.6 (versionCode 23)")
     print("PASS: Astra icon menu, compact chat, offline model, version stamp")
     print("PASS: no legacy bottom tabs, top-right overflow, or obsolete fallback")
 
