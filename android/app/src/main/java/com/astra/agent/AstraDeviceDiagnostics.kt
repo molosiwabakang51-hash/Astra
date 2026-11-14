@@ -78,7 +78,7 @@ internal object AstraDeviceDiagnostics {
 
     /** Never include arbitrary model text in the shareable diagnostic. */
     fun summarizeSelfTest(status: String): String {
-        val elapsed = Regex("""^MODEL RESPONDED OFFLINE in (\\d+) ms:""")
+        val elapsed = Regex("""^MODEL RESPONDED OFFLINE in (\d+) ms:""")
             .find(status)?.groupValues?.getOrNull(1)
         if (elapsed != null) return "PASS (${elapsed.take(10)} ms)"
         if (status.startsWith("OFFLINE TEST FAILED:")) {
