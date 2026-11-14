@@ -225,6 +225,20 @@ private class AstraStorage(
             .apply()
     }
 
+    fun getString(key: String, default: String): String =
+        prefs.getString(key, default) ?: default
+
+    fun setString(key: String, value: String) {
+        prefs.edit().putString(key, value).apply()
+    }
+
+    fun getInt(key: String, default: Int = 0): Int =
+        prefs.getInt(key, default)
+
+    fun setInt(key: String, value: Int) {
+        prefs.edit().putInt(key, value).apply()
+    }
+
     fun save(
         history: List<ChatMessage>,
         notes: List<String>,
@@ -1309,7 +1323,7 @@ private object UtilityEngine {
 // MIDDLE OFFICE — COMMAND PROCESSOR
 // ============================================================
 
-private class AstraProcessor {
+private class AstraProcessor(private val russianTutor: RussianTutor) {
 
     fun process(
         raw: String,
@@ -1410,17 +1424,8 @@ private class AstraProcessor {
             )
         }
 
-        if (lower in listOf("teach me russian", "learn russian", "russian lesson", "start russian lessons")) {
-            return AssistantResult(
-                "Russian lesson 1 — Greetings\n\n" +
-                    "Привет (privet) — Hi\n" +
-                    "Здравствуйте (zdravstvuyte) — Hello (formal)\n" +
-                    "Спасибо (spasibo) — Thank you\n" +
-                    "Да (da) — Yes\n" +
-                    "Нет (net) — No\n\n" +
-                    "Practice: What does 'Спасибо' mean? " +
-                    "This is a starter lesson; progress tracking is not implemented yet."
-            )
+        russianTutor.respond(clean)?.let {
+            return AssistantResult(it)
         }
 
         if (
@@ -1691,6 +1696,13 @@ private class AstraProcessor {
                 investment return 100 120 5
                 weighted return 40 10, 60 5
 
+                LANGUAGES
+                teach me Russian
+                Russian lesson 2
+                Russian quiz
+                Russian progress
+                answer thank you
+
                 UTILITIES
                 flip coin
                 roll dice
@@ -1925,7 +1937,7 @@ class MainActivity :
                 recognitionAvailable = true
 
                 recognitionStatus =
-                    "On-device recognition available"
+                    "On-device speech service installed (language support not verified)"
 
             } else {
 
@@ -1946,7 +1958,9 @@ class MainActivity :
 
     private fun startRecognition(
         onResult: (String) -> Unit,
-        onError: (String) -> Unit
+        onError: (String) -> Unit,
+        languageTag: String,
+        onLanguageUnsupported: (() -> Unit)? = null
     ) {
 
         speechResultCallback = onResult
@@ -2001,6 +2015,15 @@ class MainActivity :
                 ) {
 
                     listening = false
+
+                    if (
+                        (error == SpeechRecognizer.ERROR_LANGUAGE_NOT_SUPPORTED ||
+                         error == SpeechRecognizer.ERROR_LANGUAGE_UNAVAILABLE) &&
+                        onLanguageUnsupported != null
+                    ) {
+                        onLanguageUnsupported()
+                        return
+                    }
 
                     speechErrorCallback?.invoke(
                         when (error) {
@@ -2091,7 +2114,7 @@ class MainActivity :
 
             putExtra(
                 RecognizerIntent.EXTRA_LANGUAGE,
-                Locale.ENGLISH.toLanguageTag()
+                languageTag
             )
         }
 
@@ -2127,8 +2150,9 @@ class MainActivity :
         val storage =
             AstraStorage(this)
 
-        val processor =
-            AstraProcessor()
+        val processor = AstraProcessor(
+            RussianTutor(storage::getInt, storage::setInt)
+        )
 
         setContent {
 
@@ -2269,6 +2293,18 @@ class MainActivity :
 
                 var voiceError by remember {
                     mutableStateOf("")
+                }
+
+                var speechLanguage by remember {
+                    mutableStateOf(
+                        SpeechLanguage.fromTag(
+                            storage.getString("speech_language", "en-US")
+                        )
+                    )
+                }
+
+                var speechLanguageMenuOpen by remember {
+                    mutableStateOf(false)
                 }
 
                 var toolInput by remember {
@@ -2499,84 +2535,83 @@ class MainActivity :
                         pendingVoiceStart = null
                     }
 
-                fun startVoice() {
+                fun launchSystemSpeech() {
+                    try {
+                        val intent = Intent(
+                            RecognizerIntent.ACTION_RECOGNIZE_SPEECH
+                        ).apply {
+                            putExtra(
+                                RecognizerIntent.EXTRA_LANGUAGE_MODEL,
+                                RecognizerIntent.LANGUAGE_MODEL_FREE_FORM
+                            )
+                            putExtra(
+                                RecognizerIntent.EXTRA_PREFER_OFFLINE,
+                                true
+                            )
+                            putExtra(
+                                RecognizerIntent.EXTRA_LANGUAGE,
+                                speechLanguage.tag
+                            )
+                        }
+                        systemSpeech.launch(intent)
+                    } catch (_: Exception) {
+                        voiceError =
+                            "No compatible system speech service is installed."
+                    }
+                }
 
+                fun startVoice() {
                     voiceError = ""
 
-                    val resultCallback:
-                        (String) -> Unit = { words ->
-
-                            if (autoSendVoice) {
-                                submit(words)
-                            } else {
-                                input = words
-                            }
+                    val resultCallback: (String) -> Unit = { words ->
+                        if (autoSendVoice) {
+                            submit(words)
+                        } else {
+                            input = words
                         }
+                    }
 
-                    val errorCallback:
-                        (String) -> Unit = {
+                    val errorCallback: (String) -> Unit = { message ->
+                        voiceError = message
+                    }
 
-                            voiceError = it
+                    val unsupportedFallback: (() -> Unit)? =
+                        if (allowSystemSpeech) {
+                            { launchSystemSpeech() }
+                        } else {
+                            null
                         }
 
                     if (
-                        checkSelfPermission(
-                            Manifest.permission.RECORD_AUDIO
-                        ) != PackageManager.PERMISSION_GRANTED
+                        checkSelfPermission(Manifest.permission.RECORD_AUDIO) !=
+                        PackageManager.PERMISSION_GRANTED
                     ) {
-
                         pendingVoiceStart = {
                             startRecognition(
                                 resultCallback,
-                                errorCallback
+                                errorCallback,
+                                speechLanguage.tag,
+                                unsupportedFallback
                             )
                         }
-
                         microphonePermission.launch(
                             Manifest.permission.RECORD_AUDIO
                         )
-
                         return
                     }
 
                     if (recognitionAvailable) {
-
                         startRecognition(
                             resultCallback,
-                            errorCallback
+                            errorCallback,
+                            speechLanguage.tag,
+                            unsupportedFallback
                         )
-
                     } else if (allowSystemSpeech) {
-
-                        try {
-
-                            val intent = Intent(
-                                RecognizerIntent.ACTION_RECOGNIZE_SPEECH
-                            ).apply {
-
-                                putExtra(
-                                    RecognizerIntent.EXTRA_LANGUAGE_MODEL,
-                                    RecognizerIntent.LANGUAGE_MODEL_FREE_FORM
-                                )
-
-                                putExtra(
-                                    RecognizerIntent.EXTRA_PREFER_OFFLINE,
-                                    true
-                                )
-                            }
-
-                            systemSpeech.launch(intent)
-
-                        } catch (_: Exception) {
-
-                            voiceError =
-                                "System speech unavailable."
-                        }
-
+                        launchSystemSpeech()
                     } else {
-
                         voiceError =
-                            "On-device recognition unavailable."
+                            "On-device speech recognition is unavailable. Enable system fallback or install a compatible offline speech model."
                     }
                 }
 
@@ -3403,6 +3438,55 @@ class MainActivity :
                                         Text(
                                             recognitionStatus
                                         )
+                                    }
+
+                                    item {
+                                        Column(
+                                            verticalArrangement =
+                                                Arrangement.spacedBy(6.dp)
+                                        ) {
+                                            Text(
+                                                "Recognition language",
+                                                style = MaterialTheme.typography.titleSmall
+                                            )
+                                            Box {
+                                                OutlinedButton(
+                                                    onClick = {
+                                                        speechLanguageMenuOpen = true
+                                                    }
+                                                ) {
+                                                    Text(speechLanguage.displayName)
+                                                }
+
+                                                DropdownMenu(
+                                                    expanded = speechLanguageMenuOpen,
+                                                    onDismissRequest = {
+                                                        speechLanguageMenuOpen = false
+                                                    }
+                                                ) {
+                                                    SpeechLanguage.entries.forEach { language ->
+                                                        DropdownMenuItem(
+                                                            text = {
+                                                                Text(language.displayName)
+                                                            },
+                                                            onClick = {
+                                                                speechLanguage = language
+                                                                speechLanguageMenuOpen = false
+                                                                storage.setString(
+                                                                    "speech_language",
+                                                                    language.tag
+                                                                )
+                                                            }
+                                                        )
+                                                    }
+                                                }
+                                            }
+                                            Text(
+                                                "The selected language must be supported by the installed recognizer. System fallback may use the network even when offline recognition is preferred.",
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
                                     }
 
                                     item {
