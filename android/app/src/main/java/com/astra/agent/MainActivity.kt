@@ -41,6 +41,8 @@ import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 
+import kotlinx.coroutines.launch
+
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -100,7 +102,7 @@ keys: history, notes, tasks.
 // CONSTANTS
 // ============================================================
 
-private const val ASTRA_VERSION = "0.9.1"
+private const val ASTRA_VERSION = "0.9.2"
 private const val MAX_HISTORY = 2000
 
 private const val WELCOME =
@@ -1714,6 +1716,13 @@ private class AstraProcessor(
                 breathing exercise
                 help me focus
 
+                ONLINE REFERENCE (internet required)
+                research the solar system
+                search wikipedia for Botswana
+                wikipedia bond duration
+                Research queries are sent to Wikipedia.
+                Astra does not send your private notes or tasks.
+
                 UNIT CONVERSIONS
                 convert 5 km to miles
                 convert 100 c to f
@@ -2346,6 +2355,12 @@ class MainActivity :
                 val keyboard =
                     LocalSoftwareKeyboardController.current
 
+                val research = remember {
+                    WikipediaResearch()
+                }
+
+                val researchScope = rememberCoroutineScope()
+
                 fun persist() {
 
                     storage.save(
@@ -2410,6 +2425,38 @@ class MainActivity :
                     val message = raw.trim()
 
                     if (message.isEmpty()) {
+                        return
+                    }
+
+                    val researchTopic = ResearchCommand.extract(message)
+                    if (researchTopic != null) {
+                        val placeholder =
+                            "Searching Wikipedia for " + researchTopic + "..."
+
+                        history.add(ChatMessage("You", message))
+                        history.add(ChatMessage("Astra", placeholder))
+                        while (history.size > MAX_HISTORY) {
+                            history.removeAt(0)
+                        }
+                        val placeholderIndex = history.lastIndex
+                        persist()
+                        input = ""
+                        keyboard?.hide()
+
+                        researchScope.launch {
+                            val answer = research.search(researchTopic)
+                            // Do not restore an asynchronous result after
+                            // the user cleared this conversation.
+                            if (
+                                placeholderIndex in history.indices &&
+                                history[placeholderIndex].role == "Astra" &&
+                                history[placeholderIndex].text == placeholder
+                            ) {
+                                history[placeholderIndex] =
+                                    ChatMessage("Astra", answer)
+                                persist()
+                            }
+                        }
                         return
                     }
 
@@ -3444,7 +3491,7 @@ class MainActivity :
                                     item {
 
                                         Text(
-                                            "A local-first assistant for tasks, notes, daily planning, shopping, habits, language practice, mathematics, finance, unit conversions and voice interaction. General-purpose AI responses are not yet installed."
+                                            "A local-first assistant for tasks, notes, daily planning, shopping, habits, language practice, mathematics, finance and unit conversions. Explicit Wikipedia research requires the internet and sends only the requested topic. General-purpose language-model responses are not yet installed."
                                         )
                                     }
 
