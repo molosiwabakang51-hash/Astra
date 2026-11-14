@@ -2442,6 +2442,9 @@ class MainActivity :
                 var returnToChatLibrary by remember { mutableStateOf(false) }
                 var navigationPopupOpen by remember { mutableStateOf(false) }
                 var commandDeckExpanded by remember { mutableStateOf(false) }
+                var selectedAdvancedModel by remember {
+                    mutableStateOf(AstraModelImport.preferAdvanced(applicationContext))
+                }
 
                 var pendingBackupRestore by remember {
                     mutableStateOf<AstraBackupCodec.Payload?>(null)
@@ -4141,10 +4144,10 @@ class MainActivity :
                                                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                                                 ) {
                                                     Text(
-                                                        listOf("✦", "✓", "▤", "⌘", "⚙")[index],
+                                                        listOf("◌", "✓", "▤", "⌘", "⚙")[index],
                                                         color = MaterialTheme.colorScheme.primary
                                                     )
-                                                    Text(title)
+                                                    Text(title, style = MaterialTheme.typography.bodyMedium)
                                                     if (tab == index) Text("✓")
                                                 }
                                             },
@@ -4311,8 +4314,13 @@ class MainActivity :
                             0 -> {
 
                                 // Dashboard is on demand to maximize chat space.
-                                if (commandDeckExpanded) {
-    
+                                AnimatedVisibility(
+                                    visible = commandDeckExpanded && offlineJob?.isActive != true,
+                                    enter = expandVertically(animationSpec = tween(240)) +
+                                        androidx.compose.animation.fadeIn(animationSpec = tween(180)),
+                                    exit = shrinkVertically(animationSpec = tween(190)) +
+                                        androidx.compose.animation.fadeOut(animationSpec = tween(130))
+                                ) {
                                     AstraCommandDeck(
                                         listening = listening,
                                         researching = activeResearchCount > 0,
@@ -4325,7 +4333,6 @@ class MainActivity :
                                         onCommand = { command -> submit(command) }
                                     )
     
-                                    Spacer(Modifier.height(8.dp))
                                 }
 
                                 LazyColumn(
@@ -4743,11 +4750,15 @@ class MainActivity :
                                             "Built-in tasks, notes and calculators run locally first."
                                         )
                                         val modelIncluded = onDeviceBrain.isModelBundled()
+                                        val advancedInstalled =
+                                            AstraModelImport.advancedInstalled(applicationContext)
                                         val modelImported = AstraModelImport.appearsInstalled(
                                             applicationContext
                                         )
                                         Text(
                                             when {
+                                                advancedInstalled && selectedAdvancedModel ->
+                                                    "QWEN3 1.7B SELECTED · ON DEVICE"
                                                 modelIncluded -> "OFFLINE MODEL INCLUDED IN APK"
                                                 modelImported -> "OFFLINE MODEL IMPORTED TO THIS PHONE"
                                                 else -> "MODEL NOT INSTALLED — IMPORT ONCE BELOW"
@@ -4765,6 +4776,26 @@ class MainActivity :
                                                 "Nothing is downloaded by the import process.",
                                             style = MaterialTheme.typography.bodySmall
                                         )
+                                        Text(
+                                            "Optional advanced offline model: Qwen3 1.7B Q4_K_M. " +
+                                                "Import the official ggml-org GGUF once (~1.28 GB). " +
+                                                "This requires more storage and RAM than 0.6B.",
+                                            style = MaterialTheme.typography.bodySmall
+                                        )
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Text("Prefer 1.7B model", modifier = Modifier.weight(1f))
+                                            Switch(
+                                                checked = selectedAdvancedModel,
+                                                enabled = advancedInstalled &&
+                                                    offlineJob?.isActive != true,
+                                                onCheckedChange = {
+                                                    selectedAdvancedModel = it
+                                                    AstraModelImport.setPreferAdvanced(
+                                                        applicationContext, it
+                                                    )
+                                                }
+                                            )
+                                        }
                                         OutlinedButton(
                                             enabled = !modelImportRunning &&
                                                 offlineJob?.isActive != true &&
