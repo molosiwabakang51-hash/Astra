@@ -1,11 +1,16 @@
 # Astra owner-signed Android updates
 
-Astra's ordinary **Astra-debug-APK** GitHub Actions artifact is suitable for testing only.
+Astra's ordinary **LITE/FULL debug APK** GitHub Actions artifact is suitable for testing only.
 GitHub-hosted runners generate disposable debug signing keys, so different debug
 builds may not update one another in place. An uninstall can delete Astra's
 private conversation history, notes and tasks.
 
-This guide configures a **separate, manually triggered owner-signed release**.
+This guide configures a **separate, manually triggered owner-signed LITE release**.
+The small Android installer does not include the ~462 MiB Qwen3 model weights;
+import the model ONCE from a locally saved GGUF, old Astra FULL APK, or downloaded
+GitHub artifact ZIP. On correctly signed upgrades the imported model remains
+in app-private storage and never needs re-downloading.
+
 The app keeps the same Android package name: **com.astra.agent**. The existing
 local preference namespace remains **astra**.
 
@@ -75,27 +80,41 @@ These secrets are referenced only by **.github/workflows/owner-release.yml**.
 The normal debug and pull-request workflows never receive the owner's key.
 Only trigger release builds on the protected main branch.
 
-## 3. Build and verify a private release
+## 3. Build and publish a small owner-signed release on GitHub
 
-Go to GitHub **Actions → Build owner-signed Astra release → Run workflow**
-and select **main**. The workflow:
+After privately configuring all five secrets in the protected
+`astra-release` environment, go to GitHub **Actions → Publish owner-signed
+Astra LITE update → Run workflow**, selecting **main**.
 
-1. Checks out main using read-only permissions.
-2. Decodes the keystore into temporary runner storage.
-3. Runs Android unit tests and builds a release APK using the protected key.
-4. Checks the APK with Android's apksigner verify and compares the signer
-   certificate SHA-256 digest to the owner-approved fingerprint.
-5. Uploads only **Astra-owner-signed-release**, with 30-day artifact retention.
-   A failed signing check never uploads an APK.
+The workflow downloads the pinned llama.cpp Android library on GitHub's build
+computer, **does not download/compile Qwen3 GGUF into the APK**, and runs the
+Android unit tests. It compiles the small release, verifies that the model is
+absent and native ARM64 inference libraries remain, and checks the signed APK's
+certificate fingerprint against `ASTRA_RELEASE_CERT_SHA256`. Publication
+fails if the signature differs.
 
-The workflow uses a monotonically increasing code derived from the GitHub
-workflow's run number (100000 + run_number). Re-running the same workflow
-run retains the same version code. Avoid resetting the release workflow or
-reducing version codes across signed updates.
+A successful run creates both:
 
-The normal Android workflow also builds a release APK with a **temporary CI-only
-certificate** solely to smoke-test the signing configuration. That APK is
-deleted and must never be installed or distributed as an owner release.
+- A 30-day **Astra-v0.11.0-Owner-Signed-LITE** workflow artifact.
+- A **persistent GitHub Release** with an APK
+  `Astra-v0.11.0-LITE-owner-signed.apk` under a versioned tag such as
+  `v0.11.0.123`.
+
+Get the release from:
+https://github.com/molosiwabakang51-hash/Astra/releases
+
+The workflow uses monotonically increasing Android version codes based on
+the workflow run number (`100000 + GITHUB_RUN_NUMBER`). It uses a version name
+such as `0.11.0.123`. When the source version changes in a future release,
+the workflow's pinned release/version text must also be updated.
+
+**Status:** An unconfigured or mismatched signing key prevents this process.
+GitHub Releases is not an Android app server or a runtime model server; it only
+hosts the small installer. GitHub Pages cannot run native Android llama.cpp.
+
+The ordinary Android CI workflow separately creates FULL and LITE **debug**
+APKs for testing. Those use disposable GitHub-runner signing certificates
+and should not be installed as though they were stable release updates.
 
 ## 4. Upgrade without losing Astra data
 
@@ -106,11 +125,22 @@ recovery** and export a JSON backup. Verify the file exists and keep it private.
 Only then uninstall the debug build, install your first owner-signed APK and
 import that backup. The exported file is **not encrypted**.
 
+**Import the model without paying for another large download:** After your
+first LITE install, open Astra's **logo → Settings → Import offline model once**.
+Choose the original Qwen3 Q4_K_M GGUF, an old downloaded Astra FULL APK, or the
+GitHub artifact ZIP that contains that APK. The phone verifies SHA-256 before
+installing the model privately. **Keep the original chosen file in Downloads**
+or other persistent phone storage if there is any chance you will need to
+uninstall an older debug build. Import copies model data locally; it never
+contacts an external server.
+
 **For later owner-signed releases:** Keep the same keystore, alias and app ID.
-Download the next verified owner-signed APK and install it as an update without
-uninstalling. Android normally retains app-private data on a same-signature,
-higher-version-code update. Export a manual backup before important upgrades
-regardless.
+Download only the next small verified owner-signed APK and install it as an
+update without uninstalling. Android normally retains private imported model
+weights, chats and tasks on same-signature, higher-version-code updates. If
+you uninstall a build because its certificate differs, the imported private
+copy will be erased; reimport from your saved GGUF/APK/ZIP without cellular
+data. Export a JSON backup before important upgrades regardless.
 
 Real-device installation/update and backup/restore smoke tests are still
 required; passing a CI build does not prove device-specific behavior.
