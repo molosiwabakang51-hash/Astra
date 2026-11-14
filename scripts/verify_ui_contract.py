@@ -11,6 +11,7 @@ MAIN = ROOT / "android/app/src/main/java/com/astra/agent/MainActivity.kt"
 GRADLE = ROOT / "android/app/build.gradle.kts"
 BRAIN = ROOT / "android/app/src/main/java/com/astra/agent/AstraOnDeviceBrain.kt"
 IMPORT = ROOT / "android/app/src/main/java/com/astra/agent/AstraModelImport.kt"
+CONTEXT = ROOT / "android/app/src/main/java/com/astra/agent/AstraConversationContext.kt"
 
 
 def main():
@@ -18,6 +19,7 @@ def main():
     config = GRADLE.read_text(encoding="utf-8")
     brain = BRAIN.read_text(encoding="utf-8")
     importer = IMPORT.read_text(encoding="utf-8")
+    conversation_context = CONTEXT.read_text(encoding="utf-8")
 
     required = {
         "Astra icon opens navigation": 'clickable { navigationPopupOpen = true }',
@@ -56,8 +58,16 @@ def main():
     if "AstraModelStorage.installVerified(" not in importer or "AstraModelStorage.installVerified(" not in brain:
         raise RuntimeError("FULL and LITE model updates must use crash-safe storage")
 
-    if '?: "0.12.0"' not in config or "?: 27" not in config:
-        raise RuntimeError("Release identity is not Astra 0.12.0 (versionCode 27)")
+    if ("current.setSystemPrompt(AstraConversationContext.systemPrompt())" not in brain or
+            "AstraConversationContext.userPrompt(" not in brain or
+            "Earlier chat excerpts" in brain):
+        raise RuntimeError("Prior chat must stay in bounded user-level context, never system policy")
+    if ("fun systemPrompt()" not in conversation_context or
+            "fun userPrompt(" not in conversation_context):
+        raise RuntimeError("Local conversation prompt safety layer is missing")
+
+    if '?: "0.12.1"' not in config or "?: 28" not in config:
+        raise RuntimeError("Release identity is not Astra 0.12.1 (versionCode 28)")
     print("PASS: Astra icon menu, compact chat, offline model, version stamp")
     print("PASS: no legacy bottom tabs, top-right overflow, or obsolete fallback")
 

@@ -1,4 +1,4 @@
-# Astra — Android personal assistant (v0.12.0 · reliable offline conversations)
+# Astra — Android personal assistant (v0.12.1 · safer offline chat recovery)
 
 Astra is a **local-first Android/Kotlin Jetpack Compose assistant** with a futuristic dark interface. It is being developed directly in this repository. The original **Astra-AI** repository is kept separately as a backup.
 
@@ -19,6 +19,14 @@ Astra is a **local-first Android/Kotlin Jetpack Compose assistant** with a futur
 - Bond Analytics Lab: fixed-coupon price, current yield, modified and Macaulay duration, convexity and DV01.
 
 **Important:** Astra's tasks, notes, calculators and local commands remain deterministic. Unhandled free-form questions now go to a **model running on the Android phone**. A small model may hallucinate or make calculation errors; Astra does not provide live financial prices or unrestricted device automation.
+
+## Isolated conversation restoration after native reloads (v0.12.1)
+
+When native Qwen3 reloads after an interrupted response, switching conversations, or a recreated Activity, Astra now reconstructs a **short, labelled excerpt of the previous chat as untrusted user-level reference text**. Previous messages are no longer copied into the higher-priority system instruction, where a pasted instruction or malicious quoted assistant reply might otherwise be promoted to model policy.
+
+The system instruction remains a **fixed offline assistant policy** with an explicit boundary between the current request and earlier quoted data. Restored excerpts preserve roles and prefer recent turns, escape quotes and line breaks, and share a strict ~3,000-character budget with the new question. The current question always takes priority; long questions omit prior context rather than truncating the user's request. Ordinary follow-up requests in an already loaded session rely on native chat history without needlessly duplicating earlier messages.
+
+This is a **prompt-boundary and context-quality improvement**, not a guarantee that a 0.6B model cannot be confused by malicious text. Eight new JVM tests cover system isolation, exact question preservation, oversized chat history, role filtering and multiline prompt spoofing. Both FULL and LITE use the same implementation and unchanged model weights.
 
 ## Offline follow-up continuity at the generation limit (v0.12.0)
 
@@ -106,14 +114,14 @@ The **Test on-device AI** control now requires the model to generate the expecte
 
 ## Avoid downloading a 539 MiB APK after every change
 
-**Astra v0.12.0** has two installable Android options built automatically on GitHub:
+**Astra v0.12.1** has two installable Android options built automatically on GitHub:
 
 | Variant | What you download | Best for |
 | --- | --- | --- |
 | **LITE** | Android UI, tasks and llama.cpp native inference, **without** GGUF model weights (enforced under 150 MiB) | Regular app updates over mobile data. |
 | **FULL** | The same Android app with Qwen3 Q4_K_M included (~539 MiB) | First installation when no model file is available. |
 
-Open [GitHub Actions](https://github.com/molosiwabakang51-hash/Astra/actions), choose a **successful v0.12.0 build**, and under Artifacts select **`Astra-v0.12.0-LITE-Offline-APK`** for the much smaller download. The full alternative is **`Astra-v0.12.0-FULL-Offline-APK`**. Extract the downloaded artifact ZIP; inside is the versioned APK. Both have the same app ID and UI but do **not** have the same bundled assets.
+Open [GitHub Actions](https://github.com/molosiwabakang51-hash/Astra/actions), choose a **successful v0.12.1 build**, and under Artifacts select **`Astra-v0.12.1-LITE-Offline-APK`** for the much smaller download. The full alternative is **`Astra-v0.12.1-FULL-Offline-APK`**. Extract the downloaded artifact ZIP; inside is the versioned APK. Both have the same app ID and UI but do **not** have the same bundled assets.
 
 **Import the model once without using internet data:** In the LITE app, tap **Astra icon → Settings → Import offline model once**. Choose a GGUF file already saved on the phone, a **previously downloaded large Astra APK**, or its original **GitHub artifact ZIP containing that APK**. Astra extracts the Qwen3 weights locally, checks their exact SHA-256, and stores the model privately. The original selected file is not modified. Once imported, airplane-mode chat works entirely on-device, subject to real-phone performance.
 
@@ -125,7 +133,7 @@ If you already downloaded a 500+ MB Astra APK, **retain the APK or artifact ZIP 
 
 ### Confirming the installed version
 
-The chat header displays `v0.12.0 · OFFLINE AI` (or the full signed release build version, such as `0.12.0.123`). The Astra icon opens the menu, the optional mission deck starts hidden and there is no old permanent bottom navigation bar. Settings clearly distinguishes a model **bundled in FULL**, **imported on the phone**, or **missing on LITE**. A missing model does not silently revert to unreliable canned answers; it prompts local import.
+The chat header displays `v0.12.1 · OFFLINE AI` (or the full signed release build version, such as `0.12.1.123`). The Astra icon opens the menu, the optional mission deck starts hidden and there is no old permanent bottom navigation bar. Settings clearly distinguishes a model **bundled in FULL**, **imported on the phone**, or **missing on LITE**. A missing model does not silently revert to unreliable canned answers; it prompts local import.
 
 ## Offline model and low-data builds
 
