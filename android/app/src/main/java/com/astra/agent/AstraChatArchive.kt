@@ -30,7 +30,7 @@ internal object AstraChatArchive {
                     val entry = entries.optJSONObject(j) ?: continue
                     val role = entry.optString("role")
                     val text = entry.optString("text")
-                    if (role in setOf("You", "Astra") && text.length <= 12_000) {
+                    if (role in setOf("You", "Astra")) {
                         messages.add(Message(role, text))
                     }
                 }
@@ -46,11 +46,17 @@ internal object AstraChatArchive {
         val array = JSONArray()
         chats.take(MAX_CHATS).forEach { chat ->
             val messages = JSONArray()
-            chat.messages.takeLast(MAX_MESSAGES).forEach { message ->
-                require(message.role in setOf("You", "Astra"))
-                require(message.text.length <= 12_000)
-                messages.put(JSONObject().put("role", message.role).put("text", message.text))
-            }
+            // Preserve full local and model-generated messages. The old 12k
+            // limit rejected valid 16k model replies and could crash "New chat".
+            // Ignore malformed roles rather than failing an entire archive.
+            chat.messages.takeLast(MAX_MESSAGES)
+                .filter { it.role in setOf("You", "Astra") }
+                .forEach { message ->
+                    messages.put(
+                        JSONObject().put("role", message.role)
+                            .put("text", message.text)
+                    )
+                }
             array.put(
                 JSONObject().put("id", chat.id.take(80))
                     .put("title", chat.title.take(100))
