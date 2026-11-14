@@ -47,7 +47,11 @@ internal object BondAnalytics {
         val coupon = match.groupValues[2].toDoubleOrNull() ?: return usage()
         val ytm = match.groupValues[3].toDoubleOrNull() ?: return usage()
         val years = match.groupValues[4].toDoubleOrNull() ?: return usage()
-        val frequency = match.groupValues[5].takeIf { it.isNotEmpty() }?.toIntOrNull() ?: 2
+        val frequencyToken = match.groupValues[5]
+        val frequency = if (frequencyToken.isEmpty()) 2 else {
+            frequencyToken.toIntOrNull()
+                ?: return "Coupon frequency must be 1, 2, 4 or 12.\n" + usage()
+        }
 
         return try {
             val terms = Terms(face, coupon, ytm, years, frequency)
