@@ -14,10 +14,10 @@ android {
         versionCode = System.getenv("ASTRA_RELEASE_VERSION_CODE")
             ?.takeIf { it.isNotBlank() }
             ?.toIntOrNull()
-            ?.also { require(it >= 9) { "Release versionCode must be at least 9." } }
-            ?: 9
+            ?.also { require(it >= 10) { "Release versionCode must be at least 10." } }
+            ?: 10
         versionName = System.getenv("ASTRA_RELEASE_VERSION_NAME")
-            ?.takeIf { it.isNotBlank() } ?: "0.9.4"
+            ?.takeIf { it.isNotBlank() } ?: "0.9.5"
     }
     // The signing key is injected only by an owner-initiated workflow.
     // PR/debug builds have no access to release credentials.

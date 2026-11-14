@@ -2377,6 +2377,9 @@ class MainActivity :
                     mutableStateOf(false)
                 }
 
+                var showFindInChat by remember { mutableStateOf(false) }
+                var findInChatQuery by remember { mutableStateOf("") }
+
                 var showClearDialog by remember {
                     mutableStateOf(false)
                 }
@@ -3093,6 +3096,88 @@ class MainActivity :
                     }
                 }
 
+                // Hidden until requested: the chat retains its full-height layout.
+                if (showFindInChat) {
+                    val foundIndices = AstraMessageSearch.find(
+                        history.map { it.text }, findInChatQuery
+                    )
+                    AlertDialog(
+                        onDismissRequest = { showFindInChat = false },
+                        title = { Text("Find in current chat") },
+                        text = {
+                            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                                OutlinedTextField(
+                                    value = findInChatQuery,
+                                    onValueChange = { findInChatQuery = it.take(150) },
+                                    label = { Text("Search messages") },
+                                    singleLine = true,
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                                if (findInChatQuery.isBlank()) {
+                                    Text(
+                                        "Search this conversation on your device.",
+                                        style = MaterialTheme.typography.bodySmall
+                                    )
+                                } else {
+                                    Text(
+                                        if (foundIndices.isEmpty()) "No matching messages"
+                                        else foundIndices.size.toString() + " matching messages",
+                                        style = MaterialTheme.typography.labelMedium
+                                    )
+                                    if (foundIndices.isNotEmpty()) {
+                                        LazyColumn(
+                                            modifier = Modifier.heightIn(max = 360.dp),
+                                            verticalArrangement = Arrangement.spacedBy(4.dp)
+                                        ) {
+                                            itemsIndexed(foundIndices.take(40)) { _, messageIndex ->
+                                                TextButton(
+                                                    modifier = Modifier.fillMaxWidth(),
+                                                    onClick = {
+                                                        showFindInChat = false
+                                                        researchScope.launch {
+                                                            scroll.animateScrollToItem(messageIndex)
+                                                        }
+                                                    }
+                                                ) {
+                                                    Column(
+                                                        modifier = Modifier.fillMaxWidth(),
+                                                        horizontalAlignment = Alignment.Start
+                                                    ) {
+                                                        Text(
+                                                            (messageIndex + 1).toString() +
+                                                                " · " + history[messageIndex].role,
+                                                            style = MaterialTheme.typography.labelSmall
+                                                        )
+                                                        Text(
+                                                            AstraMessageSearch.excerpt(
+                                                                history[messageIndex].text,
+                                                                findInChatQuery
+                                                            ),
+                                                            maxLines = 3,
+                                                            overflow = TextOverflow.Ellipsis
+                                                        )
+                                                    }
+                                                }
+                                            }
+                                        }
+                                        if (foundIndices.size > 40) {
+                                            Text(
+                                                "Showing the first 40 matches. Refine your search to see more.",
+                                                style = MaterialTheme.typography.bodySmall
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        confirmButton = {
+                            TextButton(onClick = { showFindInChat = false }) {
+                                Text("Close")
+                            }
+                        }
+                    )
+                }
+
                 val restoreToConfirm = pendingBackupRestore
                 if (restoreToConfirm != null) {
                     AlertDialog(
@@ -3734,6 +3819,15 @@ class MainActivity :
                                             showMenu = false
                                         }
                                     ) {
+
+                                        DropdownMenuItem(
+                                            text = { Text("Find in chat") },
+                                            onClick = {
+                                                showMenu = false
+                                                findInChatQuery = ""
+                                                showFindInChat = true
+                                            }
+                                        )
 
                                         DropdownMenuItem(
                                             text = {
