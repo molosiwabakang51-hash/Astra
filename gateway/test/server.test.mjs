@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { callOpenAI, createGateway, parseMessages } from '../server.mjs';
+import { callOllama, createGateway, parseMessages } from '../server.mjs';
 
 const CLIENT_TOKEN = 'A'.repeat(48);
 const userMessage = { role: 'user', content: 'Explain portfolio duration.' };
@@ -8,7 +8,6 @@ const userMessage = { role: 'user', content: 'Explain portfolio duration.' };
 async function withGateway(options, check) {
   const gateway = createGateway({
     clientToken: CLIENT_TOKEN,
-    apiKey: 'test-provider-key',
     callModel: async () => 'A concise explanation.',
     ...options
   });
@@ -30,9 +29,13 @@ function post(address, messages = [userMessage], token = CLIENT_TOKEN) {
   });
 }
 
-test('rejects startup with no or weak client authentication', () => {
-  assert.throws(() => createGateway({ clientToken: 'weak', apiKey: 'key' }), /32 bytes/);
-  assert.throws(() => createGateway({ clientToken: CLIENT_TOKEN }), /OPENAI_API_KEY/);
+test('gateway requires a strong private token but no paid provider key', () => {
+  assert.throws(() => createGateway({ clientToken: 'weak' }), /32 bytes/);
+  assert.doesNotThrow(() => createGateway({ clientToken: CLIENT_TOKEN }));
+  assert.throws(
+    () => createGateway({ clientToken: CLIENT_TOKEN, model: 'bad\nmodel' }),
+    /model name/
+  );
 });
 
 test('health endpoint and authenticated happy path', async () => {
@@ -47,7 +50,7 @@ test('health endpoint and authenticated happy path', async () => {
   });
 });
 
-test('unauthenticated, invalid and missing tokens are blocked before inference', async () => {
+test('unauthenticated, invalid and missing tokens are blocked before local inference', async () => {
   let calls = 0;
   await withGateway({ callModel: async () => { calls++; return 'bad'; } }, async (address) => {
     assert.equal((await post(address, [userMessage], 'wrong')).status, 401);
@@ -73,7 +76,7 @@ test('validates roles, character limits and conversation order', () => {
   for (const item of invalid) assert.throws(() => parseMessages(item));
 });
 
-test('bad input and unsupported media types never invoke provider', async () => {
+test('bad input and unsupported media types never invoke local model', async () => {
   let calls = 0;
   await withGateway({ callModel: async () => { calls++; return 'ok'; } }, async (address) => {
     const noType = await fetch(address + '/chat', {
@@ -94,7 +97,7 @@ test('bad input and unsupported media types never invoke provider', async () => 
   });
 });
 
-test('per-process request quota limits model spend', async () => {
+test('per-process request quota limits compute usage', async () => {
   let calls = 0;
   await withGateway({
     maxRequestsPerWindow: 2,
@@ -109,53 +112,81 @@ test('per-process request quota limits model spend', async () => {
   });
 });
 
-test('upstream failures are sanitized and never leak credentials', async () => {
+test('concurrent requests are capped at two local model calls', async () => {
+  let release;
+  let started = 0;
+  const gate = new Promise((resolve) => { release = resolve; });
   await withGateway({
-    callModel: async () => { throw new Error('top-secret API token'); }
+    callModel: async () => { started++; await gate; return 'Done'; }
+  }, async (address) => {
+    const first = post(address);
+    const second = post(address);
+    // Ensure both model calls have started before attempting the third.
+    const start = Date.now();
+    while (started < 2 && Date.now() - start < 3000) {
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+    assert.equal(started, 2);
+    const third = await post(address);
+    assert.equal(third.status, 429);
+    release();
+    assert.equal((await first).status, 200);
+    assert.equal((await second).status, 200);
+  });
+});
+
+test('upstream failures are sanitized and never leak local chat content', async () => {
+  await withGateway({
+    callModel: async () => { throw new Error('private-local-data'); }
   }, async (address) => {
     const response = await post(address);
     assert.equal(response.status, 502);
     const text = await response.text();
-    assert.doesNotMatch(text, /top-secret|test-provider-key|portfolio duration/i);
+    assert.doesNotMatch(text, /private-local-data|portfolio duration/i);
+    assert.match(text, /Local AI unavailable/);
   });
 });
 
-test('provider adapter uses Responses API without storing chat content', async () => {
+test('Ollama adapter calls only 127.0.0.1 with chat messages, no paid API keys', async () => {
   let request;
-  const answer = await callOpenAI([userMessage], {
-    apiKey: 'test-provider-key',
-    model: 'test-model',
+  const answer = await callOllama([userMessage], {
+    model: 'qwen3:0.6b',
     fetchImpl: async (url, options) => {
       request = { url, options };
       return {
         ok: true,
-        json: async () => ({
-          output: [
-            { type: 'reasoning', content: [] },
-            { type: 'message', content: [{ type: 'output_text', text: 'Duration measures sensitivity.' }] }
-          ]
-        })
+        json: async () => ({ message: { role: 'assistant', content: 'Duration measures sensitivity.' } })
       };
     }
   });
   assert.equal(answer, 'Duration measures sensitivity.');
-  assert.equal(request.url, 'https://api.openai.com/v1/responses');
+  assert.equal(request.url, 'http://127.0.0.1:11434/api/chat');
+  assert.equal(request.options.headers.Authorization, undefined);
   const body = JSON.parse(request.options.body);
-  assert.equal(body.store, false);
-  assert.equal(body.model, 'test-model');
-  assert.deepEqual(body.input, [userMessage]);
-  assert.equal(body.instructions.includes('Never claim an action'), true);
-  assert.equal(request.options.headers.Authorization, 'Bearer test-provider-key');
+  assert.equal(body.model, 'qwen3:0.6b');
+  assert.equal(body.stream, false);
+  assert.equal(body.think, false);
+  assert.equal(body.messages.at(0).role, 'system');
+  assert.deepEqual(body.messages.at(-1), userMessage);
+  assert.match(body.messages.at(0).content, /Never claim an action/);
+  assert.ok(!('api_key' in body));
 });
 
-test('provider adapter rejects empty, oversized and failed model responses', async () => {
-  const base = { apiKey: 'key' };
+test('Ollama adapter rejects failed responses, empty answers and model-name injection', async () => {
   await assert.rejects(
-    callOpenAI([userMessage], { ...base, fetchImpl: async () => ({ ok: false, status: 429 }) }),
-    /provider unavailable/
+    callOllama([userMessage], {
+      fetchImpl: async () => ({ ok: false, status: 404 })
+    }),
+    /Ollama unavailable/
   );
   await assert.rejects(
-    callOpenAI([userMessage], { ...base, fetchImpl: async () => ({ ok: true, json: async () => ({ output: [] }) }) }),
-    /invalid answer/
+    callOllama([userMessage], {
+      fetchImpl: async () => ({ ok: true, json: async () => ({ message: { content: '' } }) })
+    }),
+    /invalid or empty answer/
+  );
+  await assert.rejects(
+    callOllama([userMessage], { model: '\ninvalid' }),
+    /model name/
   );
 });
