@@ -2929,6 +2929,8 @@ class MainActivity :
                                             if (history.isEmpty()) {
                                                 history.add(ChatMessage("Astra", WELCOME))
                                             }
+                                            archivedChats.clear()
+                                            archivedChats.addAll(storage.loadChatArchive())
                                             notes.clear()
                                             notes.addAll(storage.loadNotes())
                                             tasks.clear()
