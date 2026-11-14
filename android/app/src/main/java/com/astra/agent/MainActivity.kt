@@ -1713,6 +1713,12 @@ private class AstraProcessor(
             )
         }
 
+        // Parse explicit amounts, rates and years before education or Qwen3.
+        // Deterministic maths avoids giving invented financial projections.
+        AstraNaturalFinance.respond(clean)?.let {
+            return AssistantResult(it)
+        }
+
         // Common educational finance questions receive a reliable offline
         // explanation even if Qwen3 weights have not yet been installed.
         AstraFinanceEducation.respond(clean)?.let {
@@ -1797,6 +1803,13 @@ private class AstraProcessor(
                 square root of 81
                 permutations 5 3
                 combinations 5 3
+
+                NATURAL FINANCIAL CALCULATIONS (offline)
+                What will P50,000 grow to at 10% over 7 years?
+                Calculate compound interest on P10,000 at 10% for 2 years compounded monthly
+                How much should I invest today to reach P100,000 at 10% in 7 years?
+                How long to double P10,000 at 10% compounded monthly?
+                No extra deposits, fees or taxes are assumed.
 
                 FINANCE EXPLANATIONS (always offline)
                 explain compound interest
