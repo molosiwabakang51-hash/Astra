@@ -3974,13 +3974,14 @@ class MainActivity :
                                 ) {
 
                                     item {
-                                        Text("CLOUD INTELLIGENCE",
+                                        Text("LOCAL AI · ZERO API FEES",
                                             style = MaterialTheme.typography.titleMedium)
-                                        Text("Optional cloud AI sends up to 16 recent chat " +
-                                            "messages to your private HTTPS gateway. This may " +
-                                            "include text from earlier task or note responses " +
-                                            "shown in this chat. Do not enable it for conversations " +
-                                            "that must remain entirely on-device.")
+                                        Text("Optional: use an openly available Ollama model " +
+                                            "running on your own computer, with no paid AI APIs. " +
+                                            "Your phone sends up to 16 recent messages over " +
+                                            "private HTTPS, possibly including displayed task " +
+                                            "or note content. If you want everything to remain " +
+                                            "on your phone, keep this switch off.")
                                         Switch(
                                             checked = cloudEnabled,
                                             onCheckedChange = {
@@ -3994,7 +3995,7 @@ class MainActivity :
                                                 cloudEndpoint = it.take(500)
                                                 storage.setString("cloud_ai_endpoint", cloudEndpoint)
                                             },
-                                            label = { Text("Astra gateway HTTPS URL") },
+                                            label = { Text("Private HTTPS address (Tailscale Serve)") },
                                             modifier = Modifier.fillMaxWidth(),
                                             singleLine = true
                                         )
@@ -4008,8 +4009,9 @@ class MainActivity :
                                         )
                                         Text("The access token is kept only in app memory, " +
                                             "not in saved settings or backups. Re-enter it " +
-                                            "after restarting Astra. Never enter your " +
-                                            "model provider API key here.")
+                                            "after restarting Astra. This is NOT a paid model " +
+                                            "API key. Run Ollama and the free Astra gateway on " +
+                                            "a computer you own.")
                                         Text(
                                             if (cloudEnabled &&
                                                 AstraCloudBrain.isSafeEndpoint(cloudEndpoint) &&
@@ -4019,9 +4021,12 @@ class MainActivity :
                                             color = MaterialTheme.colorScheme.primary,
                                             style = MaterialTheme.typography.labelMedium
                                         )
-                                        Text("When enabled and authenticated, unsupported " +
-                                            "questions automatically use your HTTPS gateway. " +
-                                            "Local commands stay on your device.")
+                                        Text("Setup (no model API fees): Install Ollama, " +
+                                            "download qwen3:0.6b, start the local Astra " +
+                                            "gateway, and connect using private HTTPS. " +
+                                            "Your computer must stay on. Setup instructions " +
+                                            "are in the repository under gateway/README.md. " +
+                                            "Local commands work when this is switched off.")
                                         HorizontalDivider()
                                     }
 
