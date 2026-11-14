@@ -4013,6 +4013,46 @@ class MainActivity :
 
                                     item {
                                         Text(
+                                            "Data backup & recovery",
+                                            style = MaterialTheme.typography.titleLarge
+                                        )
+                                    }
+
+                                    item {
+                                        Text(
+                                            "Export a local Astra JSON backup containing chat, notes, " +
+                                            "tasks, shopping lists, habits, learning progress and settings. " +
+                                            "The file is not encrypted, so store it privately. " +
+                                            "Import replaces the current saved data after confirmation."
+                                        )
+                                    }
+
+                                    item {
+                                        Column(
+                                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                                        ) {
+                                            OutlinedButton(
+                                                onClick = {
+                                                    exportBackupLauncher.launch("Astra-backup.json")
+                                                }
+                                            ) { Text("Export backup") }
+
+                                            OutlinedButton(
+                                                onClick = {
+                                                    importBackupLauncher.launch(
+                                                        arrayOf("application/json", "text/plain", "*/*")
+                                                    )
+                                                }
+                                            ) { Text("Import backup") }
+                                        }
+                                    }
+
+                                    item {
+                                        HorizontalDivider()
+                                    }
+
+                                    item {
+                                        Text(
                                             "Help & user guide",
                                             style = MaterialTheme.typography.titleLarge
                                         )
