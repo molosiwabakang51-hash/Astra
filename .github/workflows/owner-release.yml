@@ -136,7 +136,8 @@ jobs:
           gh release create "$tag" \
             dist/Astra-v0.11.1-LITE-owner-signed.apk \
             --target "$GITHUB_SHA" \
-            --title "Astra $tag - Low-data offline AI" \
+            --prerelease \
+            --title "Astra $tag - Experimental low-data offline AI" \
             --notes "Owner-signed ARM64 APK. Large Qwen3 model is not bundled in this small update. Settings → Import offline model once, from GGUF, previous Astra APK or GitHub artifact ZIP. All AI inference runs on-device without internet. Export local data before replacing an older debug-signed build. Subsequent same-key signed upgrades preserve the imported model. Android phone-level validation is still required."
 
       - name: Destroy temporary signing key
