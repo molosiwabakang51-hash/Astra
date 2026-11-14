@@ -21,6 +21,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.combinedClickable
@@ -2376,14 +2377,7 @@ class MainActivity :
                     }
                 }
                 var showChatSwitcher by remember { mutableStateOf(false) }
-                var dockExpanded by remember { mutableStateOf(false) }
-
-                LaunchedEffect(dockExpanded, tab) {
-                    if (dockExpanded) {
-                        delay(4_000)
-                        dockExpanded = false
-                    }
-                }
+                var navigationPopupOpen by remember { mutableStateOf(false) }
 
                 var pendingBackupRestore by remember {
                     mutableStateOf<AstraBackupCodec.Payload?>(null)
@@ -3382,18 +3376,42 @@ class MainActivity :
                                 Arrangement.SpaceBetween
                         ) {
 
-                            if (tab == 0) {
-                                AstraBrand(listening = listening)
-                            } else {
-                                Text(
-                                    when (tab) {
-                                        1 -> "Tasks"
-                                        2 -> "Notes"
-                                        3 -> "Tools"
-                                        else -> "Settings"
-                                    },
-                                    style = MaterialTheme.typography.titleLarge
-                                )
+                            Box {
+                                Box(
+                                    modifier = Modifier.clickable {
+                                        navigationPopupOpen = !navigationPopupOpen
+                                    }
+                                ) {
+                                    AstraBrand(listening = listening)
+                                }
+                                DropdownMenu(
+                                    expanded = navigationPopupOpen,
+                                    onDismissRequest = { navigationPopupOpen = false }
+                                ) {
+                                    listOf(
+                                        "Chat", "Tasks", "Notes", "Tools", "Settings"
+                                    ).forEachIndexed { index, title ->
+                                        DropdownMenuItem(
+                                            text = {
+                                                Row(
+                                                    verticalAlignment = Alignment.CenterVertically,
+                                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                                ) {
+                                                    Text(
+                                                        listOf("✦", "✓", "▤", "⌘", "⚙")[index],
+                                                        color = MaterialTheme.colorScheme.primary
+                                                    )
+                                                    Text(title)
+                                                    if (tab == index) Text("✓")
+                                                }
+                                            },
+                                            onClick = {
+                                                tab = index
+                                                navigationPopupOpen = false
+                                            }
+                                        )
+                                    }
+                                }
                             }
 
                             if (tab == 0) {
@@ -3470,57 +3488,6 @@ class MainActivity :
                             }
                         }
                     },
-
-                    bottomBar = {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .background(MaterialTheme.colorScheme.surface)
-                        ) {
-                            Box(
-                                modifier = Modifier.fillMaxWidth(),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                TextButton(
-                                    onClick = { dockExpanded = !dockExpanded }
-                                ) {
-                                    Text(if (dockExpanded) "⌄  MINIMIZE DOCK" else "⌃  EXPAND DOCK")
-                                }
-                            }
-                            val dockHeight by animateDpAsState(
-                                targetValue = if (dockExpanded) 84.dp else 56.dp,
-                                animationSpec = tween(280),
-                                label = "Astra navigation dock height"
-                            )
-                            NavigationBar(
-                                modifier = Modifier.height(dockHeight)
-                            ) {
-                                listOf(
-                                    "Chat", "Tasks", "Notes", "Tools", "Settings"
-                                ).forEachIndexed { index, title ->
-                                    NavigationBarItem(
-                                        selected = tab == index,
-                                        onClick = {
-                                            tab = index
-                                            dockExpanded = true
-                                        },
-                                        icon = {
-                                            Text(
-                                                listOf("✦", "✓", "▤", "⌘", "⚙")[index],
-                                                style = MaterialTheme.typography.titleLarge
-                                            )
-                                        },
-                                        label = {
-                                            AnimatedVisibility(visible = dockExpanded) {
-                                                Text(title)
-                                            }
-                                        },
-                                        alwaysShowLabel = false
-                                    )
-                                }
-                            }
-                        }
-                    }
 
                 ) { padding ->
 
