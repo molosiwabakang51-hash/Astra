@@ -33,7 +33,10 @@
         android:label="Astra"
         android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher_round"
-        android:theme="@style/Theme.Astra">
+        android:theme="@style/Theme.Astra"
+        android:allowBackup="false"
+        android:fullBackupContent="false"
+        android:dataExtractionRules="@xml/astra_data_extraction_rules">
 
         <activity
             android:name=".MainActivity"
