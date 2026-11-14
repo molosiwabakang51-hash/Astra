@@ -5,6 +5,8 @@ import android.os.StatFs
 import com.arm.aichat.AiChat
 import com.arm.aichat.InferenceEngine
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.sync.Mutex
@@ -55,6 +57,9 @@ internal class AstraOnDeviceBrain(private val context: Context) {
                 val finalMessage = turns.lastOrNull { it.role == "user" }?.content
                     ?.trim()?.take(3000).orEmpty()
                 require(finalMessage.isNotEmpty()) { "Message cannot be empty." }
+                if (verifiedFile == null) {
+                    onPartial("Verifying the bundled offline model...")
+                }
                 val modelPath = ensureBundledModel()
                 var current = engine
                 if (current == null) {
@@ -78,6 +83,7 @@ internal class AstraOnDeviceBrain(private val context: Context) {
                     loadedGeneration = null
                 }
                 if (loadedGeneration != conversationGeneration) {
+                    onPartial("Loading the language model on this phone...")
                     // The native engine retains chat context. Always unload
                     // between conversations, including activity recreation.
                     if (current.state.value is InferenceEngine.State.ModelReady) {
@@ -124,7 +130,8 @@ internal class AstraOnDeviceBrain(private val context: Context) {
             }
         }
 
-    private fun ensureBundledModel(): File {
+    private suspend fun ensureBundledModel(): File {
+        val workContext = currentCoroutineContext()
         verifiedFile?.takeIf { it.isFile }?.let { return it }
         val dir = File(context.noBackupFilesDir, "offline-models")
         require(dir.isDirectory || dir.mkdirs()) { "Cannot create private model storage." }
@@ -148,10 +155,12 @@ internal class AstraOnDeviceBrain(private val context: Context) {
                 FileOutputStream(temp).use { sink ->
                     val buffer = ByteArray(1024 * 1024)
                     while (true) {
+                        workContext.ensureActive()
                         val count = source.read(buffer)
                         if (count < 0) break
                         sink.write(buffer, 0, count)
                     }
+                    workContext.ensureActive()
                     sink.fd.sync()
                 }
             }
@@ -166,11 +175,13 @@ internal class AstraOnDeviceBrain(private val context: Context) {
         }
     }
 
-    private fun sha256(file: File): String {
+    private suspend fun sha256(file: File): String {
+        val workContext = currentCoroutineContext()
         val digest = MessageDigest.getInstance("SHA-256")
         file.inputStream().buffered().use { input ->
             val block = ByteArray(1024 * 1024)
             while (true) {
+                workContext.ensureActive()
                 val count = input.read(block)
                 if (count < 0) break
                 digest.update(block, 0, count)
