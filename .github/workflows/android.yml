@@ -47,6 +47,7 @@ jobs:
         run: |
           python3 -m unittest discover -s scripts/tests -p "test_*.py" -v
           python3 scripts/harden_native_inference.py --verify
+          python3 scripts/fix_native_prompt_error.py --verify
 
       - name: Run tests and build debug APK
         working-directory: android
