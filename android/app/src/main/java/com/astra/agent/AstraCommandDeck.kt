@@ -55,9 +55,14 @@ internal object AstraDeck {
         return if (total == 0L) 0 else (safeDone.toLong() * 100L / total).toInt()
     }
 
-    fun status(listening: Boolean, researching: Boolean): String = when {
+    fun status(
+        listening: Boolean,
+        researching: Boolean,
+        awaitingReply: Boolean = false
+    ): String = when {
         listening -> "VOICE INPUT ACTIVE"
         researching -> "RESEARCH IN PROGRESS"
+        awaitingReply -> "AWAITING YOUR RESPONSE"
         else -> "LOCAL SYSTEM READY"
     }
 }
@@ -69,9 +74,10 @@ internal fun AstraCommandDeck(
     openTasks: Int,
     completedTasks: Int,
     storedNotes: Int,
+    awaitingReply: Boolean = false,
     onCommand: (String) -> Unit
 ) {
-    val status = AstraDeck.status(listening, researching)
+    val status = AstraDeck.status(listening, researching, awaitingReply)
     val animation = rememberInfiniteTransition(label = "astra-deck")
     val sweep by animation.animateFloat(
         initialValue = 0f,
@@ -134,7 +140,8 @@ internal fun AstraCommandDeck(
             modifier = Modifier.horizontalScroll(rememberScrollState()),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            AstraDeck.prompts.forEach { command ->
+            (if (awaitingReply) listOf("Cancel") + AstraDeck.prompts
+                else AstraDeck.prompts).forEach { command ->
                 Text(
                     text = command,
                     modifier = Modifier

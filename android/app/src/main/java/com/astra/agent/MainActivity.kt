@@ -1348,7 +1348,8 @@ private object UtilityEngine {
 
 private class AstraProcessor(
     private val russianTutor: RussianTutor,
-    private val everydayAssistant: EverydayAssistant
+    private val everydayAssistant: EverydayAssistant,
+    private val dialogue: AstraDialogue
 ) {
 
     fun process(
@@ -1450,7 +1451,7 @@ private class AstraProcessor(
             )
         }
 
-        MissionControl.respond(clean, tasks, completed, notes)?.let {
+        dialogue.respond(clean, tasks, notes, completed)?.let {
             return AssistantResult(it)
         }
 
@@ -1713,9 +1714,16 @@ private class AstraProcessor(
                 MISSION CONTROL
                 mission control
                 what should I do next
+                make it high
+                mark it done (requires confirmation)
                 set task 1 priority high
                 set task 2 priority medium
                 show my progress
+
+                FOLLOW-UP CONVERSATION
+                add task (Astra asks what to add)
+                remember (Astra asks for the note)
+                cancel (stops a pending action)
 
                 TASKS
                 add task study finance
@@ -2228,9 +2236,12 @@ class MainActivity :
         val storage =
             AstraStorage(this)
 
+        val dialogue = AstraDialogue()
+
         val processor = AstraProcessor(
             RussianTutor(storage::getInt, storage::setInt),
-            EverydayAssistant(storage::getString, storage::setString)
+            EverydayAssistant(storage::getString, storage::setString),
+            dialogue
         )
 
         setContent {
@@ -2307,6 +2318,10 @@ class MainActivity :
 
                 var activeResearchCount by remember {
                     mutableIntStateOf(0)
+                }
+
+                var dialogueAwaiting by remember {
+                    mutableStateOf(false)
                 }
 
                 var tab by remember {
@@ -2481,6 +2496,8 @@ class MainActivity :
                     val normalized = AstraInput.normalize(message)
                     val researchTopic = ResearchCommand.extract(normalized)
                     if (researchTopic != null) {
+                        dialogue.dismissIncompletePrompt()
+                        dialogueAwaiting = false
                         val placeholder =
                             "Searching Wikipedia for " + researchTopic + "..."
 
@@ -2522,6 +2539,7 @@ class MainActivity :
                             tasks,
                             completed
                         )
+                    dialogueAwaiting = dialogue.awaitingResponse
 
                     if (!result.sensitive) {
 
@@ -2861,6 +2879,8 @@ class MainActivity :
                                             speechLanguage = SpeechLanguage.fromTag(
                                                 storage.getString("speech_language", "en-US")
                                             )
+                                            dialogue.reset()
+                                            dialogueAwaiting = false
                                             tab = 4
                                             Toast.makeText(
                                                 this@MainActivity,
@@ -2916,6 +2936,8 @@ class MainActivity :
 
                                     persist()
 
+                                    dialogue.reset()
+                                    dialogueAwaiting = false
                                     showClearDialog = false
                                 }
                             ) {
@@ -3256,6 +3278,7 @@ class MainActivity :
                                     openTasks = tasks.size,
                                     completedTasks = completed.size,
                                     storedNotes = notes.size,
+                                    awaitingReply = dialogueAwaiting,
                                     onCommand = { command -> submit(command) }
                                 )
 
