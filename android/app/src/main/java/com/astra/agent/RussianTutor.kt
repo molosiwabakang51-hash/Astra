@@ -54,7 +54,17 @@ internal class RussianTutor(
         }
 
         val pendingIndex = readInt(KEY_PENDING, 0) - 1
-        if (pendingIndex !in cards.indices) return null
+        if (pendingIndex !in cards.indices) {
+            if (input == "answer" || input.startsWith("answer ")) {
+                return "There is no active Russian question. Say 'Russian quiz' to begin."
+            }
+            return null
+        }
+
+        if (input == "answer") {
+            return "Please give the English meaning of '${cards[pendingIndex].russian}'. " +
+                "Reply 'answer <translation>', or say 'skip Russian question'."
+        }
 
         if (input == "skip russian question" || input == "skip russian") {
             writeInt(KEY_PENDING, 0)
@@ -64,6 +74,9 @@ internal class RussianTutor(
 
         val explicitlyAnswering = input.startsWith("answer ")
         val answer = if (explicitlyAnswering) input.removePrefix("answer ").trim() else input
+        if (explicitlyAnswering && answer.isBlank()) {
+            return "Please include your translation after 'answer'. The current word is '${cards[pendingIndex].russian}'."
+        }
 
         // Do not intercept unrelated assistant commands while a quiz is pending.
         if (!explicitlyAnswering &&
@@ -86,7 +99,7 @@ internal class RussianTutor(
         val index = readInt(KEY_NEXT, 0).coerceAtLeast(0) % cards.size
         writeInt(KEY_PENDING, index + 1)
         return "Russian practice: What does '${cards[index].russian}' mean in English? " +
-            "Reply 'answer ...'. Say 'skip Russian question' to reveal it."
+            "Type the English translation, or reply 'answer <translation>'. Say 'skip Russian question' to reveal it."
     }
 
     private fun lessonOne(): String =

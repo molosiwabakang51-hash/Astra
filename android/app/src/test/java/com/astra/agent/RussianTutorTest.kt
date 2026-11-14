@@ -35,11 +35,22 @@ class RussianTutorTest {
         assertTrue(coach.respond("answer thanks")!!.startsWith("Correct."))
     }
 
+    @Test fun bareAnswerPromptsWithoutLosingCurrentQuestion() {
+        val coach = tutor()
+        coach.respond("Russian quiz")
+        assertTrue(coach.respond("answer")!!.contains("Please give the English meaning"))
+        assertTrue(coach.respond("answer thank you")!!.startsWith("Correct."))
+    }
+
+    @Test fun answerWithoutActiveQuizIsExplained() {
+        assertTrue(tutor().respond("answer")!!.contains("no active Russian question"))
+    }
+
     @Test fun unrelatedCommandsAreNotConsumed() {
         val coach = tutor()
         coach.respond("Russian quiz")
         assertNull(coach.respond("add task revise bonds"))
         assertNotNull(coach.respond("skip Russian question"))
-        assertEquals(null, coach.respond("answer hi"))
+        assertTrue(coach.respond("answer hi")!!.contains("no active Russian question"))
     }
 }
