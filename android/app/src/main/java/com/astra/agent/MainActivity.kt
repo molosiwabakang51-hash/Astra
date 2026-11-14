@@ -2372,6 +2372,8 @@ class MainActivity :
                 var offlineAnswerMessageIndex by remember { mutableIntStateOf(-1) }
                 var offlineModelTestStatus by remember { mutableStateOf("") }
                 var offlineModelTestRunning by remember { mutableStateOf(false) }
+                var modelImportRunning by remember { mutableStateOf(false) }
+                var modelImportStatus by remember { mutableStateOf("") }
 
                 var tab by remember {
                     mutableIntStateOf(0)
@@ -2640,6 +2642,13 @@ class MainActivity :
 
                 // All model output stays on-device and streams into the active bubble.
                 fun enqueueOffline(displayMessage: String, prompt: String) {
+                    if (modelImportRunning) {
+                        history.add(ChatMessage(
+                            "Astra", "An offline model is being imported. Ask again after import."
+                        ))
+                        persist()
+                        return
+                    }
                     if (offlineJob?.isActive == true) {
                         history.add(ChatMessage(
                             "Astra", "A response is already being generated. Stop it first."
@@ -3003,6 +3012,42 @@ class MainActivity :
                                         error.message ?: "Could not read backup.",
                                         Toast.LENGTH_LONG
                                     ).show()
+                                }
+                            }
+                        }
+                    }
+
+                val importModelLauncher =
+                    rememberLauncherForActivityResult(
+                        ActivityResultContracts.OpenDocument()
+                    ) { selected ->
+                        if (selected != null && !modelImportRunning &&
+                            offlineJob?.isActive != true && !offlineModelTestRunning) {
+                            modelImportRunning = true
+                            modelImportStatus = "Importing a locally saved model..."
+                            researchScope.launch {
+                                try {
+                                    val bytes = AstraModelImport.importDocument(
+                                        applicationContext, selected
+                                    ) { copied ->
+                                        withContext(Dispatchers.Main) {
+                                            modelImportStatus = "Importing offline model: " +
+                                                (copied / (1024 * 1024)) + " MiB..."
+                                        }
+                                    }
+                                    modelImportStatus =
+                                        "MODEL READY ON THIS PHONE · " +
+                                            (bytes / (1024 * 1024)) + " MiB verified. " +
+                                            "No network was used."
+                                } catch (cancel: kotlinx.coroutines.CancellationException) {
+                                    modelImportStatus = "Model import cancelled."
+                                    throw cancel
+                                } catch (error: Exception) {
+                                    modelImportStatus =
+                                        "MODEL IMPORT FAILED: " +
+                                            (error.message ?: "Cannot read the model document.")
+                                } finally {
+                                    modelImportRunning = false
                                 }
                             }
                         }
@@ -4392,19 +4437,53 @@ class MainActivity :
                                             "connection is needed for AI conversation. " +
                                             "Built-in tasks, notes and calculators run locally first."
                                         )
+                                        val modelIncluded = onDeviceBrain.isModelBundled()
+                                        val modelImported = AstraModelImport.appearsInstalled(
+                                            applicationContext
+                                        )
                                         Text(
-                                            if (onDeviceBrain.isModelBundled())
-                                                "MODEL INCLUDED IN INSTALLED APP"
-                                            else
-                                                "MODEL MISSING FROM THIS BUILD — REINSTALL THE OFFLINE APK",
+                                            when {
+                                                modelIncluded -> "OFFLINE MODEL INCLUDED IN APK"
+                                                modelImported -> "OFFLINE MODEL IMPORTED TO THIS PHONE"
+                                                else -> "MODEL NOT INSTALLED — IMPORT ONCE BELOW"
+                                            },
                                             style = MaterialTheme.typography.labelMedium,
-                                            color = if (onDeviceBrain.isModelBundled())
+                                            color = if (modelIncluded || modelImported)
                                                 MaterialTheme.colorScheme.primary
                                             else MaterialTheme.colorScheme.error
                                         )
                                         Text(
-                                            "First use copies and verifies approximately " +
-                                            "484 MB of model data into private phone storage. " +
+                                            "For data-saving updates, import Qwen3 GGUF once " +
+                                                "from Downloads, or select your previous large " +
+                                                "Astra APK / GitHub ZIP. The AI model is checked " +
+                                                "locally and kept across correctly signed app updates. " +
+                                                "Nothing is downloaded by the import process.",
+                                            style = MaterialTheme.typography.bodySmall
+                                        )
+                                        OutlinedButton(
+                                            enabled = !modelImportRunning &&
+                                                offlineJob?.isActive != true &&
+                                                !offlineModelTestRunning,
+                                            onClick = {
+                                                importModelLauncher.launch(arrayOf("*/*"))
+                                            }
+                                        ) {
+                                            Text(
+                                                if (modelImportRunning) "Importing offline model..."
+                                                else "Import offline model once"
+                                            )
+                                        }
+                                        if (modelImportStatus.isNotBlank()) {
+                                            Text(
+                                                modelImportStatus,
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.primary
+                                            )
+                                        }
+                                        Text(
+                                            "The full APK includes model weights. With the smaller APK, " +
+                                            "you can import a GGUF or previous large APK/ZIP " +
+                                            "without downloading the model again. " +
                                             "Keep at least 1 GB of free storage for installation " +
                                             "and extraction. Responses may be slow on older phones. " +
                                             "Astra does not transmit these messages to a server.",
@@ -4417,8 +4496,9 @@ class MainActivity :
                                         ) {
                                             OutlinedButton(
                                                 enabled = !offlineModelTestRunning &&
+                                                    !modelImportRunning &&
                                                     offlineJob?.isActive != true &&
-                                                    onDeviceBrain.isModelBundled(),
+                                                    onDeviceBrain.hasLocalModel(),
                                                 onClick = {
                                                     offlineModelTestRunning = true
                                                     offlineModelTestStatus = "LOADING AND TESTING LOCAL MODEL..."
