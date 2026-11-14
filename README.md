@@ -1,27 +1,38 @@
-# Astra Offline — zero-cost Android starter
+# Astra — Android personal assistant (v0.9.3)
 
-This version runs **without an API key or server**. It is an offline command assistant, **not yet a generative AI model**. It stores notes, tasks, and chat history in Android private app preferences, supports arithmetic, and offers Android voice recognition and text-to-speech where available. Speech recognition may use a network connection depending on the device's installed speech service.
+Astra is a **local-first Android/Kotlin Jetpack Compose assistant** with a futuristic dark interface. It is being developed directly in this repository. The original **Astra-AI** repository is kept separately as a backup.
 
-## Build from an Android phone using GitHub Actions
+## Working capabilities
 
-1. Create a GitHub account and a **private** repository. GitHub Actions on private repositories may be subject to free-tier usage quotas.
-2. Upload the **contents** of this ZIP to the repository root. Ensure `.github/workflows/android.yml` is present (GitHub's mobile upload interface may hide dot-directories; use GitHub's web editor if necessary).
-3. Open the repository's **Actions** tab; choose **Build free Android APK**, then **Run workflow**. A push to the `main` branch also triggers a build.
-4. Open the completed run, download the `astra-offline-debug-apk` artifact, unzip it and install `app-debug.apk` on the phone. Android may ask to allow installs from your browser/files app.
-5. The debug APK is for personal testing, not a signed Play Store release.
+- Chat interface with local conversation history, notes, tasks and completion tracking.
+- **Mission Control**: progress summaries, explicit task priorities and next-task suggestions based on saved information.
+- **Local memory recall**: search saved notes/tasks with commands such as `recall bond duration`. This is lexical retrieval, not generative AI or a full chat-history search.
+- Mathematics, finance calculations, unit conversions, text utilities and random tools.
+- Shopping lists, habits, daily overviews and introductory Russian lessons/quizzes.
+- Android speech recognition and text-to-speech, depending on installed system services and language packs.
+- Explicit opt-in Wikipedia research, which sends the requested public topic to Wikipedia.
+- Local JSON backup and confirmed restore under **Settings → Data backup & recovery**. Backups are **not encrypted** and should be kept private.
+- Dark adaptive launcher artwork, animated Astra branding and a live command-deck HUD.
 
-## Commands
+**Important:** Astra currently uses deterministic command routing. It does not have a generative language model, unrestricted device automation, camera reasoning or autonomous scheduled tasks. Live financial quotes are not included.
 
-- `help`
-- `note Buy groceries`
-- `notes`
-- `task Finish assignment`
-- `tasks`
-- `done 1`
-- `calculate (12 + 3) * 2`
-- `time`
-- `clear`
+## Builds
 
-## Security and limitations
+The workflow at `.github/workflows/android.yml` compiles and tests the app on pushes to `main`, pull requests, manual dispatch and a weekly schedule. It publishes the **Astra-debug-APK** artifact from successful runs under [GitHub Actions](https://github.com/molosiwabakang51-hash/Astra/actions).
 
-No Internet permission, no backend and no paid AI APIs. No autonomous access to other apps or unrestricted device control. The app does not execute shell commands. Data remains in the app's private storage, but is not encrypted beyond Android's normal device protections. Removing app data removes stored notes/tasks. The app is not yet a fully featured AI assistant; a future release would need a compatible on-device LLM runtime and a separately downloaded quantized model. The model download and RAM/storage requirements depend on the selected model. No APK was compiled or device-tested in this environment.
+The Android project is in `android/`, with application ID `com.astra.agent`, Android API 26 minimum, Java 17 and Gradle 8.9 on CI.
+
+The generated **debug APK is for development/testing**. Build runners may use different debug-signing keys, which can prevent an in-place update from a previously installed APK. Before reinstalling, export your data. Stable private release signing is tracked in [issue #14](https://github.com/molosiwabakang51-hash/Astra/issues/14). Never put keystores or API keys in this public repository.
+
+## Quick command examples
+
+- `Mission control`, `What's next?`, `Set task 2 priority high`
+- `Hey Astra, please show me my tasks`
+- `Remember that bond prices usually move inversely to yields`
+- `What did I say about bond duration?`
+- `Teach me Russian`, `Russian quiz`
+- `Plan my day`, `Add milk to shopping list`
+- `Calculate 12 * 5`, `Compound interest 10000 10 2 12`
+- `Research the solar system`, `Help`
+
+See the repository [issues](https://github.com/molosiwabakang51-hash/Astra/issues) for outstanding model integration, quality testing, and interface development.
