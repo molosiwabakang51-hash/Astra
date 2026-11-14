@@ -35,7 +35,7 @@ The generated **debug APK is for development/testing**. Build runners may use di
 ## Conversation management and privacy
 
 - Tap the **ASTRA** logo to navigate between Chat, Tasks, Notes, Tools and Settings.
-- In Chat's three-dot menu, choose **New conversation** to archive the current thread without deleting it, or **Conversations** to switch between previous threads.
+- In Chat's three-dot menu, choose **New conversation** to archive the current thread without deleting it, **Conversations** to find and switch between previous threads, or **Rename current chat** to give the active thread a custom title. In the conversation picker, search archived chat titles, rename saved chats, or individually delete unwanted conversations with confirmation.
 - Typed or spoken `new chat` / `new conversation` now opens another conversation **without deleting the old one**. `switch chat` opens the conversation picker. `clear chat` still requires confirmation before it deletes the active history.
 - Astra keeps local conversations in app-private storage. Automatic Android system backup and device-transfer restore are disabled to reduce unintended copies of private data.
 - **Before uninstalling or changing devices**, export a JSON backup through Settings, keep it somewhere private, and restore it manually after installing Astra. Deleting the app without exporting can permanently lose its local notes, chats, and tasks.

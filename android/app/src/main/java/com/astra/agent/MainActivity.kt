@@ -50,6 +50,9 @@ import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
 
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.Dispatchers
@@ -2384,6 +2387,15 @@ class MainActivity :
                     }
                 }
                 var showChatSwitcher by remember { mutableStateOf(false) }
+                var activeChatTitle by remember {
+                    mutableStateOf(storage.getString("astra_active_chat_title", ""))
+                }
+                var chatSearchQuery by remember { mutableStateOf("") }
+                var renameActiveChat by remember { mutableStateOf(false) }
+                var renameArchivedChatId by remember { mutableStateOf<String?>(null) }
+                var renameChatDraft by remember { mutableStateOf("") }
+                var deleteChatId by remember { mutableStateOf<String?>(null) }
+                var returnToChatLibrary by remember { mutableStateOf(false) }
                 var navigationPopupOpen by remember { mutableStateOf(false) }
                 var commandDeckExpanded by remember { mutableStateOf(false) }
 
@@ -2486,7 +2498,7 @@ class MainActivity :
                             0,
                             AstraChatArchive.Chat(
                                 java.util.UUID.randomUUID().toString(),
-                                AstraChatArchive.title(messages),
+                                activeChatTitle.ifBlank { AstraChatArchive.title(messages) },
                                 messages
                             )
                         )
@@ -2498,6 +2510,8 @@ class MainActivity :
                 fun startNewConversation() {
                     chatGeneration++
                     archiveCurrentConversation()
+                    activeChatTitle = ""
+                    storage.setString("astra_active_chat_title", "")
                     history.clear()
                     history.add(ChatMessage("Astra", WELCOME))
                     dialogue.reset()
@@ -2514,6 +2528,9 @@ class MainActivity :
                     archiveCurrentConversation()
                     archivedChats.removeAll { it.id == chat.id }
                     storage.saveArchivedChats(archivedChats)
+                    activeChatTitle = chat.title
+                    storage.setString("astra_active_chat_title", activeChatTitle)
+                    chatSearchQuery = ""
                     history.clear()
                     history.addAll(chat.messages.map { ChatMessage(it.role, it.text) })
                     if (history.isEmpty()) history.add(ChatMessage("Astra", WELCOME))
@@ -3087,6 +3104,9 @@ class MainActivity :
                                             }
                                             archivedChats.clear()
                                             archivedChats.addAll(storage.loadArchivedChats())
+                                            activeChatTitle = storage.getString(
+                                                "astra_active_chat_title", ""
+                                            )
                                             history.clear()
                                             history.addAll(storage.loadHistory())
                                             if (history.isEmpty()) {
@@ -3139,32 +3159,124 @@ class MainActivity :
                         title = { Text("Conversations") },
                         text = {
                             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                Text(
-                                    "Switch chats without deleting messages. " +
-                                    "Your current conversation is saved automatically."
-                                )
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            "CURRENT CHAT",
+                                            style = MaterialTheme.typography.labelSmall
+                                        )
+                                        Text(
+                                            activeChatTitle.ifBlank {
+                                                history.firstOrNull {
+                                                    it.role == "You"
+                                                }?.text?.take(55) ?: "New conversation"
+                                            },
+                                            maxLines = 2,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    }
+                                    TextButton(
+                                        onClick = {
+                                            renameActiveChat = true
+                                            renameChatDraft = activeChatTitle.ifBlank {
+                                                history.firstOrNull {
+                                                    it.role == "You"
+                                                }?.text?.take(55) ?: "New conversation"
+                                            }
+                                            returnToChatLibrary = true
+                                            showChatSwitcher = false
+                                        }
+                                    ) { Text("Rename") }
+                                }
                                 OutlinedButton(
                                     onClick = {
                                         showChatSwitcher = false
+                                        chatSearchQuery = ""
                                         startNewConversation()
-                                    }
+                                    },
+                                    modifier = Modifier.fillMaxWidth()
                                 ) { Text("＋ New conversation") }
-                                if (archivedChats.isEmpty()) {
-                                    Text("No previous conversations yet.")
-                                }
+                                OutlinedTextField(
+                                    value = chatSearchQuery,
+                                    onValueChange = { chatSearchQuery = it.take(100) },
+                                    label = { Text("Search saved chat titles") },
+                                    singleLine = true,
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                                val visibleChats = AstraChatLibrary.search(
+                                    archivedChats.toList(),
+                                    chatSearchQuery
+                                )
+                                Text(
+                                    "${visibleChats.size} saved conversation(s)",
+                                    style = MaterialTheme.typography.labelSmall
+                                )
                                 Column(
-                                    modifier = Modifier.heightIn(max = 400.dp)
+                                    modifier = Modifier.heightIn(max = 300.dp)
                                         .verticalScroll(rememberScrollState())
                                 ) {
-                                    archivedChats.forEach { chat ->
-                                        TextButton(
-                                            onClick = {
-                                                showChatSwitcher = false
-                                                switchToConversation(chat)
-                                            },
-                                            modifier = Modifier.fillMaxWidth()
+                                    if (visibleChats.isEmpty()) {
+                                        Text(
+                                            if (archivedChats.isEmpty()) {
+                                                "No previous conversations yet."
+                                            } else {
+                                                "No saved titles match your search."
+                                            }
+                                        )
+                                    }
+                                    visibleChats.forEach { chat ->
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            verticalAlignment = Alignment.CenterVertically
                                         ) {
-                                            Text(chat.title.ifBlank { "Conversation" })
+                                            TextButton(
+                                                onClick = {
+                                                    showChatSwitcher = false
+                                                    switchToConversation(chat)
+                                                },
+                                                modifier = Modifier.weight(1f)
+                                            ) {
+                                                Column(
+                                                    modifier = Modifier.fillMaxWidth()
+                                                ) {
+                                                    Text(
+                                                        chat.title.ifBlank {
+                                                            "Conversation"
+                                                        },
+                                                        maxLines = 2,
+                                                        overflow = TextOverflow.Ellipsis
+                                                    )
+                                                    Text(
+                                                        "${chat.messages.size} messages",
+                                                        style = MaterialTheme.typography.labelSmall
+                                                    )
+                                                }
+                                            }
+                                            IconButton(
+                                                onClick = {
+                                                    renameArchivedChatId = chat.id
+                                                    renameChatDraft = chat.title
+                                                    returnToChatLibrary = true
+                                                    showChatSwitcher = false
+                                                },
+                                                modifier = Modifier.semantics {
+                                                    contentDescription =
+                                                        "Rename ${chat.title}"
+                                                }
+                                            ) { Text("✎") }
+                                            IconButton(
+                                                onClick = {
+                                                    deleteChatId = chat.id
+                                                    showChatSwitcher = false
+                                                },
+                                                modifier = Modifier.semantics {
+                                                    contentDescription =
+                                                        "Delete ${chat.title}"
+                                                }
+                                            ) { Text("×") }
                                         }
                                     }
                                 }
@@ -3174,6 +3286,111 @@ class MainActivity :
                             TextButton(onClick = { showChatSwitcher = false }) {
                                 Text("Close")
                             }
+                        }
+                    )
+                }
+
+                if (renameActiveChat || renameArchivedChatId != null) {
+                    AlertDialog(
+                        onDismissRequest = {
+                            renameActiveChat = false
+                            renameArchivedChatId = null
+                            if (returnToChatLibrary) showChatSwitcher = true
+                            returnToChatLibrary = false
+                        },
+                        title = { Text("Rename conversation") },
+                        text = {
+                            OutlinedTextField(
+                                value = renameChatDraft,
+                                onValueChange = { renameChatDraft = it.take(100) },
+                                label = { Text("Conversation title") },
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        },
+                        confirmButton = {
+                            TextButton(
+                                enabled = renameChatDraft.isNotBlank(),
+                                onClick = {
+                                    val title = AstraChatLibrary.title(renameChatDraft)
+                                    if (title.isNotBlank()) {
+                                        if (renameActiveChat) {
+                                            activeChatTitle = title
+                                            storage.setString(
+                                                "astra_active_chat_title", title
+                                            )
+                                        } else {
+                                            val id = renameArchivedChatId
+                                            if (id != null) {
+                                                val updated = AstraChatLibrary.rename(
+                                                    archivedChats.toList(), id, title
+                                                )
+                                                storage.saveArchivedChats(updated)
+                                                archivedChats.clear()
+                                                archivedChats.addAll(updated)
+                                            }
+                                        }
+                                    }
+                                    renameActiveChat = false
+                                    renameArchivedChatId = null
+                                    if (returnToChatLibrary) showChatSwitcher = true
+                                    returnToChatLibrary = false
+                                }
+                            ) { Text("Save") }
+                        },
+                        dismissButton = {
+                            TextButton(
+                                onClick = {
+                                    renameActiveChat = false
+                                    renameArchivedChatId = null
+                                    if (returnToChatLibrary) showChatSwitcher = true
+                                    returnToChatLibrary = false
+                                }
+                            ) { Text("Cancel") }
+                        }
+                    )
+                }
+
+                val deleteChat = archivedChats.firstOrNull {
+                    it.id == deleteChatId
+                }
+                if (deleteChatId != null) {
+                    AlertDialog(
+                        onDismissRequest = {
+                            deleteChatId = null
+                            showChatSwitcher = true
+                        },
+                        title = { Text("Delete saved conversation?") },
+                        text = {
+                            Text(
+                                "Delete \"${deleteChat?.title ?: "Conversation"}\" and " +
+                                    "all its saved messages? This cannot be undone."
+                            )
+                        },
+                        confirmButton = {
+                            TextButton(
+                                onClick = {
+                                    val id = deleteChatId
+                                    if (id != null) {
+                                        val updated = AstraChatLibrary.delete(
+                                            archivedChats.toList(), id
+                                        )
+                                        storage.saveArchivedChats(updated)
+                                        archivedChats.clear()
+                                        archivedChats.addAll(updated)
+                                    }
+                                    deleteChatId = null
+                                    showChatSwitcher = true
+                                }
+                            ) { Text("Delete") }
+                        },
+                        dismissButton = {
+                            TextButton(
+                                onClick = {
+                                    deleteChatId = null
+                                    showChatSwitcher = true
+                                }
+                            ) { Text("Cancel") }
                         }
                     )
                 }
@@ -3205,6 +3422,8 @@ class MainActivity :
                                             WELCOME
                                         )
                                     )
+                                    activeChatTitle = ""
+                                    storage.setString("astra_active_chat_title", "")
 
                                     persist()
 
@@ -3511,7 +3730,21 @@ class MainActivity :
                                             text = { Text("Conversations") },
                                             onClick = {
                                                 showMenu = false
+                                                chatSearchQuery = ""
                                                 showChatSwitcher = true
+                                            }
+                                        )
+                                        DropdownMenuItem(
+                                            text = { Text("Rename current chat") },
+                                            onClick = {
+                                                showMenu = false
+                                                renameActiveChat = true
+                                                renameChatDraft = activeChatTitle.ifBlank {
+                                                    history.firstOrNull {
+                                                        it.role == "You"
+                                                    }?.text?.take(55) ?: "New conversation"
+                                                }
+                                                returnToChatLibrary = false
                                             }
                                         )
                                     }

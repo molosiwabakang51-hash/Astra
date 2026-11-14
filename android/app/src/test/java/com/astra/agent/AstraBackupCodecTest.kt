@@ -42,6 +42,33 @@ class AstraBackupCodecTest {
         assertTrue(restored.preview().contains("2 chat messages"))
     }
 
+    @Test fun activeConversationTitleSurvivesBackupRoundTrip() {
+        val source = example + mapOf(
+            "astra_active_chat_title" to "Portfolio Revision",
+            "astra_chat_archive" to "[]"
+        )
+        val result = AstraBackupCodec.parse(AstraBackupCodec.encode(source))
+        assertEquals("Portfolio Revision", result.values["astra_active_chat_title"])
+    }
+
+    @Test fun oldBackupsWithoutConversationMetadataStillRestore() {
+        val old = JSONObject(AstraBackupCodec.encode(example))
+        val data = old.getJSONObject("data")
+        data.remove("astra_active_chat_title")
+        data.remove("astra_chat_archive")
+        val restored = AstraBackupCodec.parse(old.toString())
+        assertEquals("", restored.values["astra_active_chat_title"])
+        assertEquals("[]", restored.values["astra_chat_archive"])
+        assertEquals(2, restored.historyCount)
+    }
+
+    @Test fun excessiveConversationTitleInBackupIsRejected() {
+        val source = JSONObject(AstraBackupCodec.encode(example))
+        source.getJSONObject("data")
+            .put("astra_active_chat_title", "X".repeat(101))
+        assertRejects { AstraBackupCodec.parse(source.toString()) }
+    }
+
     @Test fun futureCredentialsAreNotExportedOrImported() {
         val withSecret = example.toMutableMap()
         withSecret["api_key"] = "never-export-this"

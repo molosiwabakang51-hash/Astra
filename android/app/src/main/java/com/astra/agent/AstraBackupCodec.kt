@@ -20,7 +20,8 @@ internal object AstraBackupCodec {
     private val arrays = listOf("history", "notes", "tasks", "completed_tasks")
     private val strings = listOf(
         "astra_shopping_items", "astra_habits", "astra_habit_date",
-        "astra_habit_completed_today", "speech_language", "astra_chat_archive"
+        "astra_habit_completed_today", "speech_language", "astra_chat_archive",
+        "astra_active_chat_title"
     )
     private val booleans = listOf(
         "auto_send_voice", "speak_responses", "local_only_tts", "allow_system_speech"
@@ -123,8 +124,18 @@ internal object AstraBackupCodec {
         }
 
         for (key in strings) {
-            val value = data.opt(key)
-            if (value !is String || value.length > 2_000_000) {
+            // Backups made before multiple conversations or custom titles
+            // must remain importable. Only these optional newer keys can be
+            // absent; every older field retains strict validation.
+            val value = if (!data.has(key) && key == "astra_chat_archive") {
+                "[]"
+            } else if (!data.has(key) && key == "astra_active_chat_title") {
+                ""
+            } else {
+                data.opt(key)
+            }
+            val limit = if (key == "astra_active_chat_title") 100 else 2_000_000
+            if (value !is String || value.length > limit) {
                 throw IllegalArgumentException("Invalid $key setting in backup.")
             }
             result[key] = value
