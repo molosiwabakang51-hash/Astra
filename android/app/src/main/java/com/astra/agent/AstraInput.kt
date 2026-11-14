@@ -37,8 +37,8 @@ internal object AstraInput {
         }
 
         text = text.replaceFirst(
-            Regex("""(?i)^make\s+(?:a\s+)?note\s+(?:that\s+)?"""),
-            "remember that "
+            Regex("""(?i)^(?:take\s+(?:a\s+)?note|make\s+(?:a\s+)?note|jot\s+(?:this\s+)?down)(?:\s+(?:that|of|about))?(?:\s+|$)"""),
+            "remember "
         )
         text = text.replaceFirst(
             Regex("""(?i)^add\s+a\s+task\s+to\s+"""),
