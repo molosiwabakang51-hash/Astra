@@ -2679,12 +2679,12 @@ class MainActivity :
                         )
                     dialogueAwaiting = dialogue.awaitingResponse
 
-                    if (cloudEnabled &&
-                        AstraCloudBrain.isSafeEndpoint(cloudEndpoint) &&
-                        !result.sensitive &&
-                        result.action == AssistantAction.NONE &&
-                        result.text.startsWith(
-                            "I cannot answer that reliably with Astra's current offline tools."
+                    if (AstraAiRouting.shouldUseCloud(
+                            enabled = cloudEnabled,
+                            endpointValid = AstraCloudBrain.isSafeEndpoint(cloudEndpoint),
+                            assistantText = result.text,
+                            sensitive = result.sensitive,
+                            hasAction = result.action != AssistantAction.NONE
                         )
                     ) {
                         val context = history.takeLast(14).mapNotNull {
