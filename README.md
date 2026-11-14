@@ -28,6 +28,19 @@ runners are normally free; avoid charging for oversized artifact storage
 or paid runner tiers. On-device speed, accuracy, memory pressure and battery
 use still require tests on a physical phone before stable release.
 
+## Adaptive offline answer depth
+
+Astra no longer imposes the same 384-token ceiling on every native model reply.
+The on-device generation budget is now bounded by request intent and available
+weights: 1.7B supports 256/768/1152 tokens for brief/ordinary/detailed answers,
+and compact 0.6B supports 192/448/672. Explicit requests for concise responses
+retain shorter budgets. The llama.cpp JNI runtime still enforces the token cap;
+there is no cloud call and no metered inference.
+
+This widens the *maximum response length*, not verified reasoning accuracy.
+Physical-device latency, thermal performance and answer quality must still
+be measured. Responses remain subject to context-size and model limitations.
+
 ## Working capabilities
 
 - Chat interface with **multiple persistent conversations**, an animated compact navigation dock, notes, tasks and completion tracking.
