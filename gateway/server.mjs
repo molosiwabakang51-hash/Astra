@@ -1,7 +1,10 @@
 import http from 'node:http';
 import { timingSafeEqual } from 'node:crypto';
 
-const DEFAULT_MODEL = 'gpt-4.1-mini';
+// No paid AI APIs, API keys, accounts or hosted inference services.
+// This gateway runs a downloaded Ollama model on the owner's own computer.
+const DEFAULT_MODEL = 'qwen3:0.6b';
+const OLLAMA_CHAT_URL = 'http://127.0.0.1:11434/api/chat';
 const MAX_BODY_BYTES = 64_000;
 const MAX_MESSAGES = 16;
 const MAX_CHARS = 3_000;
@@ -80,65 +83,73 @@ async function readRequest(req) {
   }
 }
 
-/** Owner-operated gateway: API key only exists on the server. */
-export async function callOpenAI(messages, { apiKey, model = DEFAULT_MODEL, fetchImpl = fetch }) {
+/**
+ * Ollama is restricted to the local loopback interface.
+ * Never open the unauthenticated Ollama API on your LAN or on the Internet.
+ * The Android phone talks only to our authenticated gateway over HTTPS.
+ */
+export async function callOllama(
+  messages,
+  { model = DEFAULT_MODEL, fetchImpl = fetch } = {}
+) {
+  if (typeof model !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/.test(model)) {
+    throw new Error('Invalid local Ollama model name.');
+  }
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 35_000);
+  const timeout = setTimeout(() => controller.abort(), 90_000);
   try {
-    const result = await fetchImpl('https://api.openai.com/v1/responses', {
+    const result = await fetchImpl(OLLAMA_CHAT_URL, {
       method: 'POST',
       headers: {
-        'Authorization': 'Bearer ' + apiKey,
         'Content-Type': 'application/json',
         'Accept': 'application/json'
       },
       body: JSON.stringify({
         model,
-        instructions: ASSISTANT_INSTRUCTIONS,
-        input: messages,
-        max_output_tokens: 900,
-        store: false
+        stream: false,
+        think: false,
+        messages: [{ role: 'system', content: ASSISTANT_INSTRUCTIONS }, ...messages],
+        options: {
+          num_predict: 900,
+          num_ctx: 4096
+        }
       }),
       signal: controller.signal
     });
-    if (!result.ok) throw new Error('AI provider unavailable (HTTP ' + result.status + ').');
-    const response = await result.json();
-    const answer = (response.output ?? [])
-      .filter((item) => item.type === 'message' && Array.isArray(item.content))
-      .flatMap((item) => item.content)
-      .filter((item) => item.type === 'output_text' && typeof item.text === 'string')
-      .map((item) => item.text)
-      .join('\n')
-      .trim();
-    if (!answer || answer.length > MAX_REPLY_CHARS) {
-      throw new Error('AI provider returned an invalid answer.');
+    if (!result.ok) {
+      throw new Error('Local Ollama unavailable (HTTP ' + result.status + ').');
     }
-    return answer;
+    const response = await result.json();
+    const answer = response?.message?.content;
+    if (typeof answer !== 'string' || !answer.trim() ||
+        answer.trim().length > MAX_REPLY_CHARS) {
+      throw new Error('Local model returned an invalid or empty answer.');
+    }
+    return answer.trim();
   } finally {
     clearTimeout(timeout);
   }
 }
 
 /**
- * In-memory quota is per process; place a persistent edge quota in front
- * of multi-instance deployments, and configure spend limits at the provider.
+ * Local rate/concurrency limits prevent requests from exhausting owner hardware.
+ * The gateway listens on loopback by default and requires a private client token.
  */
 export function createGateway({
   clientToken,
-  apiKey,
   model = DEFAULT_MODEL,
-  callModel = callOpenAI,
+  callModel = callOllama,
   maxRequestsPerWindow = 30,
   windowMs = 3_600_000
 } = {}) {
   if (typeof clientToken !== 'string' || Buffer.byteLength(clientToken) < 32) {
     throw new Error('ASTRA_CLIENT_TOKEN must be a random secret at least 32 bytes long.');
   }
-  if (typeof apiKey !== 'string' || !apiKey.trim()) {
-    throw new Error('OPENAI_API_KEY is required on the server.');
-  }
   if (!Number.isSafeInteger(maxRequestsPerWindow) || maxRequestsPerWindow < 1) {
     throw new Error('Invalid request quota.');
+  }
+  if (typeof model !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/.test(model)) {
+    throw new Error('Invalid local Ollama model name.');
   }
 
   let windowStart = Date.now();
@@ -181,14 +192,14 @@ export function createGateway({
     used++;
     concurrent++;
     try {
-      const reply = await callModel(messages, { apiKey, model });
+      const reply = await callModel(messages, { model });
       if (typeof reply !== 'string' || !reply.trim() || reply.length > MAX_REPLY_CHARS) {
         throw new Error('Invalid gateway result.');
       }
       send(res, 200, { reply: reply.trim() });
     } catch {
-      // Avoid returning provider responses, credentials or conversation text.
-      send(res, 502, { error: 'Model provider unavailable. Retry later.' });
+      // Do not expose private conversation content or local-model diagnostics.
+      send(res, 502, { error: 'Local AI unavailable. Check that Ollama and the model are running.' });
     } finally {
       concurrent--;
     }
@@ -198,15 +209,17 @@ export function createGateway({
 if (process.argv[1] && import.meta.url === new URL('file://' + process.argv[1]).href) {
   const server = createGateway({
     clientToken: process.env.ASTRA_CLIENT_TOKEN,
-    apiKey: process.env.OPENAI_API_KEY,
-    model: process.env.OPENAI_MODEL || DEFAULT_MODEL
+    model: process.env.OLLAMA_MODEL || DEFAULT_MODEL
   });
   const address = process.env.HOST || '127.0.0.1';
   const port = Number(process.env.PORT || '8080');
   if (!Number.isInteger(port) || port < 1 || port > 65_535) {
     throw new Error('PORT must be between 1 and 65535.');
   }
+  if (address !== '127.0.0.1' && address !== '::1') {
+    throw new Error('For safety, the gateway must bind only to loopback. Use an HTTPS reverse proxy for remote access.');
+  }
   server.listen(port, address, () => {
-    console.log('Astra gateway listening on ' + address + ':' + port);
+    console.log('Astra local AI gateway ready on ' + address + ':' + port);
   });
 }

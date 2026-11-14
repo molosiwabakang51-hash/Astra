@@ -13,16 +13,16 @@ Astra is a **local-first Android/Kotlin Jetpack Compose assistant** with a futur
 - Explicit opt-in Wikipedia research, which sends the requested public topic to Wikipedia.
 - Local JSON backup and confirmed restore under **Settings → Data backup & recovery**. Backups are **not encrypted** and should be kept private.
 - Dark adaptive launcher artwork, animated Astra branding and a live command-deck HUD.
-- Optional **natural-language Cloud AI** routing for unsupported questions through a private, authenticated model gateway. Offline commands remain local and operate when no gateway is configured.
+- Optional **natural-language Local AI** routing for unsupported questions to a model running on the owner's own computer through an authenticated private HTTPS gateway. No paid model API or subscription is required. Offline commands remain local.
 - Bond Analytics Lab: fixed-coupon price, current yield, modified and Macaulay duration, convexity and DV01.
 
-**Important:** Astra's offline engine uses deterministic command routing. A generative model becomes available **only after the user independently deploys and authenticates a private AI gateway and enables Cloud AI**. There is no preconfigured live AI provider. Unrestricted device automation, camera reasoning, autonomous scheduled tasks and live financial quotes are not included.
+**Important:** Astra's offline engine uses deterministic command routing. A generative model becomes available **only after the user installs a local Ollama model, runs their own authenticated gateway and enables networked Local AI**. There is no preconfigured live AI provider. Unrestricted device automation, camera reasoning, autonomous scheduled tasks and live financial quotes are not included.
 
-## Optional cloud conversation
+## Zero-API-fee local model conversation
 
-Astra can send unanswered natural-language questions to a model **only after explicit opt-in**. The phone must be configured with an HTTPS gateway URL and a private gateway client token. No provider API key is embedded in the APK. The owner-operated Node.js backend, API protocol tests, deployment requirements and privacy guidance are in [gateway/README.md](gateway/README.md).
+Astra can send unanswered natural-language questions to a **free-to-run local model hosted on your own computer** after explicit opt-in. The model runs using [Ollama](https://ollama.com), without paid inference APIs or subscription charges. The Android phone connects privately over HTTPS with a session-only gateway access token. A documented no-fee personal setup uses Tailscale Serve, which keeps your gateway private. See [gateway/README.md](gateway/README.md) for Windows setup, free networking, limits and tests.
 
-The Android gateway token is **session-only**, not saved in preferences or backups; it must be re-entered after restart. Up to 16 recent chat messages can be sent to the gateway, including messages displaying content from local tasks or notes. The model cannot execute device actions. A ChatGPT subscription does not pay for the separate API service.
+The Android gateway token is **session-only**, not saved in preferences or backups; re-enter it after app restart. Up to 16 recent chat messages can be sent to your own computer, including messages displaying task or note content. The local model cannot execute device actions. **There is no metered model API fee**, but your computer consumes electricity and initial model downloads use data. This is not on-device phone inference; the computer must be running.
 
 ## Builds
 

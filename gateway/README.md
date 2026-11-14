@@ -1,80 +1,132 @@
-# Astra private AI gateway
+# Astra local AI — no paid AI APIs
 
-This backend is an **optional owner-operated service** for Astra's Android app. The Android app connects to this service over HTTPS. The gateway authenticates the request, applies a per-process quota, calls the OpenAI Responses API, then returns JSON of the form:
+Astra can hold natural-language conversations using an **Ollama model running on a computer you already own**, rather than a paid AI API. This repository contains the Node.js gateway, Android client, and security tests. The gateway uses Ollama's **local** HTTP API at `127.0.0.1:11434`. **No OpenAI API key, subscription, card, or model-provider account is required.**
 
-```json
-{"reply":"Hello from Astra."}
+The AI software and chosen downloadable model have no usage-based API fee. There are still **real-world costs** if you need to buy hardware, pay for electricity/data, or rent a server. This setup does not promise zero physical operating cost. The computer must be on and running Ollama for AI chat to work; Astra's offline commands work even if it is off.
+
+## Architecture
+
+```text
+Android Astra app
+    |  Private HTTPS; authenticated with your session-only token
+    v
+Tailscale Serve (personal tailnet; HTTPS, no public port forwarding)
+    |
+    v
+Astra gateway on your computer — 127.0.0.1:8080
+    |  Local HTTP, not exposed to the phone or public internet
+    v
+Ollama on the same computer — 127.0.0.1:11434
+    |
+    v
+Downloaded local model — qwen3:0.6b by default
 ```
 
-It is **not a public, hosted AI service**. No model keys or gateway tokens belong in the repository or inside the APK. A ChatGPT Plus/Pro subscription does not include OpenAI API usage; API billing is separate.
+The default model `qwen3:0.6b` has a relatively small download (about **523 MB** on Ollama's model page). Larger models generally produce stronger responses but use more disk space, RAM, and compute. You can try `qwen3:1.7b` or `qwen3:4b` if your computer can run them. Model quality is not equivalent to a premium cloud AI.
 
-## Requirements
+## Step 1 — Install the free software
 
-- Node.js 20+ (the CI uses Node.js 22)
-- An OpenAI API project/key and API spending limits
-- A **cryptographically random** client access token (32+ bytes)
-- A server under your control with an **HTTPS endpoint** and TLS reverse proxy
+On your computer, install **Ollama** from https://ollama.com/download and **Node.js 20+** from https://nodejs.org/en/download. This repository's gateway has no npm dependencies.
 
-## Local setup
-
-Generate a private token on your own computer:
+Download a model once (this consumes internet data; local inference thereafter requires no external model API):
 
 ```sh
-openssl rand -hex 32
+ollama pull qwen3:0.6b
 ```
 
-Place the generated value in the backend environment as `ASTRA_CLIENT_TOKEN`. Set `OPENAI_API_KEY` separately. Never commit either value or share them in screenshots or chat.
+Check that your model works:
 
 ```sh
+ollama run qwen3:0.6b
+```
+
+Ollama normally listens on `127.0.0.1:11434`. **Keep it bound to loopback**: do not set `OLLAMA_HOST=0.0.0.0`, expose port 11434, or open it in your router.
+
+## Step 2 — Start Astra's free gateway
+
+Generate a random, private access token. This is **not an API key for a paid model**. Never commit or share it.
+
+**Windows PowerShell:**
+
+```powershell
+$bytes = New-Object byte[] 32
+[System.Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($bytes)
+$env:ASTRA_CLIENT_TOKEN = [BitConverter]::ToString($bytes).Replace("-", "").ToLowerInvariant()
+$env:OLLAMA_MODEL = "qwen3:0.6b"
 cd gateway
-export ASTRA_CLIENT_TOKEN='<64-character-random-hex-value>'
-export OPENAI_API_KEY='<your-provider-key>'
-export OPENAI_MODEL='gpt-4.1-mini'
 npm test
 npm start
 ```
 
-The server listens on `127.0.0.1:8080` by default. It intentionally does **not** expose itself to your network automatically.
-
-## Deployment
-
-1. Deploy this service onto a private server, behind a TLS termination reverse proxy with a valid certificate and a domain name. Configure your proxy to forward **only** `POST /chat` (and optionally `GET /health`) to `127.0.0.1:8080`. **Do not publicly expose the backend's HTTP port** or permit plaintext HTTP access to the Android app.
-2. Supply `OPENAI_API_KEY`, `ASTRA_CLIENT_TOKEN`, and optionally `OPENAI_MODEL` through your host's secret manager. Keep the secret manager and server access private.
-3. Configure external rate limiting and daily/monthly provider spend caps. The included 30-request/hour default is **per process** and resets on restart; it is not a distributed or persistent budget enforcement system. A single shared client token is suitable only for a private personal deployment—not a multiuser service.
-4. In the Astra Android app, open **Settings → Cloud Intelligence**. Enable it, paste the public HTTPS URL ending in `/chat`, and enter the *client token*, not the model-provider key.
-5. Submit an open-ended question. Astra runs supported local commands first; only unsupported questions use the cloud gateway. The explicit `ask ai ...` command always requests cloud AI.
-
-For security, the Android client keeps the gateway token **only in memory**. Re-enter it after the app process restarts. Do not put it in backups or store it as a preference. The URL and enabled flag may persist. The app rejects local URLs, user-info in URLs, non-443 ports and non-HTTPS endpoints.
-
-## Privacy and limitations
-
-- Up to 16 recent chat messages may be transmitted with a request; this may include text from local tasks or notes that were displayed in the chat. Do not enable cloud AI if those messages should remain on-device.
-- The gateway does not deliberately log conversations, request bodies or provider responses; external hosting, networking and provider services may maintain their own logs and retention policies.
-- The OpenAI API request includes `store: false` to avoid response application-state storage. This does not necessarily mean zero data retention for all processing.
-- The gateway grants **no access to Android tasks, contacts, camera, notifications or files**; model responses are plain text, not executable device commands.
-- Requests are limited to 16 messages, 3,000 characters each, with a ~64 KB input cap, a ~16,000-character output cap and timeouts.
-- The gateway performs basic quota and concurrency limiting, but real deployment still requires monitoring and stronger infrastructure-level abuse protection.
-- A manual end-to-end test with a real API key, HTTPS deployment and Android device **has not been performed**.
-
-## Test
+**Linux/macOS:**
 
 ```sh
+export ASTRA_CLIENT_TOKEN="$(openssl rand -hex 32)"
+export OLLAMA_MODEL="qwen3:0.6b"
 cd gateway
 npm test
+npm start
 ```
 
-The test suite uses a mocked provider and checks request authentication, secret non-disclosure, message validation, quotas, error handling and the Responses API request/response mapping. GitHub Actions runs it independently of the Android build.
+**The token is only set for this terminal session.** To restart the gateway after closing the terminal, generate/set the same token again or retrieve it from an existing private credential manager. If you generate a new one, update it in Astra Settings. Never create an unprotected `.env` file in a public or shared location.
 
-## API format
+The gateway listens only on `127.0.0.1:8080` and accepts `POST /chat` and `GET /health`. You can test the health endpoint from your computer at `http://127.0.0.1:8080/health`. It returns `{"status":"ready"}` when the gateway itself is running; it does **not** guarantee Ollama or the model is ready.
 
+## Step 3 — Reach your own computer from Android, without renting a server
+
+**Recommended personal-use setup:** [Tailscale Personal](https://tailscale.com/pricing) currently offers a free tier for non-commercial personal use. Install Tailscale on both your computer and Android phone, and sign both into the same private tailnet. Enable MagicDNS and HTTPS certificates for the tailnet, then run on the computer:
+
+```sh
+tailscale serve --bg 8080
 ```
-POST https://your-private-gateway.example/chat
-Authorization: Bearer <your-private-client-token>
+
+Tailscale Serve outputs a **private HTTPS URL**, usually similar to `https://computer.tailnet-name.ts.net/`, reachable only through your tailnet. Configure the Astra gateway address in Android as `https://computer.tailnet-name.ts.net/chat`, using the **actual URL** Tailscale gives you. Enter the same secret `ASTRA_CLIENT_TOKEN` in Astra's **Settings → Cloud Intelligence → Gateway access token**.
+
+The Android client requires a trusted HTTPS hostname and port 443. It rejects plaintext HTTP, localhost URLs and direct provider endpoints. The phone must be connected to your Tailscale tailnet and the computer must be on. The gateway's bearer token is required **in addition** to tailnet access; the phone holds it only in memory, not in local backups.
+
+**Do not use Tailscale Funnel**: that publishes a service to the public internet. Serve is restricted to your tailnet. The free Personal tier is subject to Tailscale's published terms and may change; confirm its availability for your use before signing up.
+
+Alternative: use another owner-operated private HTTPS reverse proxy, but do not forward ports 8080 or 11434 directly from the public internet.
+
+## Step 4 — Use Astra
+
+In Android Settings:
+
+1. Enable **Local Model Gateway** (the optional network AI connection).
+2. Paste your private HTTPS URL ending in `/chat`.
+3. Paste your gateway access token. This token is held in app memory **for this session only**.
+4. Ask a normal question: `Explain bond convexity and show an example`. Unsupported local requests automatically go to your own model. You can also type `ask ai ...`.
+
+Local tasks, notes, and deterministic calculators run **before** the model and remain available without the gateway. No model-generated response can directly control or edit device data.
+
+## Privacy and costs
+
+- **No usage-based AI charges**: no provider API or paid subscription is used. The model runs on your own hardware. A downloaded local model is not automatically installed on the phone.
+- Up to 16 recent chat messages may travel **from your phone to your own computer**, including text previously displayed from notes/tasks. A private Tailscale connection encrypts this traffic, and the gateway does not intentionally log message contents. Disable cloud/network AI if you don't want these messages transmitted.
+- The gateway's session token is not placed in Astra backups; the URL and AI-enabled preference may persist. It must be re-entered after app restart.
+- Gateway responses are plain text; the model cannot open device apps, read contacts, send notifications, change tasks, or browse the internet.
+- Client authentication, basic 30-request/hour per-process throttling, two concurrent request limit and 90-second model timeout guard against accidental overuse. They are not suitable for a public multiuser deployment.
+- The gateway and Ollama inference are entirely on your own machine; there is no call to OpenAI or any other paid AI inference API.
+- Ollama model downloads and Tailscale connection require internet access; your internet provider may charge for data and your hardware uses electricity.
+- **No device-level end-to-end test or live Ollama inference has been performed by CI**. CI tests the gateway protocol using a mocked Ollama response.
+
+## Gateway protocol
+
+```http
+POST https://your-tailnet-host.ts.net/chat
+Authorization: Bearer <your-random-session-token>
 Content-Type: application/json
 
 {"messages":[{"role":"user","content":"What is modified duration?"}]}
 ```
 
-An authenticated successful response is `{"reply":"..."}`. Unauthenticated requests return `401`, invalid payloads `400`, quota failures `429`, and upstream model failures `502`. No model key is returned to the client.
+Success: `{"reply":"..."}`. Unauthorized requests return 401, invalid payloads 400, throttled requests 429, and missing/unresponsive local models 502. Health check: `GET /health` on the private gateway.
 
-For any production deployment, use a managed identity provider and per-user tokens rather than extending this shared-token prototype into an unauthenticated public service.
+## Verification
+
+```sh
+cd gateway
+npm test
+```
+
+GitHub Actions separately runs Android unit tests/APK build and gateway protocol/security tests. No paid cloud deployment or billing account is required to build and test the project.
