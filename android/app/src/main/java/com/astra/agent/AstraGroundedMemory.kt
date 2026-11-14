@@ -105,7 +105,7 @@ internal object AstraGroundedMemory {
             val dedupKey = excerpt.lowercase(Locale.ROOT)
             if (!dedup.add(dedupKey)) return
             val score = hits * 10 + sourceBoost +
-                if (hits == tokens.size) 12 else 0
+                (if (hits == tokens.size) 12 else 0)
             val item = Evidence(source, excerpt, score, sequence++)
             best.add(item)
             // Keep memory bounded while scanning all archived user messages.
