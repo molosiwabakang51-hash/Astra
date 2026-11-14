@@ -4412,7 +4412,10 @@ class MainActivity :
                                     }
                                     OutlinedTextField(
                                         value = input,
-                                        onValueChange = { input = it },
+                                        onValueChange = {
+                                            input = it
+                                            if (it.isNotBlank()) commandDeckExpanded = false
+                                        },
                                         modifier = Modifier.weight(1f),
                                         placeholder = { Text("Message Astra...") },
                                         maxLines = 4,
