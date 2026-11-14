@@ -40,7 +40,14 @@ internal class AstraOnDeviceBrain(private val context: Context) {
     private var engine: InferenceEngine? = null
     private val session = AstraInferenceSession()
     private var verifiedFile: File? = null
+    @Volatile
     private var loadedModelPath: String? = null
+
+    /**
+     * Only reports the last model successfully loaded into the native engine.
+     * The on-device self-test independently determines if it produced an answer.
+     */
+    fun loadedModelLabel(): String? = AstraModelChoice.loadedName(loadedModelPath)
 
     fun hasLocalModel(): Boolean = isModelBundled() ||
         AstraModelImport.appearsInstalled(context)
@@ -124,11 +131,11 @@ internal class AstraOnDeviceBrain(private val context: Context) {
                         current.cleanUp()
                     }
                     current.loadModel(modelPath.absolutePath)
-                    loadedModelPath = modelPath.absolutePath
                     // Never place previous user text or model replies inside the
                     // higher-priority system prompt. Reloaded sessions receive
                     // quoted history once through a bounded user-level prompt.
                     current.setSystemPrompt(AstraConversationContext.systemPrompt())
+                    loadedModelPath = modelPath.absolutePath
                     restoringConversation = true
                     session.markLoaded(conversationGeneration)
                 }
