@@ -213,8 +213,7 @@ jobs:
             echo "Lightweight APK identity mismatch"; exit 1;
           }
           cp "$apk" ../dist/Astra-v0.11.0-LITE-offline-arm64-debug.apk
-          printf "# Lite APK\\n\\nSize: %s bytes\\n\\n" "$(wc -c < "$apk")" \\
-            > ../dist/LITE-size-report.md
+          printf "# Lite APK\n\nSize: %s bytes\n\n" "$(wc -c < "$apk")" > ../dist/LITE-size-report.md
           echo "LITE APK ready; existing model can be imported from previous APK/ZIP."
 
       - name: Publish APK size analysis
