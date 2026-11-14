@@ -2358,6 +2358,8 @@ class MainActivity :
                 }
                 var chatGeneration by remember { mutableIntStateOf(0) }
                 val onDeviceBrain = remember { AstraOnDeviceBrain(applicationContext) }
+                var offlineModelTestStatus by remember { mutableStateOf("") }
+                var offlineModelTestRunning by remember { mutableStateOf(false) }
 
                 var tab by remember {
                     mutableIntStateOf(0)
@@ -4304,6 +4306,66 @@ class MainActivity :
                                             "Astra does not transmit these messages to a server.",
                                             style = MaterialTheme.typography.bodySmall
                                         )
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                        ) {
+                                            OutlinedButton(
+                                                enabled = !offlineModelTestRunning &&
+                                                    onDeviceBrain.isModelBundled(),
+                                                onClick = {
+                                                    offlineModelTestRunning = true
+                                                    offlineModelTestStatus = "LOADING AND TESTING LOCAL MODEL..."
+                                                    val began = System.nanoTime()
+                                                    researchScope.launch {
+                                                        try {
+                                                            val answer = onDeviceBrain.reply(
+                                                                listOf(
+                                                                    AstraOnDeviceBrain.Turn(
+                                                                        "user",
+                                                                        "Say ASTRA OFFLINE and nothing else."
+                                                                    )
+                                                                ),
+                                                                Int.MIN_VALUE
+                                                            )
+                                                            val elapsed =
+                                                                (System.nanoTime() - began) / 1_000_000
+                                                            offlineModelTestStatus =
+                                                                "MODEL RESPONDED OFFLINE in ${elapsed} ms: " +
+                                                                    answer.take(180)
+                                                        } catch (error: Exception) {
+                                                            offlineModelTestStatus =
+                                                                "OFFLINE TEST FAILED: " +
+                                                                    (error.message ?: "Unknown inference error")
+                                                        } finally {
+                                                            offlineModelTestRunning = false
+                                                        }
+                                                    }
+                                                }
+                                            ) {
+                                                Text("Test on-device AI")
+                                            }
+                                            if (offlineModelTestRunning) {
+                                                CircularProgressIndicator(
+                                                    modifier = Modifier.size(20.dp),
+                                                    strokeWidth = 2.dp
+                                                )
+                                            }
+                                        }
+                                        Text(
+                                            "To verify true offline generation, turn on airplane " +
+                                                "mode before tapping Test on-device AI. This test " +
+                                                "never contacts the internet or another computer.",
+                                            style = MaterialTheme.typography.bodySmall
+                                        )
+                                        if (offlineModelTestStatus.isNotBlank()) {
+                                            Text(
+                                                offlineModelTestStatus,
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.primary
+                                            )
+                                        }
                                         HorizontalDivider()
                                     }
 
