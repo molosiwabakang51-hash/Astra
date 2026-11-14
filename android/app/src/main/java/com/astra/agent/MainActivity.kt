@@ -1744,13 +1744,17 @@ private class AstraProcessor(
             return AssistantResult(it)
         }
 
-        if (
-            lower in listOf(
-                "help",
-                "commands",
-                "what can you do"
+        if (lower == "help" || lower == "what can you do") {
+            return AssistantResult(
+                "I can help you learn, plan, calculate, and organise things offline. " +
+                    "Try 'russian', 'explain bond duration', 'calculate 12 * 5', " +
+                    "'add milk to shopping list', or 'what should I do next'. " +
+                    "With a local Qwen3 model installed, you can also ask open-ended " +
+                    "questions naturally. Type 'commands' for the full reference."
             )
-        ) {
+        }
+
+        if (lower == "commands") {
 
             return AssistantResult(
                 """
