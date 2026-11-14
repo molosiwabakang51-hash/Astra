@@ -16,6 +16,13 @@ def main(apk_path: Path) -> None:
         names = apk.namelist()
         if MODEL not in names:
             raise RuntimeError("APK has no bundled Qwen3 weights: " + MODEL)
+        for notice in (
+            "assets/open_source_licenses/Qwen3-Apache-2.0.txt",
+            "assets/open_source_licenses/llama.cpp-MIT.txt",
+            "assets/open_source_licenses/SOURCES.txt",
+        ):
+            if notice not in names:
+                raise RuntimeError("APK missing required open-source license: " + notice)
         libraries = [name for name in names
                      if name.startswith("lib/arm64-v8a/") and name.endswith(".so")]
         if not libraries:
@@ -28,7 +35,7 @@ def main(apk_path: Path) -> None:
             raise RuntimeError("The APK contains incorrect GGUF model weights")
 
     print("PASS: bundled on-device Qwen3 GGUF matches pinned SHA-256")
-    print("PASS: native arm64 libraries included:", len(libraries))
+    print("PASS: native arm64 libraries included:", len(libraries))\n    print("PASS: open-source model and inference notices packaged.")
     print("APK size: %.1f MiB" % (apk_path.stat().st_size / (1024 * 1024)))
 
 
