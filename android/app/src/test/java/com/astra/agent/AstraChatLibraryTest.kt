@@ -64,6 +64,51 @@ class AstraChatLibraryTest {
         assertEquals(original, AstraChatLibrary.delete(original, "nonexistent"))
     }
 
+    @Test fun fullArchiveDoesNotSilentlyEvictOnNewConversation() {
+        val full = (0 until AstraChatArchive.MAX_CHATS).map { index ->
+            AstraChatArchive.Chat(
+                "id-$index", "Saved $index",
+                listOf(AstraChatArchive.Message("You", "Content $index"))
+            )
+        }
+        val current = AstraChatArchive.Chat(
+            "active", "Current",
+            listOf(AstraChatArchive.Message("You", "Private current message"))
+        )
+        assertEquals(null, AstraChatLibrary.archive(full, current))
+        assertEquals(full, AstraChatLibrary.archive(full, null))
+        assertEquals(40, full.size)
+    }
+
+    @Test fun switchingAcrossFullArchivePreservesEveryConversation() {
+        val original = (0 until AstraChatArchive.MAX_CHATS).map { index ->
+            AstraChatArchive.Chat(
+                "id-$index", "Saved $index",
+                listOf(AstraChatArchive.Message("You", "Content $index"))
+            )
+        }
+        var archived = original
+        var active = AstraChatArchive.Chat(
+            "active", "Current",
+            listOf(AstraChatArchive.Message("You", "Private current message"))
+        )
+        val allMessages = (original + active)
+            .map { it.messages.single().text }.toSet()
+        repeat(5_000) { iteration ->
+            val target = archived[(iteration * 17) % archived.size]
+            val result = AstraChatLibrary.activate(archived, target.id, active)
+                ?: error("Archive lost target")
+            archived = result.archived
+            active = result.active
+            assertEquals(40, archived.size)
+            assertEquals(41, (archived + active).distinctBy { it.id }.size)
+            assertEquals(
+                allMessages,
+                (archived + active).map { it.messages.single().text }.toSet()
+            )
+        }
+    }
+
     @Test fun thousandMixedOperationsSurviveArchiveCodec() {
         var chats = emptyList<AstraChatArchive.Chat>()
         repeat(1_000) { i ->
