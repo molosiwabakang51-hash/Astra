@@ -15,6 +15,7 @@ import sys
 import urllib.request
 from pathlib import Path
 from harden_native_inference import apply_privacy_patch
+from fix_native_prompt_error import apply as patch_native_prompt_error
 
 ROOT = Path(__file__).resolve().parent.parent
 UPSTREAM = ROOT / "third_party" / "llama.cpp"
@@ -60,6 +61,7 @@ def prepare_binding() -> None:
         raise RuntimeError("Upstream Android JNI module is missing.")
     shutil.copyfile(GRADLE_SRC, LIB_DIR / "build.gradle.kts")
     apply_privacy_patch(UPSTREAM)
+    patch_native_prompt_error(UPSTREAM)
     print("Pinned native Android inference binding:", commit, flush=True)
 
 
