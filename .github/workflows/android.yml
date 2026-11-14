@@ -12,6 +12,12 @@ on:
 permissions:
   contents: read
 
+# Only the newest push to a PR needs to consume Android build capacity.
+# Keep standard public runners; never introduce a paid large runner.
+concurrency:
+  group: astra-android-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   android:
     name: Build debug APK
@@ -243,10 +249,13 @@ jobs:
           if-no-files-found: error
 
       - name: Publish self-contained full APK (first installs only)
-        if: success()
+        # PR builds validate FULL but do not store large duplicate artifacts.
+        # Main/owner-dispatched builds retain FULL for just one day to keep
+        # artifact storage within free-tier budget as far as practical.
+        if: success() && github.event_name != 'pull_request'
         uses: actions/upload-artifact@v4
         with:
           name: Astra-v0.12.1-FULL-Offline-APK
-          retention-days: 7
+          retention-days: 1
           path: dist/Astra-v0.12.1-FULL-offline-arm64-debug.apk
           if-no-files-found: error

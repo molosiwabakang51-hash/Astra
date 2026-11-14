@@ -98,7 +98,7 @@ internal fun AstraCommandDeck(
                 ),
                 shape = RoundedCornerShape(18.dp)
             )
-            .padding(horizontal = 14.dp, vertical = 7.dp)
+            .padding(horizontal = 12.dp, vertical = 4.dp)
     ) {
         // The collapsed surface remains a single accessible touch target.
         Row(
@@ -111,7 +111,7 @@ internal fun AstraCommandDeck(
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    "ASTRA // COMMAND DECK",
+                    "Overview",
                     color = Color(0xFFBBDFFF),
                     fontWeight = FontWeight.SemiBold,
                     style = MaterialTheme.typography.labelMedium,
@@ -129,9 +129,9 @@ internal fun AstraCommandDeck(
             Spacer(Modifier.width(10.dp))
             Column(horizontalAlignment = Alignment.End) {
                 Text(
-                    if (expanded) "CLOSE  ▲" else "EXPAND  ▼",
+                    if (expanded) "⌃" else "⌄",
                     color = Color(0xFFBBDFFF),
-                    style = MaterialTheme.typography.labelSmall
+                    style = MaterialTheme.typography.titleMedium
                 )
                 if (!expanded) {
                     Spacer(Modifier.height(4.dp))

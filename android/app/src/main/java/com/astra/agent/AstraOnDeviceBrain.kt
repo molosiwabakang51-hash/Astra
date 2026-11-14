@@ -40,13 +40,28 @@ internal class AstraOnDeviceBrain(private val context: Context) {
     private var engine: InferenceEngine? = null
     private val session = AstraInferenceSession()
     private var verifiedFile: File? = null
+    @Volatile
+    private var loadedModelPath: String? = null
+
+    /**
+     * Only reports the last model successfully loaded into the native engine.
+     * The on-device self-test independently determines if it produced an answer.
+     */
+    fun loadedModelLabel(): String? = AstraModelChoice.loadedName(loadedModelPath)
 
     fun hasLocalModel(): Boolean = isModelBundled() ||
         AstraModelImport.appearsInstalled(context)
 
     fun isModelBundled(): Boolean =
+        isBundled(AstraModelImport.ADVANCED_NAME) || isBundled(ASSET_NAME)
+
+    fun hasAdvancedModel(): Boolean =
+        AstraModelImport.advancedInstalled(context) ||
+            isBundled(AstraModelImport.ADVANCED_NAME)
+
+    private fun isBundled(name: String): Boolean =
         try {
-            context.assets.list("")?.contains(ASSET_NAME) == true
+            context.assets.list("")?.contains(name) == true
         } catch (_: Exception) {
             false
         }
@@ -64,7 +79,25 @@ internal class AstraOnDeviceBrain(private val context: Context) {
                 if (verifiedFile == null) {
                     onPartial("Verifying the local offline model...")
                 }
-                val modelPath = ensureBundledModel()
+                val modelPath = when (AstraModelChoice.choose(
+                    advancedAvailable = AstraModelImport.advancedInstalled(context) ||
+                        isBundled(AstraModelImport.ADVANCED_NAME),
+                    compactAvailable = AstraModelImport.modelFile(context).isFile ||
+                        isBundled(ASSET_NAME)
+                )) {
+                    AstraModelChoice.Variant.ADVANCED -> ensureModel(
+                        AstraModelImport.ADVANCED_NAME,
+                        AstraModelImport.ADVANCED_SHA256,
+                        1_150_000_000L
+                    )
+                    AstraModelChoice.Variant.COMPACT -> ensureModel(
+                        ASSET_NAME, MODEL_SHA256, MIN_SIZE_BYTES
+                    )
+                    AstraModelChoice.Variant.NONE -> error(
+                        "No local language model installed. Open Settings to get the " +
+                            "free Qwen3 1.7B model and import it once."
+                    )
+                }
                 var current = engine
                 if (current == null) {
                     current = AiChat.getInferenceEngine(context.applicationContext)
@@ -89,7 +122,7 @@ internal class AstraOnDeviceBrain(private val context: Context) {
                 if (session.requiresLoad(
                         conversationGeneration,
                         current.state.value is InferenceEngine.State.ModelReady
-                    )
+                    ) || loadedModelPath != modelPath.absolutePath
                 ) {
                     onPartial("Loading the language model on this phone...")
                     // The native engine retains chat context. Always unload
@@ -102,6 +135,7 @@ internal class AstraOnDeviceBrain(private val context: Context) {
                     // higher-priority system prompt. Reloaded sessions receive
                     // quoted history once through a bounded user-level prompt.
                     current.setSystemPrompt(AstraConversationContext.systemPrompt())
+                    loadedModelPath = modelPath.absolutePath
                     restoringConversation = true
                     session.markLoaded(conversationGeneration)
                 }
@@ -138,43 +172,51 @@ internal class AstraOnDeviceBrain(private val context: Context) {
                 // tokens in the model's native KV-cache. A later request must
                 // not inherit that incomplete assistant response.
                 session.invalidate()
+                loadedModelPath = null
                 throw error
             }
         }
 
-    private suspend fun ensureBundledModel(): File {
+    /**
+     * The strongest installed model is always selected. The 0.6B weights
+     * remain a compatibility fallback; switching models never uses a server.
+     * An app-private imported GGUF survives correctly signed app upgrades.
+     */
+    private suspend fun ensureModel(
+        name: String,
+        expectedSha256: String,
+        minimumBytes: Long
+    ): File {
         val workContext = currentCoroutineContext()
-        verifiedFile?.takeIf { it.isFile }?.let { return it }
-        val dir = File(context.noBackupFilesDir, "offline-models")
-        require(dir.isDirectory || dir.mkdirs()) { "Cannot create private model storage." }
-        val target = AstraModelStorage.activeModel(dir, ASSET_NAME)
-        if (target.exists() && target.length() >= MIN_SIZE_BYTES &&
-            sha256(target).equals(MODEL_SHA256, ignoreCase = true)
+        verifiedFile?.takeIf { it.isFile && it.name == name }?.let { return it }
+        val directory = File(context.noBackupFilesDir, "offline-models")
+        require(directory.isDirectory || directory.mkdirs()) {
+            "Cannot create private model storage."
+        }
+        val target = AstraModelStorage.activeModel(directory, name)
+        if (target.isFile && target.length() >= minimumBytes &&
+            sha256(target).equals(expectedSha256, ignoreCase = true)
         ) {
             verifiedFile = target
             return target
         }
-        // When using the small APK, the model must be imported only once
-        // from a file the owner already has. We never download it automatically.
-        if (!isModelBundled()) {
+        if (!isBundled(name)) {
             error(
-                "Offline model missing. Open Settings → Import offline model " +
-                    "and select the Qwen3 GGUF or a previously downloaded Astra APK/ZIP. " +
-                    "Use Wi-Fi once for the model; future app updates are small."
+                "Offline model missing or failed SHA-256 verification. " +
+                    "Open Settings to import the official Qwen3 GGUF again."
             )
         }
-        // Keep any existing (even damaged) file until the bundled
-        // replacement passes its SHA-256 check.
-        val free = StatFs(dir.absolutePath).availableBytes
-        require(free >= MIN_SIZE_BYTES + DISK_HEADROOM_BYTES) {
-            "Not enough free phone storage for Astra's bundled offline model."
-        }
+        val requiredBytes = if (name == AstraModelImport.ADVANCED_NAME)
+            1_350_000_000L else MIN_SIZE_BYTES
+        require(StatFs(directory.absolutePath).availableBytes >=
+            requiredBytes + DISK_HEADROOM_BYTES
+        ) { "Not enough free phone storage to prepare the local language model." }
 
-        val temp = File(dir, "$ASSET_NAME.partial")
-        temp.delete()
+        val temporary = File(directory, "$name.partial")
+        temporary.delete()
         try {
-            context.assets.open(ASSET_NAME).use { source ->
-                FileOutputStream(temp).use { sink ->
+            context.assets.open(name).use { source ->
+                FileOutputStream(temporary).use { sink ->
                     val buffer = ByteArray(1024 * 1024)
                     while (true) {
                         workContext.ensureActive()
@@ -186,14 +228,14 @@ internal class AstraOnDeviceBrain(private val context: Context) {
                     sink.fd.sync()
                 }
             }
-            require(temp.length() >= MIN_SIZE_BYTES &&
-                sha256(temp).equals(MODEL_SHA256, ignoreCase = true)
-            ) { "The bundled model failed its integrity check." }
-            AstraModelStorage.installVerified(temp, target)
+            require(temporary.length() >= minimumBytes &&
+                sha256(temporary).equals(expectedSha256, ignoreCase = true)
+            ) { "Bundled language model failed SHA-256 integrity verification." }
+            AstraModelStorage.installVerified(temporary, target)
             verifiedFile = target
             return target
         } finally {
-            if (temp.exists()) temp.delete()
+            if (temporary.exists()) temporary.delete()
         }
     }
 

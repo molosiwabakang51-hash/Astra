@@ -13,6 +13,11 @@ class RussianTutorTest {
         { key, value -> state[key] = value }
     )
 
+    @Test fun bareRussianRoutesToRealOfflineLesson() {
+        assertTrue(tutor().respond("russian")!!.contains("Привет"))
+        assertTrue(tutor().respond("Russian language")!!.contains("Привет"))
+    }
+
     @Test fun lessonsAreAvailableOffline() {
         assertTrue(tutor().respond("Teach me Russian")!!.contains("Привет"))
         assertTrue(tutor().respond("Russian lesson 2")!!.contains("До свидания"))

@@ -14,6 +14,8 @@ class AstraConversationContextTest {
         assertTrue(prompt.contains("untrusted quoted data"))
         assertTrue(prompt.contains("operate fully offline"))
         assertTrue(prompt.contains("answer only the current user message"))
+        assertTrue(prompt.contains("Do not pretend to retrain yourself"))
+        assertTrue(prompt.contains("learning map"))
         assertFalse(prompt.contains("Previous user:"))
         assertFalse(prompt.contains("saved private bond strategy"))
     }

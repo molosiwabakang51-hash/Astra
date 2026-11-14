@@ -5,6 +5,7 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
@@ -1744,13 +1745,11 @@ private class AstraProcessor(
             return AssistantResult(it)
         }
 
-        if (
-            lower in listOf(
-                "help",
-                "commands",
-                "what can you do"
-            )
-        ) {
+        if (lower == "help" || lower == "what can you do") {
+            return AssistantResult(AstraHelp.concise())
+        }
+
+        if (lower == "commands") {
 
             return AssistantResult(
                 """
@@ -4141,10 +4140,10 @@ class MainActivity :
                                                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                                                 ) {
                                                     Text(
-                                                        listOf("✦", "✓", "▤", "⌘", "⚙")[index],
+                                                        listOf("◌", "✓", "▤", "⌘", "⚙")[index],
                                                         color = MaterialTheme.colorScheme.primary
                                                     )
-                                                    Text(title)
+                                                    Text(title, style = MaterialTheme.typography.bodyMedium)
                                                     if (tab == index) Text("✓")
                                                 }
                                             },
@@ -4311,8 +4310,13 @@ class MainActivity :
                             0 -> {
 
                                 // Dashboard is on demand to maximize chat space.
-                                if (commandDeckExpanded) {
-    
+                                AnimatedVisibility(
+                                    visible = commandDeckExpanded && offlineJob?.isActive != true,
+                                    enter = expandVertically(animationSpec = tween(240)) +
+                                        androidx.compose.animation.fadeIn(animationSpec = tween(180)),
+                                    exit = shrinkVertically(animationSpec = tween(190)) +
+                                        androidx.compose.animation.fadeOut(animationSpec = tween(130))
+                                ) {
                                     AstraCommandDeck(
                                         listening = listening,
                                         researching = activeResearchCount > 0,
@@ -4325,7 +4329,6 @@ class MainActivity :
                                         onCommand = { command -> submit(command) }
                                     )
     
-                                    Spacer(Modifier.height(8.dp))
                                 }
 
                                 LazyColumn(
@@ -4444,7 +4447,10 @@ class MainActivity :
                                     }
                                     OutlinedTextField(
                                         value = input,
-                                        onValueChange = { input = it },
+                                        onValueChange = {
+                                            input = it
+                                            if (it.isNotBlank()) commandDeckExpanded = false
+                                        },
                                         modifier = Modifier.weight(1f),
                                         placeholder = { Text("Message Astra...") },
                                         maxLines = 4,
@@ -4771,28 +4777,32 @@ class MainActivity :
 
                                     item {
                                         Text(
-                                            "OFFLINE AI · QWEN3 0.6B",
+                                            "Offline AI models",
                                             style = MaterialTheme.typography.titleMedium
                                         )
                                         Text(
-                                            "Astra includes a quantized Qwen3 model and runs " +
+                                            "Astra supports quantized Qwen3 models and runs " +
                                             "its inference directly on this Android phone. " +
                                             "No computer, gateway, subscription, or internet " +
                                             "connection is needed for AI conversation. " +
                                             "Built-in tasks, notes and calculators run locally first."
                                         )
                                         val modelIncluded = onDeviceBrain.isModelBundled()
+                                        val advancedInstalled =
+                                            onDeviceBrain.hasAdvancedModel()
                                         val modelImported = AstraModelImport.appearsInstalled(
                                             applicationContext
                                         )
                                         Text(
                                             when {
-                                                modelIncluded -> "OFFLINE MODEL INCLUDED IN APK"
-                                                modelImported -> "OFFLINE MODEL IMPORTED TO THIS PHONE"
-                                                else -> "MODEL NOT INSTALLED — IMPORT ONCE BELOW"
+                                                advancedInstalled ->
+                                                    "QWEN3 1.7B AVAILABLE · PREFERRED MODEL"
+                                                modelIncluded || modelImported ->
+                                                    "QWEN3 0.6B AVAILABLE · COMPACT FALLBACK"
+                                                else -> "NO LOCAL MODEL · IMPORT THE FREE 1.7B MODEL"
                                             },
                                             style = MaterialTheme.typography.labelMedium,
-                                            color = if (modelIncluded || modelImported)
+                                            color = if (modelIncluded || modelImported || advancedInstalled)
                                                 MaterialTheme.colorScheme.primary
                                             else MaterialTheme.colorScheme.error
                                         )
@@ -4804,6 +4814,37 @@ class MainActivity :
                                                 "Nothing is downloaded by the import process.",
                                             style = MaterialTheme.typography.bodySmall
                                         )
+                                        Text(
+                                            "Astra automatically uses Qwen3 1.7B when available. " +
+                                                "The 0.6B model is a recovery fallback, not a " +
+                                                "performance limit. Neither model needs paid APIs " +
+                                                "or subscriptions. Download the free 1.7B GGUF " +
+                                                "once, then import it here; future signed updates " +
+                                                "preserve the model.",
+                                            style = MaterialTheme.typography.bodySmall
+                                        )
+                                        OutlinedButton(
+                                            onClick = {
+                                                try {
+                                                    startActivity(
+                                                        Intent(
+                                                            Intent.ACTION_VIEW,
+                                                            Uri.parse(
+                                                                "https://huggingface.co/ggml-org/" +
+                                                                    "Qwen3-1.7B-GGUF/resolve/main/" +
+                                                                    "Qwen3-1.7B-Q4_K_M.gguf"
+                                                            )
+                                                        )
+                                                    )
+                                                } catch (error: Exception) {
+                                                    Toast.makeText(
+                                                        applicationContext,
+                                                        "No browser available for the model download.",
+                                                        Toast.LENGTH_LONG
+                                                    ).show()
+                                                }
+                                            }
+                                        ) { Text("Get free Qwen3 1.7B model") }
                                         OutlinedButton(
                                             enabled = !modelImportRunning &&
                                                 offlineJob?.isActive != true &&
@@ -4860,10 +4901,15 @@ class MainActivity :
                                                             )
                                                             val elapsed =
                                                                 (System.nanoTime() - began) / 1_000_000
+                                                            val testResult = AstraOfflineSelfTest.evaluate(
+                                                                answer, elapsed
+                                                            )
+                                                            val actualModel = onDeviceBrain.loadedModelLabel()
+                                                                ?: "unknown local model"
                                                             offlineModelTestStatus =
-                                                                AstraOfflineSelfTest.evaluate(
-                                                                    answer, elapsed
-                                                                ).message
+                                                                testResult.message +
+                                                                    "\nModel used: " + actualModel +
+                                                                    "\nNo prompts were sent to an AI server."
                                                         } catch (error: Exception) {
                                                             offlineModelTestStatus =
                                                                 "OFFLINE TEST FAILED: " +

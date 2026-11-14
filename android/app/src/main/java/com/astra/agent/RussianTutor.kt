@@ -35,7 +35,7 @@ internal class RussianTutor(
             .trim()
 
         when (input) {
-            "teach me russian", "learn russian", "russian lesson",
+            "russian", "russian language", "teach me russian", "learn russian", "russian lesson",
             "start russian lessons", "russian lesson 1" ->
                 return lessonOne()
 
