@@ -4460,6 +4460,51 @@ class MainActivity :
                                                 color = MaterialTheme.colorScheme.primary
                                             )
                                         }
+                                        Text(
+                                            "Device diagnostics",
+                                            style = MaterialTheme.typography.titleSmall
+                                        )
+                                        Text(
+                                            "Create a local report containing Android version, " +
+                                                "device model, available RAM/storage, model files " +
+                                                "and the result of the offline self-test. " +
+                                                "No conversations, notes, passwords or device IDs " +
+                                                "are included. Review the report before sharing.",
+                                            style = MaterialTheme.typography.bodySmall
+                                        )
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                        ) {
+                                            OutlinedButton(
+                                                onClick = {
+                                                    val report = AstraDeviceDiagnostics.render(
+                                                        AstraDeviceDiagnostics.capture(
+                                                            applicationContext,
+                                                            ASTRA_VERSION,
+                                                            offlineModelTestStatus
+                                                        )
+                                                    )
+                                                    copyText(report)
+                                                }
+                                            ) {
+                                                Text("Copy diagnostics")
+                                            }
+                                            OutlinedButton(
+                                                onClick = {
+                                                    val report = AstraDeviceDiagnostics.render(
+                                                        AstraDeviceDiagnostics.capture(
+                                                            applicationContext,
+                                                            ASTRA_VERSION,
+                                                            offlineModelTestStatus
+                                                        )
+                                                    )
+                                                    shareText(report)
+                                                }
+                                            ) {
+                                                Text("Share report")
+                                            }
+                                        }
                                         HorizontalDivider()
                                     }
 
