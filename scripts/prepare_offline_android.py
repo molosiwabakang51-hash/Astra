@@ -7,6 +7,7 @@ No model weights or generated native binaries are committed to Git.
 """
 from __future__ import annotations
 
+import argparse
 import hashlib
 import shutil
 import subprocess
@@ -123,12 +124,22 @@ def prepare_licenses() -> None:
 
 
 def main() -> None:
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--lite", action="store_true",
+        help="Build small APK with native model engine but no GGUF assets."
+    )
+    opts = parser.parse_args()
     prepare_binding()
-    prepare_model()
+    if opts.lite:
+        MODEL_PATH.unlink(missing_ok=True)
+        print("Lite build: GGUF omitted from APK.", flush=True)
+    else:
+        prepare_model()
     prepare_licenses()
-    if not check_model(MODEL_PATH):
+    if not opts.lite and not check_model(MODEL_PATH):
         raise RuntimeError("Bundled model verification failed.")
-    print("Offline build prerequisites ready. Phone will require NO model download.")
+    print("Android offline inference build preparation complete.")
 
 
 if __name__ == "__main__":
