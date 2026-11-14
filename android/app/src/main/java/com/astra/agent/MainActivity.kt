@@ -3947,6 +3947,17 @@ class MainActivity :
                                 }
                             }
 
+                            // Visible build identification makes old APKs unmistakable.
+                            // This is a label, never a second navigation control.
+                            Text(
+                                text = "v" + ASTRA_VERSION + "  ·  OFFLINE AI",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.primary,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.padding(start = 8.dp)
+                            )
+
                         }
                     }
 
