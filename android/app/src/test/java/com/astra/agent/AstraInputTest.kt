@@ -19,7 +19,7 @@ class AstraInputTest {
             "hi astra" to "hi astra",
             "Astra take a note" to "remember",
             "Astra, take a note that bond duration matters" to "remember bond duration matters",
-            "Astra jot this down: revise finance" to "remember : revise finance",
+            "Astra jot this down: revise finance" to "remember revise finance",
             "What would you like to do" to "help",
             "What can you do?" to "help",
             "calculate 12 * 5" to "calculate 12 * 5"
