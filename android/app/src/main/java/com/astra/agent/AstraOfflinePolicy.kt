@@ -16,6 +16,14 @@ internal object AstraOfflinePolicy {
     fun modelPrompt(userText: String): String =
         userText.trim().take(3000) + "\n/no_think"
 
+    // A killed Android process can leave its last saved reply as 'thinking'.
+    // Recover these placeholders without changing valid saved conversations.
+    fun recoverInterruptedMessage(role: String, text: String): String =
+        if (role == "Astra" && text in setOf(
+                "ASTRA // THINKING OFFLINE...", "ASTRA // THINKING..."
+            )
+        ) "The response was interrupted when Astra closed." else text
+
     fun publicReply(modelOutput: String): String {
         var reply = modelOutput.trim()
         // Reasoning is not a user-facing answer. Do not display a partial
