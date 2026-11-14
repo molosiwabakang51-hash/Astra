@@ -105,7 +105,7 @@ keys: history, notes, tasks.
 // CONSTANTS
 // ============================================================
 
-private const val ASTRA_VERSION = "0.9.2"
+private const val ASTRA_VERSION = "0.9.3"
 private const val MAX_HISTORY = 2000
 
 private const val WELCOME =
