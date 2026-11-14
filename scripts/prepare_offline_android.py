@@ -82,9 +82,50 @@ def prepare_model() -> None:
     print("Verified and bundled model:", MODEL_PATH, flush=True)
 
 
+def prepare_licenses() -> None:
+    """Include full model/native-library license notices inside the offline APK."""
+    from urllib.request import urlopen
+    notices = MODEL_PATH.parent / "open_source_licenses"
+    notices.mkdir(parents=True, exist_ok=True)
+
+    upstream_license = UPSTREAM / "LICENSE"
+    if not upstream_license.is_file():
+        raise RuntimeError("Pinned llama.cpp MIT license missing.")
+    shutil.copyfile(upstream_license, notices / "llama.cpp-MIT.txt")
+
+    upstream_dependencies = UPSTREAM / "licenses"
+    if upstream_dependencies.is_dir():
+        shutil.copytree(
+            upstream_dependencies, notices / "llama.cpp-dependencies",
+            dirs_exist_ok=True
+        )
+
+    qwen_license = notices / "Qwen3-Apache-2.0.txt"
+    if not qwen_license.exists():
+        url = "https://huggingface.co/Qwen/Qwen3-0.6B/raw/main/LICENSE"
+        with urlopen(url, timeout=30) as source:
+            license_data = source.read(32_768)
+        if (not license_data.startswith(b"Apache License") or
+                b"END OF TERMS AND CONDITIONS" not in license_data):
+            raise RuntimeError("Model license download is invalid.")
+        qwen_license.write_bytes(license_data)
+
+    (notices / "SOURCES.txt").write_text(
+        "Qwen3 0.6B original model: https://huggingface.co/Qwen/Qwen3-0.6B\\n"
+        "QuantFactory Q4_K_M GGUF: "
+        "https://huggingface.co/QuantFactory/Qwen3-0.6B-GGUF\\n"
+        "Qwen3 model weights: Apache License 2.0.\\n"
+        "llama.cpp native runtime: https://github.com/ggml-org/llama.cpp\\n"
+        "llama.cpp: MIT license; dependency notices are included in this folder.\\n",
+        encoding="utf-8"
+    )
+    print("Packaged model and inference open-source licenses.", flush=True)
+
+
 def main() -> None:
     prepare_binding()
     prepare_model()
+    prepare_licenses()
     if not check_model(MODEL_PATH):
         raise RuntimeError("Bundled model verification failed.")
     print("Offline build prerequisites ready. Phone will require NO model download.")
