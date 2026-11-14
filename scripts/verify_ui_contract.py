@@ -22,6 +22,8 @@ def main():
         "Chat takes remaining space": 'Modifier.weight(1f)',
         "Qwen is installed on device": 'AstraOnDeviceBrain(applicationContext)',
         "Unhandled chat routes to model": 'AstraOfflinePolicy.shouldUseModel(',
+        "Finance explanations are wired into chat": 'AstraFinanceEducation.respond(clean)',
+        "Strict on-device AI challenge is wired in": 'AstraOfflineSelfTest.evaluate(',
         "Build identity is in the chat header": '"v" + ASTRA_VERSION + "  ·  OFFLINE AI"',
     }
 
