@@ -80,7 +80,7 @@ jobs:
         run: |
           set -euo pipefail
           export ASTRA_RELEASE_VERSION_CODE="$((100000 + GITHUB_RUN_NUMBER))"
-          export ASTRA_RELEASE_VERSION_NAME="0.11.3.$GITHUB_RUN_NUMBER"
+          export ASTRA_RELEASE_VERSION_NAME="0.11.4.$GITHUB_RUN_NUMBER"
           gradle --no-daemon testDebugUnitTest assembleRelease
           python3 ../scripts/verify_lite_apk.py app/build/outputs/apk/release/app-release.apk
 
@@ -110,19 +110,19 @@ jobs:
           echo "$package"
           [[ "$package" == *"name='com.astra.agent'"* &&
              "$package" == *"versionCode='$((100000 + GITHUB_RUN_NUMBER))'"* &&
-             "$package" == *"versionName='0.11.3.$GITHUB_RUN_NUMBER'"* ]] || {
+             "$package" == *"versionName='0.11.4.$GITHUB_RUN_NUMBER'"* ]] || {
             echo "::error::Unexpected APK version or package name."
             exit 1
           }
           mkdir -p dist
-          cp "$apk" dist/Astra-v0.11.3-LITE-owner-signed.apk
+          cp "$apk" dist/Astra-v0.11.4-LITE-owner-signed.apk
           echo "Owner certificate and package identity verified."
 
       - name: Upload owner-signed small APK as workflow artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Astra-v0.11.3-Owner-Signed-LITE
-          path: dist/Astra-v0.11.3-LITE-owner-signed.apk
+          name: Astra-v0.11.4-Owner-Signed-LITE
+          path: dist/Astra-v0.11.4-LITE-owner-signed.apk
           if-no-files-found: error
           retention-days: 30
 
@@ -132,9 +132,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          tag="v0.11.3.$GITHUB_RUN_NUMBER"
+          tag="v0.11.4.$GITHUB_RUN_NUMBER"
           gh release create "$tag" \
-            dist/Astra-v0.11.3-LITE-owner-signed.apk \
+            dist/Astra-v0.11.4-LITE-owner-signed.apk \
             --target "$GITHUB_SHA" \
             --prerelease \
             --title "Astra $tag - Experimental low-data offline AI" \
