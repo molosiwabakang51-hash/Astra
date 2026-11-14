@@ -118,7 +118,7 @@ keys: history, notes, tasks.
 // CONSTANTS
 // ============================================================
 
-private const val ASTRA_VERSION = "0.9.3"
+private val ASTRA_VERSION: String get() = BuildConfig.VERSION_NAME
 private const val MAX_HISTORY = 2000
 
 private const val WELCOME =
