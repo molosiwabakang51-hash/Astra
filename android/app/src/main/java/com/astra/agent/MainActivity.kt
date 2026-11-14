@@ -1710,6 +1710,12 @@ private class AstraProcessor(
             )
         }
 
+        // Common educational finance questions receive a reliable offline
+        // explanation even if Qwen3 weights have not yet been installed.
+        AstraFinanceEducation.respond(clean)?.let {
+            return AssistantResult(it)
+        }
+
         BondAnalytics.respond(clean)?.let {
             return AssistantResult(it)
         }
@@ -1784,6 +1790,14 @@ private class AstraProcessor(
                 square root of 81
                 permutations 5 3
                 combinations 5 3
+
+                FINANCE EXPLANATIONS (always offline)
+                explain compound interest
+                what is yield to maturity
+                explain bond duration
+                explain convexity
+                what is dividend yield
+                explain portfolio diversification
 
                 FINANCE
                 bond analyze 1000 5 6 10 2
