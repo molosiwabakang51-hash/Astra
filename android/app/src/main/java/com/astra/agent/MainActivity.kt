@@ -3700,6 +3700,9 @@ class MainActivity :
 
                             4 -> {
 
+                                CompositionLocalProvider(
+                                    LocalContentColor provides MaterialTheme.colorScheme.onBackground
+                                ) {
                                 LazyColumn(
                                     contentPadding =
                                         PaddingValues(
@@ -4141,6 +4144,7 @@ class MainActivity :
                                             "Astra currently uses deterministic command processing. Generative AI, background simulations, scheduled reminders and live financial data are not included."
                                         )
                                     }
+                                }
                                 }
                             }
                         }
