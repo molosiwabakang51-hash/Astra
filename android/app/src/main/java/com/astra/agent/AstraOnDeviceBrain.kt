@@ -40,6 +40,7 @@ internal class AstraOnDeviceBrain(private val context: Context) {
     private var engine: InferenceEngine? = null
     private val session = AstraInferenceSession()
     private var verifiedFile: File? = null
+    private var loadedModelPath: String? = null
 
     fun hasLocalModel(): Boolean = isModelBundled() ||
         AstraModelImport.appearsInstalled(context)
@@ -64,7 +65,16 @@ internal class AstraOnDeviceBrain(private val context: Context) {
                 if (verifiedFile == null) {
                     onPartial("Verifying the local offline model...")
                 }
-                val modelPath = ensureBundledModel()
+                val modelPath = if (
+                    AstraModelImport.preferAdvanced(context) &&
+                    AstraModelImport.advancedInstalled(context)
+                ) {
+                    AstraModelImport.advancedFile(context).also { file ->
+                        require(sha256(file).equals(AstraModelImport.ADVANCED_SHA256, true)) {
+                            "Advanced offline model failed integrity verification."
+                        }
+                    }
+                } else ensureBundledModel()
                 var current = engine
                 if (current == null) {
                     current = AiChat.getInferenceEngine(context.applicationContext)
@@ -89,7 +99,7 @@ internal class AstraOnDeviceBrain(private val context: Context) {
                 if (session.requiresLoad(
                         conversationGeneration,
                         current.state.value is InferenceEngine.State.ModelReady
-                    )
+                    ) || loadedModelPath != modelPath.absolutePath
                 ) {
                     onPartial("Loading the language model on this phone...")
                     // The native engine retains chat context. Always unload
@@ -98,6 +108,7 @@ internal class AstraOnDeviceBrain(private val context: Context) {
                         current.cleanUp()
                     }
                     current.loadModel(modelPath.absolutePath)
+                    loadedModelPath = modelPath.absolutePath
                     // Never place previous user text or model replies inside the
                     // higher-priority system prompt. Reloaded sessions receive
                     // quoted history once through a bounded user-level prompt.
@@ -138,6 +149,7 @@ internal class AstraOnDeviceBrain(private val context: Context) {
                 // tokens in the model's native KV-cache. A later request must
                 // not inherit that incomplete assistant response.
                 session.invalidate()
+                loadedModelPath = null
                 throw error
             }
         }
