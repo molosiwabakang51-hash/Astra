@@ -38,7 +38,7 @@ internal class AstraOnDeviceBrain(private val context: Context) {
 
     private val mutex = Mutex()
     private var engine: InferenceEngine? = null
-    private var loadedGeneration: Int? = null
+    private val session = AstraInferenceSession()
     private var verifiedFile: File? = null
 
     fun hasLocalModel(): Boolean = isModelBundled() ||
@@ -56,7 +56,8 @@ internal class AstraOnDeviceBrain(private val context: Context) {
         conversationGeneration: Int,
         onPartial: suspend (String) -> Unit = {}
     ): String = mutex.withLock {
-            withContext(Dispatchers.IO) {
+            try {
+                withContext(Dispatchers.IO) {
                 val finalMessage = turns.lastOrNull { it.role == "user" }?.content
                     ?.trim()?.take(3000).orEmpty()
                 require(finalMessage.isNotEmpty()) { "Message cannot be empty." }
@@ -79,13 +80,16 @@ internal class AstraOnDeviceBrain(private val context: Context) {
                     }
                 }
                 if (initialized is InferenceEngine.State.Error) {
+                    // JNI exposes Error as a resettable state. The next load
+                    // must start with a clean native context.
                     current.cleanUp()
-                    loadedGeneration = null
+                    session.invalidate()
                 }
-                if (current.state.value is InferenceEngine.State.Initialized) {
-                    loadedGeneration = null
-                }
-                if (loadedGeneration != conversationGeneration) {
+                if (session.requiresLoad(
+                        conversationGeneration,
+                        current.state.value is InferenceEngine.State.ModelReady
+                    )
+                ) {
                     onPartial("Loading the language model on this phone...")
                     // The native engine retains chat context. Always unload
                     // between conversations, including activity recreation.
@@ -109,7 +113,7 @@ internal class AstraOnDeviceBrain(private val context: Context) {
                             append(recent)
                         }
                     })
-                    loadedGeneration = conversationGeneration
+                    session.markLoaded(conversationGeneration)
                 }
 
                 val answer = StringBuilder()
@@ -128,8 +132,18 @@ internal class AstraOnDeviceBrain(private val context: Context) {
                     }
                 }
                 AstraOfflinePolicy.publicReply(answer.toString()).ifBlank {
+                    // Empty native generation is not a completed conversational
+                    // turn. Force a clean reload before another user request.
+                    session.invalidate()
                     "The offline model did not produce a usable answer. Please try again."
                 }
+                }
+            } catch (error: Exception) {
+                // Cancellation, JNI failures and timeouts can leave partial
+                // tokens in the model's native KV-cache. A later request must
+                // not inherit that incomplete assistant response.
+                session.invalidate()
+                throw error
             }
         }
 
