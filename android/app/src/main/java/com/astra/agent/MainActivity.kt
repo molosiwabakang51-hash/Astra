@@ -2344,6 +2344,13 @@ class MainActivity :
                 var dialogueAwaiting by remember {
                     mutableStateOf(false)
                 }
+                var cloudEnabled by remember {
+                    mutableStateOf(storage.getBoolean("cloud_ai_enabled"))
+                }
+                var cloudEndpoint by remember {
+                    mutableStateOf(storage.getString("cloud_ai_endpoint", ""))
+                }
+                val cloudBrain = remember { AstraCloudBrain() }
 
                 var tab by remember {
                     mutableIntStateOf(0)
@@ -2577,6 +2584,49 @@ class MainActivity :
                     }
 
                     val normalized = AstraInput.normalize(message)
+                    val explicitCloud = message.startsWith("ask ai ", ignoreCase = true)
+                    if (explicitCloud) {
+                        val prompt = message.substring(7).trim()
+                        if (!cloudEnabled || !AstraCloudBrain.isSafeEndpoint(cloudEndpoint)) {
+                            history.add(ChatMessage("You", message))
+                            history.add(ChatMessage("Astra",
+                                "Cloud AI is not configured. Open Settings, enable Cloud AI, " +
+                                "and enter your own secure HTTPS Astra gateway URL."))
+                            persist()
+                        } else if (prompt.isNotEmpty()) {
+                            val context = history.takeLast(14).mapNotNull {
+                                val role = when (it.role) {
+                                    "You" -> "user"
+                                    "Astra" -> "assistant"
+                                    else -> null
+                                }
+                                role?.let { r -> AstraCloudBrain.Turn(r, it.text) }
+                            } + AstraCloudBrain.Turn("user", prompt)
+                            val placeholder = "ASTRA // THINKING..."
+                            history.add(ChatMessage("You", message))
+                            history.add(ChatMessage("Astra", placeholder))
+                            val target = history.lastIndex
+                            persist()
+                            activeResearchCount++
+                            researchScope.launch {
+                                val response = try {
+                                    cloudBrain.reply(cloudEndpoint, context)
+                                } catch (error: Exception) {
+                                    "Cloud AI unavailable: " + (error.message ?: "Network error") +
+                                        ". Offline commands remain available."
+                                }
+                                if (target in history.indices &&
+                                    history[target].text == placeholder) {
+                                    history[target] = ChatMessage("Astra", response)
+                                    persist()
+                                }
+                                activeResearchCount = (activeResearchCount - 1).coerceAtLeast(0)
+                            }
+                        }
+                        input = ""
+                        keyboard?.hide()
+                        return
+                    }
                     val researchTopic = ResearchCommand.extract(normalized)
                     if (researchTopic != null) {
                         dialogue.dismissIncompletePrompt()
@@ -3856,6 +3906,35 @@ class MainActivity :
                                     verticalArrangement =
                                         Arrangement.spacedBy(14.dp)
                                 ) {
+
+                                    item {
+                                        Text("CLOUD INTELLIGENCE",
+                                            style = MaterialTheme.typography.titleMedium)
+                                        Text("Optional. Sends only the current conversation " +
+                                            "context to your configured HTTPS gateway. " +
+                                            "Never enter a provider API key here.")
+                                        Switch(
+                                            checked = cloudEnabled,
+                                            onCheckedChange = {
+                                                cloudEnabled = it
+                                                storage.setBoolean("cloud_ai_enabled", it)
+                                            }
+                                        )
+                                        OutlinedTextField(
+                                            value = cloudEndpoint,
+                                            onValueChange = {
+                                                cloudEndpoint = it.take(500)
+                                                storage.setString("cloud_ai_endpoint", cloudEndpoint)
+                                            },
+                                            label = { Text("Astra gateway HTTPS URL") },
+                                            modifier = Modifier.fillMaxWidth(),
+                                            singleLine = true
+                                        )
+                                        Text("Use: ask ai explain bond convexity. " +
+                                            "Other commands remain offline. " +
+                                            "Gateway deployment and authentication are required.")
+                                        HorizontalDivider()
+                                    }
 
                                     item {
 
