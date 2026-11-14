@@ -41,6 +41,9 @@ internal class AstraOnDeviceBrain(private val context: Context) {
     private var loadedGeneration: Int? = null
     private var verifiedFile: File? = null
 
+    fun hasLocalModel(): Boolean = isModelBundled() ||
+        AstraModelImport.appearsInstalled(context)
+
     fun isModelBundled(): Boolean =
         try {
             context.assets.list("")?.contains(ASSET_NAME) == true
@@ -58,7 +61,7 @@ internal class AstraOnDeviceBrain(private val context: Context) {
                     ?.trim()?.take(3000).orEmpty()
                 require(finalMessage.isNotEmpty()) { "Message cannot be empty." }
                 if (verifiedFile == null) {
-                    onPartial("Verifying the bundled offline model...")
+                    onPartial("Verifying the local offline model...")
                 }
                 val modelPath = ensureBundledModel()
                 var current = engine
@@ -141,6 +144,15 @@ internal class AstraOnDeviceBrain(private val context: Context) {
         ) {
             verifiedFile = target
             return target
+        }
+        // When using the small APK, the model must be imported only once
+        // from a file the owner already has. We never download it automatically.
+        if (!isModelBundled()) {
+            error(
+                "Offline model missing. Open Settings → Import offline model " +
+                    "and select the Qwen3 GGUF or a previously downloaded Astra APK/ZIP. " +
+                    "Use Wi-Fi once for the model; future app updates are small."
+            )
         }
         if (target.exists()) target.delete()
         val free = StatFs(dir.absolutePath).availableBytes
