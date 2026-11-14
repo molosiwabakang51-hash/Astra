@@ -2373,10 +2373,6 @@ class MainActivity :
                     mutableIntStateOf(0)
                 }
 
-                var showMenu by remember {
-                    mutableStateOf(false)
-                }
-
                 var showFindInChat by remember { mutableStateOf(false) }
                 var findInChatQuery by remember { mutableStateOf("") }
 
@@ -3754,8 +3750,8 @@ class MainActivity :
                                 .fillMaxWidth()
                                 .statusBarsPadding()
                                 .padding(
-                                    horizontal = 16.dp,
-                                    vertical = 8.dp
+                                    horizontal = 14.dp,
+                                    vertical = 4.dp
                                 ),
                             verticalAlignment =
                                 Alignment.CenterVertically,
@@ -3765,9 +3761,9 @@ class MainActivity :
 
                             Box {
                                 Box(
-                                    modifier = Modifier.clickable {
-                                        navigationPopupOpen = !navigationPopupOpen
-                                    }
+                                    modifier = Modifier
+                                        .semantics { contentDescription = "Open Astra navigation and chat options" }
+                                        .clickable { navigationPopupOpen = true }
                                 ) {
                                     AstraBrand(listening = listening)
                                 }
@@ -3798,32 +3794,22 @@ class MainActivity :
                                             }
                                         )
                                     }
-                                }
-                            }
+                                    if (tab == 0) {
+                                        HorizontalDivider()
+                                        Text(
+                                            "CHAT OPTIONS",
+                                            modifier = Modifier.padding(
+                                                start = 16.dp, top = 8.dp, bottom = 4.dp
+                                            ),
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.primary
+                                        )
 
-                            if (tab == 0) {
-
-                                Box {
-
-                                    TextButton(
-                                        onClick = {
-                                            showMenu = true
-                                        }
-                                    ) {
-                                        Text("⋮")
-                                    }
-
-                                    DropdownMenu(
-                                        expanded = showMenu,
-                                        onDismissRequest = {
-                                            showMenu = false
-                                        }
-                                    ) {
 
                                         DropdownMenuItem(
                                             text = { Text("Find in chat") },
                                             onClick = {
-                                                showMenu = false
+                                                navigationPopupOpen = false
                                                 findInChatQuery = ""
                                                 showFindInChat = true
                                             }
@@ -3835,7 +3821,7 @@ class MainActivity :
                                             },
                                             onClick = {
 
-                                                showMenu = false
+                                                navigationPopupOpen = false
 
                                                 copyText(
                                                     exportConversation(
@@ -3851,7 +3837,7 @@ class MainActivity :
                                             },
                                             onClick = {
 
-                                                showMenu = false
+                                                navigationPopupOpen = false
 
                                                 shareText(
                                                     exportConversation(
@@ -3867,7 +3853,7 @@ class MainActivity :
                                             },
                                             onClick = {
 
-                                                showMenu = false
+                                                navigationPopupOpen = false
 
                                                 startNewConversation()
                                             }
@@ -3875,7 +3861,7 @@ class MainActivity :
                                         DropdownMenuItem(
                                             text = { Text("Conversations") },
                                             onClick = {
-                                                showMenu = false
+                                                navigationPopupOpen = false
                                                 chatSearchQuery = ""
                                                 showChatSwitcher = true
                                             }
@@ -3883,7 +3869,7 @@ class MainActivity :
                                         DropdownMenuItem(
                                             text = { Text("Rename current chat") },
                                             onClick = {
-                                                showMenu = false
+                                                navigationPopupOpen = false
                                                 renameActiveChat = true
                                                 renameChatDraft = activeChatTitle.ifBlank {
                                                     history.firstOrNull {
@@ -3893,9 +3879,34 @@ class MainActivity :
                                                 returnToChatLibrary = false
                                             }
                                         )
+                                        DropdownMenuItem(
+                                            text = { Text(if (commandDeckExpanded) "Hide mission control" else "Show mission control") },
+                                            onClick = {
+                                                commandDeckExpanded = !commandDeckExpanded
+                                                navigationPopupOpen = false
+                                            }
+                                        )
+                                        DropdownMenuItem(
+                                            text = { Text("Read last response aloud") },
+                                            enabled = history.any { it.role == "Astra" },
+                                            onClick = {
+                                                navigationPopupOpen = false
+                                                val reply = history.lastOrNull { it.role == "Astra" }?.text.orEmpty()
+                                                if (reply.isNotBlank()) speak(reply, localOnlyTts)
+                                            }
+                                        )
+                                        DropdownMenuItem(
+                                            text = { Text("Clear current chat") },
+                                            onClick = {
+                                                navigationPopupOpen = false
+                                                showClearDialog = true
+                                            }
+                                        )
                                     }
+
                                 }
                             }
+
                         }
                     }
 
@@ -3919,19 +3930,23 @@ class MainActivity :
 
                             0 -> {
 
-                                AstraCommandDeck(
-                                    listening = listening,
-                                    researching = activeResearchCount > 0,
-                                    openTasks = tasks.size,
-                                    completedTasks = completed.size,
-                                    storedNotes = notes.size,
-                                    awaitingReply = dialogueAwaiting,
-                                    expanded = commandDeckExpanded,
-                                    onExpandedChange = { commandDeckExpanded = it },
-                                    onCommand = { command -> submit(command) }
-                                )
-
-                                Spacer(Modifier.height(8.dp))
+                                // Dashboard is on demand to maximize chat space.
+                                if (commandDeckExpanded) {
+    
+                                    AstraCommandDeck(
+                                        listening = listening,
+                                        researching = activeResearchCount > 0,
+                                        openTasks = tasks.size,
+                                        completedTasks = completed.size,
+                                        storedNotes = notes.size,
+                                        awaitingReply = dialogueAwaiting,
+                                        expanded = true,
+                                        onExpandedChange = { commandDeckExpanded = it },
+                                        onCommand = { command -> submit(command) }
+                                    )
+    
+                                    Spacer(Modifier.height(8.dp))
+                                }
 
                                 LazyColumn(
                                     modifier =
@@ -3974,90 +3989,35 @@ class MainActivity :
                                 }
 
                                 Row(
-                                    modifier =
-                                        Modifier.fillMaxWidth(),
-                                    verticalAlignment =
-                                        Alignment.CenterVertically,
-                                    horizontalArrangement =
-                                        Arrangement.spacedBy(8.dp)
+                                    modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
                                 ) {
-
+                                    FilledTonalIconButton(
+                                        onClick = { startVoice() },
+                                        modifier = Modifier.semantics {
+                                            contentDescription = if (listening) "Stop voice dictation"
+                                                else "Start voice dictation"
+                                        }
+                                    ) {
+                                        Text(if (listening) "■" else "🎙")
+                                    }
                                     OutlinedTextField(
                                         value = input,
-                                        onValueChange = {
-                                            input = it
-                                        },
-                                        modifier =
-                                            Modifier.weight(1f),
-                                        placeholder = {
-                                            Text(
-                                                "Message Astra..."
-                                            )
-                                        },
+                                        onValueChange = { input = it },
+                                        modifier = Modifier.weight(1f),
+                                        placeholder = { Text("Message Astra...") },
                                         maxLines = 4,
-                                        shape =
-                                            RoundedCornerShape(24.dp),
-                                        keyboardOptions =
-                                            KeyboardOptions(
-                                                imeAction =
-                                                    ImeAction.Send
-                                            ),
-                                        keyboardActions =
-                                            KeyboardActions(
-                                                onSend = {
-                                                    submit(input)
-                                                }
-                                            )
+                                        shape = RoundedCornerShape(24.dp),
+                                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
+                                        keyboardActions = KeyboardActions(onSend = { submit(input) })
                                     )
-
                                     FilledIconButton(
-                                        onClick = {
-                                            submit(input)
-                                        },
-                                        enabled =
-                                            input.isNotBlank()
+                                        onClick = { submit(input) },
+                                        enabled = input.isNotBlank(),
+                                        modifier = Modifier.semantics { contentDescription = "Send message" }
                                     ) {
                                         Text("➤")
-                                    }
-                                }
-
-                                Row(
-                                    modifier =
-                                        Modifier.fillMaxWidth(),
-                                    horizontalArrangement =
-                                        Arrangement.SpaceBetween
-                                ) {
-
-                                    TextButton(
-                                        onClick = {
-                                            startVoice()
-                                        }
-                                    ) {
-
-                                        Text(
-                                            if (listening) {
-                                                "Stop"
-                                            } else {
-                                                "Speak"
-                                            }
-                                        )
-                                    }
-
-                                    TextButton(
-                                        onClick = {
-
-                                            val reply =
-                                                history.lastOrNull {
-                                                    it.role == "Astra"
-                                                }?.text ?: ""
-
-                                            speak(
-                                                reply,
-                                                localOnlyTts
-                                            )
-                                        }
-                                    ) {
-                                        Text("Read aloud")
                                     }
                                 }
                             }
