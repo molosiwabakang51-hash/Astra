@@ -102,10 +102,10 @@ def prepare_licenses() -> None:
 
     qwen_license = notices / "Qwen3-Apache-2.0.txt"
     if not qwen_license.exists():
-        url = "https://huggingface.co/Qwen/Qwen3-0.6B/raw/main/LICENSE"
+        url = "https://www.apache.org/licenses/LICENSE-2.0.txt"
         with urlopen(url, timeout=30) as source:
             license_data = source.read(32_768)
-        if (not license_data.startswith(b"Apache License") or
+        if (not license_data.lstrip().startswith(b"Apache License") or
                 b"END OF TERMS AND CONDITIONS" not in license_data):
             raise RuntimeError("Model license download is invalid.")
         qwen_license.write_bytes(license_data)
