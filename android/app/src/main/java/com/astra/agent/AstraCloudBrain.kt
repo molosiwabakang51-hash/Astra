@@ -9,8 +9,8 @@ import java.net.URL
 
 /**
  * Network client for a user-controlled Astra gateway. Never embeds an AI
- * provider secret. A gateway must authenticate clients, rate-limit usage,
- * and hold provider credentials on its server.
+ * provider secret or paid model account. The private gateway authenticates
+ * mobile clients and forwards requests to Ollama running on the owner's own PC.
  */
 internal class AstraCloudBrain {
     data class Turn(val role: String, val content: String)
@@ -38,7 +38,7 @@ internal class AstraCloudBrain {
             try {
                 connection.requestMethod = "POST"
                 connection.connectTimeout = 12_000
-                connection.readTimeout = 45_000
+                connection.readTimeout = 105_000
                 connection.instanceFollowRedirects = false
                 connection.doOutput = true
                 connection.setRequestProperty("Authorization", "Bearer " + accessToken)
