@@ -4,6 +4,30 @@ Astra is a **local-first Android/Kotlin Jetpack Compose assistant** with a futur
 
 **Release status: EXPERIMENTAL.** Compilation and APK checks pass, but stable status requires on-phone offline inference, one-time model import, chat/Stop usability, data-preserving same-key updates and privacy checks. See the [stable-release acceptance checklist](docs/stable-release-acceptance.md). Owner-signed builds remain GitHub **pre-releases** until those mandatory checks pass.
 
+## Zero-fee offline model strategy
+
+**No mandatory paid AI API, subscription, remote model server, cloud GPU or paid hosting.**
+On supported Android phones, Astra uses the strongest verified locally available model.
+Qwen3 1.7B Q4_K_M is the preferred conversation model; the existing Qwen3 0.6B
+continues to work as an offline fallback. The 1.7B GGUF can be obtained from
+[ggml-org on Hugging Face](https://huggingface.co/ggml-org/Qwen3-1.7B-GGUF/blob/main/Qwen3-1.7B-Q4_K_M.gguf)
+under Apache 2.0 and imported once through Settings. The application never
+sends chat prompts to Hugging Face for inference.
+
+Astra's low-data APK updates reuse verified model weights already stored in
+app-private no-backup storage (with the same signing key). Neither every build
+nor every update needs to host another 1.28 GB copy. The GitHub-hosted build
+may still bundle compact GGUF weights in the FULL artifact; **installing that
+artifact alone does not mean the 1.7B model is installed**. The 1.7B model
+becomes the default automatically once imported.
+
+**Zero-fee refers to software subscriptions and metered inference/hosting fees.**
+Initial downloads, mobile data charges, power consumption and hardware are
+physical costs, not included in the claim. Public GitHub Actions standard
+runners are normally free; avoid charging for oversized artifact storage
+or paid runner tiers. On-device speed, accuracy, memory pressure and battery
+use still require tests on a physical phone before stable release.
+
 ## Working capabilities
 
 - Chat interface with **multiple persistent conversations**, an animated compact navigation dock, notes, tasks and completion tracking.
