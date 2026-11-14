@@ -14,10 +14,10 @@ android {
         versionCode = System.getenv("ASTRA_RELEASE_VERSION_CODE")
             ?.takeIf { it.isNotBlank() }
             ?.toIntOrNull()
-            ?.also { require(it >= 16) { "Release versionCode must be at least 16." } }
-            ?: 16
+            ?.also { require(it >= 17) { "Release versionCode must be at least 17." } }
+            ?: 17
         versionName = System.getenv("ASTRA_RELEASE_VERSION_NAME")
-            ?.takeIf { it.isNotBlank() } ?: "0.10.4"
+            ?.takeIf { it.isNotBlank() } ?: "0.11.0"
     }
     // The bundled llama.cpp Android binding supports arm64 (Android 13+).
     defaultConfig { ndk { abiFilters += listOf("arm64-v8a") } }
@@ -60,13 +60,25 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
 }
 
-// Refuse to ship an apparently offline APK without its actual Qwen3 weights.
+// The full build includes GGUF weights. The lite build contains only Android
+// code and native inference; the owner imports a model already on the phone.
+// Use a clean source asset directory for lite builds to prevent accidental
+// 500 MB uploads disguised as low-data updates.
+val bundleModel = System.getenv("ASTRA_BUNDLE_MODEL") != "false"
+
+// Refuse to ship a mislabeled full or lite APK.
 val verifyBundledModel by tasks.registering {
     group = "verification"
     doLast {
         val model = file("src/main/assets/qwen3-0.6b-q4km.gguf")
-        require(model.isFile && model.length() > 450_000_000L) {
-            "Bundled offline model missing. Run python3 scripts/prepare_offline_android.py from the repository root."
+        if (bundleModel) {
+            require(model.isFile && model.length() > 450_000_000L) {
+                "Full APK requires bundled model. Run python3 scripts/prepare_offline_android.py."
+            }
+        } else {
+            require(!model.exists()) {
+                "Lite APK must not contain model weights; remove model asset before building."
+            }
         }
     }
 }
