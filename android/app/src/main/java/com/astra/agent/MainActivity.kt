@@ -36,6 +36,7 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.ui.graphics.Color
@@ -3368,10 +3369,13 @@ class MainActivity :
                                     Text(if (dockExpanded) "⌄  MINIMIZE DOCK" else "⌃  EXPAND DOCK")
                                 }
                             }
+                            val dockHeight by animateDpAsState(
+                                targetValue = if (dockExpanded) 84.dp else 56.dp,
+                                animationSpec = tween(280),
+                                label = "Astra navigation dock height"
+                            )
                             NavigationBar(
-                                modifier = Modifier.animateContentSize(
-                                    animationSpec = tween(280)
-                                )
+                                modifier = Modifier.height(dockHeight)
                             ) {
                                 listOf(
                                     "Chat", "Tasks", "Notes", "Tools", "Settings"
