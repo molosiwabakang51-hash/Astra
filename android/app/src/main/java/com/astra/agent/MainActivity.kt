@@ -4739,11 +4739,11 @@ class MainActivity :
 
                                     item {
                                         Text(
-                                            "OFFLINE AI · QWEN3 0.6B",
+                                            "Offline AI models",
                                             style = MaterialTheme.typography.titleMedium
                                         )
                                         Text(
-                                            "Astra includes a quantized Qwen3 model and runs " +
+                                            "Astra supports quantized Qwen3 models and runs " +
                                             "its inference directly on this Android phone. " +
                                             "No computer, gateway, subscription, or internet " +
                                             "connection is needed for AI conversation. " +
