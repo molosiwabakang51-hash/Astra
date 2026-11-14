@@ -21,14 +21,14 @@ internal object ResearchCommand {
     // permission to send the remaining words as a Wikimedia search query.
     // Explicit Wikipedia commands still work without relying on the LLM.
     private val wikipedia = Regex(
-        """(?i)^(?:wikipedia|search wikipedia for|look up on wikipedia)\\s+(.+)$"""
+        """(?i)^(?:wikipedia|search wikipedia for|look up on wikipedia)\s+(.+)$"""
     )
-    private val research = Regex("""(?i)^research\\s+(.+)$""")
+    private val research = Regex("""(?i)^research\s+(.+)$""")
     private val chainedInstruction = Regex(
-        """(?i)^(?:and|then|to)\\s+(?:learn|study|understand|explore|research|investigate|read|remember)\\b.*$"""
+        """(?i)^(?:and|then|to)\s+(?:learn|study|understand|explore|research|investigate|read|remember)\b.*$"""
     )
     private val personalContext = Regex(
-        """(?i)^(?:(?:my|our|private|personal|saved)\\s+).*$"""
+        """(?i)^(?:(?:my|our|private|personal|saved)\s+).*$"""
     )
     private val unboundedTopics = setOf(
         "everything", "anything", "all knowledge", "all topics",
@@ -36,7 +36,7 @@ internal object ResearchCommand {
     )
 
     fun extract(raw: String): String? {
-        val text = raw.trim().replace(Regex("""\\s+"""), " ")
+        val text = raw.trim().replace(Regex("""\s+"""), " ")
         wikipedia.matchEntire(text)?.groupValues?.getOrNull(1)?.trim()?.let {
             return it.takeIf(String::isNotBlank)
         }
