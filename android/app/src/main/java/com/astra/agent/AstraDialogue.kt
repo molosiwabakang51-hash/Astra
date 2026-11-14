@@ -21,6 +21,13 @@ internal class AstraDialogue {
     private var pending: Pending? = null
     private var suggested: SuggestedTask? = null
 
+    val awaitingResponse: Boolean
+        get() = pending != null
+
+    fun dismissIncompletePrompt() {
+        pending = null
+    }
+
     private val taskRequests = setOf(
         "add task", "add a task", "create task", "new task",
         "remind me to", "add a new task"
