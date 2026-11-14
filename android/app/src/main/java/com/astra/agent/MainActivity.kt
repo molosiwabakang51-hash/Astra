@@ -274,6 +274,25 @@ private class AstraStorage(
         prefs.edit().putInt(key, value).apply()
     }
 
+    /**
+     * All collections touched by a workflow are committed in one atomic
+     * SharedPreferences transaction. A failed commit leaves UI lists unchanged.
+     * Existing EverydayAssistant encodings and backup keys are preserved.
+     */
+    fun commitWorkflow(next: AstraWorkflow.Snapshot) {
+        fun json(values: List<String>): String =
+            JSONArray().apply { values.forEach { put(it) } }.toString()
+
+        val saved = prefs.edit()
+            .putString("tasks", json(next.tasks))
+            .putString("completed_tasks", json(next.completed))
+            .putString("notes", json(next.notes))
+            .putString("astra_shopping_items", AstraWorkflow.encodeItems(next.shopping))
+            .putString("astra_habits", AstraWorkflow.encodeItems(next.habits))
+            .commit()
+        check(saved) { "Could not save the workflow. No changes were applied." }
+    }
+
     fun exportBackup(): String =
         AstraBackupCodec.encode(prefs.all)
 
@@ -2313,6 +2332,7 @@ class MainActivity :
             AstraStorage(this)
 
         val dialogue = AstraDialogue()
+        val workflowSession = AstraWorkflowSession()
 
         val processor = AstraProcessor(
             RussianTutor(storage::getInt, storage::setInt),
@@ -2591,6 +2611,7 @@ class MainActivity :
                     history.clear()
                     history.add(ChatMessage("Astra", WELCOME))
                     dialogue.reset()
+                    workflowSession.reset()
                     dialogueAwaiting = false
                     input = ""
                     tab = 0
@@ -2620,6 +2641,7 @@ class MainActivity :
                     })
                     if (history.isEmpty()) history.add(ChatMessage("Astra", WELCOME))
                     dialogue.reset()
+                    workflowSession.reset()
                     dialogueAwaiting = false
                     input = ""
                     tab = 0
@@ -2872,6 +2894,52 @@ class MainActivity :
                     // Return the conversation to its spacious default after sending.
                     commandDeckExpanded = false
                     val normalized = AstraInput.normalize(message)
+
+                    // Explicit multi-step workflows are locally simulated first.
+                    // Neither LLM output nor Wikipedia text can execute actions.
+                    // Every plan is previewed; only 'confirm workflow' commits.
+                    val workflow = workflowSession.handle(
+                        normalized,
+                        AstraWorkflow.Snapshot(
+                            tasks.toList(),
+                            completed.toList(),
+                            notes.toList(),
+                            AstraWorkflow.decodeItems(
+                                storage.getString("astra_shopping_items", "")
+                            ),
+                            AstraWorkflow.decodeItems(
+                                storage.getString("astra_habits", "")
+                            )
+                        )
+                    )
+                    if (workflow != null) {
+                        var reply = workflow.text
+                        val result = workflow.apply
+                        if (result != null) {
+                            try {
+                                // Commit persistent data BEFORE updating UI state.
+                                storage.commitWorkflow(result)
+                                tasks.clear()
+                                tasks.addAll(result.tasks)
+                                completed.clear()
+                                completed.addAll(result.completed)
+                                notes.clear()
+                                notes.addAll(result.notes)
+                                dialogue.reset()
+                                dialogueAwaiting = false
+                            } catch (failure: Exception) {
+                                reply = "Workflow could not be saved. " +
+                                    (failure.message ?: "No changes were applied.")
+                            }
+                        }
+                        history.add(ChatMessage("You", message))
+                        history.add(ChatMessage("Astra", reply))
+                        while (history.size > MAX_HISTORY) history.removeAt(0)
+                        persist()
+                        input = ""
+                        keyboard?.hide()
+                        return
+                    }
 
                     // Evidence-grounded analysis is opt-in and runs on the phone.
                     // It cannot take actions, browse, or silently access memory.
@@ -3580,6 +3648,7 @@ class MainActivity :
                                             )
                                             chatGeneration++
                                             dialogue.reset()
+                    workflowSession.reset()
                                             dialogueAwaiting = false
                                             tab = 4
                                             Toast.makeText(
@@ -3921,6 +3990,7 @@ class MainActivity :
 
                                     chatGeneration++
                                     dialogue.reset()
+                    workflowSession.reset()
                                     dialogueAwaiting = false
                                     showClearDialog = false
                                 }
