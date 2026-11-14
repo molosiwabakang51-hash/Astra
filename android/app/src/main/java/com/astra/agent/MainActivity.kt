@@ -2777,6 +2777,10 @@ class MainActivity :
                     // sends notes, tasks or chat content to a language model.
                     val memoryRequest = AstraMemoryRecall.parse(message)
                     if (memoryRequest != null) {
+                        // Capture a non-null sealed request before crossing the
+                        // coroutine boundary; Kotlin cannot smart-cast a nullable
+                        // closure capture inside the asynchronous when.
+                        val selectedMemoryRequest: AstraMemoryRecall.Request = memoryRequest
                         val notesSnapshot = notes.toList()
                         val tasksSnapshot = tasks.toList()
                         val currentSnapshot = history.map {
@@ -2796,7 +2800,7 @@ class MainActivity :
                         researchScope.launch {
                             try {
                                 val reply = withContext(Dispatchers.Default) {
-                                    when (val request = memoryRequest) {
+                                    when (val request = selectedMemoryRequest) {
                                         is AstraMemoryRecall.Request.Overview ->
                                             AstraMemoryRecall.overview(
                                                 notesSnapshot, tasksSnapshot,
