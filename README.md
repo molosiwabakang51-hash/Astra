@@ -28,6 +28,24 @@ runners are normally free; avoid charging for oversized artifact storage
 or paid runner tiers. On-device speed, accuracy, memory pressure and battery
 use still require tests on a physical phone before stable release.
 
+## One-time free advanced-model download
+
+In **Settings → Offline AI models → Get free Qwen3 1.7B model**, Astra asks
+for explicit permission before downloading approximately **1.28 GB**.
+The download is HTTPS-only from the published ggml-org Hugging Face model,
+with a pinned SHA-256 checksum. It may use mobile data; Wi-Fi is recommended.
+
+Downloads are saved in app-private storage and can be **paused and resumed**.
+If the server does not support byte-range requests, the transfer restarts
+safely rather than appending duplicate bytes. Astra verifies the full model
+before replacing any working local copy. A completed corrupt download is
+discarded. Subsequent same-key Android updates reuse the stored GGUF; chat
+inference itself uses no network or paid API.
+
+The original **Import offline model once** option remains for users who already
+have the exact GGUF or want to transfer it offline from another device.
+Physical-phone tests remain necessary before this is considered production-ready.
+
 ## Working capabilities
 
 - Chat interface with **multiple persistent conversations**, an animated compact navigation dock, notes, tasks and completion tracking.
