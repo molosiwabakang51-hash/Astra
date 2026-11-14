@@ -2354,6 +2354,8 @@ class MainActivity :
                 }
                 // Deliberately session-only: not stored in SharedPreferences or exported JSON.
                 var gatewayToken by remember { mutableStateOf("") }
+                var gatewayCheckStatus by remember { mutableStateOf("") }
+                var gatewayCheckInProgress by remember { mutableStateOf(false) }
                 val cloudBrain = remember { AstraCloudBrain() }
 
                 var tab by remember {
@@ -3986,6 +3988,7 @@ class MainActivity :
                                             checked = cloudEnabled,
                                             onCheckedChange = {
                                                 cloudEnabled = it
+                                                gatewayCheckStatus = ""
                                                 storage.setBoolean("cloud_ai_enabled", it)
                                             }
                                         )
@@ -3993,6 +3996,7 @@ class MainActivity :
                                             value = cloudEndpoint,
                                             onValueChange = {
                                                 cloudEndpoint = it.take(500)
+                                                gatewayCheckStatus = ""
                                                 storage.setString("cloud_ai_endpoint", cloudEndpoint)
                                             },
                                             label = { Text("Private HTTPS address (Tailscale Serve)") },
@@ -4001,7 +4005,10 @@ class MainActivity :
                                         )
                                         OutlinedTextField(
                                             value = gatewayToken,
-                                            onValueChange = { gatewayToken = it.take(512) },
+                                            onValueChange = {
+                                                gatewayToken = it.take(512)
+                                                gatewayCheckStatus = ""
+                                            },
                                             label = { Text("Gateway access token (session only)") },
                                             visualTransformation = PasswordVisualTransformation(),
                                             modifier = Modifier.fillMaxWidth(),
@@ -4020,6 +4027,72 @@ class MainActivity :
                                             else "GATEWAY INACTIVE OR NOT CONFIGURED",
                                             color = MaterialTheme.colorScheme.primary,
                                             style = MaterialTheme.typography.labelMedium
+                                        )
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                        ) {
+                                            OutlinedButton(
+                                                enabled = cloudEnabled &&
+                                                    AstraCloudBrain.isSafeEndpoint(cloudEndpoint) &&
+                                                    gatewayToken.length >= 32 &&
+                                                    !gatewayCheckInProgress,
+                                                onClick = {
+                                                    val endpointSnapshot = cloudEndpoint
+                                                    val tokenSnapshot = gatewayToken
+                                                    gatewayCheckInProgress = true
+                                                    gatewayCheckStatus = "TESTING LOCAL MODEL..."
+                                                    researchScope.launch {
+                                                        try {
+                                                            val reply = cloudBrain.reply(
+                                                                endpointSnapshot,
+                                                                listOf(AstraCloudBrain.Turn(
+                                                                    "user",
+                                                                    "Reply with just ASTRA ONLINE."
+                                                                )),
+                                                                tokenSnapshot
+                                                            )
+                                                            if (cloudEnabled &&
+                                                                cloudEndpoint == endpointSnapshot &&
+                                                                gatewayToken == tokenSnapshot) {
+                                                                gatewayCheckStatus =
+                                                                    "CONNECTED TO LOCAL MODEL: " +
+                                                                    reply.take(100)
+                                                            }
+                                                        } catch (error: Exception) {
+                                                            if (cloudEnabled &&
+                                                                cloudEndpoint == endpointSnapshot &&
+                                                                gatewayToken == tokenSnapshot) {
+                                                                gatewayCheckStatus =
+                                                                    "LOCAL MODEL TEST FAILED: " +
+                                                                    (error.message ?: "Connection error")
+                                                            }
+                                                        } finally {
+                                                            gatewayCheckInProgress = false
+                                                        }
+                                                    }
+                                                }
+                                            ) { Text("Test local AI") }
+                                            if (gatewayCheckInProgress) {
+                                                CircularProgressIndicator(
+                                                    modifier = Modifier.size(20.dp),
+                                                    strokeWidth = 2.dp
+                                                )
+                                            }
+                                        }
+                                        if (gatewayCheckStatus.isNotEmpty()) {
+                                            Text(
+                                                gatewayCheckStatus,
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.onBackground
+                                            )
+                                        }
+                                        Text(
+                                            "Testing sends only a short test phrase to your own " +
+                                            "gateway, not your saved conversation history.",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
                                         Text("Setup (no model API fees): Install Ollama, " +
                                             "download qwen3:0.6b, start the local Astra " +

@@ -95,7 +95,8 @@ In Android Settings:
 1. Enable **Local Model Gateway** (the optional network AI connection).
 2. Paste your private HTTPS URL ending in `/chat`.
 3. Paste your gateway access token. This token is held in app memory **for this session only**.
-4. Ask a normal question: `Explain bond convexity and show an example`. Unsupported local requests automatically go to your own model. You can also type `ask ai ...`.
+4. Tap **Test local AI** to send only a short diagnostic prompt to your private model—**not** your conversation history. Astra reports whether the local model responded.
+5. Ask a normal question: `Explain bond convexity and show an example`. Unsupported local requests automatically go to your own model. You can also type `ask ai ...`.
 
 Local tasks, notes, and deterministic calculators run **before** the model and remain available without the gateway. No model-generated response can directly control or edit device data.
 
