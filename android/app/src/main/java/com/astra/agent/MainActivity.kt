@@ -2649,6 +2649,14 @@ class MainActivity :
                         persist()
                         return
                     }
+                    if (offlineModelTestRunning) {
+                        history.add(ChatMessage(
+                            "Astra",
+                            "The offline AI self-test is running. Try again when it finishes."
+                        ))
+                        persist()
+                        return
+                    }
                     if (offlineJob?.isActive == true) {
                         history.add(ChatMessage(
                             "Astra", "A response is already being generated. Stop it first."
@@ -4509,7 +4517,7 @@ class MainActivity :
                                                                 listOf(
                                                                     AstraOnDeviceBrain.Turn(
                                                                         "user",
-                                                                        "Say ASTRA OFFLINE and nothing else."
+                                                                        AstraOfflineSelfTest.CHALLENGE
                                                                     )
                                                                 ),
                                                                 Int.MIN_VALUE
@@ -4517,8 +4525,9 @@ class MainActivity :
                                                             val elapsed =
                                                                 (System.nanoTime() - began) / 1_000_000
                                                             offlineModelTestStatus =
-                                                                "MODEL RESPONDED OFFLINE in ${elapsed} ms: " +
-                                                                    answer.take(180)
+                                                                AstraOfflineSelfTest.evaluate(
+                                                                    answer, elapsed
+                                                                ).message
                                                         } catch (error: Exception) {
                                                             offlineModelTestStatus =
                                                                 "OFFLINE TEST FAILED: " +
