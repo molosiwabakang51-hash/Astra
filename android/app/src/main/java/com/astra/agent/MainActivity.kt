@@ -54,6 +54,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.contentDescription
 
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -2358,6 +2359,8 @@ class MainActivity :
                 }
                 var chatGeneration by remember { mutableIntStateOf(0) }
                 val onDeviceBrain = remember { AstraOnDeviceBrain(applicationContext) }
+                var offlineJob by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
+                var offlineAnswerMessageIndex by remember { mutableIntStateOf(-1) }
                 var offlineModelTestStatus by remember { mutableStateOf("") }
                 var offlineModelTestRunning by remember { mutableStateOf(false) }
 
@@ -2493,7 +2496,28 @@ class MainActivity :
                     )
                 }
 
+                // Stop native generation before archiving or replacing the
+                // active transcript, preserving the text already generated.
+                fun interruptOfflineForTransition() {
+                    if (offlineJob?.isActive == true) {
+                        offlineJob?.cancel()
+                        val messageIndex = offlineAnswerMessageIndex
+                        if (messageIndex in history.indices &&
+                            history[messageIndex].role == "Astra"
+                        ) {
+                            val existing = history[messageIndex].text
+                            val updated = if (existing == "ASTRA // THINKING OFFLINE...")
+                                "Offline response interrupted."
+                            else existing + "\n\n[Response interrupted]"
+                            history[messageIndex] = ChatMessage("Astra", updated)
+                        }
+                    }
+                    offlineJob = null
+                    offlineAnswerMessageIndex = -1
+                }
+
                 fun startNewConversation() {
+                    interruptOfflineForTransition()
                     val nextArchive = AstraChatLibrary.archive(
                         archivedChats.toList(), currentArchiveRecord()
                     )
@@ -2521,6 +2545,7 @@ class MainActivity :
                 }
 
                 fun switchToConversation(chat: AstraChatArchive.Chat) {
+                    interruptOfflineForTransition()
                     val next = AstraChatLibrary.activate(
                         archivedChats.toList(), chat.id, currentArchiveRecord()
                     ) ?: return
@@ -2604,8 +2629,15 @@ class MainActivity :
                     )
                 }
 
-                // Execute model-generated answers on the phone; no HTTP request or PC.
+                // All model output stays on-device and streams into the active bubble.
                 fun enqueueOffline(displayMessage: String, prompt: String) {
+                    if (offlineJob?.isActive == true) {
+                        history.add(ChatMessage(
+                            "Astra", "A response is already being generated. Stop it first."
+                        ))
+                        persist()
+                        return
+                    }
                     val turns = history.takeLast(12).mapNotNull { entry ->
                         val role = when (entry.role) {
                             "You" -> "user"
@@ -2616,35 +2648,71 @@ class MainActivity :
                     } + AstraOnDeviceBrain.Turn("user", prompt)
                     val generation = chatGeneration
                     val placeholder = "ASTRA // THINKING OFFLINE..."
+                    var displayed = placeholder
                     history.add(ChatMessage("You", displayMessage))
                     history.add(ChatMessage("Astra", placeholder))
                     while (history.size > MAX_HISTORY) history.removeAt(0)
                     val target = history.lastIndex
+                    offlineAnswerMessageIndex = target
                     persist()
                     activeResearchCount++
-                    researchScope.launch {
+
+                    val job = researchScope.launch {
+                        val runningJob = coroutineContext[kotlinx.coroutines.Job]
+                        fun stillActiveBubble(): Boolean =
+                            chatGeneration == generation &&
+                                target in history.indices &&
+                                history[target].role == "Astra" &&
+                                history[target].text == displayed
+
                         try {
                             val response = try {
-                                onDeviceBrain.reply(turns, generation)
+                                onDeviceBrain.reply(turns, generation) { partial ->
+                                    // Compose state and conversation history are
+                                    // mutated on the UI thread, not the model thread.
+                                    withContext(Dispatchers.Main.immediate) {
+                                        if (stillActiveBubble()) {
+                                            history[target] = ChatMessage("Astra", partial)
+                                            displayed = partial
+                                        }
+                                    }
+                                }
+                            } catch (cancel: CancellationException) {
+                                throw cancel
                             } catch (error: Exception) {
                                 "Offline model unavailable: " +
                                     (error.message ?: "The on-device inference engine failed.") +
                                     " Astra's built-in tools are still available."
                             }
-                            if (chatGeneration == generation &&
-                                target in history.indices &&
-                                history[target].role == "Astra" &&
-                                history[target].text == placeholder) {
+                            if (stillActiveBubble()) {
                                 history[target] = ChatMessage("Astra", response)
                                 persist()
-                                if (speakResponses && !response.startsWith("Offline model unavailable:")) {
+                                if (speakResponses &&
+                                    !response.startsWith("Offline model unavailable:")) {
                                     speak(response, localOnlyTts)
                                 }
                             }
+                        } catch (cancel: CancellationException) {
+                            // Preserve already streamed text; never leave a
+                            // permanent 'thinking' placeholder in saved chat.
+                            if (stillActiveBubble()) {
+                                val stopped = if (displayed == placeholder)
+                                    "Offline response stopped."
+                                else displayed + "\n\n[Response stopped]"
+                                history[target] = ChatMessage("Astra", stopped)
+                                persist()
+                            }
+                            throw cancel
                         } finally {
+                            // A cancelled old chat must not clear a newer job.
+                            if (offlineJob === runningJob) {
+                                offlineJob = null
+                                offlineAnswerMessageIndex = -1
+                            }
                             activeResearchCount = (activeResearchCount - 1).coerceAtLeast(0)
                         }
                     }
+                    offlineJob = job
                     input = ""
                     keyboard?.hide()
                 }
@@ -3153,6 +3221,7 @@ class MainActivity :
                             TextButton(
                                 onClick = {
                                     pendingBackupRestore = null
+                                    interruptOfflineForTransition()
                                     researchScope.launch {
                                         try {
                                             withContext(Dispatchers.IO) {
@@ -3508,7 +3577,7 @@ class MainActivity :
 
                             TextButton(
                                 onClick = {
-
+                                    interruptOfflineForTransition()
                                     history.clear()
 
                                     history.add(
@@ -3972,14 +4041,29 @@ class MainActivity :
                                         maxLines = 4,
                                         shape = RoundedCornerShape(24.dp),
                                         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
-                                        keyboardActions = KeyboardActions(onSend = { submit(input) })
+                                        keyboardActions = KeyboardActions(onSend = {
+                                            if (offlineJob?.isActive != true) submit(input)
+                                        })
                                     )
-                                    FilledIconButton(
-                                        onClick = { submit(input) },
-                                        enabled = input.isNotBlank(),
-                                        modifier = Modifier.semantics { contentDescription = "Send message" }
-                                    ) {
-                                        Text("➤")
+                                    if (offlineJob?.isActive == true) {
+                                        FilledTonalIconButton(
+                                            onClick = { offlineJob?.cancel() },
+                                            modifier = Modifier.semantics {
+                                                contentDescription = "Stop offline response"
+                                            }
+                                        ) {
+                                            Text("■")
+                                        }
+                                    } else {
+                                        FilledIconButton(
+                                            onClick = { submit(input) },
+                                            enabled = input.isNotBlank(),
+                                            modifier = Modifier.semantics {
+                                                contentDescription = "Send message"
+                                            }
+                                        ) {
+                                            Text("➤")
+                                        }
                                     }
                                 }
                             }
@@ -4313,6 +4397,7 @@ class MainActivity :
                                         ) {
                                             OutlinedButton(
                                                 enabled = !offlineModelTestRunning &&
+                                                    offlineJob?.isActive != true &&
                                                     onDeviceBrain.isModelBundled(),
                                                 onClick = {
                                                     offlineModelTestRunning = true
