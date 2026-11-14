@@ -23,7 +23,7 @@ CPP_RULES = (
     ("User prompt received:", 'LOGd("%s: User prompt supplied", __func__);', 1),
     ("common_token_to_piece(g_context, id).c_str()",
      "// PRIVATE: token content is deliberately not logged.", 2),
-    ("cached_token_chars.c_str()",
+    ("new_token_chars.c_str()",
      "// PRIVATE: generated token text is deliberately not logged.", 1),
     ('LOGv("id: %d,', "// PRIVATE: per-token log suppressed.", 1),
 )
@@ -47,7 +47,7 @@ FORBIDDEN = (
     "Loading model from:", "Formatted and added %s message:",
     "System prompt received:", "User prompt received:",
     "common_token_to_piece(g_context, id).c_str()",
-    "cached_token_chars.c_str()",
+    "new_token_chars.c_str()",
     '"Checking access to model file...', '"Loading model...',
     '(e.message ?: "Error loading model")',
     '"Native library loaded! System info:',
