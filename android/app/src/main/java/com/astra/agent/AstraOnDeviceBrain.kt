@@ -126,11 +126,9 @@ internal class AstraOnDeviceBrain(private val context: Context) {
                         "Re-import a model from Settings.",
                     lastPreparationError
                 )
-                var current = engine
-                if (current == null) {
-                    current = AiChat.getInferenceEngine(context.applicationContext)
-                    engine = current
-                }
+                val current = engine ?: AiChat.getInferenceEngine(
+                    context.applicationContext
+                ).also { engine = it }
                 // Upstream initializes JNI asynchronously. Wait for the engine
                 // to be ready instead of racing model loading against init.
                 val initialized = withTimeout(30_000L) {
