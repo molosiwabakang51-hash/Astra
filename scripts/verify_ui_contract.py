@@ -38,8 +38,8 @@ def main():
         if re.search(pattern, app):
             raise RuntimeError(f"Regression: {description}")
 
-    if '?: "0.11.0"' not in config or "?: 17" not in config:
-        raise RuntimeError("Release identity is not Astra 0.11.0 (versionCode 17)")
+    if '?: "0.11.1"' not in config or "?: 18" not in config:
+        raise RuntimeError("Release identity is not Astra 0.11.1 (versionCode 18)")
     print("PASS: Astra icon menu, compact chat, offline model, version stamp")
     print("PASS: no legacy bottom tabs, top-right overflow, or obsolete fallback")
 
