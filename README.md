@@ -1,4 +1,4 @@
-# Astra — Android personal assistant (v0.11.2 · private memory retrieval)
+# Astra — Android personal assistant (v0.11.3 · responsive streaming chat)
 
 Astra is a **local-first Android/Kotlin Jetpack Compose assistant** with a futuristic dark interface. It is being developed directly in this repository. The original **Astra-AI** repository is kept separately as a backup.
 
@@ -20,6 +20,17 @@ Astra is a **local-first Android/Kotlin Jetpack Compose assistant** with a futur
 
 **Important:** Astra's tasks, notes, calculators and local commands remain deterministic. Unhandled free-form questions now go to a **model running on the Android phone**. A small model may hallucinate or make calculation errors; Astra does not provide live financial prices or unrestricted device automation.
 
+## Chat that stays readable while AI is generating (v0.11.3)
+
+Astra now follows the latest reply only until you deliberately scroll upward.
+During on-device Qwen3 streaming, you can review older messages without Astra
+dragging you back to the bottom on every token batch. A compact **↓ Latest
+messages** action appears only while you are reading older chat content.
+Tapping it, sending another message, or manually scrolling to the end resumes
+following. Choosing a **Find in chat** search result pauses auto-follow too.
+This change runs entirely within the Android UI, needs no network, and
+does not alter existing saved conversations or model weights.
+
 ## Private, source-grounded recall across chats (v0.11.2)
 
 Astra can now answer explicit questions about **what you previously wrote** without using mobile data, the 462 MiB model, or any external AI service. Its memory search indexes saved notes, open tasks, user-written messages in the active chat, and user-written messages from archived conversations. AI-generated replies are **excluded** so Astra does not misrepresent model output as something you said.
@@ -36,14 +47,14 @@ The **Test on-device AI** control now requires the model to generate the expecte
 
 ## Avoid downloading a 539 MiB APK after every change
 
-**Astra v0.11.2** has two installable Android options built automatically on GitHub:
+**Astra v0.11.3** has two installable Android options built automatically on GitHub:
 
 | Variant | What you download | Best for |
 | --- | --- | --- |
 | **LITE** | Android UI, tasks and llama.cpp native inference, **without** GGUF model weights (enforced under 150 MiB) | Regular app updates over mobile data. |
 | **FULL** | The same Android app with Qwen3 Q4_K_M included (~539 MiB) | First installation when no model file is available. |
 
-Open [GitHub Actions](https://github.com/molosiwabakang51-hash/Astra/actions), choose a **successful v0.11.2 build**, and under Artifacts select **`Astra-v0.11.2-LITE-Offline-APK`** for the much smaller download. The full alternative is **`Astra-v0.11.2-FULL-Offline-APK`**. Extract the downloaded artifact ZIP; inside is the versioned APK. Both have the same app ID and UI but do **not** have the same bundled assets.
+Open [GitHub Actions](https://github.com/molosiwabakang51-hash/Astra/actions), choose a **successful v0.11.3 build**, and under Artifacts select **`Astra-v0.11.3-LITE-Offline-APK`** for the much smaller download. The full alternative is **`Astra-v0.11.3-FULL-Offline-APK`**. Extract the downloaded artifact ZIP; inside is the versioned APK. Both have the same app ID and UI but do **not** have the same bundled assets.
 
 **Import the model once without using internet data:** In the LITE app, tap **Astra icon → Settings → Import offline model once**. Choose a GGUF file already saved on the phone, a **previously downloaded large Astra APK**, or its original **GitHub artifact ZIP containing that APK**. Astra extracts the Qwen3 weights locally, checks their exact SHA-256, and stores the model privately. The original selected file is not modified. Once imported, airplane-mode chat works entirely on-device, subject to real-phone performance.
 

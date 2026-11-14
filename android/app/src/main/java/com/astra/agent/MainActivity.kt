@@ -23,6 +23,7 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.interaction.collectIsDraggedAsState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
@@ -2511,6 +2512,12 @@ class MainActivity :
 
                 val researchScope = rememberCoroutineScope()
 
+                // One shared list state for chat and search-result navigation.
+                // User drags suspend auto-follow until they reach the end again.
+                val scroll = rememberLazyListState()
+                var followNewest by remember { mutableStateOf(true) }
+                val userDraggingChat by scroll.interactionSource.collectIsDraggedAsState()
+
                 fun currentArchiveRecord(): AstraChatArchive.Chat? {
                     if (history.none { it.role == "You" }) return null
                     val messages = history.map {
@@ -2558,6 +2565,7 @@ class MainActivity :
                     archivedChats.clear()
                     archivedChats.addAll(nextArchive)
                     chatGeneration++
+                    followNewest = true
                     activeChatTitle = ""
                     storage.setString("astra_active_chat_title", "")
                     history.clear()
@@ -2582,6 +2590,7 @@ class MainActivity :
                     archivedChats.clear()
                     archivedChats.addAll(next.archived)
                     chatGeneration++
+                    followNewest = true
                     activeChatTitle = next.active.title
                     storage.setString("astra_active_chat_title", activeChatTitle)
                     chatSearchQuery = ""
@@ -2768,6 +2777,9 @@ class MainActivity :
                     if (message.isEmpty()) {
                         return
                     }
+
+                    // A deliberate Send always returns focus to the newest reply.
+                    followNewest = true
 
                     // Return the conversation to its spacious default after sending.
                     commandDeckExpanded = false
@@ -3244,25 +3256,38 @@ class MainActivity :
                     }
                 }
 
-                val scroll =
-                    rememberLazyListState()
+                // A drag is a clear signal that the reader wants to inspect
+                // earlier text. Reaching the end re-enables automatic following.
+                // Observe scroll layout in a flow rather than triggering a full
+                // chat recomposition for every pixel of a user gesture.
+                LaunchedEffect(scroll, userDraggingChat, chatGeneration) {
+                    snapshotFlow { scroll.canScrollForward }.collect { canScrollForward ->
+                        followNewest = AstraChatViewport.nextFollowState(
+                            wasFollowing = followNewest,
+                            userDragging = userDraggingChat,
+                            canScrollForward = canScrollForward
+                        )
+                    }
+                }
 
                 LaunchedEffect(
                     history.size,
                     history.lastOrNull()?.text,
-                    tab
+                    tab,
+                    followNewest
                 ) {
-                    if (tab == 0 && history.isNotEmpty()) {
-                        scroll.animateScrollToItem(history.lastIndex)
-                        // A long final bubble may be taller than the viewport.
-                        // Scrolling to its start would hide the actual answer.
-                        val finalItem = scroll.layoutInfo.visibleItemsInfo
+                    if (tab == 0 && followNewest && history.isNotEmpty()) {
+                        // Avoid animating on every streamed token batch. Jump
+                        // only when the user is following the latest answer.
+                        scroll.scrollToItem(history.lastIndex)
+                        // A long last bubble can exceed the viewport height.
+                        // Scroll down to the bottom of that bubble as well.
+                        val last = scroll.layoutInfo.visibleItemsInfo
                             .firstOrNull { it.index == history.lastIndex }
-                        if (finalItem != null) {
-                            val remaining =
-                                (finalItem.offset + finalItem.size -
-                                    scroll.layoutInfo.viewportEndOffset).coerceAtLeast(0)
-                            if (remaining > 0) scroll.animateScrollBy(remaining.toFloat())
+                        if (last != null) {
+                            val remaining = (last.offset + last.size -
+                                scroll.layoutInfo.viewportEndOffset).coerceAtLeast(0)
+                            if (remaining > 0) scroll.scrollBy(remaining.toFloat())
                         }
                     }
                 }
@@ -3350,6 +3375,9 @@ class MainActivity :
                                                     modifier = Modifier.fillMaxWidth(),
                                                     onClick = {
                                                         showFindInChat = false
+                                                        // Search jumps are intentional; don't snap
+                                                        // back to the newest reply as tokens arrive.
+                                                        followNewest = false
                                                         researchScope.launch {
                                                             scroll.animateScrollToItem(messageIndex)
                                                         }
@@ -4213,6 +4241,27 @@ class MainActivity :
                                                     message
                                             }
                                         )
+                                    }
+                                }
+
+                                // This appears only after the reader scrolls
+                                // away; it does not consume permanent chat space.
+                                if (AstraChatViewport.showReturnToLatest(
+                                        followNewest, scroll.canScrollForward
+                                    )
+                                ) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.Center
+                                    ) {
+                                        TextButton(
+                                            onClick = { followNewest = true },
+                                            modifier = Modifier.semantics {
+                                                contentDescription = "Jump to latest message"
+                                            }
+                                        ) {
+                                            Text("↓  Latest messages")
+                                        }
                                     }
                                 }
 
