@@ -65,6 +65,27 @@ class AstraConversationCommandsTest {
         }
     }
 
+    @Test fun speechWakeWordAndPolitenessStillPreserveNewChatIntent() {
+        for (utterance in listOf(
+            "Astra, new conversation",
+            "Hey Astra, please start a new chat",
+            "Okay Astra, can you start a new conversation?",
+            "Astra: switch chats",
+            "Hi Astra, please show conversations"
+        )) {
+            val action = AstraConversationCommands.classify(
+                AstraInput.normalize(utterance)
+            )
+            val expected = if (utterance.contains("switch", true) ||
+                utterance.contains("show conversations", true)) {
+                AstraConversationCommands.Action.OPEN_CONVERSATIONS
+            } else {
+                AstraConversationCommands.Action.NEW_CONVERSATION
+            }
+            assertEquals(utterance, expected, action)
+        }
+    }
+
     @Test fun classificationIsLocaleIndependent() {
         val previous = Locale.getDefault()
         try {
