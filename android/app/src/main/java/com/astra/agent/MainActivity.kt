@@ -42,7 +42,9 @@ import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 import org.json.JSONArray
 import org.json.JSONObject
@@ -240,6 +242,24 @@ private class AstraStorage(
 
     fun setInt(key: String, value: Int) {
         prefs.edit().putInt(key, value).apply()
+    }
+
+    fun exportBackup(): String =
+        AstraBackupCodec.encode(prefs.all)
+
+    fun restoreBackup(payload: AstraBackupCodec.Payload) {
+        val editor = prefs.edit()
+        payload.values.forEach { (key, value) ->
+            when (value) {
+                is String -> editor.putString(key, value)
+                is Boolean -> editor.putBoolean(key, value)
+                is Int -> editor.putInt(key, value)
+                else -> throw IllegalArgumentException("Unsupported backup setting.")
+            }
+        }
+        if (!editor.commit()) {
+            throw IllegalStateException("Could not save the restored data.")
+        }
     }
 
     fun save(
@@ -2301,6 +2321,10 @@ class MainActivity :
                     mutableStateOf(false)
                 }
 
+                var pendingBackupRestore by remember {
+                    mutableStateOf<AstraBackupCodec.Payload?>(null)
+                }
+
                 var selectedMessage by remember {
                     mutableStateOf<ChatMessage?>(null)
                 }
@@ -2621,6 +2645,63 @@ class MainActivity :
                         }
                     }
 
+                val exportBackupLauncher =
+                    rememberLauncherForActivityResult(
+                        ActivityResultContracts.CreateDocument("application/json")
+                    ) { uri ->
+                        if (uri != null) {
+                            researchScope.launch {
+                                try {
+                                    withContext(Dispatchers.IO) {
+                                        val backup = storage.exportBackup()
+                                        val output = contentResolver.openOutputStream(uri)
+                                            ?: throw IllegalStateException("Cannot write the selected file.")
+                                        output.use {
+                                            it.write(backup.toByteArray(Charsets.UTF_8))
+                                        }
+                                    }
+                                    Toast.makeText(
+                                        this@MainActivity,
+                                        "Astra backup exported.",
+                                        Toast.LENGTH_SHORT
+                                    ).show()
+                                } catch (error: Exception) {
+                                    Toast.makeText(
+                                        this@MainActivity,
+                                        error.message ?: "Could not export backup.",
+                                        Toast.LENGTH_LONG
+                                    ).show()
+                                }
+                            }
+                        }
+                    }
+
+                val importBackupLauncher =
+                    rememberLauncherForActivityResult(
+                        ActivityResultContracts.OpenDocument()
+                    ) { uri ->
+                        if (uri != null) {
+                            researchScope.launch {
+                                try {
+                                    pendingBackupRestore = withContext(Dispatchers.IO) {
+                                        val source = contentResolver.openInputStream(uri)
+                                            ?: throw IllegalStateException("Cannot open selected file.")
+                                        val contents = source.use {
+                                            AstraBackupCodec.readLimited(it)
+                                        }
+                                        AstraBackupCodec.parse(contents)
+                                    }
+                                } catch (error: Exception) {
+                                    Toast.makeText(
+                                        this@MainActivity,
+                                        error.message ?: "Could not read backup.",
+                                        Toast.LENGTH_LONG
+                                    ).show()
+                                }
+                            }
+                        }
+                    }
+
                 val microphonePermission =
                     rememberLauncherForActivityResult(
                         ActivityResultContracts.RequestPermission()
@@ -2738,6 +2819,71 @@ class MainActivity :
                             history.lastIndex
                         )
                     }
+                }
+
+                val restoreToConfirm = pendingBackupRestore
+                if (restoreToConfirm != null) {
+                    AlertDialog(
+                        onDismissRequest = { pendingBackupRestore = null },
+                        title = { Text("Restore Astra data?") },
+                        text = {
+                            Text(
+                                restoreToConfirm.preview() +
+                                "\n\nRestoring replaces existing saved chat, notes, tasks, habits, " +
+                                "shopping lists and preferences. This action cannot be undone. " +
+                                "Ensure the source file is trustworthy."
+                            )
+                        },
+                        confirmButton = {
+                            TextButton(
+                                onClick = {
+                                    pendingBackupRestore = null
+                                    researchScope.launch {
+                                        try {
+                                            withContext(Dispatchers.IO) {
+                                                storage.restoreBackup(restoreToConfirm)
+                                            }
+                                            history.clear()
+                                            history.addAll(storage.loadHistory())
+                                            if (history.isEmpty()) {
+                                                history.add(ChatMessage("Astra", WELCOME))
+                                            }
+                                            notes.clear()
+                                            notes.addAll(storage.loadNotes())
+                                            tasks.clear()
+                                            tasks.addAll(storage.loadTasks())
+                                            completed.clear()
+                                            completed.addAll(storage.loadCompletedTasks())
+                                            autoSendVoice = storage.getBoolean("auto_send_voice")
+                                            speakResponses = storage.getBoolean("speak_responses")
+                                            localOnlyTts = storage.getBoolean("local_only_tts", true)
+                                            allowSystemSpeech = storage.getBoolean("allow_system_speech")
+                                            speechLanguage = SpeechLanguage.fromTag(
+                                                storage.getString("speech_language", "en-US")
+                                            )
+                                            tab = 4
+                                            Toast.makeText(
+                                                this@MainActivity,
+                                                "Astra data restored.",
+                                                Toast.LENGTH_LONG
+                                            ).show()
+                                        } catch (error: Exception) {
+                                            Toast.makeText(
+                                                this@MainActivity,
+                                                error.message ?: "Could not restore backup.",
+                                                Toast.LENGTH_LONG
+                                            ).show()
+                                        }
+                                    }
+                                }
+                            ) { Text("Restore data") }
+                        },
+                        dismissButton = {
+                            TextButton(
+                                onClick = { pendingBackupRestore = null }
+                            ) { Text("Cancel") }
+                        }
+                    )
                 }
 
                 if (showClearDialog) {
@@ -3859,6 +4005,46 @@ class MainActivity :
 
                                     item {
                                         HorizontalDivider()
+                                    }
+
+                                    item {
+                                        HorizontalDivider()
+                                    }
+
+                                    item {
+                                        Text(
+                                            "Data backup & recovery",
+                                            style = MaterialTheme.typography.titleLarge
+                                        )
+                                    }
+
+                                    item {
+                                        Text(
+                                            "Export a local Astra JSON backup containing chat, notes, " +
+                                            "tasks, shopping lists, habits, learning progress and settings. " +
+                                            "The file is not encrypted, so store it privately. " +
+                                            "Import replaces the current saved data after confirmation."
+                                        )
+                                    }
+
+                                    item {
+                                        Column(
+                                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                                        ) {
+                                            OutlinedButton(
+                                                onClick = {
+                                                    exportBackupLauncher.launch("Astra-backup.json")
+                                                }
+                                            ) { Text("Export backup") }
+
+                                            OutlinedButton(
+                                                onClick = {
+                                                    importBackupLauncher.launch(
+                                                        arrayOf("application/json", "text/plain", "*/*")
+                                                    )
+                                                }
+                                            ) { Text("Import backup") }
+                                        }
                                     }
 
                                     item {
