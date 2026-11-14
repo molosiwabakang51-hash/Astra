@@ -1434,6 +1434,10 @@ private class AstraProcessor(
             return AssistantResult(it)
         }
 
+        AstraRecall.respond(clean, notes, tasks)?.let {
+            return AssistantResult(it)
+        }
+
         russianTutor.respond(clean)?.let {
             return AssistantResult(it)
         }
@@ -1680,6 +1684,12 @@ private class AstraProcessor(
 
             return AssistantResult(
                 """
+                LOCAL MEMORY
+                memory overview
+                recall bond duration
+                what did I say about dividends
+                find my notes about risk
+
                 MISSION CONTROL
                 mission control
                 what should I do next
