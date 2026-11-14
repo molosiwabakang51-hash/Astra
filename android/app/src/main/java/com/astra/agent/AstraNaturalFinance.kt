@@ -58,7 +58,8 @@ internal object AstraNaturalFinance {
     )
     private val monthlyCashflow = Regex(
         """\b(?:monthly contributions?|regular contributions?|additional (?:monthly )?deposits?|""" +
-            """deposit (?:each|every) month|add money (?:each|every) month|withdrawals?)\b""",
+            """deposit (?:each|every) month|(?:deposit|save|invest|add|contribute)\s+[^ ]{1,30}\s+(?:each|every) month|""" +
+            """add money (?:each|every) month|withdrawals?)\b""",
         RegexOption.IGNORE_CASE
     )
     private val monthlyRate = Regex(
