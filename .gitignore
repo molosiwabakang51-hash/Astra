@@ -18,3 +18,8 @@
 # Local editor and operating system files
 .DS_Store
 Thumbs.db
+
+# Build-time native inference sources and model weights (never commit weights)
+/third_party/llama.cpp/
+/android/app/src/main/assets/*.gguf
+/android/app/src/main/assets/*.gguf.partial
