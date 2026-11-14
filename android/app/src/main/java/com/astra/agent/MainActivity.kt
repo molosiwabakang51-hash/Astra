@@ -30,6 +30,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.*
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -42,6 +45,7 @@ import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -150,6 +154,13 @@ private class AstraStorage(
             "astra",
             Context.MODE_PRIVATE
         )
+
+    fun loadArchivedChats(): List<AstraChatArchive.Chat> =
+        AstraChatArchive.decode(getString("astra_chat_archive", "[]"))
+
+    fun saveArchivedChats(chats: List<AstraChatArchive.Chat>) {
+        setString("astra_chat_archive", AstraChatArchive.encode(chats))
+    }
 
     fun loadHistory(): List<ChatMessage> {
 
@@ -2343,6 +2354,21 @@ class MainActivity :
                     mutableStateOf(false)
                 }
 
+                val archivedChats = remember {
+                    mutableStateListOf<AstraChatArchive.Chat>().apply {
+                        addAll(storage.loadArchivedChats())
+                    }
+                }
+                var showChatSwitcher by remember { mutableStateOf(false) }
+                var dockExpanded by remember { mutableStateOf(false) }
+
+                LaunchedEffect(dockExpanded, tab) {
+                    if (dockExpanded) {
+                        delay(4_000)
+                        dockExpanded = false
+                    }
+                }
+
                 var pendingBackupRestore by remember {
                     mutableStateOf<AstraBackupCodec.Payload?>(null)
                 }
@@ -2432,6 +2458,53 @@ class MainActivity :
                 }
 
                 val researchScope = rememberCoroutineScope()
+
+                fun archiveCurrentConversation() {
+                    if (history.any { it.role == "You" }) {
+                        val messages = history.map {
+                            AstraChatArchive.Message(it.role, it.text)
+                        }
+                        archivedChats.add(
+                            0,
+                            AstraChatArchive.Chat(
+                                java.util.UUID.randomUUID().toString(),
+                                AstraChatArchive.title(messages),
+                                messages
+                            )
+                        )
+                        while (archivedChats.size > 40) archivedChats.removeAt(archivedChats.lastIndex)
+                        storage.saveArchivedChats(archivedChats)
+                    }
+                }
+
+                fun startNewConversation() {
+                    archiveCurrentConversation()
+                    history.clear()
+                    history.add(ChatMessage("Astra", WELCOME))
+                    dialogue.reset()
+                    dialogueAwaiting = false
+                    input = ""
+                    tab = 0
+                    storage.save(
+                        history.toList(), notes.toList(), tasks.toList(), completed.toList()
+                    )
+                }
+
+                fun switchToConversation(chat: AstraChatArchive.Chat) {
+                    archiveCurrentConversation()
+                    archivedChats.removeAll { it.id == chat.id }
+                    storage.saveArchivedChats(archivedChats)
+                    history.clear()
+                    history.addAll(chat.messages.map { ChatMessage(it.role, it.text) })
+                    if (history.isEmpty()) history.add(ChatMessage("Astra", WELCOME))
+                    dialogue.reset()
+                    dialogueAwaiting = false
+                    input = ""
+                    tab = 0
+                    storage.save(
+                        history.toList(), notes.toList(), tasks.toList(), completed.toList()
+                    )
+                }
 
                 fun persist() {
 
@@ -2913,6 +2986,51 @@ class MainActivity :
                     )
                 }
 
+                if (showChatSwitcher) {
+                    AlertDialog(
+                        onDismissRequest = { showChatSwitcher = false },
+                        title = { Text("Conversations") },
+                        text = {
+                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Text(
+                                    "Switch chats without deleting messages. " +
+                                    "Your current conversation is saved automatically."
+                                )
+                                OutlinedButton(
+                                    onClick = {
+                                        showChatSwitcher = false
+                                        startNewConversation()
+                                    }
+                                ) { Text("＋ New conversation") }
+                                if (archivedChats.isEmpty()) {
+                                    Text("No previous conversations yet.")
+                                }
+                                Column(
+                                    modifier = Modifier.heightIn(max = 400.dp)
+                                        .verticalScroll(rememberScrollState())
+                                ) {
+                                    archivedChats.forEach { chat ->
+                                        TextButton(
+                                            onClick = {
+                                                showChatSwitcher = false
+                                                switchToConversation(chat)
+                                            },
+                                            modifier = Modifier.fillMaxWidth()
+                                        ) {
+                                            Text(chat.title.ifBlank { "Conversation" })
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        confirmButton = {
+                            TextButton(onClick = { showChatSwitcher = false }) {
+                                Text("Close")
+                            }
+                        }
+                    )
+                }
+
                 if (showClearDialog) {
 
                     AlertDialog(
@@ -3214,7 +3332,14 @@ class MainActivity :
 
                                                 showMenu = false
 
-                                                showClearDialog = true
+                                                startNewConversation()
+                                            }
+                                        )
+                                        DropdownMenuItem(
+                                            text = { Text("Conversations") },
+                                            onClick = {
+                                                showMenu = false
+                                                showChatSwitcher = true
                                             }
                                         )
                                     }
@@ -3224,37 +3349,49 @@ class MainActivity :
                     },
 
                     bottomBar = {
-
-                        NavigationBar {
-
-                            listOf(
-                                "Chat",
-                                "Tasks",
-                                "Notes",
-                                "Tools",
-                                "Settings"
-                            ).forEachIndexed { index, title ->
-
-                                NavigationBarItem(
-                                    selected = tab == index,
-                                    onClick = {
-                                        tab = index
-                                    },
-                                    icon = {
-                                        Text(
-                                            listOf(
-                                                "✦",
-                                                "✓",
-                                                "▤",
-                                                "⌘",
-                                                "⚙"
-                                            )[index]
-                                        )
-                                    },
-                                    label = {
-                                        Text(title)
-                                    }
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(MaterialTheme.colorScheme.surface)
+                        ) {
+                            Box(
+                                modifier = Modifier.fillMaxWidth(),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                TextButton(
+                                    onClick = { dockExpanded = !dockExpanded }
+                                ) {
+                                    Text(if (dockExpanded) "⌄  MINIMIZE DOCK" else "⌃  EXPAND DOCK")
+                                }
+                            }
+                            NavigationBar(
+                                modifier = Modifier.animateContentSize(
+                                    animationSpec = tween(280)
                                 )
+                            ) {
+                                listOf(
+                                    "Chat", "Tasks", "Notes", "Tools", "Settings"
+                                ).forEachIndexed { index, title ->
+                                    NavigationBarItem(
+                                        selected = tab == index,
+                                        onClick = {
+                                            tab = index
+                                            dockExpanded = true
+                                        },
+                                        icon = {
+                                            Text(
+                                                listOf("✦", "✓", "▤", "⌘", "⚙")[index],
+                                                style = MaterialTheme.typography.titleLarge
+                                            )
+                                        },
+                                        label = {
+                                            AnimatedVisibility(visible = dockExpanded) {
+                                                Text(title)
+                                            }
+                                        },
+                                        alwaysShowLabel = false
+                                    )
+                                }
                             }
                         }
                     }
