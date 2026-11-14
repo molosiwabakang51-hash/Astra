@@ -1,4 +1,4 @@
-# Astra — Android personal assistant (v0.10.3 · on-device AI)
+# Astra — Android personal assistant (v0.10.4 · on-device AI)
 
 Astra is a **local-first Android/Kotlin Jetpack Compose assistant** with a futuristic dark interface. It is being developed directly in this repository. The original **Astra-AI** repository is kept separately as a backup.
 
@@ -18,7 +18,17 @@ Astra is a **local-first Android/Kotlin Jetpack Compose assistant** with a futur
 
 **Important:** Astra's tasks, notes, calculators and local commands remain deterministic. Unhandled free-form questions now go to a **model running on the Android phone**. A small model may hallucinate or make calculation errors; Astra does not provide live financial prices or unrestricted device automation.
 
+## Confirming the correct APK is installed
+
+**Astra v0.10.4** displays `v0.10.4 · OFFLINE AI` directly in the chat header, beside the Astra logo. Its controls are in the **Astra-logo menu**; there is **no permanent bottom tab bar or top-right three-dot menu**. The optional mission deck starts hidden. The app includes a local Qwen3 model and no longer shows the obsolete "additional language model required" reply for ordinary unsupported questions.
+
+For the GitHub Actions download, open the successful workflow and find artifact **`Astra-v0.10.4-Offline-ARM64-APK`**. Extract the ZIP and install **`Astra-v0.10.4-offline-arm64-debug.apk`**. The workflow inspects its Android manifest to confirm package ID `com.astra.agent`, versionName `0.10.4`, and versionCode `16`; it also verifies bundled model weights and ARM64 native libraries. Do not mistake a previously downloaded generic `app-debug.apk` for this build.
+
+**Before changing installs, export your existing data.** GitHub debug APK signing certificates may differ between workflow runs. Android will refuse an update signed with a different key, so a previous build might remain installed. Only uninstall an older signed build after you have successfully exported your chats, notes, and tasks. Verify the new installed version under Android **Settings → Apps → Astra** or via the `v0.10.4 · OFFLINE AI` label in the Astra header.
+
 ## Bundled on-device Qwen3 (no separate computer)
+
+**v0.10.4 install clarity:** The chat header displays the installed build version and offline AI identity. GitHub publishes one versioned APK file per workflow, and CI rejects a version or package-name mismatch. A regression guard ensures the icon-tap navigation, initially collapsed mission deck, and on-device model fallback remain implemented.
 
 **v0.10.3 diagnostics:** Settings → Offline AI now offers **Copy diagnostics** and **Share report**. Reports are generated locally and show device model, Android version, supported ABIs, free app storage, available RAM, the bundled/extracted model sizes and the offline self-test result. They exclude conversations, tasks, notes, device identifiers, secrets, access tokens and raw model output; there is no automatic upload. Review before sharing.
 
