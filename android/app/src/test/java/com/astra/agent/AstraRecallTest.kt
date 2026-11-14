@@ -62,9 +62,10 @@ class AstraRecallTest {
         val beforeNotes = notes.toList()
         val beforeTasks = tasks.toList()
         repeat(10_000) {
+            val alphabet = "abc ABC 123 ?! Привет"
             val suffix = buildString {
                 repeat(random.nextInt(24)) {
-                    append("abc ABC 123 ?! Привет"[random.nextInt(22)])
+                    append(alphabet[random.nextInt(alphabet.length)])
                 }
             }
             AstraRecall.respond("recall $suffix", notes, tasks)
