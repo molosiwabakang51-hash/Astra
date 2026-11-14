@@ -42,6 +42,38 @@ jobs:
             gradle --no-daemon testDebugUnitTest assembleDebug
           fi
 
+      - name: Smoke test release signing with disposable CI-only key
+        working-directory: android
+        shell: bash
+        run: |
+          set -euo pipefail
+          # This certificate is for validation ONLY and is never published.
+          # Real owner release keys are not available in PR or debug builds.
+          keytool -genkeypair -noprompt \
+            -keystore "$RUNNER_TEMP/astra-ci-test.jks" \
+            -storetype PKCS12 \
+            -storepass 'ci-ephemeral-test-password' \
+            -keypass 'ci-ephemeral-test-password' \
+            -alias 'astra-ci-test' \
+            -keyalg RSA -keysize 2048 -validity 1 \
+            -dname 'CN=Astra CI Test, O=Testing, C=US'
+          export ASTRA_KEYSTORE_PATH="$RUNNER_TEMP/astra-ci-test.jks"
+          export ASTRA_KEYSTORE_PASSWORD='ci-ephemeral-test-password'
+          export ASTRA_KEY_ALIAS='astra-ci-test'
+          export ASTRA_KEY_PASSWORD='ci-ephemeral-test-password'
+          export ASTRA_RELEASE_VERSION_CODE=100001
+          if [ -f ./gradlew ]; then
+            ./gradlew --no-daemon assembleRelease
+          else
+            gradle --no-daemon assembleRelease
+          fi
+          signed="app/build/outputs/apk/release/app-release.apk"
+          test -s "$signed"
+          signer="$(find "${ANDROID_HOME}/build-tools" -maxdepth 2 -type f -name apksigner | sort -V | tail -n 1)"
+          "$signer" verify "$signed"
+          # Never distribute this throwaway-key release APK.
+          rm -f "$signed" "$RUNNER_TEMP/astra-ci-test.jks"
+
       - name: Publish debug APK
         if: success()
         uses: actions/upload-artifact@v4

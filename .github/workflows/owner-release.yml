@@ -1,0 +1,112 @@
+name: Build owner-signed Astra release
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  owner-release:
+    name: Signed owner release APK
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: astra-release
+    timeout-minutes: 35
+    steps:
+      - name: Checkout main only
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Configure Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Configure Gradle 8.9
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+
+      - name: Recover owner keystore in temporary runner storage
+        env:
+          ASTRA_RELEASE_KEYSTORE_BASE64: ${{ secrets.ASTRA_RELEASE_KEYSTORE_BASE64 }}
+          ASTRA_RELEASE_STORE_PASSWORD: ${{ secrets.ASTRA_RELEASE_STORE_PASSWORD }}
+          ASTRA_RELEASE_KEY_ALIAS: ${{ secrets.ASTRA_RELEASE_KEY_ALIAS }}
+          ASTRA_RELEASE_KEY_PASSWORD: ${{ secrets.ASTRA_RELEASE_KEY_PASSWORD }}
+          ASTRA_RELEASE_CERT_SHA256: ${{ secrets.ASTRA_RELEASE_CERT_SHA256 }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          for name in ASTRA_RELEASE_KEYSTORE_BASE64 ASTRA_RELEASE_STORE_PASSWORD \
+              ASTRA_RELEASE_KEY_ALIAS ASTRA_RELEASE_KEY_PASSWORD \
+              ASTRA_RELEASE_CERT_SHA256; do
+            if [[ -z "${!name:-}" ]]; then
+              echo "::error::Release environment is missing $name."
+              exit 1
+            fi
+          done
+          umask 077
+          printf '%s' "$ASTRA_RELEASE_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/astra-owner-release.jks"
+          if [[ ! -s "$RUNNER_TEMP/astra-owner-release.jks" ]]; then
+            echo "::error::Invalid release keystore."
+            exit 1
+          fi
+          echo "ASTRA_KEYSTORE_PATH=$RUNNER_TEMP/astra-owner-release.jks" >> "$GITHUB_ENV"
+
+      - name: Build verified release APK
+        working-directory: android
+        env:
+          ASTRA_KEYSTORE_PASSWORD: ${{ secrets.ASTRA_RELEASE_STORE_PASSWORD }}
+          ASTRA_KEY_ALIAS: ${{ secrets.ASTRA_RELEASE_KEY_ALIAS }}
+          ASTRA_KEY_PASSWORD: ${{ secrets.ASTRA_RELEASE_KEY_PASSWORD }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          # The workflow run number increases the versionCode for releases.
+          export ASTRA_RELEASE_VERSION_CODE="$((100000 + GITHUB_RUN_NUMBER))"
+          export ASTRA_RELEASE_VERSION_NAME="0.9.4.$GITHUB_RUN_NUMBER"
+          if [[ -f ./gradlew ]]; then
+            chmod +x ./gradlew
+            ./gradlew --no-daemon testDebugUnitTest assembleRelease
+          else
+            gradle --no-daemon testDebugUnitTest assembleRelease
+          fi
+
+      - name: Verify certificate matches owner-approved fingerprint
+        env:
+          ASTRA_RELEASE_CERT_SHA256: ${{ secrets.ASTRA_RELEASE_CERT_SHA256 }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          apk="android/app/build/outputs/apk/release/app-release.apk"
+          test -s "$apk"
+          signer="$(find "${ANDROID_HOME}/build-tools" -maxdepth 2 -type f -name apksigner | sort -V | tail -n 1)"
+          test -x "$signer"
+          "$signer" verify "$apk"
+          actual="$("$signer" verify --print-certs "$apk" | sed -n 's/^Signer #1 certificate SHA-256 digest: //p' | head -n 1)"
+          expected="$(printf '%s' "$ASTRA_RELEASE_CERT_SHA256" | tr -d '[:space:]:' | tr '[:upper:]' '[:lower:]')"
+          actual="$(printf '%s' "$actual" | tr -d '[:space:]:' | tr '[:upper:]' '[:lower:]')"
+          if [[ ! "$expected" =~ ^[0-9a-f]{64}$ ]] || [[ "$actual" != "$expected" ]]; then
+            echo "::error::Signing certificate fingerprint mismatch. Refusing to publish the APK."
+            exit 1
+          fi
+          echo "Release signature verified against owner-approved certificate."
+
+      - name: Publish verified signed APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Astra-owner-signed-release
+          path: android/app/build/outputs/apk/release/app-release.apk
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Remove temporary key material
+        if: always()
+        shell: bash
+        run: |
+          if [[ -f "$RUNNER_TEMP/astra-owner-release.jks" ]]; then
+            shred -u "$RUNNER_TEMP/astra-owner-release.jks" || rm -f "$RUNNER_TEMP/astra-owner-release.jks"
+          fi
