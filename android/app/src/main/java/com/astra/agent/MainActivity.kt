@@ -1759,6 +1759,10 @@ private class AstraProcessor(
                 recall bond duration
                 what did I say about dividends
                 find my notes about risk
+                ask my memory why did I choose bonds?
+                analyse my notes about portfolio risk
+                Tap Astra icon → Search all local memory → Ask with evidence.
+                Grounded AI answers include the original source excerpts.
 
                 MISSION CONTROL
                 mission control
