@@ -1,0 +1,138 @@
+package com.astra.agent
+
+import android.content.Context
+import android.os.StatFs
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.withContext
+import java.io.File
+import java.io.FileOutputStream
+import java.net.URL
+import java.security.MessageDigest
+import javax.net.ssl.HttpsURLConnection
+
+/**
+ * Optional one-time, resumable HTTPS download of public GGUF weights.
+ *
+ * No prompts or private data are uploaded. Network is used ONLY to obtain
+ * the open GGUF model file. After SHA-256 verification, all inference is local.
+ * Partial bytes are retained on cancellation so data is not redownloaded.
+ */
+internal object AstraModelDownload {
+    private const val MODEL_URL =
+        "https://huggingface.co/ggml-org/Qwen3-1.7B-GGUF/resolve/main/Qwen3-1.7B-Q4_K_M.gguf"
+    private const val MIN_BYTES = 1_150_000_000L
+    private const val MAX_BYTES = 1_350_000_000L
+    private const val HEADROOM = 64L * 1024L * 1024L
+
+    suspend fun download(
+        context: Context,
+        onProgress: suspend (downloaded: Long, expected: Long) -> Unit = { _, _ -> }
+    ): Long = withContext(Dispatchers.IO) {
+        val target = AstraModelImport.advancedFile(context)
+        val folder = target.parentFile ?: error("Offline model storage unavailable.")
+        require(folder.isDirectory || folder.mkdirs()) { "Cannot create offline model storage." }
+
+        // A correctly installed model needs no network call at all.
+        if (target.isFile && target.length() in MIN_BYTES..MAX_BYTES &&
+            sha256(target) == AstraModelImport.ADVANCED_SHA256
+        ) {
+            onProgress(target.length(), target.length())
+            return@withContext target.length()
+        }
+        val partial = File(folder, AstraModelImport.ADVANCED_NAME + ".downloading")
+        if (partial.isFile && partial.length() > MAX_BYTES) {
+            check(partial.delete()) { "Cannot clear oversized incomplete download." }
+        }
+        val offset = partial.takeIf(File::isFile)?.length() ?: 0L
+        val connection = URL(MODEL_URL).openConnection() as HttpsURLConnection
+        try {
+            connection.requestMethod = "GET"
+            connection.instanceFollowRedirects = true
+            connection.connectTimeout = 25_000
+            connection.readTimeout = 35_000
+            connection.setRequestProperty("Accept-Encoding", "identity")
+            connection.setRequestProperty("User-Agent", "Astra-Android-offline-model-setup")
+            if (offset > 0L) connection.setRequestProperty("Range", "bytes=$offset-")
+            val status = connection.responseCode
+            if (status == 416 && offset in MIN_BYTES..MAX_BYTES) {
+                // Completed bytes may have survived a crash before final rename.
+                require(sha256(partial) == AstraModelImport.ADVANCED_SHA256) {
+                    "Incomplete model download failed checksum. Restart the model download."
+                }
+                AstraModelStorage.installVerified(partial, target)
+                onProgress(target.length(), target.length())
+                return@withContext target.length()
+            }
+            val transfer = AstraDownloadRange.plan(
+                status, offset, connection.getHeaderField("Content-Range"),
+                connection.contentLengthLong
+            )
+            require(transfer.totalBytes in MIN_BYTES..MAX_BYTES) {
+                "The model server returned an unexpected GGUF size."
+            }
+            val usedBytes = if (transfer.append) offset else 0L
+            require(StatFs(folder.absolutePath).availableBytes >=
+                transfer.totalBytes - usedBytes + HEADROOM) {
+                "Insufficient storage to finish the offline model download."
+            }
+
+            currentCoroutineContext().ensureActive()
+            connection.inputStream.use { input ->
+                FileOutputStream(partial, transfer.append).use { output ->
+                    val data = ByteArray(1024 * 1024)
+                    var total = usedBytes
+                    var lastUpdate = 0L
+                    while (true) {
+                        currentCoroutineContext().ensureActive()
+                        val n = input.read(data)
+                        if (n < 0) break
+                        total += n
+                        require(total <= transfer.totalBytes && total <= MAX_BYTES) {
+                            "The model download exceeded its declared size."
+                        }
+                        output.write(data, 0, n)
+                        if (total - lastUpdate >= 16L * 1024 * 1024) {
+                            onProgress(total, transfer.totalBytes)
+                            lastUpdate = total
+                        }
+                    }
+                    currentCoroutineContext().ensureActive()
+                    output.fd.sync()
+                }
+            }
+            require(partial.length() == transfer.totalBytes) {
+                "The model download stopped early. Start again to resume."
+            }
+            require(sha256(partial) == AstraModelImport.ADVANCED_SHA256) {
+                // Do not install unverified bytes, but retain partial so that
+                // the next server request can detect a non-resumable download.
+                "Downloaded GGUF failed its SHA-256 integrity check."
+            }
+            AstraModelStorage.installVerified(partial, target)
+            onProgress(target.length(), target.length())
+            target.length()
+        } catch (cancel: CancellationException) {
+            throw cancel
+        } finally {
+            connection.disconnect()
+        }
+    }
+
+    private suspend fun sha256(file: File): String {
+        val digest = MessageDigest.getInstance("SHA-256")
+        val scope = currentCoroutineContext()
+        file.inputStream().buffered().use { input ->
+            val block = ByteArray(1024 * 1024)
+            while (true) {
+                scope.ensureActive()
+                val read = input.read(block)
+                if (read < 0) break
+                digest.update(block, 0, read)
+            }
+        }
+        return digest.digest().joinToString("") { "%02x".format(it) }
+    }
+}
