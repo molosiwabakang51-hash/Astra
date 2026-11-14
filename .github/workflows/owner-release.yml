@@ -1,0 +1,95 @@
+name: Build owner-signed Astra APK
+
+# Explicit opt-in. Never use secrets on pull requests or untrusted forks.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  signed-release:
+    name: Verify and build owner-signed release
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - name: Checkout trusted main branch
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          persist-credentials: false
+
+      - name: Configure Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Configure Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+
+      - name: Validate release secrets and restore private keystore
+        shell: bash
+        env:
+          ASTRA_RELEASE_KEYSTORE_B64: ${{ secrets.ASTRA_RELEASE_KEYSTORE_B64 }}
+          ASTRA_RELEASE_STORE_PASSWORD: ${{ secrets.ASTRA_RELEASE_STORE_PASSWORD }}
+          ASTRA_RELEASE_KEY_ALIAS: ${{ secrets.ASTRA_RELEASE_KEY_ALIAS }}
+          ASTRA_RELEASE_KEY_PASSWORD: ${{ secrets.ASTRA_RELEASE_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${ASTRA_RELEASE_KEYSTORE_B64:-}" ||
+                -z "${ASTRA_RELEASE_STORE_PASSWORD:-}" ||
+                -z "${ASTRA_RELEASE_KEY_ALIAS:-}" ||
+                -z "${ASTRA_RELEASE_KEY_PASSWORD:-}" ]]; then
+            echo "::error::Configure all four ASTRA_RELEASE_* repository secrets before running this workflow."
+            exit 1
+          fi
+          umask 077
+          printf '%s' "$ASTRA_RELEASE_KEYSTORE_B64" |
+            base64 --decode > "$RUNNER_TEMP/astra-owner-release.jks"
+          test -s "$RUNNER_TEMP/astra-owner-release.jks"
+
+      - name: Run unit tests and assemble signed APK
+        working-directory: android
+        env:
+          ASTRA_SIGNING_STORE_FILE: ${{ runner.temp }}/astra-owner-release.jks
+          ASTRA_SIGNING_STORE_PASSWORD: ${{ secrets.ASTRA_RELEASE_STORE_PASSWORD }}
+          ASTRA_SIGNING_KEY_ALIAS: ${{ secrets.ASTRA_RELEASE_KEY_ALIAS }}
+          ASTRA_SIGNING_KEY_PASSWORD: ${{ secrets.ASTRA_RELEASE_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          if [[ -f ./gradlew ]]; then
+            chmod +x ./gradlew
+            ./gradlew --no-daemon testDebugUnitTest assembleRelease
+          else
+            gradle --no-daemon testDebugUnitTest assembleRelease
+          fi
+
+      - name: Verify signed APK before publishing
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK="android/app/build/outputs/apk/release/app-release.apk"
+          test -s "$APK"
+          APKSIGNER="$(find "$ANDROID_HOME/build-tools" -maxdepth 2 -type f -name apksigner | sort -V | tail -n 1)"
+          if [[ -z "$APKSIGNER" ]]; then
+            echo "::error::Android apksigner was not found."
+            exit 1
+          fi
+          "$APKSIGNER" verify --verbose "$APK"
+
+      - name: Remove private signing material
+        if: always()
+        shell: bash
+        run: rm -f "$RUNNER_TEMP/astra-owner-release.jks"
+
+      - name: Publish owner-signed APK
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Astra-owner-signed-APK
+          path: android/app/build/outputs/apk/release/app-release.apk
+          retention-days: 14
+          if-no-files-found: error
