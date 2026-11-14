@@ -9,11 +9,15 @@ import re
 ROOT = Path(__file__).resolve().parents[1]
 MAIN = ROOT / "android/app/src/main/java/com/astra/agent/MainActivity.kt"
 GRADLE = ROOT / "android/app/build.gradle.kts"
+BRAIN = ROOT / "android/app/src/main/java/com/astra/agent/AstraOnDeviceBrain.kt"
+IMPORT = ROOT / "android/app/src/main/java/com/astra/agent/AstraModelImport.kt"
 
 
 def main():
     app = MAIN.read_text(encoding="utf-8")
     config = GRADLE.read_text(encoding="utf-8")
+    brain = BRAIN.read_text(encoding="utf-8")
+    importer = IMPORT.read_text(encoding="utf-8")
 
     required = {
         "Astra icon opens navigation": 'clickable { navigationPopupOpen = true }',
@@ -46,8 +50,13 @@ def main():
         if re.search(pattern, app):
             raise RuntimeError(f"Regression: {description}")
 
-    if '?: "0.11.4"' not in config or "?: 21" not in config:
-        raise RuntimeError("Release identity is not Astra 0.11.4 (versionCode 21)")
+    if "session.invalidate()" not in brain or "AstraInferenceSession()" not in brain:
+        raise RuntimeError("Offline native inference must reset its KV-cache after errors")
+    if "AstraModelStorage.installVerified(" not in importer or "AstraModelStorage.installVerified(" not in brain:
+        raise RuntimeError("FULL and LITE model updates must use crash-safe storage")
+
+    if '?: "0.11.5"' not in config or "?: 22" not in config:
+        raise RuntimeError("Release identity is not Astra 0.11.5 (versionCode 22)")
     print("PASS: Astra icon menu, compact chat, offline model, version stamp")
     print("PASS: no legacy bottom tabs, top-right overflow, or obsolete fallback")
 

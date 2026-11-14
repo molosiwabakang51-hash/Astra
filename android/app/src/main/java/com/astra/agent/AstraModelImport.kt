@@ -30,7 +30,10 @@ internal object AstraModelImport {
     private const val ASSET_PATH = "assets/" + AstraOnDeviceBrain.ASSET_NAME
 
     fun modelFile(context: Context): File =
-        File(File(context.noBackupFilesDir, "offline-models"), AstraOnDeviceBrain.ASSET_NAME)
+        AstraModelStorage.activeModel(
+            File(context.noBackupFilesDir, "offline-models"),
+            AstraOnDeviceBrain.ASSET_NAME
+        )
 
     fun appearsInstalled(context: Context): Boolean =
         modelFile(context).let { it.isFile && it.length() >= MIN_BYTES }
@@ -86,11 +89,10 @@ internal object AstraModelImport {
                 digest.digest().joinToString("") { "%02x".format(it) }
                     .equals(AstraOnDeviceBrain.MODEL_SHA256, ignoreCase = true)
             ) { "This is not Astra's expected Qwen3 model (size or SHA-256 mismatch)." }
-            // Do not replace a working model until the new file is verified.
-            if (target.isFile && !target.delete()) {
-                error("Cannot replace previously installed model.")
-            }
-            require(partial.renameTo(target)) { "Unable to finalize imported model." }
+            // Preserve the previously working GGUF until the fully verified
+            // replacement is installed. A process death during the final
+            // renames is recoverable at the next model-file lookup.
+            AstraModelStorage.installVerified(partial, target)
             total
         } finally {
             if (partial.exists()) partial.delete()
