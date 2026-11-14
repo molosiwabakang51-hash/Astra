@@ -2378,6 +2378,7 @@ class MainActivity :
                 }
                 var showChatSwitcher by remember { mutableStateOf(false) }
                 var navigationPopupOpen by remember { mutableStateOf(false) }
+                var commandDeckExpanded by remember { mutableStateOf(false) }
 
                 var pendingBackupRestore by remember {
                     mutableStateOf<AstraBackupCodec.Payload?>(null)
@@ -2585,6 +2586,8 @@ class MainActivity :
                         return
                     }
 
+                    // Return the conversation to its spacious default after sending.
+                    commandDeckExpanded = false
                     val normalized = AstraInput.normalize(message)
                     val explicitCloud = message.startsWith("ask ai ", ignoreCase = true)
                     if (explicitCloud) {
@@ -3516,6 +3519,8 @@ class MainActivity :
                                     completedTasks = completed.size,
                                     storedNotes = notes.size,
                                     awaitingReply = dialogueAwaiting,
+                                    expanded = commandDeckExpanded,
+                                    onExpandedChange = { commandDeckExpanded = it },
                                     onCommand = { command -> submit(command) }
                                 )
 
