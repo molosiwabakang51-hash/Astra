@@ -54,15 +54,6 @@ internal object AstraModelImport {
         modelFile(context).let { it.isFile && it.length() in MIN_BYTES..600_000_000L } ||
             advancedInstalled(context)
 
-    fun preferAdvanced(context: Context): Boolean =
-        context.getSharedPreferences("astra", Context.MODE_PRIVATE)
-            .getBoolean("astra_prefer_advanced_model", true)
-
-    fun setPreferAdvanced(context: Context, selected: Boolean) {
-        context.getSharedPreferences("astra", Context.MODE_PRIVATE)
-            .edit().putBoolean("astra_prefer_advanced_model", selected).apply()
-    }
-
     suspend fun importDocument(
         context: Context,
         uri: Uri,
@@ -122,7 +113,6 @@ internal object AstraModelImport {
             // replacement is installed. A process death during the final
             // renames is recoverable at the next model-file lookup.
             AstraModelStorage.installVerified(partial, target)
-            if (advanced) setPreferAdvanced(context, true)
             total
         } finally {
             if (partial.exists()) partial.delete()
