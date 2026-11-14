@@ -25,6 +25,15 @@ class AstraModelChoiceTest {
         )
     }
 
+    @Test fun exposesRealModelNameWithoutPrivatePath() {
+        assertEquals("Qwen3 1.7B · Q4_K_M",
+            AstraModelChoice.loadedName("/data/user/0/com.astra.agent/files/Qwen3-1.7B-Q4_K_M.gguf"))
+        assertEquals("Qwen3 0.6B · Q4_K_M",
+            AstraModelChoice.loadedName("/private/qwen3-0.6b-q4km.gguf"))
+        assertEquals(null, AstraModelChoice.loadedName(null))
+        assertEquals(null, AstraModelChoice.loadedName("/private/unknown.bin"))
+    }
+
     @Test fun noWeightsNeverPretendThatInferenceIsAvailable() {
         assertEquals(
             AstraModelChoice.Variant.NONE,
