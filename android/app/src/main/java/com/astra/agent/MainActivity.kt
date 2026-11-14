@@ -20,6 +20,8 @@ import androidx.activity.compose.setContent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
@@ -2424,11 +2426,19 @@ class MainActivity :
                     mutableStateOf("")
                 }
 
+                var visionBusy by remember { mutableStateOf(false) }
+                var visionOutput by remember { mutableStateOf("") }
+                var visionError by remember { mutableStateOf("") }
+
                 val keyboard =
                     LocalSoftwareKeyboardController.current
 
                 val research = remember {
                     WikipediaResearch()
+                }
+
+                val vision = remember {
+                    AstraVision()
                 }
 
                 val researchScope = rememberCoroutineScope()
@@ -2666,6 +2676,36 @@ class MainActivity :
                                 submit(words)
                             } else {
                                 input = words
+                            }
+                        }
+                    }
+
+                val visionPhotoPicker =
+                    rememberLauncherForActivityResult(
+                        ActivityResultContracts.GetContent()
+                    ) { selectedUri ->
+                        if (selectedUri != null && !visionBusy) {
+                            visionBusy = true
+                            visionError = ""
+                            visionOutput = ""
+                            researchScope.launch {
+                                try {
+                                    val result = vision.recognize(
+                                        this@MainActivity,
+                                        selectedUri
+                                    )
+                                    if (result.isBlank()) {
+                                        visionError =
+                                            "No readable Latin-script text detected. Try a clearer photo."
+                                    } else {
+                                        visionOutput = result
+                                    }
+                                } catch (_: Exception) {
+                                    visionError =
+                                        "Could not scan the image. Choose a clear, readable photo."
+                                } finally {
+                                    visionBusy = false
+                                }
                             }
                         }
                     }
@@ -3620,6 +3660,11 @@ class MainActivity :
 
                             3 -> {
 
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .verticalScroll(rememberScrollState())
+                                ) {
                                 Spacer(
                                     Modifier.height(12.dp)
                                 )
@@ -3669,6 +3714,7 @@ class MainActivity :
                                                 completed
                                             )
 
+                                        dialogueAwaiting = dialogue.awaitingResponse
                                         toolOutput =
                                             if (result.sensitive) {
 
@@ -3692,6 +3738,79 @@ class MainActivity :
                                 )
 
                                 Text(toolOutput)
+
+                                Spacer(Modifier.height(22.dp))
+                                HorizontalDivider()
+                                Spacer(Modifier.height(12.dp))
+
+                                Text(
+                                    "ASTRA VISION // PHOTO TEXT SCANNER",
+                                    color = MaterialTheme.colorScheme.primary,
+                                    style = MaterialTheme.typography.titleMedium
+                                )
+                                Spacer(Modifier.height(8.dp))
+                                Text(
+                                    "Choose a photo to extract Latin-script text on your device. " +
+                                    "Astra does not upload or automatically save the photo or extracted text. " +
+                                    "Recognition accuracy depends on image quality."
+                                )
+                                Spacer(Modifier.height(12.dp))
+                                OutlinedButton(
+                                    enabled = !visionBusy,
+                                    onClick = {
+                                        visionPhotoPicker.launch("image/*")
+                                    }
+                                ) {
+                                    Text(if (visionBusy) "SCANNING..." else "Scan text from photo")
+                                }
+
+                                if (visionError.isNotBlank()) {
+                                    Spacer(Modifier.height(8.dp))
+                                    Text(
+                                        visionError,
+                                        color = MaterialTheme.colorScheme.error
+                                    )
+                                }
+
+                                if (visionOutput.isNotBlank()) {
+                                    Spacer(Modifier.height(12.dp))
+                                    Text(
+                                        "RECOGNIZED TEXT",
+                                        style = MaterialTheme.typography.labelMedium,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                    Spacer(Modifier.height(8.dp))
+                                    Text(
+                                        visionOutput,
+                                        style = MaterialTheme.typography.bodyMedium
+                                    )
+                                    Spacer(Modifier.height(10.dp))
+                                    Row(
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        OutlinedButton(
+                                            onClick = { copyText(visionOutput) }
+                                        ) {
+                                            Text("Copy text")
+                                        }
+                                        OutlinedButton(
+                                            onClick = {
+                                                notes.add(visionOutput)
+                                                persist()
+                                                Toast.makeText(
+                                                    this@MainActivity,
+                                                    "Recognized text saved to Notes.",
+                                                    Toast.LENGTH_SHORT
+                                                ).show()
+                                            }
+                                        ) {
+                                            Text("Save to Notes")
+                                        }
+                                    }
+                                }
+
+                                Spacer(Modifier.height(18.dp))
+                                }
                             }
 
                             // ========================================
