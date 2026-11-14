@@ -69,14 +69,15 @@ jobs:
           [[ "$package" == *"name='com.astra.agent'"* ]] || {
             echo "Unexpected package ID in APK"; exit 1;
           }
-          [[ "$package" == *"versionCode='16'"* ]] || {
+          [[ "$package" == *"versionCode='17'"* ]] || {
             echo "Unexpected versionCode in APK"; exit 1;
           }
-          [[ "$package" == *"versionName='0.10.4'"* ]] || {
+          [[ "$package" == *"versionName='0.11.0'"* ]] || {
             echo "Unexpected versionName in APK"; exit 1;
           }
-          cp "$apk" "app/build/outputs/apk/debug/Astra-v0.10.4-offline-arm64-debug.apk"
-          echo "Verified installable APK identity: Astra v0.10.4 (16), offline ARM64"
+          mkdir -p ../dist
+          cp "$apk" "../dist/Astra-v0.11.0-FULL-offline-arm64-debug.apk"
+          echo "Verified installable FULL APK identity: Astra v0.11.0 (17), offline ARM64"
 
       - name: Inspect debug APK composition
         working-directory: android
@@ -155,6 +156,12 @@ jobs:
                   summary.write(report)
           PY
 
+      - name: Preserve full-build size report
+        working-directory: android
+        run: |
+          mkdir -p ../dist
+          cp app/build/reports/apk-size-report.md ../dist/FULL-size-report.md
+
       - name: Smoke test release signing with disposable CI-only key
         working-directory: android
         shell: bash
@@ -187,20 +194,51 @@ jobs:
           # Never distribute this throwaway-key release APK.
           rm -f "$signed" "$RUNNER_TEMP/astra-ci-test.jks"
 
+      - name: Build lightweight APK without repackaging Qwen3 weights
+        working-directory: android
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Keep the verified native runtime, but remove the GGUF asset.
+          rm -f app/src/main/assets/qwen3-0.6b-q4km.gguf
+          ASTRA_BUNDLE_MODEL=false gradle --no-daemon :app:clean :app:assembleDebug
+          python3 ../scripts/verify_lite_apk.py app/build/outputs/apk/debug/app-debug.apk
+          apk="app/build/outputs/apk/debug/app-debug.apk"
+          aapt="$(find "${ANDROID_HOME}/build-tools" -maxdepth 2 -name aapt -type f | sort -V | tail -n 1)"
+          package="$("$aapt" dump badging "$apk" | head -n 1)"
+          echo "$package"
+          [[ "$package" == *"name='com.astra.agent'"* &&
+             "$package" == *"versionCode='17'"* &&
+             "$package" == *"versionName='0.11.0'"* ]] || {
+            echo "Lightweight APK identity mismatch"; exit 1;
+          }
+          cp "$apk" ../dist/Astra-v0.11.0-LITE-offline-arm64-debug.apk
+          printf "# Lite APK\n\nSize: %s bytes\n\n" "$(wc -c < "$apk")" > ../dist/LITE-size-report.md
+          echo "LITE APK ready; existing model can be imported from previous APK/ZIP."
+
       - name: Publish APK size analysis
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: Astra-APK-Size-Report
+          name: Astra-v0.11.0-Sizes
           retention-days: 7
-          path: android/app/build/reports/apk-size-report.md
+          path: dist/*-size-report.md
           if-no-files-found: error
 
-      - name: Publish debug APK
+      - name: Publish lightweight APK for low-data updates
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: Astra-v0.10.4-Offline-ARM64-APK
+          name: Astra-v0.11.0-LITE-Offline-APK
           retention-days: 7
-          path: android/app/build/outputs/apk/debug/Astra-v0.10.4-offline-arm64-debug.apk
+          path: dist/Astra-v0.11.0-LITE-offline-arm64-debug.apk
+          if-no-files-found: error
+
+      - name: Publish self-contained full APK (first installs only)
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Astra-v0.11.0-FULL-Offline-APK
+          retention-days: 7
+          path: dist/Astra-v0.11.0-FULL-offline-arm64-debug.apk
           if-no-files-found: error
