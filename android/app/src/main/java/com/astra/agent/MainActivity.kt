@@ -5,6 +5,7 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
@@ -2446,9 +2447,6 @@ class MainActivity :
                 var returnToChatLibrary by remember { mutableStateOf(false) }
                 var navigationPopupOpen by remember { mutableStateOf(false) }
                 var commandDeckExpanded by remember { mutableStateOf(false) }
-                var selectedAdvancedModel by remember {
-                    mutableStateOf(AstraModelImport.preferAdvanced(applicationContext))
-                }
 
                 var pendingBackupRestore by remember {
                     mutableStateOf<AstraBackupCodec.Payload?>(null)
@@ -4758,20 +4756,20 @@ class MainActivity :
                                         )
                                         val modelIncluded = onDeviceBrain.isModelBundled()
                                         val advancedInstalled =
-                                            AstraModelImport.advancedInstalled(applicationContext)
+                                            onDeviceBrain.hasAdvancedModel()
                                         val modelImported = AstraModelImport.appearsInstalled(
                                             applicationContext
                                         )
                                         Text(
                                             when {
-                                                advancedInstalled && selectedAdvancedModel ->
-                                                    "QWEN3 1.7B SELECTED · ON DEVICE"
-                                                modelIncluded -> "OFFLINE MODEL INCLUDED IN APK"
-                                                modelImported -> "OFFLINE MODEL IMPORTED TO THIS PHONE"
-                                                else -> "MODEL NOT INSTALLED — IMPORT ONCE BELOW"
+                                                advancedInstalled ->
+                                                    "QWEN3 1.7B AVAILABLE · PREFERRED MODEL"
+                                                modelIncluded || modelImported ->
+                                                    "QWEN3 0.6B AVAILABLE · COMPACT FALLBACK"
+                                                else -> "NO LOCAL MODEL · IMPORT THE FREE 1.7B MODEL"
                                             },
                                             style = MaterialTheme.typography.labelMedium,
-                                            color = if (modelIncluded || modelImported)
+                                            color = if (modelIncluded || modelImported || advancedInstalled)
                                                 MaterialTheme.colorScheme.primary
                                             else MaterialTheme.colorScheme.error
                                         )
@@ -4784,25 +4782,36 @@ class MainActivity :
                                             style = MaterialTheme.typography.bodySmall
                                         )
                                         Text(
-                                            "Optional advanced offline model: Qwen3 1.7B Q4_K_M. " +
-                                                "Import the official ggml-org GGUF once (~1.28 GB). " +
-                                                "This requires more storage and RAM than 0.6B.",
+                                            "Astra automatically uses Qwen3 1.7B when available. " +
+                                                "The 0.6B model is a recovery fallback, not a " +
+                                                "performance limit. Neither model needs paid APIs " +
+                                                "or subscriptions. Download the free 1.7B GGUF " +
+                                                "once, then import it here; future signed updates " +
+                                                "preserve the model.",
                                             style = MaterialTheme.typography.bodySmall
                                         )
-                                        Row(verticalAlignment = Alignment.CenterVertically) {
-                                            Text("Prefer 1.7B model", modifier = Modifier.weight(1f))
-                                            Switch(
-                                                checked = selectedAdvancedModel,
-                                                enabled = advancedInstalled &&
-                                                    offlineJob?.isActive != true,
-                                                onCheckedChange = {
-                                                    selectedAdvancedModel = it
-                                                    AstraModelImport.setPreferAdvanced(
-                                                        applicationContext, it
+                                        OutlinedButton(
+                                            onClick = {
+                                                try {
+                                                    startActivity(
+                                                        Intent(
+                                                            Intent.ACTION_VIEW,
+                                                            Uri.parse(
+                                                                "https://huggingface.co/ggml-org/" +
+                                                                    "Qwen3-1.7B-GGUF/resolve/main/" +
+                                                                    "Qwen3-1.7B-Q4_K_M.gguf"
+                                                            )
+                                                        )
                                                     )
+                                                } catch (error: Exception) {
+                                                    Toast.makeText(
+                                                        applicationContext,
+                                                        "No browser available for the model download.",
+                                                        Toast.LENGTH_LONG
+                                                    ).show()
                                                 }
-                                            )
-                                        }
+                                            }
+                                        ) { Text("Get free Qwen3 1.7B model") }
                                         OutlinedButton(
                                             enabled = !modelImportRunning &&
                                                 offlineJob?.isActive != true &&
