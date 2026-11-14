@@ -4389,6 +4389,45 @@ class MainActivity :
                                     )
                                 }
 
+                                // A failed or stopped local generation can be retried in
+                                // place. The original user text is preserved and routed
+                                // through submit again (including grounded-memory prompts).
+                                val retryQuestion = AstraResponseRetry.eligibleQuestion(
+                                    history.takeLast(2).map {
+                                        AstraResponseRetry.Message(it.role, it.text)
+                                    },
+                                    offlineJob?.isActive == true || modelImportRunning ||
+                                        offlineModelTestRunning
+                                )
+                                if (retryQuestion != null) {
+                                    TextButton(
+                                        onClick = {
+                                            val draft = input
+                                            // Remove only the exact tail validated above.
+                                            val stillEligible = AstraResponseRetry.eligibleQuestion(
+                                                history.takeLast(2).map {
+                                                    AstraResponseRetry.Message(it.role, it.text)
+                                                },
+                                                offlineJob?.isActive == true || modelImportRunning ||
+                                                    offlineModelTestRunning
+                                            )
+                                            if (stillEligible == retryQuestion &&
+                                                history.size >= 2) {
+                                                history.removeAt(history.lastIndex)
+                                                history.removeAt(history.lastIndex)
+                                                persist()
+                                                submit(retryQuestion)
+                                                input = draft
+                                            }
+                                        },
+                                        modifier = Modifier.semantics {
+                                            contentDescription = "Retry last interrupted offline answer"
+                                        }
+                                    ) {
+                                        Text("↻ Retry last response")
+                                    }
+                                }
+
                                 Row(
                                     modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp),
                                     verticalAlignment = Alignment.CenterVertically,
