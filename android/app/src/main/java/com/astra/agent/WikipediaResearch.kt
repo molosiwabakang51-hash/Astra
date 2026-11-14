@@ -17,16 +17,39 @@ import java.net.URL
  * it never uploads local notes, tasks, conversations or financial information.
  */
 internal object ResearchCommand {
-    private val pattern = Regex(
-        """(?i)^(?:research|wikipedia|search wikipedia for|look up on wikipedia)\s+(.+)$"""
+    // A request to research and *learn* is an assistant conversation, not
+    // permission to send the remaining words as a Wikimedia search query.
+    // Explicit Wikipedia commands still work without relying on the LLM.
+    private val wikipedia = Regex(
+        """(?i)^(?:wikipedia|search wikipedia for|look up on wikipedia)\\s+(.+)$"""
+    )
+    private val research = Regex("""(?i)^research\\s+(.+)$""")
+    private val chainedInstruction = Regex(
+        """(?i)^(?:and|then|to)\\s+(?:learn|study|understand|explore|research|investigate|read|remember)\\b.*$"""
+    )
+    private val personalContext = Regex(
+        """(?i)^(?:(?:my|our|private|personal|saved)\\s+).*$"""
+    )
+    private val unboundedTopics = setOf(
+        "everything", "anything", "all knowledge", "all topics",
+        "every subject", "the entirety of human knowledge"
     )
 
-    fun extract(raw: String): String? =
-        pattern.matchEntire(raw.trim())
-            ?.groupValues
-            ?.getOrNull(1)
-            ?.trim()
-            ?.takeIf { it.isNotBlank() }
+    fun extract(raw: String): String? {
+        val text = raw.trim().replace(Regex("""\\s+"""), " ")
+        wikipedia.matchEntire(text)?.groupValues?.getOrNull(1)?.trim()?.let {
+            return it.takeIf(String::isNotBlank)
+        }
+        val topic = research.matchEntire(text)?.groupValues?.getOrNull(1)
+            ?.trim() ?: return null
+        // Treat broad goals and requests involving the user's personal records
+        // as conversation. Do not silently upload them to Wikipedia.
+        if (topic.isBlank() || chainedInstruction.matches(topic) ||
+            personalContext.matches(topic) ||
+            topic.lowercase(java.util.Locale.ROOT) in unboundedTopics
+        ) return null
+        return topic
+    }
 }
 
 internal class WikipediaResearch {
