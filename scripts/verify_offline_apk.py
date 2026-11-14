@@ -35,7 +35,8 @@ def main(apk_path: Path) -> None:
             raise RuntimeError("The APK contains incorrect GGUF model weights")
 
     print("PASS: bundled on-device Qwen3 GGUF matches pinned SHA-256")
-    print("PASS: native arm64 libraries included:", len(libraries))\n    print("PASS: open-source model and inference notices packaged.")
+    print("PASS: native arm64 libraries included:", len(libraries))
+    print("PASS: open-source model and inference notices packaged.")
     print("APK size: %.1f MiB" % (apk_path.stat().st_size / (1024 * 1024)))
 
 
