@@ -1338,7 +1338,7 @@ private class AstraProcessor(
         completed: MutableList<String>
     ): AssistantResult {
 
-        val clean = raw.trim()
+        val clean = AstraInput.normalize(raw)
             .trimEnd('?', '!')
             .replace(
                 Regex("""\s+"""),
@@ -1428,6 +1428,10 @@ private class AstraProcessor(
             return AssistantResult(
                 "Hello. What would you like me to do?"
             )
+        }
+
+        MissionControl.respond(clean, tasks, completed, notes)?.let {
+            return AssistantResult(it)
         }
 
         russianTutor.respond(clean)?.let {
@@ -1676,6 +1680,13 @@ private class AstraProcessor(
 
             return AssistantResult(
                 """
+                MISSION CONTROL
+                mission control
+                what should I do next
+                set task 1 priority high
+                set task 2 priority medium
+                show my progress
+
                 TASKS
                 add task study finance
                 show tasks
@@ -2264,6 +2275,10 @@ class MainActivity :
                     mutableStateOf("")
                 }
 
+                var activeResearchCount by remember {
+                    mutableIntStateOf(0)
+                }
+
                 var tab by remember {
                     mutableIntStateOf(0)
                 }
@@ -2429,7 +2444,8 @@ class MainActivity :
                         return
                     }
 
-                    val researchTopic = ResearchCommand.extract(message)
+                    val normalized = AstraInput.normalize(message)
+                    val researchTopic = ResearchCommand.extract(normalized)
                     if (researchTopic != null) {
                         val placeholder =
                             "Searching Wikipedia for " + researchTopic + "..."
@@ -2444,18 +2460,22 @@ class MainActivity :
                         input = ""
                         keyboard?.hide()
 
+                        activeResearchCount += 1
                         researchScope.launch {
-                            val answer = research.search(researchTopic)
-                            // Do not restore an asynchronous result after
-                            // the user cleared this conversation.
-                            if (
-                                placeholderIndex in history.indices &&
-                                history[placeholderIndex].role == "Astra" &&
-                                history[placeholderIndex].text == placeholder
-                            ) {
-                                history[placeholderIndex] =
-                                    ChatMessage("Astra", answer)
-                                persist()
+                            try {
+                                val answer = research.search(researchTopic)
+                                // Don't restore results after a conversation clear.
+                                if (
+                                    placeholderIndex in history.indices &&
+                                    history[placeholderIndex].role == "Astra" &&
+                                    history[placeholderIndex].text == placeholder
+                                ) {
+                                    history[placeholderIndex] =
+                                        ChatMessage("Astra", answer)
+                                    persist()
+                                }
+                            } finally {
+                                activeResearchCount = (activeResearchCount - 1).coerceAtLeast(0)
                             }
                         }
                         return
@@ -2463,7 +2483,7 @@ class MainActivity :
 
                     val result =
                         processor.process(
-                            message,
+                            normalized,
                             notes,
                             tasks,
                             completed
@@ -3076,7 +3096,10 @@ class MainActivity :
 
                                 AstraCommandDeck(
                                     listening = listening,
-                                    researching = false,
+                                    researching = activeResearchCount > 0,
+                                    openTasks = tasks.size,
+                                    completedTasks = completed.size,
+                                    storedNotes = notes.size,
                                     onCommand = { command -> submit(command) }
                                 )
 
