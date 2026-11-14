@@ -25,6 +25,34 @@ class AstraOfflinePolicyTest {
         assertTrue(AstraOfflinePolicy.modelPrompt("a".repeat(10_000)).length <= 3010)
     }
 
+    @Test fun interruptedThinkingMessageIsRecoveredAfterRestart() {
+        assertEquals(
+            "The response was interrupted when Astra closed.",
+            AstraOfflinePolicy.recoverInterruptedMessage(
+                "Astra", "ASTRA // THINKING OFFLINE..."
+            )
+        )
+        assertEquals(
+            "The response was interrupted when Astra closed.",
+            AstraOfflinePolicy.recoverInterruptedMessage(
+                "Astra", "ASTRA // THINKING..."
+            )
+        )
+    }
+
+    @Test fun completeAndUserMessagesRemainUnmodified() {
+        assertEquals(
+            "Completed response.",
+            AstraOfflinePolicy.recoverInterruptedMessage("Astra", "Completed response.")
+        )
+        assertEquals(
+            "ASTRA // THINKING OFFLINE...",
+            AstraOfflinePolicy.recoverInterruptedMessage(
+                "You", "ASTRA // THINKING OFFLINE..."
+            )
+        )
+    }
+
     @Test fun noReasoningOrIncompleteThoughtsAreDisplayed() {
         assertEquals("Short answer.", AstraOfflinePolicy.publicReply(
             "<think>private scratchpad</think>\n\nShort answer."
