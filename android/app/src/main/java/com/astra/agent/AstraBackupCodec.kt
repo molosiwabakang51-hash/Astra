@@ -20,7 +20,7 @@ internal object AstraBackupCodec {
     private val arrays = listOf("history", "notes", "tasks", "completed_tasks")
     private val strings = listOf(
         "astra_shopping_items", "astra_habits", "astra_habit_date",
-        "astra_habit_completed_today", "speech_language"
+        "astra_habit_completed_today", "speech_language", "astra_chat_archive"
     )
     private val booleans = listOf(
         "auto_send_voice", "speak_responses", "local_only_tts", "allow_system_speech"
@@ -124,7 +124,7 @@ internal object AstraBackupCodec {
 
         for (key in strings) {
             val value = data.opt(key)
-            if (value !is String || value.length > 500_000) {
+            if (value !is String || value.length > 2_000_000) {
                 throw IllegalArgumentException("Invalid $key setting in backup.")
             }
             result[key] = value
