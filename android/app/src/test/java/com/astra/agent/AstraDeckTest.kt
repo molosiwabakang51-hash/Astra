@@ -15,6 +15,14 @@ class AstraDeckTest {
         assertEquals("VOICE INPUT ACTIVE", AstraDeck.status(true, true, true))
     }
 
+    @Test fun compactHudCompletionHandlesEmptyAndExtremeCounts() {
+        assertEquals(0, AstraDeck.completionPercent(0, 0))
+        assertEquals(25, AstraDeck.completionPercent(3, 1))
+        assertEquals(100, AstraDeck.completionPercent(0, 12))
+        assertEquals(0, AstraDeck.completionPercent(-5, -7))
+        assertEquals(50, AstraDeck.completionPercent(Int.MAX_VALUE, Int.MAX_VALUE))
+    }
+
     @Test fun shortcutsUseExistingAssistantCommands() {
         assertTrue(AstraDeck.prompts.contains("Show tasks"))
         assertTrue(AstraDeck.prompts.contains("Russian quiz"))

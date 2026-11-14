@@ -1,5 +1,10 @@
 package com.astra.agent
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
@@ -10,6 +15,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -22,8 +28,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -76,16 +84,11 @@ internal fun AstraCommandDeck(
     completedTasks: Int,
     storedNotes: Int,
     awaitingReply: Boolean = false,
+    expanded: Boolean,
+    onExpandedChange: (Boolean) -> Unit,
     onCommand: (String) -> Unit
 ) {
     val status = AstraDeck.status(listening, researching, awaitingReply)
-    val animation = rememberInfiniteTransition(label = "astra-deck")
-    val sweep by animation.animateFloat(
-        initialValue = 0f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(tween(4200), RepeatMode.Restart),
-        label = "scanline"
-    )
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -95,63 +98,131 @@ internal fun AstraCommandDeck(
                 ),
                 shape = RoundedCornerShape(18.dp)
             )
-            .padding(horizontal = 14.dp, vertical = 12.dp)
+            .padding(horizontal = 14.dp, vertical = 7.dp)
     ) {
-        Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
-            Text(
-                "ASTRA // COMMAND DECK",
-                color = Color(0xFFBBDFFF),
-                fontWeight = FontWeight.SemiBold,
-                style = MaterialTheme.typography.labelMedium
-            )
-            Text("MISSION HUD", color = Color(0xFF7199BC), style = MaterialTheme.typography.labelSmall)
-        }
-        Spacer(Modifier.height(8.dp))
-        Text(status, color = Color(0xFF6ED2FF), style = MaterialTheme.typography.labelSmall)
-        Spacer(Modifier.height(8.dp))
-        Text(
-            "OPEN " + openTasks + "    DONE " + completedTasks +
-                "    NOTES " + storedNotes + "    COMPLETION " +
-                AstraDeck.completionPercent(openTasks, completedTasks) + "%",
-            color = Color(0xFFB2C9DE),
-            style = MaterialTheme.typography.labelSmall
-        )
-        Spacer(Modifier.height(7.dp))
-        Canvas(modifier = Modifier.fillMaxWidth().height(8.dp)) {
-            val y = size.height / 2f
-            drawLine(Color(0xFF1D4564), Offset(0f, y), Offset(size.width, y), 2.dp.toPx())
-            val progress = AstraDeck.completionPercent(openTasks, completedTasks) / 100f
-            drawLine(
-                Color(0xFF238FCB).copy(alpha = 0.64f),
-                Offset(0f, y),
-                Offset(size.width * progress, y),
-                3.dp.toPx(),
-                cap = StrokeCap.Round
-            )
-            drawLine(
-                Color(0xFF70D7FF),
-                Offset((size.width * sweep).coerceAtMost(size.width), y),
-                Offset((size.width * (sweep + 0.12f)).coerceAtMost(size.width), y),
-                2.dp.toPx(),
-                cap = StrokeCap.Round
-            )
-        }
-        Spacer(Modifier.height(7.dp))
+        // The collapsed surface remains a single accessible touch target.
         Row(
-            modifier = Modifier.horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = 48.dp)
+                .clickable { onExpandedChange(!expanded) },
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            (if (awaitingReply) listOf("Cancel") + AstraDeck.prompts
-                else AstraDeck.prompts).forEach { command ->
+            Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = command,
-                    modifier = Modifier
-                        .background(Color(0xFF20364F), RoundedCornerShape(50))
-                        .clickable { onCommand(command) }
-                        .padding(horizontal = 12.dp, vertical = 8.dp),
-                    color = Color(0xFFE4F5FF),
-                    style = MaterialTheme.typography.labelMedium
+                    "ASTRA // COMMAND DECK",
+                    color = Color(0xFFBBDFFF),
+                    fontWeight = FontWeight.SemiBold,
+                    style = MaterialTheme.typography.labelMedium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    status,
+                    color = Color(0xFF6ED2FF),
+                    style = MaterialTheme.typography.labelSmall,
+                    maxLines = 1
+                )
+            }
+            Spacer(Modifier.width(10.dp))
+            Column(horizontalAlignment = Alignment.End) {
+                Text(
+                    if (expanded) "CLOSE  ▲" else "EXPAND  ▼",
+                    color = Color(0xFFBBDFFF),
+                    style = MaterialTheme.typography.labelSmall
+                )
+                if (!expanded) {
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        "OPEN $openTasks  ·  NOTES $storedNotes",
+                        color = Color(0xFF92B7D2),
+                        style = MaterialTheme.typography.labelSmall
+                    )
+                }
+            }
+        }
+
+        AnimatedVisibility(
+            visible = expanded,
+            enter = expandVertically(animationSpec = tween(240)) +
+                fadeIn(animationSpec = tween(180)),
+            exit = shrinkVertically(animationSpec = tween(220)) +
+                fadeOut(animationSpec = tween(150))
+        ) {
+            Column {
+                Spacer(Modifier.height(9.dp))
+                Text(
+                    "MISSION HUD",
+                    color = Color(0xFF7199BC),
+                    style = MaterialTheme.typography.labelSmall
+                )
+                Spacer(Modifier.height(7.dp))
+                Text(
+                    "OPEN $openTasks    DONE $completedTasks    NOTES $storedNotes" +
+                        "    COMPLETION ${AstraDeck.completionPercent(openTasks, completedTasks)}%",
+                    color = Color(0xFFB2C9DE),
+                    style = MaterialTheme.typography.labelSmall
+                )
+                Spacer(Modifier.height(7.dp))
+                val animation = rememberInfiniteTransition(label = "astra-deck")
+                val sweep by animation.animateFloat(
+                    initialValue = 0f,
+                    targetValue = 1f,
+                    animationSpec = infiniteRepeatable(tween(4200), RepeatMode.Restart),
+                    label = "scanline"
+                )
+                Canvas(modifier = Modifier.fillMaxWidth().height(8.dp)) {
+                    val y = size.height / 2f
+                    drawLine(
+                        Color(0xFF1D4564),
+                        Offset(0f, y),
+                        Offset(size.width, y),
+                        2.dp.toPx()
+                    )
+                    val progress =
+                        AstraDeck.completionPercent(openTasks, completedTasks) / 100f
+                    drawLine(
+                        Color(0xFF238FCB).copy(alpha = 0.64f),
+                        Offset(0f, y),
+                        Offset(size.width * progress, y),
+                        3.dp.toPx(),
+                        cap = StrokeCap.Round
+                    )
+                    drawLine(
+                        Color(0xFF70D7FF),
+                        Offset((size.width * sweep).coerceAtMost(size.width), y),
+                        Offset((size.width * (sweep + 0.12f)).coerceAtMost(size.width), y),
+                        2.dp.toPx(),
+                        cap = StrokeCap.Round
+                    )
+                }
+                Spacer(Modifier.height(9.dp))
+                Text(
+                    "QUICK COMMANDS  ·  SWIPE FOR MORE",
+                    color = Color(0xFF8FB3D1),
+                    style = MaterialTheme.typography.labelSmall
+                )
+                Spacer(Modifier.height(7.dp))
+                Row(
+                    modifier = Modifier.horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    (if (awaitingReply) listOf("Cancel") + AstraDeck.prompts
+                        else AstraDeck.prompts).forEach { command ->
+                        Text(
+                            text = command,
+                            modifier = Modifier
+                                .background(Color(0xFF20364F), RoundedCornerShape(50))
+                                .clickable { onCommand(command) }
+                                .padding(horizontal = 12.dp, vertical = 8.dp),
+                            color = Color(0xFFE4F5FF),
+                            style = MaterialTheme.typography.labelMedium
+                        )
+                    }
+                }
+                Spacer(Modifier.height(5.dp))
             }
         }
     }

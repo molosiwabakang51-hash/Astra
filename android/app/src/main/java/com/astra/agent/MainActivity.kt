@@ -29,6 +29,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -2378,6 +2379,7 @@ class MainActivity :
                 }
                 var showChatSwitcher by remember { mutableStateOf(false) }
                 var navigationPopupOpen by remember { mutableStateOf(false) }
+                var commandDeckExpanded by remember { mutableStateOf(false) }
 
                 var pendingBackupRestore by remember {
                     mutableStateOf<AstraBackupCodec.Payload?>(null)
@@ -2585,6 +2587,8 @@ class MainActivity :
                         return
                     }
 
+                    // Return the conversation to its spacious default after sending.
+                    commandDeckExpanded = false
                     val normalized = AstraInput.normalize(message)
                     val explicitCloud = message.startsWith("ask ai ", ignoreCase = true)
                     if (explicitCloud) {
@@ -3018,17 +3022,21 @@ class MainActivity :
 
                 LaunchedEffect(
                     history.size,
+                    history.lastOrNull()?.text,
                     tab
                 ) {
-
-                    if (
-                        tab == 0 &&
-                        history.isNotEmpty()
-                    ) {
-
-                        scroll.animateScrollToItem(
-                            history.lastIndex
-                        )
+                    if (tab == 0 && history.isNotEmpty()) {
+                        scroll.animateScrollToItem(history.lastIndex)
+                        // A long final bubble may be taller than the viewport.
+                        // Scrolling to its start would hide the actual answer.
+                        val finalItem = scroll.layoutInfo.visibleItemsInfo
+                            .firstOrNull { it.index == history.lastIndex }
+                        if (finalItem != null) {
+                            val remaining =
+                                (finalItem.offset + finalItem.size -
+                                    scroll.layoutInfo.viewportEndOffset).coerceAtLeast(0)
+                            if (remaining > 0) scroll.animateScrollBy(remaining.toFloat())
+                        }
                     }
                 }
 
@@ -3516,6 +3524,8 @@ class MainActivity :
                                     completedTasks = completed.size,
                                     storedNotes = notes.size,
                                     awaitingReply = dialogueAwaiting,
+                                    expanded = commandDeckExpanded,
+                                    onExpandedChange = { commandDeckExpanded = it },
                                     onCommand = { command -> submit(command) }
                                 )
 
