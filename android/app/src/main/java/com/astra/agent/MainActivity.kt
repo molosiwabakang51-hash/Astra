@@ -242,6 +242,24 @@ private class AstraStorage(
         prefs.edit().putInt(key, value).apply()
     }
 
+    fun exportBackup(): String =
+        AstraBackupCodec.encode(prefs.all)
+
+    fun restoreBackup(payload: AstraBackupCodec.Payload) {
+        val editor = prefs.edit()
+        payload.values.forEach { (key, value) ->
+            when (value) {
+                is String -> editor.putString(key, value)
+                is Boolean -> editor.putBoolean(key, value)
+                is Int -> editor.putInt(key, value)
+                else -> throw IllegalArgumentException("Unsupported backup setting.")
+            }
+        }
+        if (!editor.commit()) {
+            throw IllegalStateException("Could not save the restored data.")
+        }
+    }
+
     fun save(
         history: List<ChatMessage>,
         notes: List<String>,
