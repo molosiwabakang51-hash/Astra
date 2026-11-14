@@ -46,7 +46,7 @@ internal object AstraModelDownload {
         if (partial.isFile && partial.length() > MAX_BYTES) {
             check(partial.delete()) { "Cannot clear oversized incomplete download." }
         }
-        val offset = partial.takeIf(File::isFile)?.length() ?: 0L
+        val offset = partial.takeIf { it.isFile }?.length() ?: 0L
         val connection = URL(MODEL_URL).openConnection() as HttpsURLConnection
         try {
             connection.requestMethod = "GET"
