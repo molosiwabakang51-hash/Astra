@@ -43,6 +43,11 @@ jobs:
       - name: Guard Astra navigation, offline AI and build identity
         run: python3 scripts/verify_ui_contract.py
 
+      - name: Verify private JNI logs and fail-closed patch tests
+        run: |
+          python3 -m unittest discover -s scripts/tests -p "test_*.py" -v
+          python3 scripts/harden_native_inference.py --verify
+
       - name: Run tests and build debug APK
         working-directory: android
         run: |
