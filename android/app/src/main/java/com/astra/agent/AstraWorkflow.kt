@@ -221,7 +221,12 @@ internal class AstraWorkflowSession {
             }
         }
         return when (val parsed = AstraWorkflow.parse(raw)) {
-            AstraWorkflow.Parse.NotAWorkflow -> null
+            AstraWorkflow.Parse.NotAWorkflow -> {
+                // A different conversational intent abandons a pending plan;
+                // a much later confirmation cannot activate an old preview.
+                pending = null
+                null
+            }
             is AstraWorkflow.Parse.Invalid -> {
                 pending = null
                 Response(parsed.reason)
