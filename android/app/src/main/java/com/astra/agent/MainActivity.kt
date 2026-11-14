@@ -78,7 +78,7 @@ import kotlin.math.sqrt
 
 /*
 ============================================================
-ASTRA v0.8 — LOCAL-FIRST ASSISTANT
+ASTRA v0.10.2 — OFFLINE AI ASSISTANT
 ============================================================
 
 FRONT OFFICE
@@ -190,9 +190,12 @@ private class AstraStorage(
                 val item =
                     array.getJSONObject(index)
 
+                val role = item.optString("role")
                 ChatMessage(
-                    item.optString("role"),
-                    item.optString("text")
+                    role,
+                    AstraOfflinePolicy.recoverInterruptedMessage(
+                        role, item.optString("text")
+                    )
                 )
             }
 
@@ -1736,6 +1739,12 @@ private class AstraProcessor(
 
             return AssistantResult(
                 """
+                OFFLINE AI
+                Ask any normal question in chat.
+                ask ai explain bond convexity
+                AI runs on your phone without a model server.
+                Tap Stop while Astra generates a response.
+
                 LOCAL MEMORY
                 memory overview
                 recall bond duration
@@ -1844,7 +1853,7 @@ private class AstraProcessor(
             "I cannot answer that reliably with Astra's current offline tools. " +
                 "I can help with tasks, notes, shopping lists, daily habits, unit conversions, " +
                 "Russian practice, mathematics, and finance. Type 'help' for examples. " +
-                "General open-ended questions will require an additional language model."
+                "General open-ended questions are handled by the bundled offline language model."
         )
     }
 }
