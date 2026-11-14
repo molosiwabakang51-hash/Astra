@@ -59,8 +59,13 @@ internal object AstraModelDownload {
             val status = connection.responseCode
             if (status == 416 && offset in MIN_BYTES..MAX_BYTES) {
                 // Completed bytes may have survived a crash before final rename.
-                require(sha256(partial) == AstraModelImport.ADVANCED_SHA256) {
-                    "Incomplete model download failed checksum. Restart the model download."
+                if (sha256(partial) != AstraModelImport.ADVANCED_SHA256) {
+                    // A complete but invalid partial cannot be resumed; discard
+                    // it so the next user-approved attempt starts cleanly.
+                    check(partial.delete()) {
+                        "Corrupted offline download could not be cleared."
+                    }
+                    error("The saved download failed SHA-256. Please retry.")
                 }
                 AstraModelStorage.installVerified(partial, target)
                 onProgress(target.length(), target.length())
@@ -106,10 +111,11 @@ internal object AstraModelDownload {
             require(partial.length() == transfer.totalBytes) {
                 "The model download stopped early. Start again to resume."
             }
-            require(sha256(partial) == AstraModelImport.ADVANCED_SHA256) {
-                // Do not install unverified bytes, but retain partial so that
-                // the next server request can detect a non-resumable download.
-                "Downloaded GGUF failed its SHA-256 integrity check."
+            if (sha256(partial) != AstraModelImport.ADVANCED_SHA256) {
+                // Never install corrupt bytes or keep retrying a complete
+                // checksum-mismatched file indefinitely.
+                check(partial.delete()) { "Cannot clear corrupted model download." }
+                error("Downloaded GGUF failed SHA-256 verification. Please retry.")
             }
             AstraModelStorage.installVerified(partial, target)
             onProgress(target.length(), target.length())
