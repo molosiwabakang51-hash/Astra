@@ -85,6 +85,7 @@ internal class AstraOnDeviceBrain(private val context: Context) {
                     current.cleanUp()
                     session.invalidate()
                 }
+                var restoringConversation = false
                 if (session.requiresLoad(
                         conversationGeneration,
                         current.state.value is InferenceEngine.State.ModelReady
@@ -97,30 +98,24 @@ internal class AstraOnDeviceBrain(private val context: Context) {
                         current.cleanUp()
                     }
                     current.loadModel(modelPath.absolutePath)
-                    val recent = turns.dropLast(1).takeLast(8)
-                        .filter { it.role in setOf("user", "assistant") }
-                        .joinToString("\n") {
-                            (if (it.role == "user") "User" else "Astra") +
-                                ": " + it.content.trim().take(550)
-                        }
-                    current.setSystemPrompt(buildString {
-                        append("You are Astra, a concise, helpful Android assistant. ")
-                        append("You run fully offline on this phone. ")
-                        append("Do not pretend to browse the internet, know today's live prices, ")
-                        append("or control apps. State uncertainty. Respond directly and briefly. /no_think ")
-                        if (recent.isNotBlank()) {
-                            append("\nRecent conversation for context:\n")
-                            append(recent)
-                        }
-                    })
+                    // Never place previous user text or model replies inside the
+                    // higher-priority system prompt. Reloaded sessions receive
+                    // quoted history once through a bounded user-level prompt.
+                    current.setSystemPrompt(AstraConversationContext.systemPrompt())
+                    restoringConversation = true
                     session.markLoaded(conversationGeneration)
                 }
 
                 val answer = StringBuilder()
                 var lastUiUpdate = 0L
-                current.sendUserPrompt(
-                    AstraOfflinePolicy.modelPrompt(finalMessage), 384
-                ).collect { part ->
+                val requestPrompt = AstraConversationContext.userPrompt(
+                    finalMessage,
+                    turns.dropLast(1).map {
+                        AstraConversationContext.Turn(it.role, it.content)
+                    },
+                    restoringConversation
+                )
+                current.sendUserPrompt(requestPrompt, 384).collect { part ->
                     // Restrict accumulated output and cap main-thread UI updates.
                     val space = (16_000 - answer.length).coerceAtLeast(0)
                     if (space > 0) answer.append(part.take(space))
