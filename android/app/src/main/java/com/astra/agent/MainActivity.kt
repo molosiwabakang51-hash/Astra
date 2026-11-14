@@ -2320,6 +2320,10 @@ class MainActivity :
                     mutableIntStateOf(0)
                 }
 
+                var dialogueAwaiting by remember {
+                    mutableStateOf(false)
+                }
+
                 var tab by remember {
                     mutableIntStateOf(0)
                 }
@@ -2492,6 +2496,8 @@ class MainActivity :
                     val normalized = AstraInput.normalize(message)
                     val researchTopic = ResearchCommand.extract(normalized)
                     if (researchTopic != null) {
+                        dialogue.dismissIncompletePrompt()
+                        dialogueAwaiting = false
                         val placeholder =
                             "Searching Wikipedia for " + researchTopic + "..."
 
@@ -2533,6 +2539,7 @@ class MainActivity :
                             tasks,
                             completed
                         )
+                    dialogueAwaiting = dialogue.awaitingResponse
 
                     if (!result.sensitive) {
 
@@ -2873,6 +2880,7 @@ class MainActivity :
                                                 storage.getString("speech_language", "en-US")
                                             )
                                             dialogue.reset()
+                                            dialogueAwaiting = false
                                             tab = 4
                                             Toast.makeText(
                                                 this@MainActivity,
@@ -2929,6 +2937,7 @@ class MainActivity :
                                     persist()
 
                                     dialogue.reset()
+                                    dialogueAwaiting = false
                                     showClearDialog = false
                                 }
                             ) {
@@ -3269,6 +3278,7 @@ class MainActivity :
                                     openTasks = tasks.size,
                                     completedTasks = completed.size,
                                     storedNotes = notes.size,
+                                    awaitingReply = dialogueAwaiting,
                                     onCommand = { command -> submit(command) }
                                 )
 
