@@ -15,11 +15,16 @@ import java.net.URL
 internal class AstraCloudBrain {
     data class Turn(val role: String, val content: String)
 
-    suspend fun reply(endpoint: String, turns: List<Turn>): String =
+    suspend fun reply(endpoint: String, turns: List<Turn>, accessToken: String): String =
         withContext(Dispatchers.IO) {
             val address = endpoint.trim()
             require(isSafeEndpoint(address)) {
                 "Configure an HTTPS Astra gateway. Direct provider API URLs are not allowed."
+            }
+            require(accessToken.length >= 32 && accessToken.length <= 512 &&
+                accessToken.all { it.code in 33..126 } &&
+                !accessToken.contains(' ') ) {
+                "Enter the gateway access token from your private gateway deployment."
             }
             val bounded = sanitizeTurns(turns)
             require(bounded.any { it.role == "user" }) { "No user message supplied." }
@@ -36,6 +41,7 @@ internal class AstraCloudBrain {
                 connection.readTimeout = 45_000
                 connection.instanceFollowRedirects = false
                 connection.doOutput = true
+                connection.setRequestProperty("Authorization", "Bearer " + accessToken)
                 connection.setRequestProperty("Content-Type", "application/json; charset=utf-8")
                 connection.setRequestProperty("Accept", "application/json")
                 connection.outputStream.use { it.write(payload.toByteArray(Charsets.UTF_8)) }
