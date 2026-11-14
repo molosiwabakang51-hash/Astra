@@ -24,6 +24,9 @@ def main():
         "Unhandled chat routes to model": 'AstraOfflinePolicy.shouldUseModel(',
         "Finance explanations are wired into chat": 'AstraFinanceEducation.respond(clean)',
         "Cross-chat memory is in local submit handler": 'AstraMemoryRecall.parse(message)',
+        "Grounded Q&A stays explicitly opt-in": 'AstraGroundedMemory.parse(message)',
+        "On-phone source extraction is integrated": 'AstraGroundedMemory.retrieve(',
+        "Memory analysis UI remains in icon menu": 'Text("Ask with evidence")',
         "Memory recall stays off-device model prompt": 'AstraMemoryRecall.find(',
         "Compact logo offers memory search": 'Text("Search all local memory")',
         "Strict on-device AI challenge is wired in": 'AstraOfflineSelfTest.evaluate(',
@@ -43,8 +46,8 @@ def main():
         if re.search(pattern, app):
             raise RuntimeError(f"Regression: {description}")
 
-    if '?: "0.11.3"' not in config or "?: 20" not in config:
-        raise RuntimeError("Release identity is not Astra 0.11.3 (versionCode 20)")
+    if '?: "0.11.4"' not in config or "?: 21" not in config:
+        raise RuntimeError("Release identity is not Astra 0.11.4 (versionCode 21)")
     print("PASS: Astra icon menu, compact chat, offline model, version stamp")
     print("PASS: no legacy bottom tabs, top-right overflow, or obsolete fallback")
 
