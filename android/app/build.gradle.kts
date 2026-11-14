@@ -12,6 +12,8 @@ android {
     kotlinOptions { jvmTarget = "17" }
 }
 dependencies {
+    // On-device Latin-script OCR model bundled; no first-use model download.
+    implementation("com.google.mlkit:text-recognition:16.0.1")
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.json:json:20240303")
     implementation(platform("androidx.compose:compose-bom:2024.12.01"))
