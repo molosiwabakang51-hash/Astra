@@ -1,4 +1,4 @@
-# Astra — Android personal assistant (v0.9.3)
+# Astra — Android personal assistant (v0.9.4)
 
 Astra is a **local-first Android/Kotlin Jetpack Compose assistant** with a futuristic dark interface. It is being developed directly in this repository. The original **Astra-AI** repository is kept separately as a backup.
 
@@ -30,7 +30,7 @@ The workflow at `.github/workflows/android.yml` compiles and tests the app on pu
 
 The Android project is in `android/`, with application ID `com.astra.agent`, Android API 26 minimum, Java 17 and Gradle 8.9 on CI.
 
-The generated **debug APK is for development/testing**. Build runners may use different debug-signing keys, which can prevent an in-place update from a previously installed APK. Before reinstalling, export your data. Stable private release signing is tracked in [issue #14](https://github.com/molosiwabakang51-hash/Astra/issues/14). Never put keystores or API keys in this public repository.
+The generated **debug APK is for development/testing**. Build runners may use different debug-signing keys, which can prevent an in-place update from a previously installed APK. Before reinstalling, export your data. The repo also contains a **separate manual owner-signed release workflow** that can deliver consistently signed updates once you configure your own private keystore and four GitHub Actions secrets. See [owner release signing instructions](docs/RELEASE_SIGNING.md). This workflow has not produced an owner-signed artifact until the secrets are configured and a build succeeds. Never put keystores or API keys in this public repository. Release-signing completion remains tracked in [issue #14](https://github.com/molosiwabakang51-hash/Astra/issues/14).
 
 ## Conversation management and privacy
 
