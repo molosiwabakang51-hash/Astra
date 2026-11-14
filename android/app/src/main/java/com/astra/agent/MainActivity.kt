@@ -3074,6 +3074,14 @@ class MainActivity :
 
                             0 -> {
 
+                                AstraCommandDeck(
+                                    listening = listening,
+                                    researching = false,
+                                    onCommand = { command -> submit(command) }
+                                )
+
+                                Spacer(Modifier.height(8.dp))
+
                                 LazyColumn(
                                     modifier =
                                         Modifier.weight(1f),
