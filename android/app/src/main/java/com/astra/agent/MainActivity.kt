@@ -21,6 +21,8 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -2941,6 +2943,8 @@ class MainActivity :
                                             withContext(Dispatchers.IO) {
                                                 storage.restoreBackup(restoreToConfirm)
                                             }
+                                            archivedChats.clear()
+                                            archivedChats.addAll(storage.loadArchivedChats())
                                             history.clear()
                                             history.addAll(storage.loadHistory())
                                             if (history.isEmpty()) {
