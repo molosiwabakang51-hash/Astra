@@ -137,7 +137,7 @@ internal class AstraDialogue {
             return missionResponse
         }
 
-        if (lower in taskWhy || lower in taskDone || contextPriority.matches(input) != null) {
+        if (lower in taskWhy || lower in taskDone || contextPriority.matches(input)) {
             val reference = suggested
                 ?: return "No task is selected. Ask 'what should I do next?' first."
             if (tasks.getOrNull(reference.index) != reference.text) {
