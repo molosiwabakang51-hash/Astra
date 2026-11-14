@@ -40,6 +40,9 @@ jobs:
           "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install \
             "platforms;android-36" "ndk;29.0.13113456" "cmake;3.31.6"
           python3 scripts/prepare_offline_android.py
+      - name: Guard Astra navigation, offline AI and build identity
+        run: python3 scripts/verify_ui_contract.py
+
       - name: Run tests and build debug APK
         working-directory: android
         run: |
@@ -52,6 +55,28 @@ jobs:
 
       - name: Confirm APK contains real offline inference and model weights
         run: python3 scripts/verify_offline_apk.py
+
+      - name: Check installed APK identity and label the downloadable APK
+        working-directory: android
+        shell: bash
+        run: |
+          set -euo pipefail
+          apk="app/build/outputs/apk/debug/app-debug.apk"
+          aapt="$(find "${ANDROID_HOME}/build-tools" -maxdepth 2 -name aapt -type f | sort -V | tail -n 1)"
+          test -n "$aapt"
+          package="$("$aapt" dump badging "$apk" | head -n 1)"
+          echo "$package"
+          [[ "$package" == *"name='com.astra.agent'"* ]] || {
+            echo "Unexpected package ID in APK"; exit 1;
+          }
+          [[ "$package" == *"versionCode='16'"* ]] || {
+            echo "Unexpected versionCode in APK"; exit 1;
+          }
+          [[ "$package" == *"versionName='0.10.4'"* ]] || {
+            echo "Unexpected versionName in APK"; exit 1;
+          }
+          cp "$apk" "app/build/outputs/apk/debug/Astra-v0.10.4-offline-arm64-debug.apk"
+          echo "Verified installable APK identity: Astra v0.10.4 (16), offline ARM64"
 
       - name: Inspect debug APK composition
         working-directory: android
@@ -175,7 +200,7 @@ jobs:
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: Astra-offline-Qwen3-debug-APK
+          name: Astra-v0.10.4-Offline-ARM64-APK
           retention-days: 7
-          path: android/app/build/outputs/apk/debug/*.apk
+          path: android/app/build/outputs/apk/debug/Astra-v0.10.4-offline-arm64-debug.apk
           if-no-files-found: error
