@@ -16,7 +16,7 @@ jobs:
   android:
     name: Build debug APK
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 90
     steps:
       - name: Checkout project
         uses: actions/checkout@v4
@@ -30,8 +30,15 @@ jobs:
       - name: Configure Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
-          gradle-version: '8.9'
+          gradle-version: '8.13'
 
+      - name: Prepare native llama.cpp and bundled Qwen3 offline weights
+        shell: bash
+        run: |
+          set -euo pipefail
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install \
+            "platforms;android-36" "ndk;29.0.13113456" "cmake;3.31.6"
+          python3 scripts/prepare_offline_android.py
       - name: Run tests and build debug APK
         working-directory: android
         run: |
@@ -41,6 +48,9 @@ jobs:
           else
             gradle --no-daemon testDebugUnitTest assembleDebug
           fi
+
+      - name: Confirm APK contains real offline inference and model weights
+        run: python3 scripts/verify_offline_apk.py
 
       - name: Inspect debug APK composition
         working-directory: android
@@ -105,8 +115,8 @@ jobs:
           lines += [
               "",
               "This is the **debug** build. Its size does not indicate whether",
-              "a neural language model is included. Astra currently connects",
-              "to an optional model hosted outside the APK.",
+              "Qwen3 weights and Android llama.cpp native inference libraries are", 
+              "included and verified by the preceding CI step.",
               "",
           ]
           report = "\n".join(lines) + "\n"
@@ -156,6 +166,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: Astra-APK-Size-Report
+          retention-days: 7
           path: android/app/build/reports/apk-size-report.md
           if-no-files-found: error
 
@@ -163,6 +174,7 @@ jobs:
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: Astra-debug-APK
+          name: Astra-offline-Qwen3-debug-APK
+          retention-days: 7
           path: android/app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
