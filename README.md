@@ -1,4 +1,4 @@
-# Astra — Android personal assistant (v0.10.1 · on-device AI)
+# Astra — Android personal assistant (v0.10.2 · on-device AI)
 
 Astra is a **local-first Android/Kotlin Jetpack Compose assistant** with a futuristic dark interface. It is being developed directly in this repository. The original **Astra-AI** repository is kept separately as a backup.
 
@@ -19,6 +19,8 @@ Astra is a **local-first Android/Kotlin Jetpack Compose assistant** with a futur
 **Important:** Astra's tasks, notes, calculators and local commands remain deterministic. Unhandled free-form questions now go to a **model running on the Android phone**. A small model may hallucinate or make calculation errors; Astra does not provide live financial prices or unrestricted device automation.
 
 ## Bundled on-device Qwen3 (no separate computer)
+
+**v0.10.2 first-run resilience:** When a model is first verified, extracted or loaded, Astra reports the current phase in chat. The Stop control now cancels disk copying/checksumming cooperatively, cleans temporary files, and avoids leaving a stalled model preparation. Any saved "THINKING" placeholder left by an Android process restart is displayed as an interrupted response.
 
 **v0.10.1 user experience:** Text generation now appears progressively in the chat bubble, and the Send button becomes a **Stop** control during inference. Stopping a response preserves the text already generated. Switching or clearing a conversation cancels its inference request so an old response cannot overwrite a different chat.
 
