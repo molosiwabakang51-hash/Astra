@@ -17,7 +17,7 @@ internal object AstraBackupCodec {
     private const val FORMAT = "astra-local-backup"
     private const val VERSION = 1
 
-    private val arrays = listOf("history", "notes", "tasks", "completed_tasks")
+    private val arrays = listOf("history", "notes", "tasks", "completed_tasks", "chat_archive")
     private val strings = listOf(
         "astra_shopping_items", "astra_habits", "astra_habit_date",
         "astra_habit_completed_today", "speech_language"
@@ -95,13 +95,31 @@ internal object AstraBackupCodec {
         val result = linkedMapOf<String, Any>()
         val counts = linkedMapOf<String, Int>()
         for (key in arrays) {
+            // Older backups predate multiple conversations; import as an empty archive.
             val array = data.optJSONArray(key)
-                ?: throw IllegalArgumentException("The backup is missing a valid $key list.")
-            if (array.length() > 2_000) {
+                ?: if (key == "chat_archive" && !data.has(key)) JSONArray()
+                else throw IllegalArgumentException("The backup is missing a valid $key list.")
+            if (array.length() > (if (key == "chat_archive") 60 else 2_000)) {
                 throw IllegalArgumentException("The $key list is too long to restore.")
             }
             for (i in 0 until array.length()) {
-                if (key == "history") {
+                if (key == "chat_archive") {
+                    val chat = array.optJSONObject(i)
+                        ?: throw IllegalArgumentException("Invalid archived conversation.")
+                    val title = chat.opt("title")
+                    val messages = chat.optJSONArray("messages")
+                    if (title !is String || title.length > 100 || messages == null ||
+                        messages.length() > 2_000
+                    ) throw IllegalArgumentException("Invalid archived conversation.")
+                    for (j in 0 until messages.length()) {
+                        val message = messages.optJSONObject(j)
+                            ?: throw IllegalArgumentException("Invalid archived message.")
+                        if (message.optString("role") !in setOf("You", "Astra") ||
+                            message.opt("text") !is String ||
+                            (message.opt("text") as String).length > 12_000
+                        ) throw IllegalArgumentException("Invalid archived message.")
+                    }
+                } else if (key == "history") {
                     val entry = array.optJSONObject(i)
                         ?: throw IllegalArgumentException("Invalid chat entry in backup.")
                     val role = entry.optString("role")
