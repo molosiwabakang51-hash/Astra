@@ -2395,6 +2395,8 @@ class MainActivity :
 
                 var showFindInChat by remember { mutableStateOf(false) }
                 var findInChatQuery by remember { mutableStateOf("") }
+                var showMemorySearch by remember { mutableStateOf(false) }
+                var memorySearchQuery by remember { mutableStateOf("") }
 
                 var showClearDialog by remember {
                     mutableStateOf(false)
@@ -2770,6 +2772,73 @@ class MainActivity :
                     // Return the conversation to its spacious default after sending.
                     commandDeckExpanded = false
                     val normalized = AstraInput.normalize(message)
+
+                    // Explicit, source-grounded local recall. This search never
+                    // sends notes, tasks or chat content to a language model.
+                    val memoryRequest = AstraMemoryRecall.parse(message)
+                    if (memoryRequest != null) {
+                        // Capture a non-null sealed request before crossing the
+                        // coroutine boundary; Kotlin cannot smart-cast a nullable
+                        // closure capture inside the asynchronous when.
+                        val selectedMemoryRequest: AstraMemoryRecall.Request = memoryRequest
+                        val notesSnapshot = notes.toList()
+                        val tasksSnapshot = tasks.toList()
+                        val currentSnapshot = history.map {
+                            AstraChatArchive.Message(it.role, it.text)
+                        }
+                        val archiveSnapshot = archivedChats.toList()
+                        val generation = chatGeneration
+                        val placeholder = "Searching private memory on this phone..."
+                        history.add(ChatMessage("You", message))
+                        history.add(ChatMessage("Astra", placeholder))
+                        while (history.size > MAX_HISTORY) history.removeAt(0)
+                        val target = history.lastIndex
+                        persist()
+                        input = ""
+                        keyboard?.hide()
+                        activeResearchCount += 1
+                        researchScope.launch {
+                            try {
+                                val reply = withContext(Dispatchers.Default) {
+                                    when (val request = selectedMemoryRequest) {
+                                        is AstraMemoryRecall.Request.Overview ->
+                                            AstraMemoryRecall.overview(
+                                                notesSnapshot, tasksSnapshot,
+                                                currentSnapshot, archiveSnapshot
+                                            )
+                                        is AstraMemoryRecall.Request.Search ->
+                                            AstraMemoryRecall.find(
+                                                request.term, notesSnapshot, tasksSnapshot,
+                                                currentSnapshot, archiveSnapshot,
+                                                notesOnly = request.notesOnly
+                                            )
+                                    }
+                                }
+                                if (chatGeneration == generation &&
+                                    target in history.indices &&
+                                    history[target].role == "Astra" &&
+                                    history[target].text == placeholder) {
+                                    history[target] = ChatMessage("Astra", reply)
+                                    persist()
+                                }
+                            } catch (cancel: CancellationException) {
+                                throw cancel
+                            } catch (error: Exception) {
+                                if (chatGeneration == generation &&
+                                    target in history.indices &&
+                                    history[target].text == placeholder) {
+                                    history[target] = ChatMessage(
+                                        "Astra",
+                                        "Private memory search was interrupted. Please try again."
+                                    )
+                                    persist()
+                                }
+                            } finally {
+                                activeResearchCount = (activeResearchCount - 1).coerceAtLeast(0)
+                            }
+                        }
+                        return
+                    }
                     // Explicit model request, always fulfilled on this phone.
                     if (message.startsWith("ask ai ", ignoreCase = true)) {
                         val prompt = message.substring(7).trim()
@@ -3196,6 +3265,51 @@ class MainActivity :
                             if (remaining > 0) scroll.animateScrollBy(remaining.toFloat())
                         }
                     }
+                }
+
+                // Private cross-chat recall is user-initiated, never a
+                // background upload or silent model-memory injection.
+                if (showMemorySearch) {
+                    AlertDialog(
+                        onDismissRequest = { showMemorySearch = false },
+                        title = { Text("Search your private memory") },
+                        text = {
+                            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                                Text(
+                                    "Search saved notes, open tasks and your own messages " +
+                                        "across conversations. Results identify their sources " +
+                                        "and stay entirely on this phone.",
+                                    style = MaterialTheme.typography.bodySmall
+                                )
+                                OutlinedTextField(
+                                    value = memorySearchQuery,
+                                    onValueChange = { memorySearchQuery = it.take(130) },
+                                    label = { Text("Recall a topic") },
+                                    placeholder = { Text("e.g. bond duration") },
+                                    singleLine = true,
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                            }
+                        },
+                        confirmButton = {
+                            TextButton(
+                                enabled = memorySearchQuery.trim().length >= 2,
+                                onClick = {
+                                    val query = memorySearchQuery.trim()
+                                    showMemorySearch = false
+                                    tab = 0
+                                    submit("recall " + query)
+                                }
+                            ) {
+                                Text("Recall")
+                            }
+                        },
+                        dismissButton = {
+                            TextButton(onClick = { showMemorySearch = false }) {
+                                Text("Cancel")
+                            }
+                        }
+                    )
                 }
 
                 // Hidden until requested: the chat retains its full-height layout.
@@ -3919,6 +4033,15 @@ class MainActivity :
                                                 navigationPopupOpen = false
                                                 findInChatQuery = ""
                                                 showFindInChat = true
+                                            }
+                                        )
+
+                                        DropdownMenuItem(
+                                            text = { Text("Search all local memory") },
+                                            onClick = {
+                                                navigationPopupOpen = false
+                                                memorySearchQuery = ""
+                                                showMemorySearch = true
                                             }
                                         )
 

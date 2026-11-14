@@ -23,6 +23,9 @@ def main():
         "Qwen is installed on device": 'AstraOnDeviceBrain(applicationContext)',
         "Unhandled chat routes to model": 'AstraOfflinePolicy.shouldUseModel(',
         "Finance explanations are wired into chat": 'AstraFinanceEducation.respond(clean)',
+        "Cross-chat memory is in local submit handler": 'AstraMemoryRecall.parse(message)',
+        "Memory recall stays off-device model prompt": 'AstraMemoryRecall.find(',
+        "Compact logo offers memory search": 'Text("Search all local memory")',
         "Strict on-device AI challenge is wired in": 'AstraOfflineSelfTest.evaluate(',
         "Build identity is in the chat header": '"v" + ASTRA_VERSION + "  ·  OFFLINE AI"',
     }
@@ -40,8 +43,8 @@ def main():
         if re.search(pattern, app):
             raise RuntimeError(f"Regression: {description}")
 
-    if '?: "0.11.1"' not in config or "?: 18" not in config:
-        raise RuntimeError("Release identity is not Astra 0.11.1 (versionCode 18)")
+    if '?: "0.11.2"' not in config or "?: 19" not in config:
+        raise RuntimeError("Release identity is not Astra 0.11.2 (versionCode 19)")
     print("PASS: Astra icon menu, compact chat, offline model, version stamp")
     print("PASS: no legacy bottom tabs, top-right overflow, or obsolete fallback")
 
