@@ -193,7 +193,14 @@ internal class AstraOnDeviceBrain(private val context: Context) {
                     },
                     restoringConversation
                 )
-                current.sendUserPrompt(requestPrompt, 384).collect { part ->
+                // Match requested answer depth rather than hard-capping all
+                // conversations at 384 tokens. Native generation still has a
+                // strict output budget and never invokes a remote provider.
+                val maxTokens = AstraGenerationPolicy.maxAnswerTokens(
+                    finalMessage,
+                    advancedModel = modelPath.name == AstraModelImport.ADVANCED_NAME
+                )
+                current.sendUserPrompt(requestPrompt, maxTokens).collect { part ->
                     // Restrict accumulated output and cap main-thread UI updates.
                     val space = (16_000 - answer.length).coerceAtLeast(0)
                     if (space > 0) answer.append(part.take(space))
