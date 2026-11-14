@@ -4862,10 +4862,15 @@ class MainActivity :
                                                             )
                                                             val elapsed =
                                                                 (System.nanoTime() - began) / 1_000_000
+                                                            val testResult = AstraOfflineSelfTest.evaluate(
+                                                                answer, elapsed
+                                                            )
+                                                            val actualModel = onDeviceBrain.loadedModelLabel()
+                                                                ?: "unknown local model"
                                                             offlineModelTestStatus =
-                                                                AstraOfflineSelfTest.evaluate(
-                                                                    answer, elapsed
-                                                                ).message
+                                                                testResult.message +
+                                                                    "\nModel used: " + actualModel +
+                                                                    "\nNo prompts were sent to an AI server."
                                                         } catch (error: Exception) {
                                                             offlineModelTestStatus =
                                                                 "OFFLINE TEST FAILED: " +
