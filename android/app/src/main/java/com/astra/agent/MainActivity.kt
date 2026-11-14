@@ -47,6 +47,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.Dispatchers
@@ -2351,6 +2352,8 @@ class MainActivity :
                 var cloudEndpoint by remember {
                     mutableStateOf(storage.getString("cloud_ai_endpoint", ""))
                 }
+                // Deliberately session-only: not stored in SharedPreferences or exported JSON.
+                var gatewayToken by remember { mutableStateOf("") }
                 val cloudBrain = remember { AstraCloudBrain() }
 
                 var tab by remember {
@@ -2590,11 +2593,12 @@ class MainActivity :
                     val explicitCloud = message.startsWith("ask ai ", ignoreCase = true)
                     if (explicitCloud) {
                         val prompt = message.substring(7).trim()
-                        if (!cloudEnabled || !AstraCloudBrain.isSafeEndpoint(cloudEndpoint)) {
+                        if (!cloudEnabled || !AstraCloudBrain.isSafeEndpoint(cloudEndpoint) ||
+                            gatewayToken.length < 32) {
                             history.add(ChatMessage("You", message))
                             history.add(ChatMessage("Astra",
-                                "Cloud AI is not configured. Open Settings, enable Cloud AI, " +
-                                "and enter your own secure HTTPS Astra gateway URL."))
+                                "Cloud AI is not ready. Open Settings and enable Cloud AI, " +
+                                "enter your HTTPS gateway URL and gateway access token."))
                             persist()
                         } else if (prompt.isNotEmpty()) {
                             val context = history.takeLast(14).mapNotNull {
@@ -2610,11 +2614,13 @@ class MainActivity :
                             history.add(ChatMessage("Astra", placeholder))
                             val target = history.lastIndex
                             val requestGeneration = chatGeneration
+                            val endpointSnapshot = cloudEndpoint
+                            val tokenSnapshot = gatewayToken
                             persist()
                             activeResearchCount++
                             researchScope.launch {
                                 val response = try {
-                                    cloudBrain.reply(cloudEndpoint, context)
+                                    cloudBrain.reply(endpointSnapshot, context, tokenSnapshot)
                                 } catch (error: Exception) {
                                     "Cloud AI unavailable: " + (error.message ?: "Network error") +
                                         ". Offline commands remain available."
@@ -2683,7 +2689,8 @@ class MainActivity :
 
                     if (AstraAiRouting.shouldUseCloud(
                             enabled = cloudEnabled,
-                            endpointValid = AstraCloudBrain.isSafeEndpoint(cloudEndpoint),
+                            endpointValid = AstraCloudBrain.isSafeEndpoint(cloudEndpoint) &&
+                                gatewayToken.length >= 32,
                             assistantText = result.text,
                             sensitive = result.sensitive,
                             hasAction = result.action != AssistantAction.NONE
@@ -2703,12 +2710,13 @@ class MainActivity :
                         val target = history.lastIndex
                         val requestGeneration = chatGeneration
                         val endpointSnapshot = cloudEndpoint
+                        val tokenSnapshot = gatewayToken
                         persist()
                         activeResearchCount++
                         researchScope.launch {
                             try {
                                 val response = try {
-                                    cloudBrain.reply(endpointSnapshot, context)
+                                    cloudBrain.reply(endpointSnapshot, context, tokenSnapshot)
                                 } catch (error: Exception) {
                                     "Cloud AI unavailable: " +
                                         (error.message ?: "Network error") +
@@ -3968,9 +3976,11 @@ class MainActivity :
                                     item {
                                         Text("CLOUD INTELLIGENCE",
                                             style = MaterialTheme.typography.titleMedium)
-                                        Text("Optional. Sends only the current conversation " +
-                                            "context to your configured HTTPS gateway. " +
-                                            "Never enter a provider API key here.")
+                                        Text("Optional cloud AI sends up to 16 recent chat " +
+                                            "messages to your private HTTPS gateway. This may " +
+                                            "include text from earlier task or note responses " +
+                                            "shown in this chat. Do not enable it for conversations " +
+                                            "that must remain entirely on-device.")
                                         Switch(
                                             checked = cloudEnabled,
                                             onCheckedChange = {
@@ -3988,11 +3998,30 @@ class MainActivity :
                                             modifier = Modifier.fillMaxWidth(),
                                             singleLine = true
                                         )
-                                        Text("When enabled, unsupported open-ended questions " +
-                                            "automatically use the configured AI gateway. " +
-                                            "You can also use: ask ai explain bond convexity. " +
-                                            "Offline tools stay local. Gateway authentication " +
-                                            "and deployment are required.")
+                                        OutlinedTextField(
+                                            value = gatewayToken,
+                                            onValueChange = { gatewayToken = it.take(512) },
+                                            label = { Text("Gateway access token (session only)") },
+                                            visualTransformation = PasswordVisualTransformation(),
+                                            modifier = Modifier.fillMaxWidth(),
+                                            singleLine = true
+                                        )
+                                        Text("The access token is kept only in app memory, " +
+                                            "not in saved settings or backups. Re-enter it " +
+                                            "after restarting Astra. Never enter your " +
+                                            "model provider API key here.")
+                                        Text(
+                                            if (cloudEnabled &&
+                                                AstraCloudBrain.isSafeEndpoint(cloudEndpoint) &&
+                                                gatewayToken.length >= 32
+                                            ) "GATEWAY CONFIGURED · NETWORK NOT YET VERIFIED"
+                                            else "GATEWAY INACTIVE OR NOT CONFIGURED",
+                                            color = MaterialTheme.colorScheme.primary,
+                                            style = MaterialTheme.typography.labelMedium
+                                        )
+                                        Text("When enabled and authenticated, unsupported " +
+                                            "questions automatically use your HTTPS gateway. " +
+                                            "Local commands stay on your device.")
                                         HorizontalDivider()
                                     }
 
