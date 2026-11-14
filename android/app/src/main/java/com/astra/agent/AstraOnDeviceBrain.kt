@@ -46,8 +46,11 @@ internal class AstraOnDeviceBrain(private val context: Context) {
             false
         }
 
-    suspend fun reply(turns: List<Turn>, conversationGeneration: Int): String =
-        mutex.withLock {
+    suspend fun reply(
+        turns: List<Turn>,
+        conversationGeneration: Int,
+        onPartial: suspend (String) -> Unit = {}
+    ): String = mutex.withLock {
             withContext(Dispatchers.IO) {
                 val finalMessage = turns.lastOrNull { it.role == "user" }?.content
                     ?.trim()?.take(3000).orEmpty()
@@ -101,9 +104,19 @@ internal class AstraOnDeviceBrain(private val context: Context) {
                 }
 
                 val answer = StringBuilder()
-                current.sendUserPrompt(AstraOfflinePolicy.modelPrompt(finalMessage), 384).collect { part ->
-                    // Bound memory even if a backend unexpectedly emits too much text.
-                    if (answer.length + part.length <= 16_000) answer.append(part)
+                var lastUiUpdate = 0L
+                current.sendUserPrompt(
+                    AstraOfflinePolicy.modelPrompt(finalMessage), 384
+                ).collect { part ->
+                    // Restrict accumulated output and cap main-thread UI updates.
+                    val space = (16_000 - answer.length).coerceAtLeast(0)
+                    if (space > 0) answer.append(part.take(space))
+                    val now = System.nanoTime()
+                    if (now - lastUiUpdate >= 200_000_000L) {
+                        val partial = AstraOfflinePolicy.publicReply(answer.toString())
+                        if (partial.isNotBlank()) onPartial(partial)
+                        lastUiUpdate = now
+                    }
                 }
                 AstraOfflinePolicy.publicReply(answer.toString()).ifBlank {
                     "The offline model did not produce a usable answer. Please try again."
