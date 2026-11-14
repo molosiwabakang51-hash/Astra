@@ -37,12 +37,22 @@ import androidx.compose.ui.unit.dp
  */
 internal object AstraDeck {
     val prompts = listOf(
+        "Mission control",
+        "What's next",
         "Show tasks",
+        "Plan my day",
         "Russian quiz",
-        "Calculate 12 * 5",
         "Show notes",
+        "Research the solar system",
         "Help"
     )
+
+    fun completionPercent(open: Int, done: Int): Int {
+        val safeOpen = open.coerceAtLeast(0)
+        val safeDone = done.coerceAtLeast(0)
+        val total = safeOpen.toLong() + safeDone.toLong()
+        return if (total == 0L) 0 else (safeDone.toLong() * 100L / total).toInt()
+    }
 
     fun status(listening: Boolean, researching: Boolean): String = when {
         listening -> "VOICE INPUT ACTIVE"
@@ -55,6 +65,9 @@ internal object AstraDeck {
 internal fun AstraCommandDeck(
     listening: Boolean,
     researching: Boolean,
+    openTasks: Int,
+    completedTasks: Int,
+    storedNotes: Int,
     onCommand: (String) -> Unit
 ) {
     val status = AstraDeck.status(listening, researching)
@@ -83,14 +96,30 @@ internal fun AstraCommandDeck(
                 fontWeight = FontWeight.SemiBold,
                 style = MaterialTheme.typography.labelMedium
             )
-            Text("v0.9", color = Color(0xFF7199BC), style = MaterialTheme.typography.labelSmall)
+            Text("MISSION HUD", color = Color(0xFF7199BC), style = MaterialTheme.typography.labelSmall)
         }
         Spacer(Modifier.height(8.dp))
         Text(status, color = Color(0xFF6ED2FF), style = MaterialTheme.typography.labelSmall)
+        Spacer(Modifier.height(8.dp))
+        Text(
+            "OPEN " + openTasks + "    DONE " + completedTasks +
+                "    NOTES " + storedNotes + "    COMPLETION " +
+                AstraDeck.completionPercent(openTasks, completedTasks) + "%",
+            color = Color(0xFFB2C9DE),
+            style = MaterialTheme.typography.labelSmall
+        )
         Spacer(Modifier.height(7.dp))
         Canvas(modifier = Modifier.fillMaxWidth().height(8.dp)) {
             val y = size.height / 2f
             drawLine(Color(0xFF1D4564), Offset(0f, y), Offset(size.width, y), 2.dp.toPx())
+            val progress = AstraDeck.completionPercent(openTasks, completedTasks) / 100f
+            drawLine(
+                Color(0xFF238FCB).copy(alpha = 0.64f),
+                Offset(0f, y),
+                Offset(size.width * progress, y),
+                3.dp.toPx(),
+                cap = StrokeCap.Round
+            )
             drawLine(
                 Color(0xFF70D7FF),
                 Offset((size.width * sweep).coerceAtMost(size.width), y),
