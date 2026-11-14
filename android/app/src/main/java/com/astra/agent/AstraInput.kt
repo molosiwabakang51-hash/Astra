@@ -32,7 +32,9 @@ internal object AstraInput {
             "give me a mission briefing", "tell me my status" -> "mission control"
             "what should i work on today", "help me prioritize my tasks" ->
                 "what should i do next"
-            "what can astra do", "what can you help me with" -> "help"
+            "what can astra do", "what can you help me with",
+            "what would you like to do", "what should we do", "what can we do",
+            "what do you want to do", "what can you do" -> "help"
             else -> text
         }
 
