@@ -100,7 +100,7 @@ keys: history, notes, tasks.
 // CONSTANTS
 // ============================================================
 
-private const val ASTRA_VERSION = "0.9.0"
+private const val ASTRA_VERSION = "0.9.1"
 private const val MAX_HISTORY = 2000
 
 private const val WELCOME =
@@ -1323,7 +1323,10 @@ private object UtilityEngine {
 // MIDDLE OFFICE — COMMAND PROCESSOR
 // ============================================================
 
-private class AstraProcessor(private val russianTutor: RussianTutor) {
+private class AstraProcessor(
+    private val russianTutor: RussianTutor,
+    private val everydayAssistant: EverydayAssistant
+) {
 
     fun process(
         raw: String,
@@ -1425,6 +1428,10 @@ private class AstraProcessor(private val russianTutor: RussianTutor) {
         }
 
         russianTutor.respond(clean)?.let {
+            return AssistantResult(it)
+        }
+
+        everydayAssistant.respond(clean, tasks)?.let {
             return AssistantResult(it)
         }
 
@@ -1696,6 +1703,23 @@ private class AstraProcessor(private val russianTutor: RussianTutor) {
                 investment return 100 120 5
                 weighted return 40 10, 60 5
 
+                DAILY LIFE
+                plan my day
+                add milk to shopping list
+                shopping list
+                remove milk from shopping list
+                add habit exercise
+                habit done exercise
+                habits
+                breathing exercise
+                help me focus
+
+                UNIT CONVERSIONS
+                convert 5 km to miles
+                convert 100 c to f
+                convert 75 kg to lb
+                convert 2 hours to minutes
+
                 LANGUAGES
                 teach me Russian
                 Russian lesson 2
@@ -1724,7 +1748,10 @@ private class AstraProcessor(private val russianTutor: RussianTutor) {
         }
 
         return AssistantResult(
-            "I cannot process that request yet. Type 'help' for supported commands."
+            "I cannot answer that reliably with Astra's current offline tools. " +
+                "I can help with tasks, notes, shopping lists, daily habits, unit conversions, " +
+                "Russian practice, mathematics, and finance. Type 'help' for examples. " +
+                "General open-ended questions will require an additional language model."
         )
     }
 }
@@ -2151,7 +2178,8 @@ class MainActivity :
             AstraStorage(this)
 
         val processor = AstraProcessor(
-            RussianTutor(storage::getInt, storage::setInt)
+            RussianTutor(storage::getInt, storage::setInt),
+            EverydayAssistant(storage::getString, storage::setString)
         )
 
         setContent {
@@ -3416,7 +3444,7 @@ class MainActivity :
                                     item {
 
                                         Text(
-                                            "A local-first assistant with task management, notes, mathematics, financial calculations, utilities and voice interaction."
+                                            "A local-first assistant for tasks, notes, daily planning, shopping, habits, language practice, mathematics, finance, unit conversions and voice interaction. General-purpose AI responses are not yet installed."
                                         )
                                     }
 
