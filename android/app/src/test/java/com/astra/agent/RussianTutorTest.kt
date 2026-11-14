@@ -51,6 +51,6 @@ class RussianTutorTest {
         coach.respond("Russian quiz")
         assertNull(coach.respond("add task revise bonds"))
         assertNotNull(coach.respond("skip Russian question"))
-        assertEquals(null, coach.respond("answer hi"))
+        assertTrue(coach.respond("answer hi")!!.contains("no active Russian question"))
     }
 }
