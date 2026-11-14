@@ -2357,17 +2357,9 @@ class MainActivity :
                     mutableStateOf(false)
                 }
                 var chatGeneration by remember { mutableIntStateOf(0) }
-                var cloudEnabled by remember {
-                    mutableStateOf(storage.getBoolean("cloud_ai_enabled"))
-                }
-                var cloudEndpoint by remember {
-                    mutableStateOf(storage.getString("cloud_ai_endpoint", ""))
-                }
-                // Deliberately session-only: not stored in SharedPreferences or exported JSON.
-                var gatewayToken by remember { mutableStateOf("") }
-                var gatewayCheckStatus by remember { mutableStateOf("") }
-                var gatewayCheckInProgress by remember { mutableStateOf(false) }
-                val cloudBrain = remember { AstraCloudBrain() }
+                val onDeviceBrain = remember { AstraOnDeviceBrain(applicationContext) }
+                var offlineModelTestStatus by remember { mutableStateOf("") }
+                var offlineModelTestRunning by remember { mutableStateOf(false) }
 
                 var tab by remember {
                     mutableIntStateOf(0)
@@ -2612,6 +2604,51 @@ class MainActivity :
                     )
                 }
 
+                // Execute model-generated answers on the phone; no HTTP request or PC.
+                fun enqueueOffline(displayMessage: String, prompt: String) {
+                    val turns = history.takeLast(12).mapNotNull { entry ->
+                        val role = when (entry.role) {
+                            "You" -> "user"
+                            "Astra" -> "assistant"
+                            else -> null
+                        }
+                        role?.let { AstraOnDeviceBrain.Turn(it, entry.text) }
+                    } + AstraOnDeviceBrain.Turn("user", prompt)
+                    val generation = chatGeneration
+                    val placeholder = "ASTRA // THINKING OFFLINE..."
+                    history.add(ChatMessage("You", displayMessage))
+                    history.add(ChatMessage("Astra", placeholder))
+                    while (history.size > MAX_HISTORY) history.removeAt(0)
+                    val target = history.lastIndex
+                    persist()
+                    activeResearchCount++
+                    researchScope.launch {
+                        try {
+                            val response = try {
+                                onDeviceBrain.reply(turns, generation)
+                            } catch (error: Exception) {
+                                "Offline model unavailable: " +
+                                    (error.message ?: "The on-device inference engine failed.") +
+                                    " Astra's built-in tools are still available."
+                            }
+                            if (chatGeneration == generation &&
+                                target in history.indices &&
+                                history[target].role == "Astra" &&
+                                history[target].text == placeholder) {
+                                history[target] = ChatMessage("Astra", response)
+                                persist()
+                                if (speakResponses && !response.startsWith("Offline model unavailable:")) {
+                                    speak(response, localOnlyTts)
+                                }
+                            }
+                        } finally {
+                            activeResearchCount = (activeResearchCount - 1).coerceAtLeast(0)
+                        }
+                    }
+                    input = ""
+                    keyboard?.hide()
+                }
+
                 fun submit(
                     raw: String
                 ) {
@@ -2625,52 +2662,16 @@ class MainActivity :
                     // Return the conversation to its spacious default after sending.
                     commandDeckExpanded = false
                     val normalized = AstraInput.normalize(message)
-                    val explicitCloud = message.startsWith("ask ai ", ignoreCase = true)
-                    if (explicitCloud) {
+                    // Explicit model request, always fulfilled on this phone.
+                    if (message.startsWith("ask ai ", ignoreCase = true)) {
                         val prompt = message.substring(7).trim()
-                        if (!cloudEnabled || !AstraCloudBrain.isSafeEndpoint(cloudEndpoint) ||
-                            gatewayToken.length < 32) {
-                            history.add(ChatMessage("You", message))
-                            history.add(ChatMessage("Astra",
-                                "Cloud AI is not ready. Open Settings and enable Cloud AI, " +
-                                "enter your HTTPS gateway URL and gateway access token."))
+                        if (prompt.isNotBlank()) {
+                            enqueueOffline(message, prompt)
+                        } else {
+                            history.add(ChatMessage("Astra", "Type a question after 'ask ai'."))
                             persist()
-                        } else if (prompt.isNotEmpty()) {
-                            val context = history.takeLast(14).mapNotNull {
-                                val role = when (it.role) {
-                                    "You" -> "user"
-                                    "Astra" -> "assistant"
-                                    else -> null
-                                }
-                                role?.let { r -> AstraCloudBrain.Turn(r, it.text) }
-                            } + AstraCloudBrain.Turn("user", prompt)
-                            val placeholder = "ASTRA // THINKING..."
-                            history.add(ChatMessage("You", message))
-                            history.add(ChatMessage("Astra", placeholder))
-                            val target = history.lastIndex
-                            val requestGeneration = chatGeneration
-                            val endpointSnapshot = cloudEndpoint
-                            val tokenSnapshot = gatewayToken
-                            persist()
-                            activeResearchCount++
-                            researchScope.launch {
-                                val response = try {
-                                    cloudBrain.reply(endpointSnapshot, context, tokenSnapshot)
-                                } catch (error: Exception) {
-                                    "Cloud AI unavailable: " + (error.message ?: "Network error") +
-                                        ". Offline commands remain available."
-                                }
-                                if (chatGeneration == requestGeneration &&
-                                    target in history.indices &&
-                                    history[target].text == placeholder) {
-                                    history[target] = ChatMessage("Astra", response)
-                                    persist()
-                                }
-                                activeResearchCount = (activeResearchCount - 1).coerceAtLeast(0)
-                            }
+                            input = ""
                         }
-                        input = ""
-                        keyboard?.hide()
                         return
                     }
                     val researchTopic = ResearchCommand.extract(normalized)
@@ -2736,54 +2737,15 @@ class MainActivity :
                         return
                     }
 
-                    if (AstraAiRouting.shouldUseCloud(
-                            enabled = cloudEnabled,
-                            endpointValid = AstraCloudBrain.isSafeEndpoint(cloudEndpoint) &&
-                                gatewayToken.length >= 32,
+                    // Native offline inference handles unsupported free-form requests.
+                    // Actions and sensitive built-in outputs never enter the model path.
+                    if (AstraOfflinePolicy.shouldUseModel(
                             assistantText = result.text,
                             sensitive = result.sensitive,
                             hasAction = result.action != AssistantAction.NONE
                         )
                     ) {
-                        val context = history.takeLast(14).mapNotNull {
-                            val role = when (it.role) {
-                                "You" -> "user"
-                                "Astra" -> "assistant"
-                                else -> null
-                            }
-                            role?.let { r -> AstraCloudBrain.Turn(r, it.text) }
-                        } + AstraCloudBrain.Turn("user", message)
-                        val placeholder = "ASTRA // THINKING..."
-                        history.add(ChatMessage("You", message))
-                        history.add(ChatMessage("Astra", placeholder))
-                        val target = history.lastIndex
-                        val requestGeneration = chatGeneration
-                        val endpointSnapshot = cloudEndpoint
-                        val tokenSnapshot = gatewayToken
-                        persist()
-                        activeResearchCount++
-                        researchScope.launch {
-                            try {
-                                val response = try {
-                                    cloudBrain.reply(endpointSnapshot, context, tokenSnapshot)
-                                } catch (error: Exception) {
-                                    "Cloud AI unavailable: " +
-                                        (error.message ?: "Network error") +
-                                        ". Offline commands remain available."
-                                }
-                                if (chatGeneration == requestGeneration &&
-                                    target in history.indices &&
-                                    history[target].text == placeholder) {
-                                    history[target] = ChatMessage("Astra", response)
-                                    persist()
-                                }
-                            } finally {
-                                activeResearchCount =
-                                    (activeResearchCount - 1).coerceAtLeast(0)
-                            }
-                        }
-                        input = ""
-                        keyboard?.hide()
+                        enqueueOffline(message, message)
                         return
                     }
 
@@ -4315,130 +4277,95 @@ class MainActivity :
                                 ) {
 
                                     item {
-                                        Text("LOCAL AI · ZERO API FEES",
-                                            style = MaterialTheme.typography.titleMedium)
-                                        Text("Optional: use an openly available Ollama model " +
-                                            "running on your own computer, with no paid AI APIs. " +
-                                            "Your phone sends up to 16 recent messages over " +
-                                            "private HTTPS, possibly including displayed task " +
-                                            "or note content. If you want everything to remain " +
-                                            "on your phone, keep this switch off.")
-                                        Switch(
-                                            checked = cloudEnabled,
-                                            onCheckedChange = {
-                                                cloudEnabled = it
-                                                gatewayCheckStatus = ""
-                                                storage.setBoolean("cloud_ai_enabled", it)
-                                            }
-                                        )
-                                        OutlinedTextField(
-                                            value = cloudEndpoint,
-                                            onValueChange = {
-                                                cloudEndpoint = it.take(500)
-                                                gatewayCheckStatus = ""
-                                                storage.setString("cloud_ai_endpoint", cloudEndpoint)
-                                            },
-                                            label = { Text("Private HTTPS address (Tailscale Serve)") },
-                                            modifier = Modifier.fillMaxWidth(),
-                                            singleLine = true
-                                        )
-                                        OutlinedTextField(
-                                            value = gatewayToken,
-                                            onValueChange = {
-                                                gatewayToken = it.take(512)
-                                                gatewayCheckStatus = ""
-                                            },
-                                            label = { Text("Gateway access token (session only)") },
-                                            visualTransformation = PasswordVisualTransformation(),
-                                            modifier = Modifier.fillMaxWidth(),
-                                            singleLine = true
-                                        )
-                                        Text("The access token is kept only in app memory, " +
-                                            "not in saved settings or backups. Re-enter it " +
-                                            "after restarting Astra. This is NOT a paid model " +
-                                            "API key. Run Ollama and the free Astra gateway on " +
-                                            "a computer you own.")
                                         Text(
-                                            if (cloudEnabled &&
-                                                AstraCloudBrain.isSafeEndpoint(cloudEndpoint) &&
-                                                gatewayToken.length >= 32
-                                            ) "GATEWAY CONFIGURED · NETWORK NOT YET VERIFIED"
-                                            else "GATEWAY INACTIVE OR NOT CONFIGURED",
-                                            color = MaterialTheme.colorScheme.primary,
-                                            style = MaterialTheme.typography.labelMedium
+                                            "OFFLINE AI · QWEN3 0.6B",
+                                            style = MaterialTheme.typography.titleMedium
+                                        )
+                                        Text(
+                                            "Astra includes a quantized Qwen3 model and runs " +
+                                            "its inference directly on this Android phone. " +
+                                            "No computer, gateway, subscription, or internet " +
+                                            "connection is needed for AI conversation. " +
+                                            "Built-in tasks, notes and calculators run locally first."
+                                        )
+                                        Text(
+                                            if (onDeviceBrain.isModelBundled())
+                                                "MODEL INCLUDED IN INSTALLED APP"
+                                            else
+                                                "MODEL MISSING FROM THIS BUILD — REINSTALL THE OFFLINE APK",
+                                            style = MaterialTheme.typography.labelMedium,
+                                            color = if (onDeviceBrain.isModelBundled())
+                                                MaterialTheme.colorScheme.primary
+                                            else MaterialTheme.colorScheme.error
+                                        )
+                                        Text(
+                                            "First use copies and verifies approximately " +
+                                            "484 MB of model data into private phone storage. " +
+                                            "Keep at least 1 GB of free storage for installation " +
+                                            "and extraction. Responses may be slow on older phones. " +
+                                            "Astra does not transmit these messages to a server.",
+                                            style = MaterialTheme.typography.bodySmall
                                         )
                                         Row(
                                             modifier = Modifier.fillMaxWidth(),
                                             verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                            horizontalArrangement = Arrangement.spacedBy(10.dp)
                                         ) {
                                             OutlinedButton(
-                                                enabled = cloudEnabled &&
-                                                    AstraCloudBrain.isSafeEndpoint(cloudEndpoint) &&
-                                                    gatewayToken.length >= 32 &&
-                                                    !gatewayCheckInProgress,
+                                                enabled = !offlineModelTestRunning &&
+                                                    onDeviceBrain.isModelBundled(),
                                                 onClick = {
-                                                    val endpointSnapshot = cloudEndpoint
-                                                    val tokenSnapshot = gatewayToken
-                                                    gatewayCheckInProgress = true
-                                                    gatewayCheckStatus = "TESTING LOCAL MODEL..."
+                                                    offlineModelTestRunning = true
+                                                    offlineModelTestStatus = "LOADING AND TESTING LOCAL MODEL..."
+                                                    val began = System.nanoTime()
                                                     researchScope.launch {
                                                         try {
-                                                            val reply = cloudBrain.reply(
-                                                                endpointSnapshot,
-                                                                listOf(AstraCloudBrain.Turn(
-                                                                    "user",
-                                                                    "Reply with just ASTRA ONLINE."
-                                                                )),
-                                                                tokenSnapshot
+                                                            val answer = onDeviceBrain.reply(
+                                                                listOf(
+                                                                    AstraOnDeviceBrain.Turn(
+                                                                        "user",
+                                                                        "Say ASTRA OFFLINE and nothing else."
+                                                                    )
+                                                                ),
+                                                                Int.MIN_VALUE
                                                             )
-                                                            if (cloudEnabled &&
-                                                                cloudEndpoint == endpointSnapshot &&
-                                                                gatewayToken == tokenSnapshot) {
-                                                                gatewayCheckStatus =
-                                                                    "CONNECTED TO LOCAL MODEL: " +
-                                                                    reply.take(100)
-                                                            }
+                                                            val elapsed =
+                                                                (System.nanoTime() - began) / 1_000_000
+                                                            offlineModelTestStatus =
+                                                                "MODEL RESPONDED OFFLINE in ${elapsed} ms: " +
+                                                                    answer.take(180)
                                                         } catch (error: Exception) {
-                                                            if (cloudEnabled &&
-                                                                cloudEndpoint == endpointSnapshot &&
-                                                                gatewayToken == tokenSnapshot) {
-                                                                gatewayCheckStatus =
-                                                                    "LOCAL MODEL TEST FAILED: " +
-                                                                    (error.message ?: "Connection error")
-                                                            }
+                                                            offlineModelTestStatus =
+                                                                "OFFLINE TEST FAILED: " +
+                                                                    (error.message ?: "Unknown inference error")
                                                         } finally {
-                                                            gatewayCheckInProgress = false
+                                                            offlineModelTestRunning = false
                                                         }
                                                     }
                                                 }
-                                            ) { Text("Test local AI") }
-                                            if (gatewayCheckInProgress) {
+                                            ) {
+                                                Text("Test on-device AI")
+                                            }
+                                            if (offlineModelTestRunning) {
                                                 CircularProgressIndicator(
                                                     modifier = Modifier.size(20.dp),
                                                     strokeWidth = 2.dp
                                                 )
                                             }
                                         }
-                                        if (gatewayCheckStatus.isNotEmpty()) {
+                                        Text(
+                                            "To verify true offline generation, turn on airplane " +
+                                                "mode before tapping Test on-device AI. This test " +
+                                                "never contacts the internet or another computer.",
+                                            style = MaterialTheme.typography.bodySmall
+                                        )
+                                        if (offlineModelTestStatus.isNotBlank()) {
                                             Text(
-                                                gatewayCheckStatus,
+                                                offlineModelTestStatus,
                                                 style = MaterialTheme.typography.bodySmall,
-                                                color = MaterialTheme.colorScheme.onBackground
+                                                color = MaterialTheme.colorScheme.primary
                                             )
                                         }
-                                        Text(
-                                            "Testing sends only a short test phrase to your own " +
-                                            "gateway, not your saved conversation history.",
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-                                        Text("Setup (no model API fees): Install Ollama, " +
-                                            "download qwen3:0.6b, start the local Astra " +
-                                            "gateway, and connect using private HTTPS. " +
-                                            "Your computer must stay on. Setup instructions " +
-                                            "are in the repository under gateway/README.md. " +
-                                            "Local commands work when this is switched off.")
                                         HorizontalDivider()
                                     }
 
@@ -4454,7 +4381,7 @@ class MainActivity :
                                     item {
 
                                         Text(
-                                            "A local-first assistant for tasks, notes, daily planning, shopping, habits, language practice, mathematics, finance and unit conversions. Explicit Wikipedia research requires the internet and sends only the requested topic. General-purpose language-model responses are not yet installed."
+                                            "A local-first assistant for tasks, notes, daily planning, shopping, habits, language practice, mathematics, finance and unit conversions. Explicit Wikipedia research requires the internet and sends only the requested topic. Open-ended questions are answered by the bundled offline Qwen3 model."
                                         )
                                     }
 
@@ -4871,7 +4798,7 @@ class MainActivity :
                                     item {
 
                                         Text(
-                                            "Astra currently uses deterministic command processing. Generative AI, background simulations, scheduled reminders and live financial data are not included."
+                                            "Astra runs a small language model on this device for open-ended questions. Autonomous background agents, scheduled reminders and live market quotes are not included."
                                         )
                                     }
                                 }

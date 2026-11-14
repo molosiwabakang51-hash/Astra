@@ -1,4 +1,4 @@
-# Astra — Android personal assistant (v0.9.6)
+# Astra — Android personal assistant (v0.10.0 · on-device AI)
 
 Astra is a **local-first Android/Kotlin Jetpack Compose assistant** with a futuristic dark interface. It is being developed directly in this repository. The original **Astra-AI** repository is kept separately as a backup.
 
@@ -13,24 +13,47 @@ Astra is a **local-first Android/Kotlin Jetpack Compose assistant** with a futur
 - Explicit opt-in Wikipedia research, which sends the requested public topic to Wikipedia.
 - Local JSON backup and confirmed restore under **Settings → Data backup & recovery**. Backups are **not encrypted** and should be kept private. Automatic Android cloud/device-transfer backups are intentionally disabled for conversation privacy; use manual export for migration.
 - Dark adaptive launcher artwork, animated Astra branding and a live command-deck HUD.
-- Optional **natural-language Local AI** routing for unsupported questions to a model running on the owner's own computer through an authenticated private HTTPS gateway. No paid model API or subscription is required. Offline commands remain local.
+- **Bundled, fully offline conversational AI** through Qwen3 0.6B Q4_K_M and the native llama.cpp Android binding. No computer, model server, account, subscription, or phone-side model download.
 - Bond Analytics Lab: fixed-coupon price, current yield, modified and Macaulay duration, convexity and DV01.
 
-**Important:** Astra's offline engine uses deterministic command routing. A generative model becomes available **only after the user installs a local Ollama model, runs their own authenticated gateway and enables networked Local AI**. There is no preconfigured live AI provider. Unrestricted device automation, camera reasoning, autonomous scheduled tasks and live financial quotes are not included.
+**Important:** Astra's tasks, notes, calculators and local commands remain deterministic. Unhandled free-form questions now go to a **model running on the Android phone**. A small model may hallucinate or make calculation errors; Astra does not provide live financial prices or unrestricted device automation.
 
-## Zero-API-fee local model conversation
+## Bundled on-device Qwen3 (no separate computer)
 
-Astra can send unanswered natural-language questions to a **free-to-run local model hosted on your own computer** after explicit opt-in. The model runs using [Ollama](https://ollama.com), without paid inference APIs or subscription charges. The Android phone connects privately over HTTPS with a session-only gateway access token. A documented no-fee personal setup uses Tailscale Serve, which keeps your gateway private. See [gateway/README.md](gateway/README.md) for Windows setup, free networking, limits and tests.
+Qwen3 0.6B (Q4_K_M) is **approximately 484 MB**. The final debug APK should therefore be over 450 MB—not the old 8 MB. The weights are downloaded and verified on the **build machine**, then packaged inside the APK. **The phone never downloads a model after installation.**
 
-The Android gateway token is **session-only**, not saved in preferences or backups; re-enter it after app restart. Up to 16 recent chat messages can be sent to your own computer, including messages displaying task or note content. The local model cannot execute device actions. **There is no metered model API fee**, but your computer consumes electricity and initial model downloads use data. This is not on-device phone inference; the computer must be running.
+- **Model:** QuantFactory's Qwen3-0.6B Q4_K_M GGUF on Hugging Face: https://huggingface.co/QuantFactory/Qwen3-0.6B-GGUF. SHA-256: `7af3fdf842f87b24672f8a7f1dd50404043f0bfb71093ff91c31d2b49df4631d`. Base Qwen3 model license: Apache 2.0.
+- **Engine:** Open-source llama.cpp's Android JNI binding, pinned to `b12248` (`3837bf0`). Documentation: https://github.com/ggml-org/llama.cpp/blob/master/docs/android.md.
+- **Compatibility:** ARM64 (`arm64-v8a`) devices running Android 13 / API 33 or newer. App ID remains `com.astra.agent`. The native binding raises the former API 26 minimum. RAM usage and token speed vary by device.
+- **First message:** The built-in model is verified and copied once into Astra's private no-backup storage because the Android engine loads models from a file path. Leave at least **1 GB additional storage** available for this extraction and installation. Later requests do not require a model download.
+- **Privacy:** The model runs on the same phone even in airplane mode. Explicit Wikipedia research and Android's optional speech services are separate, and may use network access. No AI chat text is transmitted to an external model service.
+- **Quality:** A 0.6B model is substantially less capable than large hosted models; local command handling and deterministic calculators retain priority.
+- **On-phone self-test:** Open the Astra-logo menu → Settings → **Test on-device AI**. With airplane mode enabled, the test prompts the packaged Qwen3 model without using the network and shows a response or the actual error and elapsed time. This is a practical device-level acceptance check, not a benchmark.
+- **Open-source notices:** Model Apache 2.0 license and native inference MIT/dependency licenses are bundled inside the APK under `assets/open_source_licenses/`.
 
+
+### Reproducible offline APK build
+
+On the **build machine only**, install Java 17, Android SDK platform 36, NDK `29.0.13113456`, CMake `3.31.6`, Gradle `8.13`, Git and Python 3. Run:
+
+```sh
+python3 scripts/prepare_offline_android.py
+cd android
+gradle --no-daemon testDebugUnitTest assembleDebug
+cd ..
+python3 scripts/verify_offline_apk.py
+```
+
+GitHub Actions performs these preparation and verification steps automatically. The reproducible script pins llama.cpp and checks the GGUF's SHA-256 before packaging. The binary weights are intentionally **not in Git**, avoiding an enormous source repository; they **are in the resulting APK**. The build will fail rather than ship an 8 MB APK missing the model.
+
+The previous `gateway/` server remains as historical code but is **not invoked by Astra v0.10.0**. It is not required for offline conversation.
 ## Builds
 
-The workflow at `.github/workflows/android.yml` compiles and tests the app on pushes to `main`, pull requests, manual dispatch and a weekly schedule. It publishes the **Astra-debug-APK** artifact from successful runs under [GitHub Actions](https://github.com/molosiwabakang51-hash/Astra/actions).
+The workflow at `.github/workflows/android.yml` prepares the model and native runtime, then compiles and tests the app on pushes to `main`, pull requests, manual dispatch and a weekly schedule. It publishes the **Astra-offline-Qwen3-debug-APK** artifact from successful runs under [GitHub Actions](https://github.com/molosiwabakang51-hash/Astra/actions).
 
-The Android project is in `android/`, with application ID `com.astra.agent`, Android API 26 minimum, Java 17 and Gradle 8.9 on CI.
+The Android project is in `android/`, with application ID `com.astra.agent`, Android API 33 minimum, Java 17 and Gradle 8.13 on CI.
 
-The generated **debug APK is for development/testing**. GitHub runners may use different debug-signing keys, preventing in-place updates. **Before uninstalling any older debug build, export your data.** An owner-signed release workflow is now provided but cannot produce durable APKs until the owner privately configures a permanent keystore and signing secrets. See **[Owner-signed release setup](docs/release-signing.md)**. Its first install over a debug build still requires export → uninstall → install → restore; later releases signed by the same owner key can update without uninstalling. Stable private release signing and device verification are tracked in [issue #14](https://github.com/molosiwabakang51-hash/Astra/issues/14). Never put keystores or API keys in this public repository.
+The generated **offline debug APK is for development/testing**, includes model weights, and should be roughly 500 MB or more. GitHub runners may use different debug-signing keys, preventing in-place updates. **Before uninstalling any older debug build, export your data.** An owner-signed release workflow is now provided but cannot produce durable APKs until the owner privately configures a permanent keystore and signing secrets. See **[Owner-signed release setup](docs/release-signing.md)**. Its first install over a debug build still requires export → uninstall → install → restore; later releases signed by the same owner key can update without uninstalling. Stable private release signing and device verification are tracked in [issue #14](https://github.com/molosiwabakang51-hash/Astra/issues/14). Never put keystores or API keys in this public repository.
 
 ## Conversation management and privacy
 
