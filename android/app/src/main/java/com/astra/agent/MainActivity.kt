@@ -3976,9 +3976,11 @@ class MainActivity :
                                     item {
                                         Text("CLOUD INTELLIGENCE",
                                             style = MaterialTheme.typography.titleMedium)
-                                        Text("Optional. Sends only the current conversation " +
-                                            "context to your configured HTTPS gateway. " +
-                                            "Never enter a provider API key here.")
+                                        Text("Optional cloud AI sends up to 16 recent chat " +
+                                            "messages to your private HTTPS gateway. This may " +
+                                            "include text from earlier task or note responses " +
+                                            "shown in this chat. Do not enable it for conversations " +
+                                            "that must remain entirely on-device.")
                                         Switch(
                                             checked = cloudEnabled,
                                             onCheckedChange = {
@@ -4008,6 +4010,15 @@ class MainActivity :
                                             "not in saved settings or backups. Re-enter it " +
                                             "after restarting Astra. Never enter your " +
                                             "model provider API key here.")
+                                        Text(
+                                            if (cloudEnabled &&
+                                                AstraCloudBrain.isSafeEndpoint(cloudEndpoint) &&
+                                                gatewayToken.length >= 32
+                                            ) "GATEWAY CONFIGURED · NETWORK NOT YET VERIFIED"
+                                            else "GATEWAY INACTIVE OR NOT CONFIGURED",
+                                            color = MaterialTheme.colorScheme.primary,
+                                            style = MaterialTheme.typography.labelMedium
+                                        )
                                         Text("When enabled and authenticated, unsupported " +
                                             "questions automatically use your HTTPS gateway. " +
                                             "Local commands stay on your device.")
