@@ -69,15 +69,15 @@ jobs:
           [[ "$package" == *"name='com.astra.agent'"* ]] || {
             echo "Unexpected package ID in APK"; exit 1;
           }
-          [[ "$package" == *"versionCode='17'"* ]] || {
+          [[ "$package" == *"versionCode='18'"* ]] || {
             echo "Unexpected versionCode in APK"; exit 1;
           }
-          [[ "$package" == *"versionName='0.11.0'"* ]] || {
+          [[ "$package" == *"versionName='0.11.1'"* ]] || {
             echo "Unexpected versionName in APK"; exit 1;
           }
           mkdir -p ../dist
-          cp "$apk" "../dist/Astra-v0.11.0-FULL-offline-arm64-debug.apk"
-          echo "Verified installable FULL APK identity: Astra v0.11.0 (17), offline ARM64"
+          cp "$apk" "../dist/Astra-v0.11.1-FULL-offline-arm64-debug.apk"
+          echo "Verified installable FULL APK identity: Astra v0.11.1 (18), offline ARM64"
 
       - name: Inspect debug APK composition
         working-directory: android
@@ -208,11 +208,11 @@ jobs:
           package="$("$aapt" dump badging "$apk" | head -n 1)"
           echo "$package"
           [[ "$package" == *"name='com.astra.agent'"* &&
-             "$package" == *"versionCode='17'"* &&
-             "$package" == *"versionName='0.11.0'"* ]] || {
+             "$package" == *"versionCode='18'"* &&
+             "$package" == *"versionName='0.11.1'"* ]] || {
             echo "Lightweight APK identity mismatch"; exit 1;
           }
-          cp "$apk" ../dist/Astra-v0.11.0-LITE-offline-arm64-debug.apk
+          cp "$apk" ../dist/Astra-v0.11.1-LITE-offline-arm64-debug.apk
           printf "# Lite APK\n\nSize: %s bytes\n\n" "$(wc -c < "$apk")" > ../dist/LITE-size-report.md
           echo "LITE APK ready; existing model can be imported from previous APK/ZIP."
 
@@ -220,7 +220,7 @@ jobs:
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: Astra-v0.11.0-Sizes
+          name: Astra-v0.11.1-Sizes
           retention-days: 7
           path: dist/*-size-report.md
           if-no-files-found: error
@@ -229,16 +229,16 @@ jobs:
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: Astra-v0.11.0-LITE-Offline-APK
+          name: Astra-v0.11.1-LITE-Offline-APK
           retention-days: 7
-          path: dist/Astra-v0.11.0-LITE-offline-arm64-debug.apk
+          path: dist/Astra-v0.11.1-LITE-offline-arm64-debug.apk
           if-no-files-found: error
 
       - name: Publish self-contained full APK (first installs only)
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: Astra-v0.11.0-FULL-Offline-APK
+          name: Astra-v0.11.1-FULL-Offline-APK
           retention-days: 7
-          path: dist/Astra-v0.11.0-FULL-offline-arm64-debug.apk
+          path: dist/Astra-v0.11.1-FULL-offline-arm64-debug.apk
           if-no-files-found: error

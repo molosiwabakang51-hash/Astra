@@ -14,10 +14,10 @@ android {
         versionCode = System.getenv("ASTRA_RELEASE_VERSION_CODE")
             ?.takeIf { it.isNotBlank() }
             ?.toIntOrNull()
-            ?.also { require(it >= 17) { "Release versionCode must be at least 17." } }
-            ?: 17
+            ?.also { require(it >= 18) { "Release versionCode must be at least 18." } }
+            ?: 18
         versionName = System.getenv("ASTRA_RELEASE_VERSION_NAME")
-            ?.takeIf { it.isNotBlank() } ?: "0.11.0"
+            ?.takeIf { it.isNotBlank() } ?: "0.11.1"
     }
     // The bundled llama.cpp Android binding supports arm64 (Android 13+).
     defaultConfig { ndk { abiFilters += listOf("arm64-v8a") } }

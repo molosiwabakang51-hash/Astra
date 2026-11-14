@@ -1710,6 +1710,12 @@ private class AstraProcessor(
             )
         }
 
+        // Common educational finance questions receive a reliable offline
+        // explanation even if Qwen3 weights have not yet been installed.
+        AstraFinanceEducation.respond(clean)?.let {
+            return AssistantResult(it)
+        }
+
         BondAnalytics.respond(clean)?.let {
             return AssistantResult(it)
         }
@@ -1784,6 +1790,14 @@ private class AstraProcessor(
                 square root of 81
                 permutations 5 3
                 combinations 5 3
+
+                FINANCE EXPLANATIONS (always offline)
+                explain compound interest
+                what is yield to maturity
+                explain bond duration
+                explain convexity
+                what is dividend yield
+                explain portfolio diversification
 
                 FINANCE
                 bond analyze 1000 5 6 10 2
@@ -2645,6 +2659,14 @@ class MainActivity :
                     if (modelImportRunning) {
                         history.add(ChatMessage(
                             "Astra", "An offline model is being imported. Ask again after import."
+                        ))
+                        persist()
+                        return
+                    }
+                    if (offlineModelTestRunning) {
+                        history.add(ChatMessage(
+                            "Astra",
+                            "The offline AI self-test is running. Try again when it finishes."
                         ))
                         persist()
                         return
@@ -4509,7 +4531,7 @@ class MainActivity :
                                                                 listOf(
                                                                     AstraOnDeviceBrain.Turn(
                                                                         "user",
-                                                                        "Say ASTRA OFFLINE and nothing else."
+                                                                        AstraOfflineSelfTest.CHALLENGE
                                                                     )
                                                                 ),
                                                                 Int.MIN_VALUE
@@ -4517,8 +4539,9 @@ class MainActivity :
                                                             val elapsed =
                                                                 (System.nanoTime() - began) / 1_000_000
                                                             offlineModelTestStatus =
-                                                                "MODEL RESPONDED OFFLINE in ${elapsed} ms: " +
-                                                                    answer.take(180)
+                                                                AstraOfflineSelfTest.evaluate(
+                                                                    answer, elapsed
+                                                                ).message
                                                         } catch (error: Exception) {
                                                             offlineModelTestStatus =
                                                                 "OFFLINE TEST FAILED: " +
