@@ -132,6 +132,8 @@ private data class ChatMessage(
 
 private enum class AssistantAction {
     NONE,
+    NEW_CONVERSATION,
+    OPEN_CONVERSATIONS,
     CLEAR_CHAT,
     COPY_CHAT,
     SHARE_CHAT,
@@ -1386,17 +1388,21 @@ private class AstraProcessor(
         val lower =
             clean.lowercase(Locale.ENGLISH)
 
+        AstraConversationCommands.classify(lower)?.let { command ->
+            return AssistantResult(
+                "",
+                when (command) {
+                    AstraConversationCommands.Action.NEW_CONVERSATION ->
+                        AssistantAction.NEW_CONVERSATION
+                    AstraConversationCommands.Action.OPEN_CONVERSATIONS ->
+                        AssistantAction.OPEN_CONVERSATIONS
+                    AstraConversationCommands.Action.CLEAR_CURRENT ->
+                        AssistantAction.CLEAR_CHAT
+                }
+            )
+        }
+
         when (lower) {
-
-            "clear chat",
-            "clear history",
-            "new conversation" -> {
-
-                return AssistantResult(
-                    "",
-                    AssistantAction.CLEAR_CHAT
-                )
-            }
 
             "copy chat",
             "copy conversation" -> {
@@ -2687,6 +2693,20 @@ class MainActivity :
                         )
                     dialogueAwaiting = dialogue.awaitingResponse
 
+                    // Navigation commands are handled without writing a synthetic
+                    // user message to a history that is about to be switched.
+                    if (result.action == AssistantAction.NEW_CONVERSATION) {
+                        startNewConversation()
+                        keyboard?.hide()
+                        return
+                    }
+                    if (result.action == AssistantAction.OPEN_CONVERSATIONS) {
+                        showChatSwitcher = true
+                        input = ""
+                        keyboard?.hide()
+                        return
+                    }
+
                     if (AstraAiRouting.shouldUseCloud(
                             enabled = cloudEnabled,
                             endpointValid = AstraCloudBrain.isSafeEndpoint(cloudEndpoint) &&
@@ -2753,6 +2773,9 @@ class MainActivity :
                         AssistantAction.CLEAR_CHAT -> {
                             showClearDialog = true
                         }
+
+                        AssistantAction.NEW_CONVERSATION,
+                        AssistantAction.OPEN_CONVERSATIONS -> Unit
 
                         AssistantAction.COPY_CHAT -> {
 
