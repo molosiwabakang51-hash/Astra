@@ -1759,6 +1759,10 @@ private class AstraProcessor(
                 recall bond duration
                 what did I say about dividends
                 find my notes about risk
+                ask my memory why did I choose bonds?
+                analyse my notes about portfolio risk
+                Tap Astra icon → Search all local memory → Ask with evidence.
+                Grounded AI answers include the original source excerpts.
 
                 MISSION CONTROL
                 mission control
@@ -2387,6 +2391,8 @@ class MainActivity :
                 val onDeviceBrain = remember { AstraOnDeviceBrain(applicationContext) }
                 var offlineJob by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
                 var offlineAnswerMessageIndex by remember { mutableIntStateOf(-1) }
+                // Grounded-memory prompts use an isolated local model context.
+                var privateInferenceCounter by remember { mutableIntStateOf(0) }
                 var offlineModelTestStatus by remember { mutableStateOf("") }
                 var offlineModelTestRunning by remember { mutableStateOf(false) }
                 var modelImportRunning by remember { mutableStateOf(false) }
@@ -2668,7 +2674,11 @@ class MainActivity :
                 }
 
                 // All model output stays on-device and streams into the active bubble.
-                fun enqueueOffline(displayMessage: String, prompt: String) {
+                fun enqueueOffline(
+                    displayMessage: String,
+                    prompt: String,
+                    grounding: AstraGroundedMemory.Request? = null
+                ) {
                     if (modelImportRunning) {
                         history.add(ChatMessage(
                             "Astra", "An offline model is being imported. Ask again after import."
@@ -2691,6 +2701,15 @@ class MainActivity :
                         persist()
                         return
                     }
+                    // Only explicit grounded questions capture private memories.
+                    // Ordinary Qwen3 questions continue to see chat turns only.
+                    val groundedNotes = if (grounding != null) notes.toList() else emptyList()
+                    val groundedTasks = if (grounding != null) tasks.toList() else emptyList()
+                    val groundedCurrent = if (grounding != null) history.map {
+                        AstraChatArchive.Message(it.role, it.text)
+                    } else emptyList()
+                    val groundedArchived =
+                        if (grounding != null) archivedChats.toList() else emptyList()
                     val turns = history.takeLast(12).mapNotNull { entry ->
                         val role = when (entry.role) {
                             "You" -> "user"
@@ -2718,9 +2737,57 @@ class MainActivity :
                                 history[target].role == "Astra" &&
                                 history[target].text == displayed
 
+                        var groundedFooter = ""
                         try {
+                            var effectiveTurns = turns
+                            var effectiveGeneration = generation
+                            if (grounding != null) {
+                                if (!stillActiveBubble()) return@launch
+                                val scanning = "Finding relevant private evidence on this phone..."
+                                history[target] = ChatMessage("Astra", scanning)
+                                displayed = scanning
+                                val brief = withContext(Dispatchers.Default) {
+                                    AstraGroundedMemory.retrieve(
+                                        grounding, groundedNotes, groundedTasks,
+                                        groundedCurrent, groundedArchived
+                                    )
+                                }
+                                if (!stillActiveBubble()) return@launch
+                                if (brief.evidence.isEmpty()) {
+                                    history[target] = ChatMessage(
+                                        "Astra",
+                                        "I found no relevant user-written evidence in your " +
+                                            "local notes, tasks or conversations. I won't " +
+                                            "invent a personal memory; try a different topic."
+                                    )
+                                    persist()
+                                    return@launch
+                                }
+                                groundedFooter = brief.sourceFooter()
+                                if (!onDeviceBrain.hasLocalModel()) {
+                                    history[target] = ChatMessage(
+                                        "Astra",
+                                        "I located this private evidence. For an AI analysis, " +
+                                            "import Qwen3 once under Settings.\n\n" +
+                                            groundedFooter
+                                    )
+                                    persist()
+                                    return@launch
+                                }
+                                // Distinct negative engine context prevents old
+                                // conversations contaminating grounded answers.
+                                privateInferenceCounter--
+                                effectiveGeneration = privateInferenceCounter
+                                effectiveTurns = listOf(
+                                    AstraOnDeviceBrain.Turn(
+                                        "user", brief.modelPrompt()
+                                    )
+                                )
+                            }
                             val response = try {
-                                onDeviceBrain.reply(turns, generation) { partial ->
+                                onDeviceBrain.reply(
+                                    effectiveTurns, effectiveGeneration
+                                ) { partial ->
                                     // Compose state and conversation history are
                                     // mutated on the UI thread, not the model thread.
                                     withContext(Dispatchers.Main.immediate) {
@@ -2738,9 +2805,13 @@ class MainActivity :
                                     " Astra's built-in tools are still available."
                             }
                             if (stillActiveBubble()) {
-                                history[target] = ChatMessage("Astra", response)
+                                val visibleResponse = if (grounding != null) {
+                                    "ON-DEVICE AI INTERPRETATION · check against sources\n\n" +
+                                        response + "\n\n" + groundedFooter
+                                } else response
+                                history[target] = ChatMessage("Astra", visibleResponse)
                                 persist()
-                                if (speakResponses &&
+                                if (speakResponses && grounding == null &&
                                     !response.startsWith("Offline model unavailable:")) {
                                     speak(response, localOnlyTts)
                                 }
@@ -2751,7 +2822,10 @@ class MainActivity :
                             if (stillActiveBubble()) {
                                 val stopped = if (displayed == placeholder)
                                     "Offline response stopped."
-                                else displayed + "\n\n[Response stopped]"
+                                else displayed + "\n\n[Response stopped]" +
+                                    if (groundedFooter.isNotBlank()) {
+                                        "\n\n" + groundedFooter
+                                    } else ""
                                 history[target] = ChatMessage("Astra", stopped)
                                 persist()
                             }
@@ -2786,6 +2860,14 @@ class MainActivity :
                     // Return the conversation to its spacious default after sending.
                     commandDeckExpanded = false
                     val normalized = AstraInput.normalize(message)
+
+                    // Evidence-grounded analysis is opt-in and runs on the phone.
+                    // It cannot take actions, browse, or silently access memory.
+                    val groundedRequest = AstraGroundedMemory.parse(message)
+                    if (groundedRequest != null) {
+                        enqueueOffline(message, groundedRequest.question, groundedRequest)
+                        return
+                    }
 
                     // Explicit, source-grounded local recall. This search never
                     // sends notes, tasks or chat content to a language model.
@@ -3303,9 +3385,10 @@ class MainActivity :
                         text = {
                             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                                 Text(
-                                    "Search saved notes, open tasks and your own messages " +
-                                        "across conversations. Results identify their sources " +
-                                        "and stay entirely on this phone.",
+                                    "Recall exact excerpts, or ask the on-device AI to " +
+                                        "interpret matching evidence. Both run locally. " +
+                                        "AI interpretations can be wrong, so original " +
+                                        "source excerpts are always attached.",
                                     style = MaterialTheme.typography.bodySmall
                                 )
                                 OutlinedTextField(
@@ -3319,16 +3402,29 @@ class MainActivity :
                             }
                         },
                         confirmButton = {
-                            TextButton(
-                                enabled = memorySearchQuery.trim().length >= 2,
-                                onClick = {
-                                    val query = memorySearchQuery.trim()
-                                    showMemorySearch = false
-                                    tab = 0
-                                    submit("recall " + query)
+                            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                TextButton(
+                                    enabled = memorySearchQuery.trim().length >= 2,
+                                    onClick = {
+                                        val query = memorySearchQuery.trim()
+                                        showMemorySearch = false
+                                        tab = 0
+                                        submit("recall " + query)
+                                    }
+                                ) {
+                                    Text("Find sources")
                                 }
-                            ) {
-                                Text("Recall")
+                                TextButton(
+                                    enabled = memorySearchQuery.trim().length >= 3,
+                                    onClick = {
+                                        val query = memorySearchQuery.trim()
+                                        showMemorySearch = false
+                                        tab = 0
+                                        submit("ask my memory " + query)
+                                    }
+                                ) {
+                                    Text("Ask with evidence")
+                                }
                             }
                         },
                         dismissButton = {
