@@ -6,6 +6,7 @@ import com.arm.aichat.AiChat
 import com.arm.aichat.InferenceEngine
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -56,10 +57,26 @@ internal class AstraOnDeviceBrain(private val context: Context) {
                     current = AiChat.getInferenceEngine(context.applicationContext)
                     engine = current
                 }
+                // Upstream initializes JNI asynchronously. Wait for the engine
+                // to be ready instead of racing model loading against init.
+                val initialized = current.state.first { state ->
+                    state is InferenceEngine.State.Initialized ||
+                        state is InferenceEngine.State.ModelReady ||
+                        state is InferenceEngine.State.Error
+                }
+                if (initialized is InferenceEngine.State.Error) {
+                    current.cleanUp()
+                    loadedGeneration = null
+                }
+                if (current.state.value is InferenceEngine.State.Initialized) {
+                    loadedGeneration = null
+                }
                 if (loadedGeneration != conversationGeneration) {
-                    // The upstream llama.cpp binding retains chat context in memory.
-                    // Unload when changing chats so private conversations cannot mix.
-                    if (loadedGeneration != null) current.cleanUp()
+                    // The native engine retains chat context. Always unload
+                    // between conversations, including activity recreation.
+                    if (current.state.value is InferenceEngine.State.ModelReady) {
+                        current.cleanUp()
+                    }
                     current.loadModel(modelPath.absolutePath)
                     val recent = turns.dropLast(1).takeLast(8)
                         .filter { it.role in setOf("user", "assistant") }
@@ -71,7 +88,7 @@ internal class AstraOnDeviceBrain(private val context: Context) {
                         append("You are Astra, a concise, helpful Android assistant. ")
                         append("You run fully offline on this phone. ")
                         append("Do not pretend to browse the internet, know today's live prices, ")
-                        append("or control apps. State uncertainty. Do not reveal chain-of-thought. ")
+                        append("or control apps. State uncertainty. Respond directly and briefly. /no_think ")
                         if (recent.isNotBlank()) {
                             append("\nRecent conversation for context:\n")
                             append(recent)
@@ -81,12 +98,12 @@ internal class AstraOnDeviceBrain(private val context: Context) {
                 }
 
                 val answer = StringBuilder()
-                current.sendUserPrompt(finalMessage, 384).collect { part ->
+                current.sendUserPrompt(AstraOfflinePolicy.modelPrompt(finalMessage), 384).collect { part ->
                     // Bound memory even if a backend unexpectedly emits too much text.
                     if (answer.length + part.length <= 16_000) answer.append(part)
                 }
-                answer.toString().trim().ifBlank {
-                    "The offline model did not produce an answer. Please try again."
+                AstraOfflinePolicy.publicReply(answer.toString()).ifBlank {
+                    "The offline model did not produce a usable answer. Please try again."
                 }
             }
         }
