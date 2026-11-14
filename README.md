@@ -11,7 +11,7 @@ Astra is a **local-first Android/Kotlin Jetpack Compose assistant** with a futur
 - Shopping lists, habits, daily overviews and introductory Russian lessons/quizzes.
 - Android speech recognition and text-to-speech, depending on installed system services and language packs.
 - Explicit opt-in Wikipedia research, which sends the requested public topic to Wikipedia.
-- Local JSON backup and confirmed restore under **Settings → Data backup & recovery**. Backups are **not encrypted** and should be kept private.
+- Local JSON backup and confirmed restore under **Settings → Data backup & recovery**. Backups are **not encrypted** and should be kept private. Automatic Android cloud/device-transfer backups are intentionally disabled for conversation privacy; use manual export for migration.
 - Dark adaptive launcher artwork, animated Astra branding and a live command-deck HUD.
 - Optional **natural-language Local AI** routing for unsupported questions to a model running on the owner's own computer through an authenticated private HTTPS gateway. No paid model API or subscription is required. Offline commands remain local.
 - Bond Analytics Lab: fixed-coupon price, current yield, modified and Macaulay duration, convexity and DV01.
@@ -31,6 +31,14 @@ The workflow at `.github/workflows/android.yml` compiles and tests the app on pu
 The Android project is in `android/`, with application ID `com.astra.agent`, Android API 26 minimum, Java 17 and Gradle 8.9 on CI.
 
 The generated **debug APK is for development/testing**. Build runners may use different debug-signing keys, which can prevent an in-place update from a previously installed APK. Before reinstalling, export your data. Stable private release signing is tracked in [issue #14](https://github.com/molosiwabakang51-hash/Astra/issues/14). Never put keystores or API keys in this public repository.
+
+## Conversation management and privacy
+
+- Tap the **ASTRA** logo to navigate between Chat, Tasks, Notes, Tools and Settings.
+- In Chat's three-dot menu, choose **New conversation** to archive the current thread without deleting it, or **Conversations** to switch between previous threads.
+- Typed or spoken `new chat` / `new conversation` now opens another conversation **without deleting the old one**. `switch chat` opens the conversation picker. `clear chat` still requires confirmation before it deletes the active history.
+- Astra keeps local conversations in app-private storage. Automatic Android system backup and device-transfer restore are disabled to reduce unintended copies of private data.
+- **Before uninstalling or changing devices**, export a JSON backup through Settings, keep it somewhere private, and restore it manually after installing Astra. Deleting the app without exporting can permanently lose its local notes, chats, and tasks.
 
 ## Quick command examples
 
