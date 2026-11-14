@@ -48,6 +48,10 @@ internal class AstraOnDeviceBrain(private val context: Context) {
     fun isModelBundled(): Boolean =
         isBundled(AstraModelImport.ADVANCED_NAME) || isBundled(ASSET_NAME)
 
+    fun hasAdvancedModel(): Boolean =
+        AstraModelImport.advancedInstalled(context) ||
+            isBundled(AstraModelImport.ADVANCED_NAME)
+
     private fun isBundled(name: String): Boolean =
         try {
             context.assets.list("")?.contains(name) == true
