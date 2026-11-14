@@ -2645,6 +2645,7 @@ class MainActivity :
                             history.removeAt(0)
                         }
                         val placeholderIndex = history.lastIndex
+                        val researchGeneration = chatGeneration
                         persist()
                         input = ""
                         keyboard?.hide()
@@ -2655,6 +2656,7 @@ class MainActivity :
                                 val answer = research.search(researchTopic)
                                 // Don't restore results after a conversation clear.
                                 if (
+                                    chatGeneration == researchGeneration &&
                                     placeholderIndex in history.indices &&
                                     history[placeholderIndex].role == "Astra" &&
                                     history[placeholderIndex].text == placeholder
