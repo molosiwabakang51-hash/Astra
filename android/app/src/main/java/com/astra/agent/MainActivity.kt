@@ -4053,14 +4053,16 @@ class MainActivity :
                                                                 )),
                                                                 tokenSnapshot
                                                             )
-                                                            if (cloudEndpoint == endpointSnapshot &&
+                                                            if (cloudEnabled &&
+                                                                cloudEndpoint == endpointSnapshot &&
                                                                 gatewayToken == tokenSnapshot) {
                                                                 gatewayCheckStatus =
                                                                     "CONNECTED TO LOCAL MODEL: " +
                                                                     reply.take(100)
                                                             }
                                                         } catch (error: Exception) {
-                                                            if (cloudEndpoint == endpointSnapshot &&
+                                                            if (cloudEnabled &&
+                                                                cloudEndpoint == endpointSnapshot &&
                                                                 gatewayToken == tokenSnapshot) {
                                                                 gatewayCheckStatus =
                                                                     "LOCAL MODEL TEST FAILED: " +
