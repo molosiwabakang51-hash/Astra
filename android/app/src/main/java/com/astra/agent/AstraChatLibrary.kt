@@ -1,6 +1,5 @@
 package com.astra.agent
 
-import java.util.Locale
 
 /**
  * Local-only conversation library operations. All operations return new
@@ -65,12 +64,49 @@ internal object AstraChatLibrary {
         return Activation(chosen, next)
     }
 
+    data class SearchHit(
+        val chat: AstraChatArchive.Chat,
+        val snippet: String?
+    )
+
+    /**
+     * Search both saved chat titles and their messages, entirely on-device.
+     * Newest message matches are preferred, while the list retains archive
+     * order. Only the snippet is normalized to avoid copying large histories
+     * for each keystroke.
+     */
+    fun searchWithPreview(
+        chats: List<AstraChatArchive.Chat>,
+        query: String
+    ): List<SearchHit> {
+        val term = query.trim()
+        if (term.isEmpty()) return chats.map { SearchHit(it, null) }
+
+        return chats.mapNotNull { chat ->
+            if (chat.title.contains(term, ignoreCase = true)) {
+                SearchHit(chat, null)
+            } else {
+                val match = chat.messages.asReversed().firstNotNullOfOrNull { message ->
+                    val index = message.text.indexOf(term, ignoreCase = true)
+                    if (index < 0) null else {
+                        val start = (index - 35).coerceAtLeast(0)
+                        val end = (index + term.length + 65)
+                            .coerceAtMost(message.text.length)
+                        val excerpt = message.text.substring(start, end)
+                            .replace(whitespace, " ").trim()
+                        val before = if (start > 0) "…" else ""
+                        val after = if (end < message.text.length) "…" else ""
+                        "${message.role}: $before$excerpt$after"
+                    }
+                }
+                if (match == null) null else SearchHit(chat, match)
+            }
+        }
+    }
+
     fun search(
         chats: List<AstraChatArchive.Chat>,
         query: String
-    ): List<AstraChatArchive.Chat> {
-        val text = query.trim().lowercase(Locale.ROOT)
-        return if (text.isEmpty()) chats
-        else chats.filter { it.title.lowercase(Locale.ROOT).contains(text) }
-    }
+    ): List<AstraChatArchive.Chat> =
+        searchWithPreview(chats, query).map { it.chat }
 }

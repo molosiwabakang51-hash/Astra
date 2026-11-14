@@ -56,6 +56,68 @@ class AstraChatLibraryTest {
         assertTrue(AstraChatLibrary.search(original, "unknown").isEmpty())
     }
 
+    @Test fun findsSavedMessageTextEvenWhenTitleDoesNotMatch() {
+        val hits = AstraChatLibrary.searchWithPreview(listOf(a, b), "MODIFIED")
+        assertEquals(1, hits.size)
+        assertEquals(a, hits.single().chat)
+        assertTrue(hits.single().snippet!!.contains("Modified duration"))
+        assertTrue(hits.single().snippet!!.startsWith("Astra: "))
+        assertEquals(listOf(b), AstraChatLibrary.search(listOf(a, b), "спасибо"))
+    }
+
+    @Test fun titleMatchesHaveNoMessageSnippetAndKeepArchiveOrder() {
+        val hits = AstraChatLibrary.searchWithPreview(listOf(a, b), "practice")
+        assertEquals(1, hits.size)
+        assertEquals(b, hits.single().chat)
+        assertEquals(null, hits.single().snippet)
+        assertEquals(listOf(a, b), AstraChatLibrary.searchWithPreview(listOf(a, b), "").map { it.chat })
+    }
+
+    @Test fun newestMatchIsShownWithoutReturningEntireChatHistory() {
+        val message = "z".repeat(20_000) + " quantitative finance " + "y".repeat(20_000)
+        val original = AstraChatArchive.Chat(
+            "chat-long", "Portfolio",
+            listOf(
+                AstraChatArchive.Message("You", "quantitative finance in a draft"),
+                AstraChatArchive.Message("Astra", message)
+            )
+        )
+        val hit = AstraChatLibrary.searchWithPreview(listOf(original), "QUANTITATIVE").single()
+        val snippet = hit.snippet!!
+        assertTrue(snippet.startsWith("Astra: …"))
+        assertTrue(snippet.endsWith("…"))
+        assertTrue(snippet.contains("quantitative finance"))
+        assertTrue(snippet.length < 160)
+        assertEquals(original, hit.chat)
+    }
+
+    @Test fun searchCanMatchUnicodeAndNeverMutatesArchivedData() {
+        val snapshot = listOf(a, b)
+        assertEquals(listOf(b), AstraChatLibrary.search(snapshot, "Спасибо"))
+        assertTrue(AstraChatLibrary.search(snapshot, "unmentioned topic").isEmpty())
+        assertEquals(listOf(a, b), snapshot)
+    }
+
+    @Test fun searchesFortyConversationsWithTwoThousandMessagesEach() {
+        val chats = (0 until AstraChatArchive.MAX_CHATS).map { index ->
+            AstraChatArchive.Chat(
+                "id-$index", "Conversation $index",
+                (0 until 2_000).map { msg ->
+                    AstraChatArchive.Message(
+                        if (msg % 2 == 0) "You" else "Astra",
+                        if (index == 29 && msg == 1_985) {
+                            "A rare topic about Pula bonds and duration."
+                        } else "Other question #$msg"
+                    )
+                }
+            )
+        }
+        val results = AstraChatLibrary.searchWithPreview(chats, "pula bonds")
+        assertEquals(1, results.size)
+        assertEquals("id-29", results.single().chat.id)
+        assertTrue(results.single().snippet!!.contains("Pula bonds"))
+    }
+
     @Test fun deleteOnlyRemovesChosenIdAndPreservesOtherChat() {
         val original = listOf(a, b)
         val remaining = AstraChatLibrary.delete(original, "chat-A")

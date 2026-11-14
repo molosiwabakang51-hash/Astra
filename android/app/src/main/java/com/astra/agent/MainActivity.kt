@@ -3244,11 +3244,11 @@ class MainActivity :
                                 OutlinedTextField(
                                     value = chatSearchQuery,
                                     onValueChange = { chatSearchQuery = it.take(100) },
-                                    label = { Text("Search saved chat titles") },
+                                    label = { Text("Search saved conversations") },
                                     singleLine = true,
                                     modifier = Modifier.fillMaxWidth()
                                 )
-                                val visibleChats = AstraChatLibrary.search(
+                                val visibleChats = AstraChatLibrary.searchWithPreview(
                                     archivedChats.toList(),
                                     chatSearchQuery
                                 )
@@ -3265,11 +3265,12 @@ class MainActivity :
                                             if (archivedChats.isEmpty()) {
                                                 "No previous conversations yet."
                                             } else {
-                                                "No saved titles match your search."
+                                                "No saved conversations match your search."
                                             }
                                         )
                                     }
-                                    visibleChats.forEach { chat ->
+                                    visibleChats.forEach { hit ->
+                                        val chat = hit.chat
                                         Row(
                                             modifier = Modifier.fillMaxWidth(),
                                             verticalAlignment = Alignment.CenterVertically
@@ -3295,6 +3296,15 @@ class MainActivity :
                                                         "${chat.messages.size} messages",
                                                         style = MaterialTheme.typography.labelSmall
                                                     )
+                                                    if (hit.snippet != null) {
+                                                        Text(
+                                                            hit.snippet,
+                                                            style = MaterialTheme.typography.bodySmall,
+                                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                            maxLines = 2,
+                                                            overflow = TextOverflow.Ellipsis
+                                                        )
+                                                    }
                                                 }
                                             }
                                             IconButton(
