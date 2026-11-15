@@ -28,7 +28,13 @@ internal object AstraOpenLibrarySync {
         Page("Russian/Grammar/Cases", "ru-cases", "russian grammar cases nouns declension"),
         Page("Russian/Verbal Aspect", "ru-aspect", "russian verbs aspect perfective imperfective"),
         Page("Russian/Grammar", "ru-grammar", "russian grammar verbs cases gender"),
-        Page("здравствуй", "ru-dictionary", "russian dictionary hello greetings formal informal", true)
+        Page("здравствуй", "ru-dictionary", "russian dictionary hello greetings formal informal", true),
+        Page("Russian/Numbers", "ru-numbers", "russian numbers cardinal numerals counting"),
+        Page("Russian/Lesson 2", "ru-pronunciation", "russian pronunciation vowels stress"),
+        Page("Russian/Grammar/Verbs", "ru-verbs", "russian verbs conjugation present tense"),
+        Page("Russian/Grammar/Prepositional case", "ru-prepositional", "russian prepositional case location"),
+        Page("спасибо", "ru-thanks", "russian dictionary thank you thanks", true),
+        Page("пока", "ru-bye", "russian dictionary informal goodbye bye", true)
     )
     private const val MAX_RESPONSE_BYTES = 90_000
     private const val MAX_EXCERPT = 1_200
