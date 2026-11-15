@@ -107,7 +107,8 @@ class AstraVocabularyStoreTest {
             { k, d -> nums[k] ?: d },
             { k, v -> nums[k] = v }, s
         )
-        assertTrue(tutor.respond("russian lesson 24")!!.contains("Самолёт"))
+        assertTrue(tutor.respond("russian lesson 23")!!.contains("Самолёт"))
+        assertTrue(tutor.respond("russian lesson 24")!!.contains("Остров"))
         assertTrue(tutor.respond("russian progress")!!.contains("99 vocabulary cards"))
         nums["russian_next_question"] = 96
         assertTrue(tutor.respond("russian quiz")!!.contains("Самолёт"))
