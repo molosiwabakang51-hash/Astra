@@ -21,12 +21,25 @@ internal object AstraLanguageBenchmark {
         "What was the invented codeword? Reply with only that word."
     const val GRAMMAR_PROMPT =
         "Name two grammatical cases used in Russian. Reply with their English names only, briefly."
+    const val COMPOUND_INTEREST_PROMPT =
+        "A deposit of P1,000 grows by 10% interest compounded once per year " +
+            "for exactly 3 years, with no deposits or withdrawals. " +
+            "What is the final balance in pula? Reply with only the amount."
+    const val DEDUCTION_PROMPT =
+        "Every lark is a bird. No bird is a robot. Could any lark be a robot " +
+            "under these rules? Reply with only YES or NO."
+    const val SETSWANA_PROMPT =
+        "Translate the Setswana greeting 'Dumela' into English. " +
+            "Reply with one English word only."
 
     enum class Probe(val title: String) {
         ARITHMETIC("19 + 23"),
         RUSSIAN("Russian translation"),
         CONTEXT("Follow-up memory"),
-        GRAMMAR("Russian grammar")
+        GRAMMAR("Russian grammar"),
+        COMPOUND_INTEREST("Compound interest"),
+        DEDUCTION("Logical deduction"),
+        SETSWANA("Setswana greeting")
     }
 
     data class Outcome(
@@ -52,14 +65,22 @@ internal object AstraLanguageBenchmark {
             Probe.ARITHMETIC ->
                 Regex("""^(?:(?:the )?answer (?:is|:)\s*)?(?:\*\*)?42(?:\*\*)?[.!]?$""")
                     .matches(text)
+            // Require concise affirmative answers. Merely mentioning the
+            // correct answer while negating it must not earn credit.
             Probe.RUSSIAN ->
-                Regex("""\b(?:thanks|thank(?:\s+|-)?you)\b""").containsMatchIn(text)
+                Regex("""^(?:thanks|thank(?:\s+|-)you)[.!]?$""").matches(text)
             Probe.CONTEXT ->
-                Regex("""\bnimbora\b""").containsMatchIn(text)
+                Regex("""^["'“‘]?nimbora["'”’]?[.!]?$""").matches(text)
             Probe.GRAMMAR -> listOf(
                 "nominative", "genitive", "dative",
                 "accusative", "instrumental", "prepositional"
             ).count { word -> Regex("""\b""" + word + """\b""").containsMatchIn(text) } >= 2
+            Probe.COMPOUND_INTEREST ->
+                Regex("""^(?:p|bwp)?\s*1,?331(?:\.0{1,2})?[.!]?$""").matches(text)
+            Probe.DEDUCTION ->
+                Regex("""^no[.!]?$""").matches(text)
+            Probe.SETSWANA ->
+                Regex("""^(?:hello|hi)[.!]?$""").matches(text)
         }
     }
 
