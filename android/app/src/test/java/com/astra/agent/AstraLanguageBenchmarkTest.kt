@@ -68,6 +68,58 @@ class AstraLanguageBenchmarkTest {
         assertFalse(report.contains("Full training complete"))
     }
 
+    @Test fun compoundInterestProbeChecksExactThreeYearGrowth() {
+        assertTrue(AstraLanguageBenchmark.score(
+            AstraLanguageBenchmark.Probe.COMPOUND_INTEREST, "P1,331.00"))
+        assertTrue(AstraLanguageBenchmark.score(
+            AstraLanguageBenchmark.Probe.COMPOUND_INTEREST, "1331"))
+        assertFalse(AstraLanguageBenchmark.score(
+            AstraLanguageBenchmark.Probe.COMPOUND_INTEREST, "P1,300"))
+        assertFalse(AstraLanguageBenchmark.score(
+            AstraLanguageBenchmark.Probe.COMPOUND_INTEREST, "P1,330, not P1,331"))
+    }
+
+    @Test fun deductionProbeRejectsContradictoryNarrative() {
+        assertTrue(AstraLanguageBenchmark.score(
+            AstraLanguageBenchmark.Probe.DEDUCTION, "No."))
+        assertFalse(AstraLanguageBenchmark.score(
+            AstraLanguageBenchmark.Probe.DEDUCTION, "Yes"))
+        assertFalse(AstraLanguageBenchmark.score(
+            AstraLanguageBenchmark.Probe.DEDUCTION, "Yes, but maybe no."))
+    }
+
+    @Test fun setswanaProbeAcceptsActualShortTranslationOnly() {
+        assertTrue(AstraLanguageBenchmark.score(
+            AstraLanguageBenchmark.Probe.SETSWANA, "Hello."))
+        assertTrue(AstraLanguageBenchmark.score(
+            AstraLanguageBenchmark.Probe.SETSWANA, "Hi"))
+        assertFalse(AstraLanguageBenchmark.score(
+            AstraLanguageBenchmark.Probe.SETSWANA, "Goodbye"))
+        assertFalse(AstraLanguageBenchmark.score(
+            AstraLanguageBenchmark.Probe.SETSWANA, "Dumela does not mean hello"))
+    }
+
+    @Test fun negativeOrQuotedAnswersDoNotInflateTranslationOrMemoryScore() {
+        assertFalse(AstraLanguageBenchmark.score(
+            AstraLanguageBenchmark.Probe.RUSSIAN, "Not thank you."))
+        assertFalse(AstraLanguageBenchmark.score(
+            AstraLanguageBenchmark.Probe.CONTEXT, "I forgot NIMBORA"))
+        assertTrue(AstraLanguageBenchmark.score(
+            AstraLanguageBenchmark.Probe.CONTEXT, "\"NIMBORA\""))
+    }
+
+    @Test fun expandedReportHasSevenDistinctProbeSlots() {
+        assertEquals(7, AstraLanguageBenchmark.Probe.entries.size)
+        val outcomes = AstraLanguageBenchmark.Probe.entries.map { probe ->
+            AstraLanguageBenchmark.outcome(probe, "", 100L)
+        }
+        val report = AstraLanguageBenchmark.render(outcomes, null)
+        assertTrue(report.contains("0/7"))
+        assertTrue(report.contains("Compound interest"))
+        assertTrue(report.contains("Logical deduction"))
+        assertTrue(report.contains("Setswana greeting"))
+    }
+
     @Test fun errorOutputsNeverCountAsSuccessfulUnderstanding() {
         for (probe in AstraLanguageBenchmark.Probe.entries) {
             assertFalse(AstraLanguageBenchmark.score(probe, ""))
