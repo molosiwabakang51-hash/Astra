@@ -215,6 +215,53 @@ not copyrighted textbooks or an LLM trained on external dictionaries.
 Real Qwen conversation quality and pronunciation remain separate
 physical-device tests.
 
+## Multilingual learning without paid services
+
+In addition to the existing **30-card Russian course**, Astra now contains
+eight more entirely local starter courses:
+
+| Language | Chat command | Android speech locale |
+| --- | --- | --- |
+| Setswana (Botswana) | `learn setswana` | `tn-BW` |
+| French | `learn french` | `fr-FR` |
+| Spanish | `learn spanish` | `es-ES` |
+| Portuguese | `learn portuguese` | `pt-PT` |
+| German | `learn german` | `de-DE` |
+| Swahili | `learn swahili` | `sw-KE` |
+| Japanese | `learn japanese` | `ja-JP` |
+| Mandarin Chinese | `learn mandarin` | `zh-CN` |
+
+Each additional language includes **three curated lessons and 12 vocabulary
+questions** (96 new cards in total), giving 126 practice cards across the
+nine courses. The commands `languages`, `<language> quiz`,
+`<language> progress`, `next language lesson`, `language progress`,
+`answer <English translation>`, and `skip language question` work
+directly in chat with no model or internet requirement. Setswana's starter
+greetings and usage were cross-checked against the
+[University of Botswana's learning guide](https://www.ub.bw/study/international/learn-setswana)
+and [Botswana Tourism](https://botswanatourism.co.bw/index.php/language).
+The packs are original short teaching examples, not copies of entire books
+or general-purpose language models.
+
+Correct answers, current quiz position and last lesson are stored
+**independently per language**. The existing manual JSON backup includes
+the new progress keys while old backups remain importable. No chat
+transcript is uploaded to train a multilingual model.
+
+**Voice is separate from these lessons.** Settings → Recognition language
+now exposes eight additional BCP-47 locales. A locale entry does not install
+a speech recognizer or TTS voice; Android's available language packs and the
+selected speech engine determine actual support. The app prefers a matching
+offline TTS voice, and reports missing data rather than pronouncing a
+different language using an English voice. On devices without a particular
+offline pack, that language still works in text-only lessons and quizzes.
+Network-capable speech fallback remains subject to existing user settings.
+
+Astra's on-device Qwen3 engine may answer open-ended questions in other
+languages, but quality varies by language and device. Adding deterministic
+courses or speech tags is **not** Qwen3 weight training or verified full
+multilingual fluency.
+
 ## Working capabilities
 
 - Chat interface with **multiple persistent conversations**, an animated compact navigation dock, notes, tasks and completion tracking.
