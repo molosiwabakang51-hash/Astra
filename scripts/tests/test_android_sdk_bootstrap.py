@@ -46,6 +46,7 @@ if (( n <= FAKE_FAIL_UNTIL )); then
 fi
 mkdir -p "$ANDROID_HOME/platforms/android-36"
 printf 'apk' > "$ANDROID_HOME/platforms/android-36/android.jar"
+mkdir -p "$ANDROID_HOME/ndk/29.0.13113456"
 printf 'ndk' > "$ANDROID_HOME/ndk/29.0.13113456/source.properties"
 mkdir -p "$ANDROID_HOME/ndk/29.0.13113456/toolchains/llvm/prebuilt/linux-x86_64/bin"
 printf '#!/bin/sh\\nexit 0\\n' > "$ANDROID_HOME/ndk/29.0.13113456/toolchains/llvm/prebuilt/linux-x86_64/bin/clang"
