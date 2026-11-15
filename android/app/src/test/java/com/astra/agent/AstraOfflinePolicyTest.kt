@@ -53,6 +53,33 @@ class AstraOfflinePolicyTest {
         )
     }
 
+    @Test fun reasoningNeverLeaksAfterVisibleAnswerOrBetweenParagraphs() {
+        assertEquals("First. Second.", AstraOfflinePolicy.publicReply(
+            "First. <think>private middle</think> Second."
+        ))
+        assertEquals("Useful answer", AstraOfflinePolicy.publicReply(
+            "Useful answer <think>unfinished private reasoning"
+        ))
+        assertEquals("Answer", AstraOfflinePolicy.publicReply(
+            "<THINK>first<think>nested</think>last</THINK>Answer"
+        ))
+        assertEquals("Final", AstraOfflinePolicy.publicReply(
+            "private model scratchpad</think>Final"
+        ))
+    }
+
+    @Test fun partialReasoningTagNeverAppearsDuringStreaming() {
+        assertEquals("Answer", AstraOfflinePolicy.publicReply("Answer <thi"))
+        assertEquals("Answer", AstraOfflinePolicy.publicReply("Answer </thin"))
+        assertEquals("Answer", AstraOfflinePolicy.publicReply(
+            "Answer <think>private"
+        ))
+        assertEquals("Math is 2 < 3.", AstraOfflinePolicy.publicReply(
+            "Math is 2 < 3."
+        ))
+        assertEquals("Text", AstraOfflinePolicy.publicReply("Text<"))
+    }
+
     @Test fun noReasoningOrIncompleteThoughtsAreDisplayed() {
         assertEquals("Short answer.", AstraOfflinePolicy.publicReply(
             "<think>private scratchpad</think>\n\nShort answer."

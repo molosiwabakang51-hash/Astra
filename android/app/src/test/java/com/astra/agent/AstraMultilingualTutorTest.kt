@@ -134,6 +134,48 @@ class AstraMultilingualTutorTest {
         assertTrue(a.respond("answer goodbye")!!.startsWith("Correct."))
     }
 
+    @Test fun localDictionaryTranslatesKnownWordsBothWaysWithoutNetwork() {
+        val coach = tutor()
+        assertTrue(coach.respond("how do you say hello in french")!!
+            .contains("Bonjour — Hello"))
+        assertTrue(coach.respond("translate mother to spanish")!!
+            .contains("madre — mother"))
+        assertTrue(coach.respond("what does こんにちは mean in japanese")!!
+            .contains("こんにちは — Hello"))
+        assertTrue(coach.respond("translate hola from spanish")!!
+            .contains("Hola — Hello"))
+        assertTrue(coach.respond("German for food")!!.contains("Essen — food"))
+        assertTrue(coach.respond("what does Essen mean in German")!!
+            .contains("Essen — food"))
+        assertTrue(coach.respond("what does essen mean in German")!!
+            .contains("essen — to eat"))
+        // Out-of-dictionary requests remain eligible for actual Qwen3 chat.
+        assertNull(coach.respond("translate astrophysics to french"))
+        assertNull(coach.respond("What is bond convexity?"))
+    }
+
+    @Test fun ownerImportedCardsBecomeOfflineDictionaryEntriesImmediately() {
+        val store = AstraVocabularyStore(
+            java.nio.file.Files.createTempDirectory("astra-local-dictionary").toFile()
+        )
+        store.importTsv("setswana", java.io.ByteArrayInputStream(
+            "Maru\\tClouds\\n".replace("\\t", "\t")
+                .replace("\\n", "\n").toByteArray(Charsets.UTF_8)
+        ))
+        val coach = AstraMultilingualTutor(
+            { key, def -> numbers[key] ?: def },
+            { key, value -> numbers[key] = value },
+            { key, def -> strings[key] ?: def },
+            { key, value -> strings[key] = value }, store
+        )
+        assertTrue(coach.respond("how do you say clouds in setswana")!!
+            .contains("Maru — Clouds"))
+        assertTrue(coach.respond("what does Maru mean in Setswana")!!
+            .contains("Maru — Clouds"))
+        assertTrue(coach.respond("setswana progress")!!
+            .contains("85 vocabulary cards"))
+    }
+
     @Test fun noAdditionalLanguageCommandsTouchRussianProgressKeys() {
         val a = tutor()
         a.respond("setswana quiz")

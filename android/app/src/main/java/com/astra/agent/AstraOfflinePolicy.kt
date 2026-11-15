@@ -25,18 +25,67 @@ internal object AstraOfflinePolicy {
         ) "The response was interrupted when Astra closed." else text
 
     fun publicReply(modelOutput: String): String {
-        var reply = modelOutput.trim()
-        // Reasoning is not a user-facing answer. Do not display a partial
-        // thinking block if generation ends before the closing tag.
-        // Some models emit more than one leading reasoning segment, or a
-        // complete segment followed by a second unfinished one. Never expose
-        // either segment in streaming updates or the final saved response.
-        while (reply.startsWith("<think>")) {
-            val end = reply.indexOf("</think>")
-            if (end < 0) return ""
-            reply = reply.substring(end + "</think>".length).trimStart()
+        // The model is streamed token by token. A reasoning block can begin
+        // after some visible answer text, not just at the beginning. Strip
+        // complete blocks anywhere and discard unfinished blocks, including
+        // nested/repeated reasoning markers. Never save private deliberation.
+        val raw = modelOutput.trim()
+        val opening = "<think>"
+        val closing = "</think>"
+        val visible = StringBuilder()
+        var index = 0
+        while (index < raw.length) {
+            val start = raw.indexOf(opening, index, ignoreCase = true)
+            val end = raw.indexOf(closing, index, ignoreCase = true)
+            if (start >= 0 && (end < 0 || start < end)) {
+                visible.append(raw, index, start)
+                var depth = 1
+                var cursor = start + opening.length
+                while (depth > 0) {
+                    val nested = raw.indexOf(opening, cursor, ignoreCase = true)
+                    val stop = raw.indexOf(closing, cursor, ignoreCase = true)
+                    if (stop < 0) {
+                        // Streaming stopped inside a reasoning block.
+                        return safeVisiblePrefix(visible.toString())
+                    }
+                    if (nested >= 0 && nested < stop) {
+                        depth++
+                        cursor = nested + opening.length
+                    } else {
+                        depth--
+                        cursor = stop + closing.length
+                    }
+                }
+                index = cursor
+                // Keep one separator when both sides of a hidden block had
+                // spaces, instead of displaying a doubled gap mid-sentence.
+                if (visible.isNotEmpty() && visible[visible.length - 1] == ' ' &&
+                    raw.getOrNull(index) == ' '
+                ) index++
+            } else if (end >= 0) {
+                // When an opening marker was lost in a partial stream, text
+                // before an unmatched closing marker cannot be trusted.
+                visible.setLength(0)
+                index = end + closing.length
+            } else {
+                visible.append(raw, index, raw.length)
+                break
+            }
         }
-        reply = reply.trimEnd()
-        return reply.take(16_000)
+        return safeVisiblePrefix(visible.toString())
+    }
+
+    private fun safeVisiblePrefix(value: String): String {
+        // In an incremental UI update, '<thi' may be the start of a new
+        // '<think>' marker. Hold back such suffixes until the token resolves.
+        var trim = 0
+        for (marker in listOf("<think>", "</think>")) {
+            for (length in 1 until marker.length) {
+                if (value.endsWith(marker.substring(0, length), ignoreCase = true)) {
+                    trim = maxOf(trim, length)
+                }
+            }
+        }
+        return value.dropLast(trim).trim().take(16_000)
     }
 }
