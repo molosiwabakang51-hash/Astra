@@ -100,10 +100,17 @@ internal class AstraMultilingualTutor(
             card("水", "Water", "shuǐ"), card("面包", "Bread", "miàn bāo"),
             card("一", "One", "yī"), card("二", "Two", "èr")
         )
-    )
+    ).mapValues { (language, original) ->
+        val extra = AstraExtendedVocabulary.additional(language.id)
+            .map { Card(it.target, it.english) }
+        // The original first 12 cards stay in their existing order so
+        // upgrades retain every user's exact quiz position.
+        (original + extra).distinctBy { it.phrase.lowercase(Locale.ROOT) }
+    }
 
     companion object {
         private const val ACTIVE = "astra_learning_language"
+        private const val CARDS_PER_LESSON = 4
         private val spacing = Regex("""\s+""")
         fun progressKeys(): List<String> = Language.entries.flatMap { language ->
             listOf("next", "correct", "pending", "lesson").map {
@@ -113,9 +120,11 @@ internal class AstraMultilingualTutor(
         fun availableLanguages(): String =
             "Offline courses: Russian, Setswana, French, Spanish, Portuguese, " +
             "German, Swahili, Japanese and Mandarin Chinese. " +
-            "Type 'learn setswana', 'learn japanese', 'french lesson 2', " +
-            "'spanish quiz', or 'language progress'. " +
-            "Answers are English translations; speech needs the corresponding Android pack."
+            "Eight additional languages now have 21 lessons and 84 vocabulary " +
+            "cards each (672 in total). Russian has a separate expanded course. " +
+            "Type 'learn setswana', 'japanese lesson 21', 'french quiz', " +
+            "'next language lesson', or 'language progress'. " +
+            "Answers are English translations; speech packs are optional."
     }
 
     fun respond(raw: String): String? {
@@ -145,9 +154,19 @@ internal class AstraMultilingualTutor(
                     activate(language)
                     return lesson(language, 1)
                 }
-                if (lower == alias + " lesson 2" || lower == alias + " lesson 3") {
-                    activate(language)
-                    return lesson(language, lower.last().digitToInt())
+                val lessonPrefix = alias + " lesson "
+                if (lower.startsWith(lessonPrefix)) {
+                    val digits = lower.removePrefix(lessonPrefix)
+                    val requested = digits.toIntOrNull()
+                    if (requested != null) {
+                        activate(language)
+                        val total = lessonCount(language)
+                        if (requested !in 1..total) {
+                            return language.display + " has " + total + " lessons. " +
+                                "Choose a lesson from 1 to " + total + "."
+                        }
+                        return lesson(language, requested)
+                    }
                 }
                 if (lower == alias + " quiz" || lower == "practice " + alias ||
                     lower == alias + " practice" || lower == "quiz me in " + alias) {
@@ -157,13 +176,15 @@ internal class AstraMultilingualTutor(
                 if (lower == alias + " progress") {
                     return language.display + ": " + readInt(key(language, "correct"), 0) +
                         " correct answers; " + decks.getValue(language).size +
-                        " practice phrases. Type '" + language.id + " quiz' to continue."
+                        " vocabulary cards across " + lessonCount(language) +
+                        " lessons. Type '" + language.id + " quiz' to continue."
                 }
             }
         }
         if (lower == "next language lesson") {
             val language = current() ?: return "Select a course first: 'learn setswana'."
-            val next = (readInt(key(language, "lesson"), 1) + 1).coerceAtMost(3)
+            val next = (readInt(key(language, "lesson"), 1) + 1)
+                .coerceAtMost(lessonCount(language))
             return lesson(language, next)
         }
         if (lower in setOf("skip language question", "skip language quiz")) {
@@ -216,11 +237,16 @@ internal class AstraMultilingualTutor(
     private fun key(language: Language, suffix: String) =
         "lang_" + language.id + "_" + suffix
 
+    private fun lessonCount(language: Language): Int =
+        (decks.getValue(language).size + CARDS_PER_LESSON - 1) / CARDS_PER_LESSON
+
     private fun lesson(language: Language, number: Int): String {
-        val module = number.coerceIn(1, 3)
+        val total = lessonCount(language)
+        val module = number.coerceIn(1, total)
         writeInt(key(language, "lesson"), module)
         val content = decks.getValue(language)
-            .drop((module - 1) * 4).take(4)
+            .drop((module - 1) * CARDS_PER_LESSON)
+            .take(CARDS_PER_LESSON)
             .joinToString("\n") {
                 it.phrase +
                     (if (it.pronunciation.isEmpty()) ""
@@ -230,14 +256,24 @@ internal class AstraMultilingualTutor(
         val title = when (module) {
             1 -> "Greetings"
             2 -> "Conversation and common requests"
-            else -> "Daily phrases and numbers"
+            3 -> "Daily phrases and numbers"
+            4, 5 -> "People and family"
+            6, 7 -> "Places and travel"
+            8, 9 -> "Food and meals"
+            10, 11 -> "Nature and weather"
+            12, 13 -> "Animals"
+            14, 15 -> "Body and health vocabulary"
+            16, 17 -> "School, work and time"
+            18, 19 -> "Everyday action verbs"
+            else -> "Actions and calendar words"
         }
-        return language.display + " lesson " + module + "/3 — " + title +
+        return language.display + " lesson " + module + "/" + total + " — " + title +
             "\n\n" + content + "\n\n" +
-            if (module < 3)
+            if (module < total)
                 "Type 'next language lesson' or '" + language.id + " quiz' to practise."
             else
-                "Lesson complete. Type '" + language.id + " quiz' for offline practice."
+                "Course lessons complete. Type '" + language.id + " quiz' to practise " +
+                    "all " + decks.getValue(language).size + " vocabulary cards."
     }
 
     private fun quiz(language: Language): String {
