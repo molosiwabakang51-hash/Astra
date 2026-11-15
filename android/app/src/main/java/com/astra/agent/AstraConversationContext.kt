@@ -85,7 +85,14 @@ internal object AstraConversationContext {
                 it.second
             }.thenByDescending { it.first.index })
             .map { it.first }
-        val priority = (recent.asReversed() + ranked + candidates.asReversed())
+        // A later owner correction often omits the original topic:
+        // "My bond maturity is seven years" -> "Actually, make it three."
+        // Retrieve a nearby correction *with* the relevant statement. Never
+        // transfer this inference to commands, other chats or assistant roles.
+        val retrieved = if (ownerRecall) ranked.flatMap { anchor ->
+            relatedCorrections(anchor, valid).asReversed() + anchor
+        } else ranked
+        val priority = (recent.asReversed() + retrieved + candidates.asReversed())
             .distinctBy { it.index }
         val selected = mutableListOf<Pair<Int, String>>()
         var remaining = room
@@ -101,7 +108,11 @@ internal object AstraConversationContext {
                 MAX_TURN_CHARS, remaining - prefix.length - suffix.length
             )
             if (availableText < 10) break
-            selected.add(item.index to (prefix + source.take(availableText) + suffix))
+            // Do not cut immediately after an escaped backslash: otherwise
+            // the following closing quote could become escaped too.
+            val bounded = source.take(availableText).removeSuffix("\\")
+            if (bounded.length < 10) continue
+            selected.add(item.index to (prefix + bounded + suffix))
             remaining -= selected.last().second.length
         }
         if (selected.isEmpty()) return AstraOfflinePolicy.modelPrompt(current)
@@ -115,6 +126,33 @@ internal object AstraConversationContext {
             "Earlier chat excerpts exceeded the bounded offline prompt."
         }
         return AstraOfflinePolicy.modelPrompt(composed)
+    }
+
+    private val correctionCue = Regex(
+        """(?i)^\s*(?:(?:actually|correction|instead|rather|sorry)\s*[:,.]?\s+|""" +
+            """i\s+meant\b|no\s*[,;:]?\s+(?:make|change|use|it|that|\d)|""" +
+            """(?:make|change|update|set|use)\s+(?:it|that|the|my)\b)"""
+    )
+
+    /**
+     * Follow short owner-authored correction chains immediately after an
+     * on-topic statement. A new, unrelated user message breaks the chain.
+     * Assistant messages are never treated as the owner's corrections.
+     */
+    private fun relatedCorrections(
+        anchor: IndexedValue<Turn>,
+        timeline: List<IndexedValue<Turn>>
+    ): List<IndexedValue<Turn>> {
+        val result = mutableListOf<IndexedValue<Turn>>()
+        for (turn in timeline) {
+            if (turn.index <= anchor.index) continue
+            if (turn.index > anchor.index + 6) break
+            if (turn.value.role != "user") continue
+            if (!correctionCue.containsMatchIn(turn.value.content.trim())) break
+            result.add(turn)
+            if (result.size >= 2) break
+        }
+        return result
     }
 
     private val topicWords = Regex("""[\p{L}\p{N}]{3,}""")
