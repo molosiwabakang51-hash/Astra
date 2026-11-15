@@ -53,7 +53,7 @@ class RussianTutorTest {
 
     @Test fun allTwentyThreeOfflineLessonsAreAvailableWithSequentialNavigation() {
         val coach = tutor()
-        assertTrue(coach.respond("Russian course")!!.contains("Six offline Russian lessons"))
+        assertTrue(coach.respond("Russian course")!!.contains("23 offline lessons and 96 vocabulary cards"))
         assertTrue(coach.respond("russian lesson 1")!!.contains("Привет"))
         assertTrue(coach.respond("next Russian lesson")!!.contains("До свидания"))
         assertTrue(coach.respond("next Russian lesson")!!.contains("33 letters"))
