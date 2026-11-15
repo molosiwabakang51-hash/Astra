@@ -11,10 +11,30 @@ internal object AstraOfflinePolicy {
     fun shouldUseModel(assistantText: String, sensitive: Boolean, hasAction: Boolean): Boolean =
         !sensitive && !hasAction && assistantText.startsWith(UNSUPPORTED)
 
+    private const val MAX_INPUT_CHARS = 3_000
+    private const val TAIL_CHARS = 1_800
+    private const val OMITTED_MARKER =
+        "\n[Middle of long input omitted to fit the offline model context.]\n"
+
+    /**
+     * Preserve both the user's context at the start and the latest request at
+     * the end. Plain take(3000) can silently lose the actual question when
+     * an owner pastes long lecture notes, a report or a coding example.
+     * Never silently concatenate disconnected excerpts as complete source.
+     */
+    fun boundedInput(raw: String): String {
+        val input = raw.trim()
+        if (input.length <= MAX_INPUT_CHARS) return input
+        val headLength = MAX_INPUT_CHARS - OMITTED_MARKER.length - TAIL_CHARS
+        val head = input.take(headLength).trimEnd()
+        val tail = input.takeLast(TAIL_CHARS).trimStart()
+        return head + OMITTED_MARKER + tail
+    }
+
     // Qwen3's documented soft switch makes the small phone model answer
     // directly rather than spend its output budget generating <think> tokens.
     fun modelPrompt(userText: String): String =
-        userText.trim().take(3000) + "\n/no_think"
+        boundedInput(userText) + "\n/no_think"
 
     // A killed Android process can leave its last saved reply as 'thinking'.
     // Recover these placeholders without changing valid saved conversations.
