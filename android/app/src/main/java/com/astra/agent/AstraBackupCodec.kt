@@ -27,7 +27,8 @@ internal object AstraBackupCodec {
         "auto_send_voice", "speak_responses", "local_only_tts", "allow_system_speech"
     )
     private val ints = listOf(
-        "russian_correct", "russian_next_question", "russian_pending_question"
+        "russian_correct", "russian_next_question", "russian_pending_question",
+        "russian_last_lesson"
     )
 
     internal data class Payload(
@@ -148,7 +149,10 @@ internal object AstraBackupCodec {
             result[key] = value
         }
         for (key in ints) {
-            val value = data.opt(key)
+            // Backups created before the expanded six-lesson course do not
+            // contain this optional progress field; restore them unchanged.
+            val value = if (key == "russian_last_lesson" && !data.has(key))
+                0 else data.opt(key)
             if (value !is Number ||
                 value.toLong() !in 0L..10_000_000L ||
                 value.toDouble() != value.toLong().toDouble()

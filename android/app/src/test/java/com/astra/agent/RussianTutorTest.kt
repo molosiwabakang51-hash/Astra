@@ -51,6 +51,39 @@ class RussianTutorTest {
         assertTrue(tutor().respond("answer")!!.contains("no active Russian question"))
     }
 
+    @Test fun allSixOfflineLessonsAreAvailableWithSequentialNavigation() {
+        val coach = tutor()
+        assertTrue(coach.respond("Russian course")!!.contains("Six offline Russian lessons"))
+        assertTrue(coach.respond("russian lesson 1")!!.contains("Привет"))
+        assertTrue(coach.respond("next Russian lesson")!!.contains("До свидания"))
+        assertTrue(coach.respond("next Russian lesson")!!.contains("33 letters"))
+        assertTrue(coach.respond("next Russian lesson")!!.contains("Один"))
+        assertTrue(coach.respond("next Russian lesson")!!.contains("Родительный"))
+        assertTrue(coach.respond("next Russian lesson")!!.contains("написать"))
+        assertTrue(coach.respond("next Russian lesson")!!.contains("написать"))
+        assertTrue(tutor().respond("Russian progress")!!.contains("6/6"))
+    }
+
+    @Test fun RussianShorthandOpensTheMatchingCourseModule() {
+        assertTrue(tutor().respond("Russian alphabet")!!.contains("Cyrillic"))
+        assertTrue(tutor().respond("Russian grammar")!!.contains("six grammatical cases"))
+        assertTrue(tutor().respond("Russian verbs")!!.contains("imperfective"))
+        assertTrue(tutor().respond("Russian numbers")!!.contains("Четыре"))
+    }
+
+    @Test fun vocabularyPracticeExtendsBeyondOriginalSixCards() {
+        val coach = tutor()
+        val firstSix = listOf("thank you", "yes", "no", "hi", "please", "goodbye")
+        for (translation in firstSix) {
+            assertTrue(coach.respond("Russian quiz")!!.contains("Russian practice:"))
+            assertTrue(coach.respond("answer " + translation)!!.startsWith("Correct."))
+        }
+        assertTrue(coach.respond("Russian quiz")!!.contains("Доброе утро"))
+        assertTrue(coach.respond("answer good morning")!!.startsWith("Correct."))
+        assertTrue(coach.respond("Russian progress")!!.contains("7 correct"))
+        assertTrue(coach.respond("Russian progress")!!.contains("30 vocabulary cards"))
+    }
+
     @Test fun unrelatedCommandsAreNotConsumed() {
         val coach = tutor()
         coach.respond("Russian quiz")
