@@ -26,7 +26,7 @@ def main():
         "Astra logo contains chat/settings options": 'listOf(\n                                        "Chat", "Tasks", "Notes", "Tools", "Settings"',
         "Chat deck starts collapsed": 'var commandDeckExpanded by remember { mutableStateOf(false) }',
         "Chat takes remaining space": 'Modifier.weight(1f)',
-        "Qwen is installed on device": 'AstraOnDeviceBrain(applicationContext)',
+        "Qwen is installed on device": 'AstraOnDeviceBrain(applicationContext',
         "Unhandled chat routes to model": 'AstraOfflinePolicy.shouldUseModel(',
         "Finance explanations are wired into chat": 'AstraFinanceEducation.respond(clean)',
         "Natural finance has deterministic arithmetic": 'AstraNaturalFinance.respond(clean)',
