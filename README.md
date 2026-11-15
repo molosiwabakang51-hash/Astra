@@ -46,6 +46,49 @@ The original **Import offline model once** option remains for users who already
 have the exact GGUF or want to transfer it offline from another device.
 Physical-phone tests remain necessary before this is considered production-ready.
 
+## Open Russian library and continuous neural topic adaptation (experimental)
+
+**Offline reference context:** Astra now includes a small, attributed reference
+pack covering Russian Cyrillic, first greetings, grammatical cases and verbal
+aspect. The Android language model can retrieve up to three relevant excerpts
+and cite their page links in a reply. This is **retrieval-augmented generation
+(RAG)**: book knowledge is supplied as evidence, not installed as Qwen weights.
+The pack has its own CC BY-SA 4.0 license and attribution notice in
+`android/app/src/main/assets/knowledge/SOURCES.md`.
+
+**Free public textbook updates:** In Settings → Local knowledge & continual
+neural learning, select **Update free Russian library** to fetch short extracts
+from a fixed list of Wikibooks and Wiktionary pages using Wikimedia's public
+read-only HTTPS API. No private chat, tasks, notes or device data are uploaded.
+A validated snapshot is saved locally and preserved across same-signing-key
+updates. This network action is voluntary; conversations and retrieval remain
+fully on-device after download. Full copyrighted paid textbooks are not silently
+scraped.
+
+**Actual local neural training, with a precise limit:** Users may turn on
+**Learn topics from conversations** in Settings, or type
+`start neural learning`. The app then performs one backpropagation/SGD update
+to a **128-input, 24-hidden-unit, 3-topic neural network** for each eligible
+user turn. The numeric weights are persisted to app-private no-backup storage,
+and can be cleared with **Clear learned neural weights** or
+`reset neural learning`. `learning status` reports whether training is
+enabled and the number of weight updates. Sensitive or private-action commands
+are excluded. This training is **off by default**, and no raw transcript is
+saved inside the neural adapter. Its predictions can influence which licensed
+reference excerpts Astra retrieves.
+
+**Limitations: This is NOT fine-tuning Qwen3.** The Qwen3 GGUF inference
+weights remain unchanged. The small model adapts topic/context selection only;
+it does not acquire general language comprehension or comprehensive lifelong
+knowledge. True on-device continual LLM fine-tuning would require a separate
+LoRA/training backend, quality controls, feedback labels and a verified path
+to applying trained adapters to the Android inference engine. The current
+llama.cpp binding does not provide that training path.
+
+Existing FULL and LITE distributions remain free of paid inference APIs.
+Android CI/unit tests and physical phone testing are required before this
+feature can be treated as stable.
+
 ## Working capabilities
 
 - Chat interface with **multiple persistent conversations**, an animated compact navigation dock, notes, tasks and completion tracking.

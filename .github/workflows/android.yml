@@ -46,8 +46,10 @@ jobs:
           "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install \
             "platforms;android-36" "ndk;29.0.13113456" "cmake;3.31.6"
           python3 scripts/prepare_offline_android.py
-      - name: Guard Astra navigation, offline AI and build identity
-        run: python3 scripts/verify_ui_contract.py
+      - name: Guard Astra navigation, offline AI, public-source attribution and build identity
+        run: |
+          python3 scripts/verify_ui_contract.py
+          python3 scripts/verify_open_library.py
 
       - name: Verify private JNI logs and fail-closed patch tests
         run: |

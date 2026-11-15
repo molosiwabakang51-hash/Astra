@@ -24,7 +24,10 @@ import java.security.MessageDigest
  * app-private no-backup storage for llama.cpp's file-path API; no network
  * request, separate computer, account or model server is involved.
  */
-internal class AstraOnDeviceBrain(private val context: Context) {
+internal class AstraOnDeviceBrain(
+    private val context: Context,
+    private val learning: AstraContinualLearning? = null
+) {
     data class Turn(val role: String, val content: String)
 
     companion object {
@@ -186,8 +189,27 @@ internal class AstraOnDeviceBrain(private val context: Context) {
 
                 val answer = StringBuilder()
                 var lastUiUpdate = 0L
+                val openReferences = runCatching {
+                    val bundled = context.assets.open(AstraOpenLibrary.BUNDLED_ASSET)
+                        .use(AstraOpenLibrary::load)
+                    val synced = java.io.File(
+                        context.noBackupFilesDir,
+                        "knowledge/" + AstraOpenLibrary.SYNCED_NAME
+                    ).takeIf { it.isFile && it.length() <= 160_000L }
+                        ?.inputStream()?.use(AstraOpenLibrary::load).orEmpty()
+                    val learnedHint = learning?.takeIf { it.status().steps >= 25 }
+                        ?.predict(finalMessage)?.let {
+                            it.topic == AstraContinualLearning.Topic.RUSSIAN &&
+                                it.confidence > 0.82
+                        } == true
+                    AstraOpenLibrary.relevant(
+                        finalMessage, (synced + bundled).distinctBy { it.id },
+                        neuralRussianHint = learnedHint
+                    )
+                }.getOrElse { emptyList() }
+                val augmentedQuestion = AstraOpenLibrary.enrich(finalMessage, openReferences)
                 val requestPrompt = AstraConversationContext.userPrompt(
-                    finalMessage,
+                    augmentedQuestion,
                     turns.dropLast(1).map {
                         AstraConversationContext.Turn(it.role, it.content)
                     },
@@ -204,11 +226,15 @@ internal class AstraOnDeviceBrain(private val context: Context) {
                         lastUiUpdate = now
                     }
                 }
-                AstraOfflinePolicy.publicReply(answer.toString()).ifBlank {
-                    // Empty native generation is not a completed conversational
-                    // turn. Force a clean reload before another user request.
+                val publicAnswer = AstraOfflinePolicy.publicReply(answer.toString())
+                if (publicAnswer.isBlank()) {
                     session.invalidate()
                     "The offline model did not produce a usable answer. Please try again."
+                } else if (openReferences.isNotEmpty()) {
+                    publicAnswer + "\n\nOpen-course references:\n" +
+                        AstraOpenLibrary.citations(openReferences)
+                } else {
+                    publicAnswer
                 }
                 }
             } catch (error: Exception) {

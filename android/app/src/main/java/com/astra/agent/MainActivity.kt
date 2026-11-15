@@ -2400,7 +2400,26 @@ class MainActivity :
                     mutableStateOf(false)
                 }
                 var chatGeneration by remember { mutableIntStateOf(0) }
-                val onDeviceBrain = remember { AstraOnDeviceBrain(applicationContext) }
+                // This trainable neural adapter is separate from immutable GGUF weights.
+                val neuralLearner = remember {
+                    AstraContinualLearning(
+                        java.io.File(
+                            applicationContext.noBackupFilesDir,
+                            "neural/topic-adapter.bin"
+                        )
+                    )
+                }
+                val onDeviceBrain = remember {
+                    AstraOnDeviceBrain(applicationContext, neuralLearner)
+                }
+                var neuralTrainingEnabled by remember {
+                    mutableStateOf(storage.getBoolean("astra_neural_learning_opt_in"))
+                }
+                var neuralTrainingSteps by remember {
+                    mutableIntStateOf(neuralLearner.status().steps)
+                }
+                var knowledgeSyncRunning by remember { mutableStateOf(false) }
+                var knowledgeSyncStatus by remember { mutableStateOf("") }
                 var offlineJob by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
                 var offlineAnswerMessageIndex by remember { mutableIntStateOf(-1) }
                 // Grounded-memory prompts use an isolated local model context.
@@ -2876,6 +2895,63 @@ class MainActivity :
                     // Return the conversation to its spacious default after sending.
                     commandDeckExpanded = false
                     val normalized = AstraInput.normalize(message)
+
+                    val neuralCommand = normalized.lowercase(Locale.ROOT).trim()
+                    if (neuralCommand in setOf(
+                            "learning status", "neural learning status",
+                            "start neural learning", "stop neural learning",
+                            "reset neural learning"
+                        )
+                    ) {
+                        val reply = when (neuralCommand) {
+                            "start neural learning" -> {
+                                neuralTrainingEnabled = true
+                                storage.setBoolean("astra_neural_learning_opt_in", true)
+                                "On-device neural topic training enabled. It trains only " +
+                                    "a small retrieval adapter, not Qwen3's GGUF weights."
+                            }
+                            "stop neural learning" -> {
+                                neuralTrainingEnabled = false
+                                storage.setBoolean("astra_neural_learning_opt_in", false)
+                                "On-device neural topic training stopped. Your existing " +
+                                    "local adapter weights are retained."
+                            }
+                            "reset neural learning" -> {
+                                neuralTrainingEnabled = false
+                                storage.setBoolean("astra_neural_learning_opt_in", false)
+                                neuralLearner.reset()
+                                neuralTrainingSteps = 0
+                                "Training stopped and local neural adapter weights cleared."
+                            }
+                            else -> "Local neural topic training: " +
+                                (if (neuralTrainingEnabled) "enabled" else "disabled") +
+                                ". Updates: $neuralTrainingSteps. " +
+                                "Qwen3 language-model weights are unchanged."
+                        }
+                        history.add(ChatMessage("You", message))
+                        history.add(ChatMessage("Astra", reply))
+                        while (history.size > MAX_HISTORY) history.removeAt(0)
+                        input = ""
+                        persist()
+                        keyboard?.hide()
+                        return
+                    }
+
+                    // Explicit opt-in. No transcript or exact message is written
+                    // to the training file: only bounded numeric neural weights.
+                    if (neuralTrainingEnabled && AstraLearningSignals.eligible(normalized)) {
+                        val trainingExample = normalized.take(350)
+                        researchScope.launch(Dispatchers.IO) {
+                            if (storage.getBoolean("astra_neural_learning_opt_in")) {
+                                runCatching { neuralLearner.learn(trainingExample) }
+                                    .getOrNull()?.let { state ->
+                                        withContext(Dispatchers.Main) {
+                                            neuralTrainingSteps = state.steps
+                                        }
+                                    }
+                            }
+                        }
+                    }
 
                     // Evidence-grounded analysis is opt-in and runs on the phone.
                     // It cannot take actions, browse, or silently access memory.
@@ -5052,6 +5128,108 @@ class MainActivity :
                                             ) {
                                                 Text("Share report")
                                             }
+                                        }
+                                        HorizontalDivider()
+                                    }
+
+                                    item {
+                                        HorizontalDivider()
+                                        Text(
+                                            "Local knowledge & continual neural learning",
+                                            style = MaterialTheme.typography.titleMedium
+                                        )
+                                        Text(
+                                            "Astra can train a small on-phone neural topic " +
+                                                "adapter from your opted-in conversations. This " +
+                                                "updates real neural weights for choosing open-course " +
+                                                "context, but does NOT retrain Qwen3 itself. Original " +
+                                                "chat messages are not stored in this adapter. " +
+                                                "Training is disabled unless you enable it.",
+                                            style = MaterialTheme.typography.bodySmall
+                                        )
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Text(
+                                                "Learn topics from conversations",
+                                                modifier = Modifier.weight(1f),
+                                                style = MaterialTheme.typography.bodyMedium
+                                            )
+                                            Switch(
+                                                checked = neuralTrainingEnabled,
+                                                onCheckedChange = { enabled ->
+                                                    neuralTrainingEnabled = enabled
+                                                    storage.setBoolean(
+                                                        "astra_neural_learning_opt_in", enabled
+                                                    )
+                                                }
+                                            )
+                                        }
+                                        Text(
+                                            "Local neural updates: $neuralTrainingSteps",
+                                            style = MaterialTheme.typography.bodySmall
+                                        )
+                                        OutlinedButton(onClick = {
+                                            neuralTrainingEnabled = false
+                                            storage.setBoolean(
+                                                "astra_neural_learning_opt_in", false
+                                            )
+                                            neuralLearner.reset()
+                                            neuralTrainingSteps = 0
+                                        }) { Text("Clear learned neural weights") }
+                                        HorizontalDivider()
+                                        Text(
+                                            "Russian open-course library",
+                                            style = MaterialTheme.typography.titleSmall
+                                        )
+                                        Text(
+                                            "Includes compact, source-attributed Russian " +
+                                                "reference material. You can refresh extracts " +
+                                                "from free Wikibooks and Wiktionary pages. " +
+                                                "Only fixed public page names are requested; " +
+                                                "your chats, tasks and notes are never uploaded. " +
+                                                "Sources remain CC BY-SA 4.0 with attribution.",
+                                            style = MaterialTheme.typography.bodySmall
+                                        )
+                                        OutlinedButton(
+                                            enabled = !knowledgeSyncRunning,
+                                            onClick = {
+                                                knowledgeSyncRunning = true
+                                                knowledgeSyncStatus = "Fetching public course pages..."
+                                                researchScope.launch {
+                                                    try {
+                                                        val count = AstraOpenLibrarySync.refresh(
+                                                            applicationContext
+                                                        ) { completed, total ->
+                                                            withContext(Dispatchers.Main) {
+                                                                knowledgeSyncStatus =
+                                                                    "Public pages: $completed/$total"
+                                                            }
+                                                        }
+                                                        knowledgeSyncStatus =
+                                                            "$count licensed pages saved for offline context."
+                                                    } catch (cancel: CancellationException) {
+                                                        throw cancel
+                                                    } catch (error: Exception) {
+                                                        knowledgeSyncStatus =
+                                                            error.message ?: "Library update failed."
+                                                    } finally {
+                                                        knowledgeSyncRunning = false
+                                                    }
+                                                }
+                                            }
+                                        ) {
+                                            Text(
+                                                if (knowledgeSyncRunning) "Updating open library..."
+                                                else "Update free Russian library"
+                                            )
+                                        }
+                                        if (knowledgeSyncStatus.isNotBlank()) {
+                                            Text(
+                                                knowledgeSyncStatus,
+                                                style = MaterialTheme.typography.bodySmall
+                                            )
                                         }
                                         HorizontalDivider()
                                     }
