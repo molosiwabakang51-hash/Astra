@@ -67,11 +67,74 @@ class AstraDeviceDiagnosticsTest {
         assertTrue(report.contains("Device: Example TestDevice"))
         assertTrue(report.contains("Supported ABIs: arm64-v8a"))
         assertTrue(report.contains("Free app storage: 5.00 GiB"))
-        assertTrue(report.contains("Model extracted privately: Unavailable"))
+        assertTrue(report.contains("Private compact candidate: Unavailable"))
+        assertTrue(report.contains("Private 1.7B candidate: Unavailable"))
+        assertTrue(report.contains("Model last loaded: Not verified in this session"))
+        assertTrue(report.contains("Language spot checks: NOT RUN"))
         assertTrue(report.contains("Offline AI self-test: NOT RUN"))
         assertFalse(report.contains("history"))
         assertFalse(report.contains("Bearer "))
         assertFalse(report.contains("saved text:"))
+    }
+
+    @Test fun reportNeverPretendsAdvancedSessionUsedCompactModel() {
+        val snapshot = AstraDeviceDiagnostics.Snapshot(
+            version = "0.12.1", manufacturer = "Example", model = "ARM64",
+            androidRelease = "16", sdk = 36,
+            supportedAbis = listOf("arm64-v8a"),
+            freeStorageBytes = null, availableRamBytes = null,
+            totalRamBytes = null, maxJavaHeapBytes = null,
+            bundledModelBytes = 520_000_000L,
+            extractedModelBytes = 520_000_000L,
+            selfTestResult = "PASS (1500 ms)",
+            loadedModelName = "Qwen3 1.7B · Q4_K_M",
+            advancedCandidateBytes = 1_275_000_000L,
+            languageBenchmarkResult = "RECORDED (5/7 narrow checks; not a general AI score)"
+        )
+        val report = AstraDeviceDiagnostics.render(snapshot)
+        assertTrue(report.contains("Model last loaded: Qwen3 1.7B"))
+        assertTrue(report.contains("Compact model bundled in APK:"))
+        assertTrue(report.contains("Private 1.7B candidate:"))
+        assertTrue(report.contains("Language spot checks: RECORDED (5/7"))
+        assertTrue(report.contains("sizes are not integrity or inference proof"))
+    }
+
+    @Test fun onlyKnownModelLabelsMayBeShared() {
+        assertEquals("Qwen3 1.7B · Q4_K_M",
+            AstraDeviceDiagnostics.verifiedLoadedName("Qwen3 1.7B · Q4_K_M"))
+        assertEquals("Qwen3 0.6B · Q4_K_M",
+            AstraDeviceDiagnostics.verifiedLoadedName("Qwen3 0.6B · Q4_K_M"))
+        assertEquals(null, AstraDeviceDiagnostics.verifiedLoadedName(
+            "/data/user/0/com.astra.agent/secrets/private.gguf"))
+        assertEquals(null, AstraDeviceDiagnostics.verifiedLoadedName("Custom model"))
+        assertEquals(null, AstraDeviceDiagnostics.verifiedLoadedName(null))
+    }
+
+    @Test fun languageScoresAreSanitizedWithoutArbitraryModelOutput() {
+        val total = AstraLanguageBenchmark.Probe.entries.size
+        val passes = total / 2
+        val raw = "ON-DEVICE LANGUAGE SPOT CHECKS\n" +
+            "Model loaded: Qwen3 1.7B · Q4_K_M\n" +
+            "$passes/$total checks passed.\n" +
+            "Model output: MY_PRIVATE_SECRET_OR_TOKEN"
+        val safe = AstraDeviceDiagnostics.summarizeLanguageBenchmark(raw)
+        assertEquals("RECORDED ($passes/$total narrow checks; not a general AI score)", safe)
+        assertFalse(safe.contains("PRIVATE_SECRET"))
+        assertEquals("NOT RUN / UNVERIFIED",
+            AstraDeviceDiagnostics.summarizeLanguageBenchmark(
+                "$passes/$total checks passed.\nMY_PRIVATE_SECRET_OR_TOKEN"))
+        assertEquals("NOT RUN / UNVERIFIED",
+            AstraDeviceDiagnostics.summarizeLanguageBenchmark(
+                "ON-DEVICE LANGUAGE SPOT CHECKS\n" +
+                    (total + 1) + "/$total checks passed."))
+        assertEquals("IN PROGRESS",
+            AstraDeviceDiagnostics.summarizeLanguageBenchmark("Running Russian translation..."))
+        assertEquals("INTERRUPTED",
+            AstraDeviceDiagnostics.summarizeLanguageBenchmark(
+                "Conversation checks interrupted: /data/user/0/secret"))
+        assertEquals("CANCELLED",
+            AstraDeviceDiagnostics.summarizeLanguageBenchmark(
+                "Conversation checks cancelled. Partial results are not scored."))
     }
 
     @Test fun bytesAreFormattedWithoutDeviceAccess() {

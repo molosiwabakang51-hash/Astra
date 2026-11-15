@@ -28,10 +28,19 @@ internal object AstraDeviceDiagnostics {
         val maxJavaHeapBytes: Long?,
         val bundledModelBytes: Long?,
         val extractedModelBytes: Long?,
-        val selfTestResult: String
+        val selfTestResult: String,
+        val loadedModelName: String? = null,
+        val advancedCandidateBytes: Long? = null,
+        val languageBenchmarkResult: String = "NOT RUN"
     )
 
-    fun capture(context: Context, version: String, selfTestStatus: String): Snapshot {
+    fun capture(
+        context: Context,
+        version: String,
+        selfTestStatus: String,
+        loadedModelName: String? = null,
+        languageBenchmarkStatus: String = ""
+    ): Snapshot {
         val appContext = context.applicationContext
         val memory = runCatching {
             val manager = appContext.getSystemService(Context.ACTIVITY_SERVICE)
@@ -58,6 +67,10 @@ internal object AstraDeviceDiagnostics {
         val extractedBytes = if (privateModel.isFile) {
             privateModel.length()
         } else null
+        val advancedCandidate = File(
+            File(appContext.noBackupFilesDir, "offline-models"),
+            AstraModelImport.ADVANCED_NAME
+        ).takeIf { it.isFile }?.length()
 
         return Snapshot(
             version = version,
@@ -72,8 +85,39 @@ internal object AstraDeviceDiagnostics {
             maxJavaHeapBytes = Runtime.getRuntime().maxMemory(),
             bundledModelBytes = assetBytes,
             extractedModelBytes = extractedBytes,
-            selfTestResult = summarizeSelfTest(selfTestStatus)
+            selfTestResult = summarizeSelfTest(selfTestStatus),
+            loadedModelName = verifiedLoadedName(loadedModelName),
+            advancedCandidateBytes = advancedCandidate,
+            languageBenchmarkResult = summarizeLanguageBenchmark(languageBenchmarkStatus)
         )
+    }
+
+    /**
+     * Only static, known model labels are allowed in a shareable report.
+     * Never interpolate model paths or arbitrary model output here.
+     */
+    fun verifiedLoadedName(candidate: String?): String? =
+        candidate?.takeIf { it in setOf(
+            "Qwen3 0.6B · Q4_K_M", "Qwen3 1.7B · Q4_K_M"
+        ) }
+
+    /** Parse the numerical summary, not raw model answers or exception text. */
+    fun summarizeLanguageBenchmark(status: String): String {
+        val count = Regex("""(?m)^(\d{1,2})/(\d{1,2}) checks passed\.$""")
+            .find(status)
+        if (status.startsWith("ON-DEVICE LANGUAGE SPOT CHECKS") && count != null) {
+            val passed = count.groupValues[1].toInt()
+            val total = count.groupValues[2].toInt()
+            if (total == AstraLanguageBenchmark.Probe.entries.size && passed in 0..total) {
+                return "RECORDED ($passed/$total narrow checks; not a general AI score)"
+            }
+        }
+        return when {
+            status.startsWith("Running ") -> "IN PROGRESS"
+            status.startsWith("Conversation checks interrupted:") -> "INTERRUPTED"
+            status.startsWith("Conversation checks cancelled.") -> "CANCELLED"
+            else -> "NOT RUN / UNVERIFIED"
+        }
     }
 
     /** Never include arbitrary model text in the shareable diagnostic. */
@@ -111,14 +155,17 @@ internal object AstraDeviceDiagnostics {
         appendLine("Device: ${snapshot.manufacturer} ${snapshot.model}".trim())
         appendLine("Android: ${snapshot.androidRelease} (API ${snapshot.sdk})")
         appendLine("Supported ABIs: ${snapshot.supportedAbis.joinToString().ifBlank { "Unknown" }}")
-        appendLine("Model: ${AstraOnDeviceBrain.MODEL_LABEL}")
-        appendLine("Model bundled in APK: ${formatBytes(snapshot.bundledModelBytes)}")
-        appendLine("Model extracted privately: ${formatBytes(snapshot.extractedModelBytes)}")
+        appendLine("Model last loaded: ${snapshot.loadedModelName ?: "Not verified in this session"}")
+        appendLine("Compact model bundled in APK: ${formatBytes(snapshot.bundledModelBytes)}")
+        appendLine("Private compact candidate: ${formatBytes(snapshot.extractedModelBytes)}")
+        appendLine("Private 1.7B candidate: ${formatBytes(snapshot.advancedCandidateBytes)}")
+        appendLine("Candidate file sizes are not integrity or inference proof.")
         appendLine("Free app storage: ${formatBytes(snapshot.freeStorageBytes)}")
         appendLine("Available device RAM: ${formatBytes(snapshot.availableRamBytes)}")
         appendLine("Total device RAM: ${formatBytes(snapshot.totalRamBytes)}")
         appendLine("Max Java heap (not native model RAM): ${formatBytes(snapshot.maxJavaHeapBytes)}")
         appendLine("Offline AI self-test: ${snapshot.selfTestResult}")
+        appendLine("Language spot checks: ${snapshot.languageBenchmarkResult}")
         appendLine()
         appendLine("No messages, notes, tasks, location, account identifiers,")
         appendLine("passwords or access tokens are included.")

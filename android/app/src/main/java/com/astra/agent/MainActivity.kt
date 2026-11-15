@@ -5799,7 +5799,9 @@ class MainActivity :
                                                         AstraDeviceDiagnostics.capture(
                                                             applicationContext,
                                                             ASTRA_VERSION,
-                                                            offlineModelTestStatus
+                                                            offlineModelTestStatus,
+                                                            onDeviceBrain.loadedModelLabel(),
+                                                            languageBenchmarkStatus
                                                         )
                                                     )
                                                     copyText(report)
@@ -5813,7 +5815,9 @@ class MainActivity :
                                                         AstraDeviceDiagnostics.capture(
                                                             applicationContext,
                                                             ASTRA_VERSION,
-                                                            offlineModelTestStatus
+                                                            offlineModelTestStatus,
+                                                            onDeviceBrain.loadedModelLabel(),
+                                                            languageBenchmarkStatus
                                                         )
                                                     )
                                                     shareText(report)
