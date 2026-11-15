@@ -141,7 +141,8 @@ internal class AstraMultilingualTutor(
             "Type 'learn setswana', 'japanese lesson 21', 'french quiz', " +
             "'next language lesson', or 'language progress'. " +
             "For offline dictionary lookups, try 'translate hello to french' " +
-            "or 'what does Bonjour mean in french'. Unknown words are not guessed. " +
+            "or 'what does Bonjour mean in french'. Words absent from this " +
+            "dictionary can fall through to the optional offline AI. " +
             "Quiz answers are English translations; speech packs are optional."
     }
 
@@ -297,7 +298,7 @@ internal class AstraMultilingualTutor(
         language: Language,
         requested: String,
         fromEnglish: Boolean
-    ): String {
+    ): String? {
         val term = requested.trim()
         val cards = deck(language)
         val matching = if (fromEnglish) {
@@ -310,11 +311,10 @@ internal class AstraMultilingualTutor(
             if (exact.isNotEmpty()) exact
             else cards.filter { canonical(it.phrase) == canonical(term) }
         }
-        if (matching.isEmpty()) {
-            return "No matching offline " + language.display +
-                " vocabulary entry for '" + term +
-                "'. Import a trusted TSV pack in Settings to expand the dictionary."
-        }
+        // Let an unrestricted local model attempt open-ended translations
+        // when a term is outside our deterministic dictionary. Returning null
+        // preserves the existing explicit offline-model fallback in chat.
+        if (matching.isEmpty()) return null
         val results = matching.take(5).joinToString("; ") {
             it.phrase + " — " + it.english
         }
