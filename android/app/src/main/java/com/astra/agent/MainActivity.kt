@@ -127,7 +127,7 @@ keys: history, notes, tasks.
 // ============================================================
 
 private val ASTRA_VERSION: String get() = BuildConfig.VERSION_NAME
-private const val MAX_HISTORY = 2000
+private const val MAX_HISTORY = AstraConversationHistory.MAX_RETAINED_TURNS
 
 private const val WELCOME =
     "Hello. How can I help you?"
@@ -2840,10 +2840,10 @@ class MainActivity :
                     } else emptyList()
                     val groundedArchived =
                         if (grounding != null) archivedChats.toList() else emptyList()
-                    // Look back across this chat when native inference restarts.
-                    // AstraConversationContext retains only eight bounded,
-                    // role-labelled excerpts; no cross-chat memory is injected.
-                    val turns = history.takeLast(160).mapNotNull { entry ->
+                    // Search the retained chat, not just the latest 160 messages.
+                    // AstraConversationContext still sends only eight short,
+                    // bounded, same-chat excerpts to the reloaded native model.
+                    val turns = AstraConversationHistory.forRecovery(history).mapNotNull { entry ->
                         val role = when (entry.role) {
                             "You" -> "user"
                             "Astra" -> "assistant"
