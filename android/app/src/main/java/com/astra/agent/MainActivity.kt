@@ -5607,7 +5607,7 @@ class MainActivity :
                                         Text(
                                             "Astra already includes 191 offline lessons and " +
                                                 "768 vocabulary cards across nine languages. " +
-                                                "Add up to 5,000 privately imported words for " +
+                                                "Add up to 10,000 privately imported words for " +
                                                 "each language; new four-word lessons are " +
                                                 "generated automatically. No AI model download " +
                                                 "or internet connection is required.",

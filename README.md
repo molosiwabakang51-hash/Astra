@@ -283,18 +283,18 @@ document picker can select a .tsv or .txt file that contains actual TAB
 separators, **not spaces or commas**.
 
 Each import is processed entirely on the device, accepts a bounded
-3 MB file, checks every line before changing saved data, and skips repeated
-terms (the first translation wins). Up to **5,000 custom cards per
+6 MB file, checks every line before changing saved data, and skips repeated
+terms (the first translation wins). Up to **10,000 custom cards per
 language** can be stored privately, on top of the built-in deck.
 Four-card lessons are then available automatically using existing
 `setswana lesson 22`, `russian lesson 24`, etc. commands. No arbitrary
 three-digit lesson ceiling prevents progress beyond lesson 999.
 
 At the per-language imported limit, the theoretical **combined capacity**
-is up to **45,768 vocabulary cards** across nine languages, corresponding
-to up to **11,441 lessons**. The actual count is lower if terms duplicate
+is up to **90,768 vocabulary cards** across nine languages, corresponding
+to up to **22,691 lessons**. The actual count is lower if terms duplicate
 the built-in dictionary or one another. These are capacity limits,
-**not** a claim that 45,768 reviewed translations ship in the APK.
+**not** a claim that 90,768 reviewed translations ship in the APK.
 
 Imported vocabulary resides in Astra's private **no-backup** app storage,
 remains available after correctly signed app upgrades, and is deleted on

@@ -59,7 +59,7 @@ class AstraVocabularyStoreTest {
     @Test fun extremelyLargeImportStopsAtBoundAndKeepsExistingData() {
         val s = store()
         s.importTsv("mandarin", bytes("汉语\tChinese language\n"))
-        val excessive = (1..5_100)
+        val excessive = (1..10_100)
             .joinToString("\n") { "word_$it\tmeaning_$it" } + "\n"
         assertThrows(IllegalArgumentException::class.java) {
             s.importTsv("mandarin", bytes(excessive))
@@ -67,13 +67,13 @@ class AstraVocabularyStoreTest {
         assertEquals(1, s.list("mandarin").size)
     }
 
-    @Test fun fiveThousandNewWordsPerLanguageRemainPossible() {
+    @Test fun tenThousandNewWordsPerLanguageRemainPossible() {
         val s = store()
         val source = (1..AstraVocabularyStore.MAX_CUSTOM_WORDS_PER_LANGUAGE)
             .joinToString("\n") { "word_$it\tmeaning_$it" }
         val result = s.importTsv("spanish", bytes(source))
-        assertEquals(5_000, result.added)
-        assertEquals(5_000, s.list("spanish").size)
+        assertEquals(10_000, result.added)
+        assertEquals(10_000, s.list("spanish").size)
         assertEquals(0, s.list("russian").size)
         assertTrue(s.clear("spanish"))
         assertTrue(s.list("spanish").isEmpty())
@@ -81,7 +81,7 @@ class AstraVocabularyStoreTest {
 
     @Test fun maximumImportedSetsReachRealLessonsBeyondOneThousand() {
         val s = store()
-        val extras = (1..5_000).joinToString("\n") {
+        val extras = (1..10_000).joinToString("\n") {
             "new_term_" + it + "\tMeaning " + it
         }
         s.importTsv("spanish", bytes(extras))
@@ -98,14 +98,14 @@ class AstraVocabularyStoreTest {
             { key, def -> state[key] ?: def },
             { key, value -> state[key] = value }, s
         )
-        assertTrue(multilingual.respond("spanish lesson 1271")!!
-            .contains("new_term_5000"))
+        assertTrue(multilingual.respond("spanish lesson 2521")!!
+            .contains("new_term_10000"))
         assertTrue(multilingual.respond("spanish progress")!!
-            .contains("5084 vocabulary cards"))
-        assertTrue(russian.respond("russian lesson 1273")!!
-            .contains("new_term_5000"))
+            .contains("10084 vocabulary cards"))
+        assertTrue(russian.respond("russian lesson 2523")!!
+            .contains("new_term_10000"))
         assertTrue(russian.respond("russian progress")!!
-            .contains("5096 vocabulary cards"))
+            .contains("10096 vocabulary cards"))
     }
 
     @Test fun existingUserCardsCanExtendMultilingualLessonCountsAndQuiz() {

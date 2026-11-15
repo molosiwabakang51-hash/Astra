@@ -68,7 +68,7 @@ class AstraVocabularyBundleTest {
 
     @Test fun exceedingLanguageCapacityRejectsBeforeAnyWrite() {
         val target = newStore()
-        val already = (1..5_000).joinToString("\n") { "item$it\tMeaning$it" }
+        val already = (1..10_000).joinToString("\n") { "item$it\tMeaning$it" }
         target.importTsv("spanish", input(already))
         val source = newStore()
         source.importTsv("setswana", input("Maru\tClouds\n"))
@@ -79,7 +79,7 @@ class AstraVocabularyBundleTest {
             AstraVocabularyBundle.restore(target, ByteArrayInputStream(archive.toByteArray()))
         }
         assertTrue(target.list("setswana").isEmpty())
-        assertEquals(5_000, target.list("spanish").size)
+        assertEquals(10_000, target.list("spanish").size)
     }
 
     @Test fun rejectsInvalidHeadersUnknownLanguagesAndMalformedUtf8() {
@@ -121,15 +121,15 @@ class AstraVocabularyBundleTest {
         assertTrue(target.list("french").isEmpty())
     }
 
-    @Test fun largeExpandedDeckRoundTripsAllFiveThousandRussianCards() {
+    @Test fun largeExpandedDeckRoundTripsAllTenThousandRussianCards() {
         val source = newStore()
         source.importTsv("russian", input(
-            (1..5_000).joinToString("\n") { "слово_$it\tword $it" }
+            (1..10_000).joinToString("\n") { "слово_$it\tword $it" }
         ))
         val saved = ByteArrayOutputStream()
-        assertEquals(5_000, AstraVocabularyBundle.export(source, saved))
+        assertEquals(10_000, AstraVocabularyBundle.export(source, saved))
         val destination = newStore()
-        assertEquals(5_000, AstraVocabularyBundle.restore(
+        assertEquals(10_000, AstraVocabularyBundle.restore(
             destination, ByteArrayInputStream(saved.toByteArray())
         ).added)
         assertEquals(source.list("russian"), destination.list("russian"))

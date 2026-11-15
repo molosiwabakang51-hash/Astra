@@ -25,10 +25,10 @@ internal class AstraVocabularyStore(private val directory: File) {
     )
 
     companion object {
-        const val MAX_CUSTOM_WORDS_PER_LANGUAGE = 5_000
-        private const val MAX_INPUT_BYTES = 3 * 1024 * 1024
-        private const val MAX_STORED_BYTES = 3 * 1024 * 1024
-        private const val MAX_LINES = 6_000
+        const val MAX_CUSTOM_WORDS_PER_LANGUAGE = 10_000
+        private const val MAX_INPUT_BYTES = 6 * 1024 * 1024
+        private const val MAX_STORED_BYTES = 6 * 1024 * 1024
+        private const val MAX_LINES = 11_000
         private const val MAX_TEXT_CHARS = 160
         val supportedLanguages = setOf(
             "russian", "setswana", "french", "spanish", "portuguese",
@@ -45,11 +45,11 @@ internal class AstraVocabularyStore(private val directory: File) {
         val file = File(directory, "$id.tsv")
         if (!file.exists()) return emptyList<Word>().also { cache[id] = it }
         require(file.isFile && file.length() in 1..MAX_STORED_BYTES.toLong()) {
-            "Private vocabulary file is invalid or exceeds 3 MB."
+            "Private vocabulary file is invalid or exceeds 6 MB."
         }
         val words = file.inputStream().use { parse(it, allowHeader = false) }
         require(words.size <= MAX_CUSTOM_WORDS_PER_LANGUAGE) {
-            "Private vocabulary exceeds the 5,000-card local limit."
+            "Private vocabulary exceeds the 10,000-card local limit."
         }
         require(words.map { it.phrase }.toSet().size == words.size) {
             "Private vocabulary contains duplicated terms."
@@ -79,7 +79,7 @@ internal class AstraVocabularyStore(private val directory: File) {
         }
         val combined = current + added
         require(combined.size <= MAX_CUSTOM_WORDS_PER_LANGUAGE) {
-            "Maximum 5,000 imported cards per language. " +
+            "Maximum 10,000 imported cards per language. " +
                 "This file would exceed that limit; no changes made."
         }
         if (added.isNotEmpty()) {
@@ -140,7 +140,7 @@ internal class AstraVocabularyStore(private val directory: File) {
             val count = source.read(buffer)
             if (count < 0) break
             require(data.size() + count <= MAX_INPUT_BYTES) {
-                "Vocabulary file exceeds the 3 MB import limit."
+                "Vocabulary file exceeds the 6 MB import limit."
             }
             data.write(buffer, 0, count)
         }
@@ -155,7 +155,7 @@ internal class AstraVocabularyStore(private val directory: File) {
         decoded.lineSequence().forEach { line ->
             rowNumber++
             require(rowNumber <= MAX_LINES) {
-                "Vocabulary contains too many lines (maximum 6,000)."
+                "Vocabulary contains too many lines (maximum 11,000)."
             }
             if (line.isBlank()) return@forEach
             val parts = line.removeSuffix("\r").split('\t')

@@ -23,8 +23,8 @@ import java.security.MessageDigest
 internal object AstraVocabularyBundle {
     private const val HEADER = "language\tphrase\ttranslation"
     private const val FOOTER = "#astra-private-vocabulary-v1-end"
-    private const val MAX_BUNDLE_BYTES = 32 * 1024 * 1024
-    private const val MAX_LANGUAGE_BYTES = 3 * 1024 * 1024
+    private const val MAX_BUNDLE_BYTES = 64 * 1024 * 1024
+    private const val MAX_LANGUAGE_BYTES = 6 * 1024 * 1024
     private const val MAX_CARD_CHARS = 160
     private val utf8 = StandardCharsets.UTF_8
 
@@ -49,7 +49,7 @@ internal object AstraVocabularyBundle {
                 val bytes = line.toByteArray(utf8)
                 totalBytes += bytes.size
                 require(totalBytes <= MAX_BUNDLE_BYTES) {
-                    "Vocabulary archive exceeds the 32 MB safety limit."
+                    "Vocabulary archive exceeds the 64 MB safety limit."
                 }
                 digest.update(bytes)
                 writer.write(line)
@@ -60,7 +60,7 @@ internal object AstraVocabularyBundle {
         // masquerading as a successful full backup.
         val marker = FOOTER + "\t" + cards + "\t" + digest.digest().toHex() + "\n"
         require(totalBytes + marker.toByteArray(utf8).size <= MAX_BUNDLE_BYTES) {
-            "Vocabulary archive exceeds the 32 MB safety limit."
+            "Vocabulary archive exceeds the 64 MB safety limit."
         }
         writer.write(marker)
         writer.flush()
@@ -79,7 +79,7 @@ internal object AstraVocabularyBundle {
             val count = input.read(buffer)
             if (count < 0) break
             require(accumulated.size().toLong() + count <= MAX_BUNDLE_BYTES.toLong()) {
-                "Vocabulary archive exceeds the 32 MB safety limit."
+                "Vocabulary archive exceeds the 64 MB safety limit."
             }
             accumulated.write(buffer, 0, count)
         }
@@ -134,7 +134,7 @@ internal object AstraVocabularyBundle {
             val deck = byLanguage.getOrPut(language) { mutableListOf() }
             deck.add(AstraVocabularyStore.Word(phrase, translation))
             require(deck.size <= AstraVocabularyStore.MAX_CUSTOM_WORDS_PER_LANGUAGE) {
-                "Vocabulary archive exceeds 5,000 cards for $language."
+                "Vocabulary archive exceeds 10,000 cards for $language."
             }
             digest.update((line + "\n").toByteArray(utf8))
         }
@@ -148,7 +148,7 @@ internal object AstraVocabularyBundle {
             val known = existing.map { it.phrase }.toMutableSet()
             val toAdd = incoming.filter { known.add(it.phrase) }
             require(known.size <= AstraVocabularyStore.MAX_CUSTOM_WORDS_PER_LANGUAGE) {
-                "Restoring $language would exceed 5,000 private cards; no changes made."
+                "Restoring $language would exceed 10,000 private cards; no changes made."
             }
             val projected = existing + toAdd
             val projectedBytes = projected.sumOf {
