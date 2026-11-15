@@ -149,8 +149,8 @@ class AstraMultilingualTutorTest {
             .contains("Essen — food"))
         assertTrue(coach.respond("what does essen mean in German")!!
             .contains("essen — to eat"))
-        assertTrue(coach.respond("translate astrophysics to french")!!
-            .contains("No matching offline"))
+        // Out-of-dictionary requests remain eligible for actual Qwen3 chat.
+        assertNull(coach.respond("translate astrophysics to french"))
         assertNull(coach.respond("What is bond convexity?"))
     }
 
