@@ -38,14 +38,21 @@ internal object AstraConversationContext {
             "tutorials or open-book questions. Never pretend that an excerpt is " +
             "a verified fact; clearly distinguish source evidence from inference. /no_think"
 
+    /**
+     * One bounded entry point for the latest user message. The native-model
+     * caller must not pre-truncate raw text: the final question frequently
+     * follows thousands of characters of pasted notes or code.
+     */
+    fun currentUserMessage(raw: String?): String =
+        AstraOfflinePolicy.boundedInput(raw.orEmpty())
+
     fun userPrompt(
         message: String,
         earlier: List<Turn>,
         restoringContext: Boolean
     ): String {
-        // The actual question often comes after pasted source material.
-        // Keep a bounded head and tail rather than silently dropping it.
-        val current = AstraOfflinePolicy.boundedInput(message)
+        // Keep the same head/tail as the initial native-model entry point.
+        val current = currentUserMessage(message)
         if (!restoringContext || current.isEmpty() || earlier.isEmpty()) {
             return AstraOfflinePolicy.modelPrompt(current)
         }
