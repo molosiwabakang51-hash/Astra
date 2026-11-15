@@ -110,6 +110,17 @@ class AstraBackupCodecTest {
         assertRejects { AstraBackupCodec.parse(root.toString()) }
     }
 
+    @Test fun preferredAiLanguageSurvivesBackupAndOldBackupsUseAutomaticMode() {
+        val source = example + ("astra_ai_reply_language" to "setswana")
+        val saved = AstraBackupCodec.parse(AstraBackupCodec.encode(source))
+        assertEquals("setswana", saved.values["astra_ai_reply_language"])
+        val legacy = JSONObject(AstraBackupCodec.encode(example))
+        legacy.getJSONObject("data").remove("astra_ai_reply_language")
+        assertEquals("auto", AstraBackupCodec.parse(
+            legacy.toString()
+        ).values["astra_ai_reply_language"])
+    }
+
     @Test fun excessiveConversationTitleInBackupIsRejected() {
         val source = JSONObject(AstraBackupCodec.encode(example))
         source.getJSONObject("data")

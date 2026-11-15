@@ -48,6 +48,7 @@ internal class AstraOnDeviceBrain(
     private var loadedModelPath: String? = null
     // A change of consent must not leave old book snippets in native KV-cache.
     private var previousBookContextAllowed: Boolean? = null
+    private var previousReplyLanguageId: String? = null
 
     /**
      * Only reports the last model successfully loaded into the native engine.
@@ -82,6 +83,17 @@ internal class AstraOnDeviceBrain(
                 val finalMessage = turns.lastOrNull { it.role == "user" }?.content
                     ?.trim()?.take(3000).orEmpty()
                 require(finalMessage.isNotEmpty()) { "Message cannot be empty." }
+                val selectedReplyLanguageId = context.getSharedPreferences(
+                    "astra", Context.MODE_PRIVATE
+                ).getString("astra_ai_reply_language", "auto") ?: "auto"
+                if (previousReplyLanguageId != null &&
+                    previousReplyLanguageId != selectedReplyLanguageId
+                ) {
+                    // Do not keep earlier output-language directives inside
+                    // the native KV cache when the owner switches languages.
+                    session.invalidate()
+                }
+                previousReplyLanguageId = selectedReplyLanguageId
                 val explicitBookQuery = AstraBookQuery.extract(finalMessage)
                 val question = explicitBookQuery ?: finalMessage
                 val permittedBooks = explicitBookQuery != null ||
@@ -233,12 +245,15 @@ internal class AstraOnDeviceBrain(
                 val augmentedQuestion = if (bookReferences.isNotEmpty())
                     books?.enrich(question, bookReferences) ?: question
                 else AstraOpenLibrary.enrich(question, openReferences)
-                val requestPrompt = AstraConversationContext.userPrompt(
-                    augmentedQuestion,
-                    turns.dropLast(1).map {
-                        AstraConversationContext.Turn(it.role, it.content)
-                    },
-                    restoringConversation
+                val requestPrompt = AstraReplyLanguage.prepare(
+                    AstraConversationContext.userPrompt(
+                        augmentedQuestion,
+                        turns.dropLast(1).map {
+                            AstraConversationContext.Turn(it.role, it.content)
+                        },
+                        restoringConversation
+                    ),
+                    AstraReplyLanguage.fromId(selectedReplyLanguageId)
                 )
                 val answerBudget = AstraGenerationPolicy.maxAnswerTokens(
                     finalMessage,

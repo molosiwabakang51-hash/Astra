@@ -21,7 +21,8 @@ internal object AstraBackupCodec {
     private val strings = listOf(
         "astra_shopping_items", "astra_habits", "astra_habit_date",
         "astra_habit_completed_today", "speech_language", "astra_chat_archive",
-        "astra_active_chat_title", "astra_learning_language"
+        "astra_active_chat_title", "astra_learning_language",
+        "astra_ai_reply_language"
     )
     private val booleans = listOf(
         "auto_send_voice", "speak_responses", "local_only_tts", "allow_system_speech"
@@ -56,7 +57,11 @@ internal object AstraBackupCodec {
             data.put(key, array)
         }
         for (key in strings) {
-            data.put(key, (source[key] as? String) ?: if (key == "speech_language") "en-US" else "")
+            data.put(key, (source[key] as? String) ?: when (key) {
+                "speech_language" -> "en-US"
+                "astra_ai_reply_language" -> "auto"
+                else -> ""
+            })
         }
         for (key in booleans) {
             data.put(key, (source[key] as? Boolean) ?: (key == "local_only_tts"))
@@ -134,6 +139,8 @@ internal object AstraBackupCodec {
                 key in setOf("astra_active_chat_title", "astra_learning_language")
             ) {
                 ""
+            } else if (!data.has(key) && key == "astra_ai_reply_language") {
+                "auto"
             } else {
                 data.opt(key)
             }
