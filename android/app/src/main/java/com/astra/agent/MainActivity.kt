@@ -2505,6 +2505,10 @@ class MainActivity :
                 var offlineModelTestRunning by remember { mutableStateOf(false) }
                 var languageBenchmarkRunning by remember { mutableStateOf(false) }
                 var languageBenchmarkStatus by remember { mutableStateOf("") }
+                var benchmarkHistory by remember {
+                    mutableStateOf(storage.getString("astra_private_benchmark_trends", ""))
+                }
+                var showBenchmarkHistory by remember { mutableStateOf(false) }
                 var languageBenchmarkJob by remember {
                     mutableStateOf<kotlinx.coroutines.Job?>(null)
                 }
@@ -5706,6 +5710,19 @@ class MainActivity :
                                                                     outcomes,
                                                                     onDeviceBrain.loadedModelLabel()
                                                                 )
+                                                            // Persist only anonymous numeric outcomes.
+                                                            // A failed/cancelled run never creates a record.
+                                                            runCatching {
+                                                                val updated = AstraBenchmarkTrends.append(
+                                                                    benchmarkHistory, outcomes,
+                                                                    onDeviceBrain.loadedModelLabel(),
+                                                                    System.currentTimeMillis()
+                                                                )
+                                                                storage.setString(
+                                                                    "astra_private_benchmark_trends", updated
+                                                                )
+                                                                benchmarkHistory = updated
+                                                            }
                                                         } catch (cancel: CancellationException) {
                                                             languageBenchmarkStatus =
                                                                 "Conversation checks cancelled. " +
@@ -5744,6 +5761,21 @@ class MainActivity :
                                                     }
                                                 ) { Text("Copy check results") }
                                             }
+                                        }
+                                        TextButton(
+                                            enabled = !languageBenchmarkRunning,
+                                            onClick = {
+                                                showBenchmarkHistory = !showBenchmarkHistory
+                                            }
+                                        ) {
+                                            Text(if (showBenchmarkHistory) "Hide past phone checks"
+                                                else "View past phone checks")
+                                        }
+                                        if (showBenchmarkHistory) {
+                                            Text(
+                                                AstraBenchmarkTrends.render(benchmarkHistory),
+                                                style = MaterialTheme.typography.bodySmall
+                                            )
                                         }
                                         Text(
                                             "Device diagnostics",
