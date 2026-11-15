@@ -3054,6 +3054,13 @@ class MainActivity :
                         }
                         return
                     }
+                    // Explicit questions about imported books must reach
+                    // local retrieval before finance, tutor or other fixed
+                    // command handlers can intercept their wording.
+                    if (AstraBookQuery.extract(normalized) != null) {
+                        enqueueOffline(message, normalized)
+                        return
+                    }
                     val researchTopic = ResearchCommand.extract(normalized)
                     if (researchTopic != null) {
                         dialogue.dismissIncompletePrompt()
