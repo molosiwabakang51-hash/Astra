@@ -233,12 +233,18 @@ internal class AstraOnDeviceBrain(
                 val augmentedQuestion = if (bookReferences.isNotEmpty())
                     books?.enrich(question, bookReferences) ?: question
                 else AstraOpenLibrary.enrich(question, openReferences)
-                val requestPrompt = AstraConversationContext.userPrompt(
-                    augmentedQuestion,
-                    turns.dropLast(1).map {
-                        AstraConversationContext.Turn(it.role, it.content)
-                    },
-                    restoringConversation
+                val requestPrompt = AstraReplyLanguage.prepare(
+                    AstraConversationContext.userPrompt(
+                        augmentedQuestion,
+                        turns.dropLast(1).map {
+                            AstraConversationContext.Turn(it.role, it.content)
+                        },
+                        restoringConversation
+                    ),
+                    AstraReplyLanguage.fromId(
+                        context.getSharedPreferences("astra", Context.MODE_PRIVATE)
+                            .getString("astra_ai_reply_language", "auto")
+                    )
                 )
                 val answerBudget = AstraGenerationPolicy.maxAnswerTokens(
                     finalMessage,
