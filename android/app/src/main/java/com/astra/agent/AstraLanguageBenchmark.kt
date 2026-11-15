@@ -37,7 +37,12 @@ internal object AstraLanguageBenchmark {
     )
 
     fun score(probe: Probe, answer: String): Boolean {
+        // Attribution footers are not part of the generated answer. A wrong
+        // response should never pass just because a cited excerpt contains
+        // the expected word or number.
         val text = AstraOfflinePolicy.publicReply(answer)
+            .substringBefore("\n\nOpen-course references:")
+            .substringBefore("\n\nRetrieved local book passages")
             .trim().lowercase(Locale.ROOT)
         if (text.isBlank() ||
             text.startsWith("the offline model did not produce") ||
@@ -45,7 +50,8 @@ internal object AstraLanguageBenchmark {
         ) return false
         return when (probe) {
             Probe.ARITHMETIC ->
-                Regex("""(?<!\d)42(?!\d)""").containsMatchIn(text)
+                Regex("""^(?:(?:the )?answer (?:is|:)\s*)?(?:\*\*)?42(?:\*\*)?[.!]?$""")
+                    .matches(text)
             Probe.RUSSIAN ->
                 Regex("""\b(?:thanks|thank(?:\s+|-)?you)\b""").containsMatchIn(text)
             Probe.CONTEXT ->
