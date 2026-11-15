@@ -7,7 +7,15 @@ package com.astra.agent
 internal enum class SpeechLanguage(val tag: String, val displayName: String) {
     ENGLISH_US("en-US", "English (United States)"),
     ENGLISH_UK("en-GB", "English (United Kingdom)"),
-    RUSSIAN("ru-RU", "Russian (Russia)");
+    RUSSIAN("ru-RU", "Russian (Russia)"),
+    SETSWANA("tn-BW", "Setswana (Botswana)"),
+    FRENCH("fr-FR", "French (France)"),
+    SPANISH("es-ES", "Spanish (Spain)"),
+    PORTUGUESE("pt-PT", "Portuguese (Portugal)"),
+    GERMAN("de-DE", "German (Germany)"),
+    SWAHILI("sw-KE", "Swahili (Kenya)"),
+    JAPANESE("ja-JP", "Japanese (Japan)"),
+    MANDARIN("zh-CN", "Mandarin Chinese (China)");
 
     companion object {
         fun fromTag(tag: String?): SpeechLanguage =
