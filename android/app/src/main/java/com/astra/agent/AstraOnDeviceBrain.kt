@@ -76,6 +76,7 @@ internal class AstraOnDeviceBrain(
     suspend fun reply(
         turns: List<Turn>,
         conversationGeneration: Int,
+        diagnosticMaxTokens: Int? = null,
         onPartial: suspend (String) -> Unit = {}
     ): String = mutex.withLock {
             try {
@@ -255,10 +256,13 @@ internal class AstraOnDeviceBrain(
                     ),
                     AstraReplyLanguage.fromId(selectedReplyLanguageId)
                 )
-                val answerBudget = AstraGenerationPolicy.maxAnswerTokens(
-                    finalMessage,
-                    advancedModel = modelPath.name == AstraModelImport.ADVANCED_NAME,
-                    hasReferences = bookReferences.isNotEmpty() || openReferences.isNotEmpty()
+                val answerBudget = AstraGenerationPolicy.effectiveBudget(
+                    AstraGenerationPolicy.maxAnswerTokens(
+                        finalMessage,
+                        advancedModel = modelPath.name == AstraModelImport.ADVANCED_NAME,
+                        hasReferences = bookReferences.isNotEmpty() || openReferences.isNotEmpty()
+                    ),
+                    diagnosticMaxTokens
                 )
                 current.sendUserPrompt(requestPrompt, answerBudget).collect { part ->
                     // Restrict accumulated output and cap main-thread UI updates.

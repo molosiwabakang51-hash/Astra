@@ -59,6 +59,36 @@ class AstraGenerationPolicyTest {
         }
     }
 
+    @Test fun diagnosticLimitsCannotExpandOrRemoveNativeAnswerBudget() {
+        assertEquals(96, AstraGenerationPolicy.DIAGNOSTIC_TOKEN_LIMIT)
+        assertEquals(96, AstraGenerationPolicy.effectiveBudget(448, 96))
+        assertEquals(96, AstraGenerationPolicy.effectiveBudget(1152, 96))
+        assertEquals(32, AstraGenerationPolicy.effectiveBudget(192, -500))
+        assertEquals(192, AstraGenerationPolicy.effectiveBudget(192, 99_999))
+        assertEquals(768, AstraGenerationPolicy.effectiveBudget(768, null))
+    }
+
+    @Test fun normalOwnerConversationsRetainTheirExistingResponseBudgets() {
+        for (question in listOf(
+            "What is a bond?",
+            "Explain convexity step by step with examples.",
+            "Briefly explain a bond.",
+            "Teach me Setswana in detail."
+        )) {
+            for (advanced in listOf(true, false)) {
+                val normal = AstraGenerationPolicy.maxAnswerTokens(
+                    question, advancedModel = advanced
+                )
+                assertEquals(normal, AstraGenerationPolicy.effectiveBudget(normal, null))
+                assertTrue(
+                    AstraGenerationPolicy.effectiveBudget(
+                        normal, AstraGenerationPolicy.DIAGNOSTIC_TOKEN_LIMIT
+                    ) in 32..96
+                )
+            }
+        }
+    }
+
     @Test fun deterministicOfflineSelfTestRemainsBounded() {
         val test = AstraGenerationPolicy.maxAnswerTokens(
             AstraOfflineSelfTest.CHALLENGE, true)
