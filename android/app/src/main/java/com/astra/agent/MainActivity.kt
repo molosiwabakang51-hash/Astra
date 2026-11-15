@@ -5555,10 +5555,11 @@ class MainActivity :
                                             style = MaterialTheme.typography.titleSmall
                                         )
                                         Text(
-                                            "Runs seven checks through the actual on-device language " +
-                                                "model: arithmetic, Russian translation, two-turn " +
-                                                "recall, Russian grammar, compound interest, " +
-                                                "logical deduction and Setswana. " +
+                                            "Runs ten checks through the actual on-device language " +
+                                                "model: arithmetic, Russian, Setswana, French, " +
+                                                "German and Spanish translations, two-turn " +
+                                                "recall, Russian grammar, compound interest " +
+                                                "and logical deduction. " +
                                                 "Run with airplane mode on to verify offline behavior. " +
                                                 "This is a small spot check, not proof of unrestricted " +
                                                 "understanding or continual language-model training.",
@@ -5578,7 +5579,7 @@ class MainActivity :
                                                 onClick = {
                                                     languageBenchmarkRunning = true
                                                     languageBenchmarkStatus =
-                                                        "Running seven local conversation checks..."
+                                                        "Running ten local conversation checks..."
                                                     languageBenchmarkJob = researchScope.launch {
                                                         val outcomes = mutableListOf<
                                                             AstraLanguageBenchmark.Outcome
@@ -5684,6 +5685,21 @@ class MainActivity :
                                                                 AstraLanguageBenchmark.Probe.SETSWANA,
                                                                 AstraLanguageBenchmark.SETSWANA_PROMPT,
                                                                 Int.MIN_VALUE + 216
+                                                            )
+                                                            sample(
+                                                                AstraLanguageBenchmark.Probe.FRENCH,
+                                                                AstraLanguageBenchmark.FRENCH_PROMPT,
+                                                                Int.MIN_VALUE + 217
+                                                            )
+                                                            sample(
+                                                                AstraLanguageBenchmark.Probe.GERMAN,
+                                                                AstraLanguageBenchmark.GERMAN_PROMPT,
+                                                                Int.MIN_VALUE + 218
+                                                            )
+                                                            sample(
+                                                                AstraLanguageBenchmark.Probe.SPANISH,
+                                                                AstraLanguageBenchmark.SPANISH_PROMPT,
+                                                                Int.MIN_VALUE + 219
                                                             )
                                                             languageBenchmarkStatus =
                                                                 AstraLanguageBenchmark.render(
