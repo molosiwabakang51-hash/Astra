@@ -172,6 +172,27 @@ or freedom from hallucinations. For an offline proof, put the phone in
 airplane mode before starting. Passing JVM tests or compiling the APK
 is not equivalent to running these checks on a physical phone.
 
+## Offline Russian learning course (six lessons, thirty cards)
+
+Even without Qwen3 loaded, Astra's deterministic tutor now offers **six
+local lessons** covering greetings, everyday phrases, Cyrillic, numbers
+and vocabulary, grammatical cases, and verb conjugation/aspect. The
+`russian` command still opens lesson one. Type `russian course` for the
+syllabus or `next russian lesson` to advance. Direct commands such as
+`russian alphabet`, `russian grammar`, `russian numbers` and
+`russian verbs` open the relevant material.
+
+Vocabulary practice now includes **30 cards** rather than only six,
+with early quiz order and existing correct-answer counts preserved.
+Astra saves the current lesson and quiz progress locally. Manual JSON
+backups include the additional lesson number, while older backups
+without that field remain importable.
+
+The lessons are original short examples and a structured curriculum,
+not copyrighted textbooks or an LLM trained on external dictionaries.
+Real Qwen conversation quality and pronunciation remain separate
+physical-device tests.
+
 ## Working capabilities
 
 - Chat interface with **multiple persistent conversations**, an animated compact navigation dock, notes, tasks and completion tracking.
