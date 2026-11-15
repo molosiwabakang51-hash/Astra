@@ -5,6 +5,8 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
+import android.os.Environment
+import android.provider.Settings
 import android.net.Uri
 import android.content.pm.PackageManager
 import android.os.Build
@@ -2467,6 +2469,10 @@ class MainActivity :
                     mutableStateOf(AstraFolderAccess.linked(applicationContext))
                 }
                 var folderImportStatus by remember { mutableStateOf("") }
+                var allFilesGranted by remember {
+                    mutableStateOf(Build.VERSION.SDK_INT >= Build.VERSION_CODES.R &&
+                        Environment.isExternalStorageManager())
+                }
                 var confirmClearBooks by remember { mutableStateOf(false) }
                 var selectedVocabularyLanguage by remember {
                     mutableStateOf("setswana")
@@ -3033,6 +3039,49 @@ class MainActivity :
                         return
                     }
 
+                    // One-time special access is always owner-approved in Android
+                    // Settings. Queries read only filenames from shared storage;
+                    // never other apps' sandbox data, media bodies or contacts.
+                    val sharedFileQuery = AstraSharedStorageSearch.parse(normalized)
+                    if (sharedFileQuery != null) {
+                        val authorized = Build.VERSION.SDK_INT >= Build.VERSION_CODES.R &&
+                            Environment.isExternalStorageManager()
+                        val placeholder = "Searching shared filenames on this phone..."
+                        history.add(ChatMessage("You", message))
+                        history.add(ChatMessage("Astra", if (authorized) placeholder else
+                            "Shared file search is off. Enable optional All files access " +
+                                "under Astra Settings, then try again."))
+                        while (history.size > MAX_HISTORY) history.removeAt(0)
+                        val target = history.lastIndex
+                        input = ""
+                        persist()
+                        keyboard?.hide()
+                        if (authorized) {
+                            val originalGeneration = chatGeneration
+                            researchScope.launch {
+                                val reply = try {
+                                    withContext(Dispatchers.IO) {
+                                        AstraSharedStorageSearch.search(
+                                            Environment.getExternalStorageDirectory(),
+                                            sharedFileQuery
+                                        ).render(sharedFileQuery)
+                                    }
+                                } catch (cancel: CancellationException) {
+                                    throw cancel
+                                } catch (_: Exception) {
+                                    "Shared file search could not read the selected storage. " +
+                                        "Verify the Android permission and try again."
+                                }
+                                if (chatGeneration == originalGeneration &&
+                                    history.getOrNull(target)?.text == placeholder) {
+                                    history[target] = ChatMessage("Astra", reply)
+                                    persist()
+                                }
+                            }
+                        }
+                        return
+                    }
+
                     AstraReplyLanguage.parseCommand(normalized)?.let { chosen ->
                         aiReplyLanguage = chosen
                         storage.setString("astra_ai_reply_language", chosen.id)
@@ -3473,6 +3522,14 @@ class MainActivity :
                                     (failure.message ?: "Android rejected access.")
                             }
                         }
+                    }
+
+                val allFilesPermissionLauncher =
+                    rememberLauncherForActivityResult(
+                        ActivityResultContracts.StartActivityForResult()
+                    ) {
+                        allFilesGranted = Build.VERSION.SDK_INT >= Build.VERSION_CODES.R &&
+                            Environment.isExternalStorageManager()
                     }
 
                 val importBookLauncher =
@@ -5822,6 +5879,48 @@ class MainActivity :
                                             ) {
                                                 Text("Remove imported words for this language")
                                             }
+                                        }
+                                    }
+
+                                    item {
+                                        HorizontalDivider()
+                                        Text(
+                                            "Shared phone files (optional)",
+                                            style = MaterialTheme.typography.titleMedium
+                                        )
+                                        Text(
+                                            "Grant once through Android Settings to search " +
+                                                "shared filenames under phone storage without " +
+                                                "selecting each file. Astra only reads file " +
+                                                "names when you type 'search phone report'. " +
+                                                "Android grants broad read/write permission, " +
+                                                "but Astra's filename search only reads metadata. " +
+                                                "No background scanning, copying or uploads. " +
+                                                "Other apps' private data is inaccessible. " +
+                                                "Revoke the grant in Android Settings.",
+                                            style = MaterialTheme.typography.bodySmall
+                                        )
+                                        Text(
+                                            if (allFilesGranted) "Access: granted" else "Access: off",
+                                            style = MaterialTheme.typography.bodySmall
+                                        )
+                                        OutlinedButton(onClick = {
+                                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                                                val intent = Intent(
+                                                    Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION,
+                                                    Uri.parse("package:" + packageName)
+                                                )
+                                                try {
+                                                    allFilesPermissionLauncher.launch(intent)
+                                                } catch (_: Exception) {
+                                                    allFilesPermissionLauncher.launch(Intent(
+                                                        Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION
+                                                    ))
+                                                }
+                                            }
+                                        }) {
+                                            Text(if (allFilesGranted) "Review / revoke file access"
+                                                else "Grant one-time shared-file access")
                                         }
                                     }
 

@@ -4,6 +4,9 @@
 
     <!-- Online research is triggered only by explicit Wikipedia commands. -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Optional owner-approved shared-file search. Android grants broad
+         shared-storage read/write scope; Astra only reads file metadata. -->
+    <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />
 
     <!-- Microphone permission for voice recognition -->
     <uses-permission
