@@ -9,6 +9,7 @@ import android.net.Uri
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
+import android.provider.OpenableColumns
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
@@ -2409,8 +2410,22 @@ class MainActivity :
                         )
                     )
                 }
+                val localBooks = remember {
+                    AstraBookLibrary(
+                        java.io.File(applicationContext.noBackupFilesDir, "knowledge/books")
+                    )
+                }
+                var importedBookCount by remember {
+                    mutableIntStateOf(localBooks.listBooks().size)
+                }
+                var useBooksInChat by remember {
+                    mutableStateOf(storage.getBoolean("astra_use_books_in_chat"))
+                }
+                var bookImportRunning by remember { mutableStateOf(false) }
+                var bookImportStatus by remember { mutableStateOf("") }
+                var confirmClearBooks by remember { mutableStateOf(false) }
                 val onDeviceBrain = remember {
-                    AstraOnDeviceBrain(applicationContext, neuralLearner)
+                    AstraOnDeviceBrain(applicationContext, neuralLearner, localBooks)
                 }
                 var neuralTrainingEnabled by remember {
                     mutableStateOf(storage.getBoolean("astra_neural_learning_opt_in"))
@@ -3295,6 +3310,74 @@ class MainActivity :
                             }
                         }
                     }
+
+                val importBookLauncher =
+                    rememberLauncherForActivityResult(
+                        ActivityResultContracts.OpenDocument()
+                    ) { uri ->
+                        if (uri != null && !bookImportRunning) {
+                            bookImportRunning = true
+                            bookImportStatus = "Importing selected book on this phone..."
+                            researchScope.launch {
+                                try {
+                                    val imported = withContext(Dispatchers.IO) {
+                                        val title = contentResolver.query(
+                                            uri, arrayOf(OpenableColumns.DISPLAY_NAME),
+                                            null, null, null
+                                        )?.use { cursor ->
+                                            if (cursor.moveToFirst())
+                                                cursor.getString(0)
+                                            else null
+                                        } ?: uri.lastPathSegment ?: "unnamed.txt"
+                                        val source = contentResolver.openInputStream(uri)
+                                            ?: error("Could not open the selected book.")
+                                        source.use { localBooks.importBook(title, it) }
+                                    }
+                                    importedBookCount = localBooks.listBooks().size
+                                    bookImportStatus =
+                                        "Indexed " + imported.chunks + " private passages from " +
+                                            imported.title +
+                                            (if (imported.truncated) " (partial index)." else ".")
+                                } catch (cancel: CancellationException) {
+                                    throw cancel
+                                } catch (error: Exception) {
+                                    bookImportStatus = "Book import failed: " +
+                                        (error.message ?: "unsupported file")
+                                } finally {
+                                    bookImportRunning = false
+                                }
+                            }
+                        }
+                    }
+
+                if (confirmClearBooks) {
+                    AlertDialog(
+                        onDismissRequest = { confirmClearBooks = false },
+                        title = { Text("Remove imported books?") },
+                        text = {
+                            Text("Delete all locally imported book excerpts? This does not " +
+                                "delete your original files in Downloads or other apps. " +
+                                "This cannot be undone inside Astra.")
+                        },
+                        confirmButton = {
+                            TextButton(onClick = {
+                                confirmClearBooks = false
+                                useBooksInChat = false
+                                storage.setBoolean("astra_use_books_in_chat", false)
+                                researchScope.launch {
+                                    withContext(Dispatchers.IO) { localBooks.clear() }
+                                    importedBookCount = 0
+                                    bookImportStatus = "Private book library cleared."
+                                }
+                            }) { Text("Delete imported books") }
+                        },
+                        dismissButton = {
+                            TextButton(onClick = { confirmClearBooks = false }) {
+                                Text("Cancel")
+                            }
+                        }
+                    )
+                }
 
                 val importModelLauncher =
                     rememberLauncherForActivityResult(
@@ -5130,6 +5213,79 @@ class MainActivity :
                                             }
                                         }
                                         HorizontalDivider()
+                                    }
+
+                                    item {
+                                        HorizontalDivider()
+                                        Text(
+                                            "Your private book library",
+                                            style = MaterialTheme.typography.titleMedium
+                                        )
+                                        Text(
+                                            "Import a downloaded UTF-8 TXT, Markdown or " +
+                                                "unencrypted EPUB book. Astra indexes it entirely " +
+                                                "on this phone and never uploads its contents. " +
+                                                "The book is reference context for the offline AI, " +
+                                                "not training data for Qwen3's model weights.",
+                                            style = MaterialTheme.typography.bodySmall
+                                        )
+                                        Text(
+                                            "Books: $importedBookCount. " +
+                                                "Ask 'ask book Russian grammar' to retrieve from them.",
+                                            style = MaterialTheme.typography.bodySmall
+                                        )
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Text(
+                                                "Use imported books in normal AI chat",
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                modifier = Modifier.weight(1f)
+                                            )
+                                            Switch(
+                                                checked = useBooksInChat,
+                                                enabled = importedBookCount > 0,
+                                                onCheckedChange = { value ->
+                                                    useBooksInChat = value
+                                                    storage.setBoolean(
+                                                        "astra_use_books_in_chat", value
+                                                    )
+                                                }
+                                            )
+                                        }
+                                        Text(
+                                            "Automatic book context is off by default. " +
+                                                "Explicit 'ask book ...' works without this switch. " +
+                                                "Only short matching passages are provided to the " +
+                                                "local model; no remote search or paid service is used.",
+                                            style = MaterialTheme.typography.bodySmall
+                                        )
+                                        OutlinedButton(
+                                            enabled = !bookImportRunning,
+                                            onClick = {
+                                                importBookLauncher.launch(arrayOf("*/*"))
+                                            }
+                                        ) {
+                                            Text(if (bookImportRunning) "Importing book..."
+                                                else "Import book (TXT / MD / EPUB)")
+                                        }
+                                        if (bookImportStatus.isNotBlank()) {
+                                            Text(bookImportStatus,
+                                                style = MaterialTheme.typography.bodySmall)
+                                        }
+                                        if (importedBookCount > 0) {
+                                            localBooks.listBooks().take(8).forEach { book ->
+                                                Text(
+                                                    "• " + book.title + " — " +
+                                                        book.chunks + " passages",
+                                                    style = MaterialTheme.typography.bodySmall
+                                                )
+                                            }
+                                            OutlinedButton(
+                                                onClick = { confirmClearBooks = true }
+                                            ) { Text("Remove imported books") }
+                                        }
                                     }
 
                                     item {
