@@ -2327,12 +2327,16 @@ class MainActivity :
             AstraStorage(this)
 
         val dialogue = AstraDialogue()
+        val vocabularyStore = AstraVocabularyStore(
+            java.io.File(applicationContext.noBackupFilesDir, "languages/vocabulary")
+        )
 
         val processor = AstraProcessor(
-            RussianTutor(storage::getInt, storage::setInt),
+            RussianTutor(storage::getInt, storage::setInt, vocabularyStore),
             AstraMultilingualTutor(
                 storage::getInt, storage::setInt,
-                storage::getString, storage::setString
+                storage::getString, storage::setString,
+                vocabularyStore
             ),
             EverydayAssistant(storage::getString, storage::setString),
             dialogue
@@ -2441,6 +2445,18 @@ class MainActivity :
                 var bookImportRunning by remember { mutableStateOf(false) }
                 var bookImportStatus by remember { mutableStateOf("") }
                 var confirmClearBooks by remember { mutableStateOf(false) }
+                var selectedVocabularyLanguage by remember {
+                    mutableStateOf("setswana")
+                }
+                var vocabularyLanguageMenuOpen by remember { mutableStateOf(false) }
+                var vocabularyImportRunning by remember { mutableStateOf(false) }
+                var vocabularyImportStatus by remember { mutableStateOf("") }
+                var confirmClearVocabulary by remember { mutableStateOf(false) }
+                var importedVocabularyCount by remember {
+                    mutableIntStateOf(runCatching {
+                        vocabularyStore.list("setswana").size
+                    }.getOrDefault(0))
+                }
                 val onDeviceBrain = remember {
                     AstraOnDeviceBrain(applicationContext, neuralLearner, localBooks)
                 }
@@ -3403,6 +3419,83 @@ class MainActivity :
                             }
                         }
                     }
+
+                val importVocabularyLauncher =
+                    rememberLauncherForActivityResult(
+                        ActivityResultContracts.OpenDocument()
+                    ) { uri ->
+                        if (uri != null && !vocabularyImportRunning) {
+                            val language = selectedVocabularyLanguage
+                            vocabularyImportRunning = true
+                            vocabularyImportStatus =
+                                "Importing your " + language + " vocabulary on this phone..."
+                            researchScope.launch {
+                                try {
+                                    val result = withContext(Dispatchers.IO) {
+                                        val stream = contentResolver.openInputStream(uri)
+                                            ?: error("Cannot read selected vocabulary document.")
+                                        stream.use { vocabularyStore.importTsv(language, it) }
+                                    }
+                                    importedVocabularyCount =
+                                        vocabularyStore.list(language).size
+                                    vocabularyImportStatus =
+                                        "Added " + result.added + " cards to " + language +
+                                            "; " + result.alreadyPresent + " duplicates skipped. " +
+                                            "Total user-added cards: " + result.totalCustomWords + "."
+                                } catch (cancel: CancellationException) {
+                                    throw cancel
+                                } catch (error: Exception) {
+                                    vocabularyImportStatus =
+                                        "Vocabulary import rejected; no changes: " +
+                                            (error.message ?: "Invalid TSV file.")
+                                } finally {
+                                    vocabularyImportRunning = false
+                                }
+                            }
+                        }
+                    }
+
+                if (confirmClearVocabulary) {
+                    val language = selectedVocabularyLanguage
+                    AlertDialog(
+                        onDismissRequest = { confirmClearVocabulary = false },
+                        title = { Text("Delete imported " + language + " words?") },
+                        text = {
+                            Text(
+                                "Deletes only the extra vocabulary imported into Astra for " +
+                                    language + ". Built-in lessons, the original documents " +
+                                    "and other languages remain unchanged. " +
+                                    "This cannot be undone in Astra."
+                            )
+                        },
+                        confirmButton = {
+                            TextButton(onClick = {
+                                confirmClearVocabulary = false
+                                researchScope.launch {
+                                    try {
+                                        withContext(Dispatchers.IO) {
+                                            vocabularyStore.clear(language)
+                                        }
+                                        if (selectedVocabularyLanguage == language) {
+                                            importedVocabularyCount = 0
+                                        }
+                                        vocabularyImportStatus =
+                                            "Removed imported " + language +
+                                                " vocabulary. Built-in cards were kept."
+                                    } catch (error: Exception) {
+                                        vocabularyImportStatus =
+                                            error.message ?: "Could not clear private vocabulary."
+                                    }
+                                }
+                            }) { Text("Delete custom words") }
+                        },
+                        dismissButton = {
+                            TextButton(onClick = {
+                                confirmClearVocabulary = false
+                            }) { Text("Cancel") }
+                        }
+                    )
+                }
 
                 if (confirmClearBooks) {
                     AlertDialog(
@@ -5433,6 +5526,104 @@ class MainActivity :
                                             }
                                         }
                                         HorizontalDivider()
+                                    }
+
+                                    item {
+                                        HorizontalDivider()
+                                        Text(
+                                            "Expand offline language lessons",
+                                            style = MaterialTheme.typography.titleMedium
+                                        )
+                                        Text(
+                                            "Astra already includes 191 offline lessons and " +
+                                                "768 vocabulary cards across nine languages. " +
+                                                "Add up to 5,000 privately imported words for " +
+                                                "each language; new four-word lessons are " +
+                                                "generated automatically. No AI model download " +
+                                                "or internet connection is required.",
+                                            style = MaterialTheme.typography.bodySmall
+                                        )
+                                        Box {
+                                            OutlinedButton(
+                                                enabled = !vocabularyImportRunning,
+                                                onClick = {
+                                                    vocabularyLanguageMenuOpen = true
+                                                }
+                                            ) {
+                                                Text(
+                                                    "Vocabulary: " +
+                                                        selectedVocabularyLanguage.replaceFirstChar {
+                                                            it.uppercase()
+                                                        }
+                                                )
+                                            }
+                                            DropdownMenu(
+                                                expanded = vocabularyLanguageMenuOpen,
+                                                onDismissRequest = {
+                                                    vocabularyLanguageMenuOpen = false
+                                                }
+                                            ) {
+                                                AstraVocabularyStore.supportedLanguages.sorted()
+                                                    .forEach { language ->
+                                                        DropdownMenuItem(
+                                                            text = {
+                                                                Text(language.replaceFirstChar {
+                                                                    it.uppercase()
+                                                                })
+                                                            },
+                                                            onClick = {
+                                                                selectedVocabularyLanguage = language
+                                                                importedVocabularyCount =
+                                                                    runCatching {
+                                                                        vocabularyStore.list(language).size
+                                                                    }.getOrDefault(0)
+                                                                vocabularyLanguageMenuOpen = false
+                                                            }
+                                                        )
+                                                    }
+                                            }
+                                        }
+                                        Text(
+                                            "Imported words in this language: " +
+                                                importedVocabularyCount + " / " +
+                                                AstraVocabularyStore.MAX_CUSTOM_WORDS_PER_LANGUAGE,
+                                            style = MaterialTheme.typography.bodySmall
+                                        )
+                                        Text(
+                                            "Choose a local UTF-8 .tsv or .txt file. " +
+                                                "Each line must contain two columns separated " +
+                                                "by a TAB: foreign phrase, then English meaning. " +
+                                                "An optional 'phrase TAB translation' header " +
+                                                "is accepted. Imported terms stay on this phone " +
+                                                "and are not included in regular JSON backups.",
+                                            style = MaterialTheme.typography.bodySmall
+                                        )
+                                        OutlinedButton(
+                                            enabled = !vocabularyImportRunning,
+                                            onClick = {
+                                                importVocabularyLauncher.launch(arrayOf("*/*"))
+                                            }
+                                        ) {
+                                            Text(
+                                                if (vocabularyImportRunning)
+                                                    "Importing vocabulary..."
+                                                else "Import extra vocabulary (TSV)"
+                                            )
+                                        }
+                                        if (vocabularyImportStatus.isNotBlank()) {
+                                            Text(
+                                                vocabularyImportStatus,
+                                                style = MaterialTheme.typography.bodySmall
+                                            )
+                                        }
+                                        if (importedVocabularyCount > 0) {
+                                            TextButton(
+                                                enabled = !vocabularyImportRunning,
+                                                onClick = { confirmClearVocabulary = true }
+                                            ) {
+                                                Text("Remove imported words for this language")
+                                            }
+                                        }
                                     }
 
                                     item {

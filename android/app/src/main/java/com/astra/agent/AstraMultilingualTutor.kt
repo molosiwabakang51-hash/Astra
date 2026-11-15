@@ -12,7 +12,8 @@ internal class AstraMultilingualTutor(
     private val readInt: (String, Int) -> Int,
     private val writeInt: (String, Int) -> Unit,
     private val readString: (String, String) -> String,
-    private val writeString: (String, String) -> Unit
+    private val writeString: (String, String) -> Unit,
+    private val vocabularyStore: AstraVocabularyStore? = null
 ) {
     internal enum class Language(val id: String, val display: String, vararg val aliases: String) {
         SETSWANA("setswana", "Setswana (Botswana)", "setswana", "tswana"),
@@ -110,6 +111,19 @@ internal class AstraMultilingualTutor(
         (original + extra).distinctBy { it.phrase }
     }
 
+    /**
+     * Imported words extend every existing deck without changing previously
+     * saved question indices. The store caches validated files in memory and
+     * atomically refreshes them on each successful import.
+     */
+    private fun deck(language: Language): List<Card> {
+        val builtIn = decks.getValue(language)
+        val extras = vocabularyStore?.list(language.id).orEmpty().map {
+            Card(it.phrase, it.translation)
+        }
+        return (builtIn + extras).distinctBy { it.phrase }
+    }
+
     companion object {
         private const val ACTIVE = "astra_learning_language"
         private const val CARDS_PER_LESSON = 4
@@ -177,7 +191,7 @@ internal class AstraMultilingualTutor(
                 }
                 if (lower == alias + " progress") {
                     return language.display + ": " + readInt(key(language, "correct"), 0) +
-                        " correct answers; " + decks.getValue(language).size +
+                        " correct answers; " + deck(language).size +
                         " vocabulary cards across " + lessonCount(language) +
                         " lessons. Type '" + language.id + " quiz' to continue."
                 }
@@ -192,18 +206,18 @@ internal class AstraMultilingualTutor(
         if (lower in setOf("skip language question", "skip language quiz")) {
             val language = current() ?: return "No active language quiz."
             val pending = readInt(key(language, "pending"), 0) - 1
-            if (pending !in decks.getValue(language).indices) return "No active language quiz."
+            if (pending !in deck(language).indices) return "No active language quiz."
             writeInt(key(language, "pending"), 0)
-            writeInt(key(language, "next"), (pending + 1) % decks.getValue(language).size)
-            val card = decks.getValue(language)[pending]
+            writeInt(key(language, "next"), (pending + 1) % deck(language).size)
+            val card = deck(language)[pending]
             return "Skipped. " + card.phrase + " means " + card.english +
                 ". Type '" + language.id + " quiz' to continue."
         }
         if (lower == "answer" || lower.startsWith("answer ")) {
             val language = current() ?: return null
             val index = readInt(key(language, "pending"), 0) - 1
-            if (index !in decks.getValue(language).indices) return null
-            val card = decks.getValue(language)[index]
+            if (index !in deck(language).indices) return null
+            val card = deck(language)[index]
             if (lower == "answer") {
                 return "Translate '" + card.phrase +
                     "' into English. Reply 'answer <translation>' " +
@@ -217,7 +231,7 @@ internal class AstraMultilingualTutor(
                     "' into English. Try 'answer ...' or 'skip language question'."
             }
             writeInt(key(language, "pending"), 0)
-            writeInt(key(language, "next"), (index + 1) % decks.getValue(language).size)
+            writeInt(key(language, "next"), (index + 1) % deck(language).size)
             val count = readInt(key(language, "correct"), 0).coerceAtLeast(0) + 1
             writeInt(key(language, "correct"), count)
             return "Correct. " + card.phrase + " means " + card.english +
@@ -240,13 +254,13 @@ internal class AstraMultilingualTutor(
         "lang_" + language.id + "_" + suffix
 
     private fun lessonCount(language: Language): Int =
-        (decks.getValue(language).size + CARDS_PER_LESSON - 1) / CARDS_PER_LESSON
+        (deck(language).size + CARDS_PER_LESSON - 1) / CARDS_PER_LESSON
 
     private fun lesson(language: Language, number: Int): String {
         val total = lessonCount(language)
         val module = number.coerceIn(1, total)
         writeInt(key(language, "lesson"), module)
-        val content = decks.getValue(language)
+        val content = deck(language)
             .drop((module - 1) * CARDS_PER_LESSON)
             .take(CARDS_PER_LESSON)
             .joinToString("\n") {
@@ -275,11 +289,11 @@ internal class AstraMultilingualTutor(
                 "Type 'next language lesson' or '" + language.id + " quiz' to practise."
             else
                 "Course lessons complete. Type '" + language.id + " quiz' to practise " +
-                    "all " + decks.getValue(language).size + " vocabulary cards."
+                    "all " + deck(language).size + " vocabulary cards."
     }
 
     private fun quiz(language: Language): String {
-        val list = decks.getValue(language)
+        val list = deck(language)
         val index = readInt(key(language, "next"), 0).coerceAtLeast(0) % list.size
         writeInt(key(language, "pending"), index + 1)
         return language.display + " practice: What does '" + list[index].phrase +
