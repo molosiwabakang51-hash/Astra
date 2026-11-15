@@ -83,10 +83,17 @@ internal object AstraLanguageBenchmark {
                 Regex("""^(?:thanks|thank(?:\s+|-)you)[.!]?$""").matches(text)
             Probe.CONTEXT ->
                 Regex("""^["'“‘]?nimbora["'”’]?[.!]?$""").matches(text)
-            Probe.GRAMMAR -> listOf(
-                "nominative", "genitive", "dative",
-                "accusative", "instrumental", "prepositional"
-            ).count { word -> Regex("""\b""" + word + """\b""").containsMatchIn(text) } >= 2
+            Probe.GRAMMAR ->
+                // Listing two case names is not evidence of understanding
+                // if the response explicitly denies that those cases exist.
+                !Regex("""\b(?:no|not|neither|none|without|isn't|aren't|doesn't|don't|incorrect|false)\b""")
+                    .containsMatchIn(text) &&
+                listOf(
+                    "nominative", "genitive", "dative",
+                    "accusative", "instrumental", "prepositional"
+                ).count { word ->
+                    Regex("""\b""" + word + """\b""").containsMatchIn(text)
+                } >= 2
             Probe.COMPOUND_INTEREST ->
                 Regex("""^(?:p|bwp)?\s*1,?331(?:\.0{1,2})?[.!]?$""").matches(text)
             Probe.DEDUCTION ->
