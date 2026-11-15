@@ -47,7 +47,7 @@ internal class AstraVocabularyStore(private val directory: File) {
         require(file.isFile && file.length() in 1..MAX_STORED_BYTES.toLong()) {
             "Private vocabulary file is invalid or exceeds 3 MB."
         }
-        val words = parse(file.inputStream(), allowHeader = false)
+        val words = file.inputStream().use { parse(it, allowHeader = false) }
         require(words.size <= MAX_CUSTOM_WORDS_PER_LANGUAGE) {
             "Private vocabulary exceeds the 5,000-card local limit."
         }
