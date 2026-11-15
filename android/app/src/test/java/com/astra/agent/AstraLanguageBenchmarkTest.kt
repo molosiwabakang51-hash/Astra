@@ -56,6 +56,22 @@ class AstraLanguageBenchmarkTest {
             AstraLanguageBenchmark.Probe.GRAMMAR, "Russian language has many cases."))
     }
 
+    @Test fun russianGrammarProbeRejectsExplicitlyNegatedCorrectWords() {
+        for (wrong in listOf(
+            "Russian has no nominative or genitive cases.",
+            "The nominative and genitive are not Russian grammatical cases.",
+            "Neither the genitive nor the instrumental exists.",
+            "It is false that Russian has nominative and accusative cases."
+        )) {
+            assertFalse("Negated case names cannot count: $wrong",
+                AstraLanguageBenchmark.score(
+                    AstraLanguageBenchmark.Probe.GRAMMAR, wrong))
+        }
+        assertTrue(AstraLanguageBenchmark.score(
+            AstraLanguageBenchmark.Probe.GRAMMAR,
+            "Nominative and genitive."))
+    }
+
     @Test fun reportIsConservativeAndIdentifiesActualModel() {
         val result = AstraLanguageBenchmark.outcome(
             AstraLanguageBenchmark.Probe.RUSSIAN, "Thanks", 125L)
