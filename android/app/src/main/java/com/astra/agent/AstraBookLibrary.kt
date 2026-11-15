@@ -36,21 +36,14 @@ internal class AstraBookLibrary(private val directory: File) {
     )
 
     private val names = Regex("""^[a-f0-9-]{36}\.jsonl$""")
-    private val words = Regex("""[\p{L}\p{N}]+""")
     private val whitespace = Regex("""\s+""")
-    private val stop = setOf(
-        "a","an","the","of","and","for","to","in","on","at","by","with",
-        "do","does","are","is","was","were","can","you","me","my","i",
-        "how","what","why","where","about","from","explain","please",
-        "tell","using","ask","book","books","read","this","that"
-    )
 
     companion object {
         private const val MAX_INPUT_BYTES = 10 * 1024 * 1024
         private const val MAX_EPUB_HTML_BYTES = 14 * 1024 * 1024
         private const val MAX_ZIP_ENTRIES = 600
         private const val MAX_HTML_ENTRIES = 200
-        private const val MAX_CHUNKS = 2_400
+        private const val MAX_CHUNKS = 5_200
         private const val MAX_BOOKS = 30
         private const val MAX_INDEX_BYTES = 6 * 1024 * 1024
         private const val MAX_CONTEXT = 1_000
@@ -67,9 +60,6 @@ internal class AstraBookLibrary(private val directory: File) {
             else -> throw IllegalArgumentException("Choose a UTF-8 TXT, Markdown or EPUB book.")
         }
         require(title.isNotBlank()) { "Book filename is missing." }
-        require(listBooks().size < MAX_BOOKS) {
-            "Book library is full. Remove a book before importing another."
-        }
         val body = when (format) {
             "epub" -> epubText(input)
             else -> decode(readBounded(input, MAX_INPUT_BYTES))
@@ -85,6 +75,9 @@ internal class AstraBookLibrary(private val directory: File) {
             val meta = readHeader(File(directory, previous.id + ".jsonl"))
             meta?.optString("digest") == digest
         }?.let { return it }
+        require(listBooks().size < MAX_BOOKS) {
+            "Book library is full. Remove a book before importing another."
+        }
 
         require(directory.isDirectory || directory.mkdirs()) {
             "Unable to create private book storage."
@@ -155,40 +148,65 @@ internal class AstraBookLibrary(private val directory: File) {
 
     @Synchronized
     fun search(question: String, maxHits: Int = 3): List<Passage> {
-        val keys = keywords(question)
+        val keys = AstraBookRanking.queryTerms(question)
         if (keys.isEmpty()) return emptyList()
-        val matches = mutableListOf<Passage>()
+
+        // Keep memory bounded even if 30 imported books contain thousands of
+        // matching passages. The original implementation accumulated *every*
+        // hit; a broad query could allocate tens of thousands of strings.
+        val capacity = maxHits.coerceIn(1, 4) * 5
+        val smallestFirst = compareBy<Passage> { it.score }
+            .thenByDescending { it.bookId }.thenByDescending { it.number }
+        val best = mutableListOf<Passage>()
         for (book in listBooks()) {
+            // Retain a few candidates per source so a long first textbook
+            // cannot suppress all results from another relevant book.
+            val perBook = java.util.PriorityQueue<Passage>(capacity, smallestFirst)
             val file = File(directory, book.id + ".jsonl")
-            // Parse strictly bounded files; corrupt files are skipped.
             runCatching {
                 file.bufferedReader(Charsets.UTF_8).use { reader ->
-                    reader.readLine() // header
-                    repeat(MAX_CHUNKS) {
-                        val line = reader.readLine() ?: return@repeat
-                        if (line.length > 5_000) return@repeat
+                    reader.readLine() // verified book header
+                    for (index in 0 until MAX_CHUNKS) {
+                        val line = reader.readLine() ?: break
+                        if (line.length > 5_000) continue
                         val entry = JSONObject(line)
-                        if (entry.optString("type") != "passage") return@repeat
+                        if (entry.optString("type") != "passage") continue
                         val passage = entry.optString("text").take(1_000)
-                        val textTokens = keywords(passage, keepStop = true)
-                        val titleTokens = keywords(book.title, keepStop = true)
-                        val score = keys.sumOf { key ->
-                            (if (key in textTokens) 4 else 0) +
-                                (if (key in titleTokens) 5 else 0)
-                        }
-                        if (score >= 4) {
-                            matches.add(
-                                Passage(book.id, book.title,
-                                    entry.optInt("n"), passage, score)
-                            )
+                        val score = AstraBookRanking.score(keys, passage, book.title)
+                        if (score <= 0) continue
+                        val hit = Passage(
+                            book.id, book.title, entry.optInt("n"),
+                            passage, score
+                        )
+                        if (perBook.size < capacity) {
+                            perBook.add(hit)
+                        } else if (smallestFirst.compare(hit, perBook.peek()) > 0) {
+                            perBook.poll()
+                            perBook.add(hit)
                         }
                     }
                 }
             }
+            best.addAll(perBook)
         }
-        return matches.sortedWith(compareByDescending<Passage> { it.score }
-            .thenBy { it.bookId }.thenBy { it.number })
-            .take(maxHits.coerceIn(1, 4))
+        val ordered = best.sortedWith(
+            compareByDescending<Passage> { it.score }
+                .thenBy { it.bookId }.thenBy { it.number }
+        )
+        // When several books answer the same topic, include another source
+        // where its score is reasonably close to the highest-ranked evidence.
+        val result = mutableListOf<Passage>()
+        val usedBooks = mutableSetOf<String>()
+        for (hit in ordered) {
+            if (result.size >= maxHits.coerceIn(1, 4)) break
+            if (hit.bookId in usedBooks && ordered.any {
+                    it.bookId !in usedBooks && it.score >= hit.score - 4
+                }
+            ) continue
+            result.add(hit)
+            usedBooks.add(hit.bookId)
+        }
+        return result
     }
 
     fun enrich(question: String, passages: List<Passage>): String {
@@ -199,7 +217,9 @@ internal class AstraBookLibrary(private val directory: File) {
             passages.take(2).forEachIndexed { i, passage ->
                 appendLine("[B" + (i + 1) + "] " + safe(passage.title).take(70) +
                     ", passage " + passage.number)
-                appendLine("\"" + safe(passage.text).take(320) + "\"")
+                appendLine("\"" + safe(
+                    AstraBookRanking.excerpt(passage.text, question, 320)
+                ) + "\"")
             }
             appendLine("CURRENT QUESTION:")
         }.take(MAX_CONTEXT)
@@ -220,11 +240,6 @@ internal class AstraBookLibrary(private val directory: File) {
         }
     }.getOrNull()
 
-    private fun keywords(text: String, keepStop: Boolean = false): Set<String> =
-        words.findAll(text.lowercase(Locale.ROOT))
-            .take(1_000).map { it.value }
-            .filter { it.length >= 2 && (keepStop || it !in stop) }
-            .toSet()
 
     private fun chunks(text: String): List<Pair<String, Int>> {
         val result = ArrayList<Pair<String, Int>>()

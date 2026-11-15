@@ -121,6 +121,45 @@ class AstraBookLibraryTest {
         }
     }
 
+    @Test fun bookTitleCannotStandInForMissingAnswerInItsPassages() {
+        val lib = library()
+        lib.importBook("Russian_Genitive_Grammar.txt", input(
+            ("Russian greetings and everyday pronunciation are useful. ").repeat(35)
+        ))
+        val results = lib.search("Explain Russian genitive cases")
+        assertTrue(results.isEmpty())
+    }
+
+    @Test fun lateRelevantChapterBeatsEarlyGenericIntroduction() {
+        val lib = library()
+        val introduction = ("Russian course introductions discuss greetings, " +
+            "conversation and reading practice. ").repeat(18)
+        val important = ("The Russian genitive case expresses possession " +
+            "and can follow negation. ").repeat(3)
+        lib.importBook("Russian_Grammar.md", input(introduction + important))
+        val question = "Explain the genitive case and possession in Russian"
+        val matches = lib.search(question)
+        assertTrue(matches.isNotEmpty())
+        assertTrue(matches.first().text.contains("genitive case"))
+        val prompt = lib.enrich(question, matches)
+        assertTrue(prompt.contains("genitive case expresses possession"))
+        assertTrue(prompt.endsWith(question))
+    }
+
+    @Test fun equallyRelevantDifferentBooksBothAppearInEvidence() {
+        val lib = library()
+        lib.importBook("Russian_Cases.txt", input(
+            ("The Russian genitive case shows possession of a noun. ").repeat(30)
+        ))
+        lib.importBook("Russian_Nouns.md", input(
+            ("The Russian genitive case shows possession of a noun. ").repeat(29) +
+                "The endings depend on the noun."
+        ))
+        val result = lib.search("Russian genitive case possession", maxHits = 2)
+        assertEquals(2, result.size)
+        assertEquals(2, result.map { it.bookId }.distinct().size)
+    }
+
     @Test fun generalUnrelatedQuestionDoesNotAutomaticallyLeakBook() {
         val lib = library()
         lib.importBook("russian.md", input(
