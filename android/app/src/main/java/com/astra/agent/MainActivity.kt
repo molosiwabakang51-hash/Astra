@@ -3420,6 +3420,83 @@ class MainActivity :
                         }
                     }
 
+                val importVocabularyLauncher =
+                    rememberLauncherForActivityResult(
+                        ActivityResultContracts.OpenDocument()
+                    ) { uri ->
+                        if (uri != null && !vocabularyImportRunning) {
+                            val language = selectedVocabularyLanguage
+                            vocabularyImportRunning = true
+                            vocabularyImportStatus =
+                                "Importing your " + language + " vocabulary on this phone..."
+                            researchScope.launch {
+                                try {
+                                    val result = withContext(Dispatchers.IO) {
+                                        val stream = contentResolver.openInputStream(uri)
+                                            ?: error("Cannot read selected vocabulary document.")
+                                        stream.use { vocabularyStore.importTsv(language, it) }
+                                    }
+                                    importedVocabularyCount =
+                                        vocabularyStore.list(language).size
+                                    vocabularyImportStatus =
+                                        "Added " + result.added + " cards to " + language +
+                                            "; " + result.alreadyPresent + " duplicates skipped. " +
+                                            "Total user-added cards: " + result.totalCustomWords + "."
+                                } catch (cancel: CancellationException) {
+                                    throw cancel
+                                } catch (error: Exception) {
+                                    vocabularyImportStatus =
+                                        "Vocabulary import rejected; no changes: " +
+                                            (error.message ?: "Invalid TSV file.")
+                                } finally {
+                                    vocabularyImportRunning = false
+                                }
+                            }
+                        }
+                    }
+
+                if (confirmClearVocabulary) {
+                    val language = selectedVocabularyLanguage
+                    AlertDialog(
+                        onDismissRequest = { confirmClearVocabulary = false },
+                        title = { Text("Delete imported " + language + " words?") },
+                        text = {
+                            Text(
+                                "Deletes only the extra vocabulary imported into Astra for " +
+                                    language + ". Built-in lessons, the original documents " +
+                                    "and other languages remain unchanged. " +
+                                    "This cannot be undone in Astra."
+                            )
+                        },
+                        confirmButton = {
+                            TextButton(onClick = {
+                                confirmClearVocabulary = false
+                                researchScope.launch {
+                                    try {
+                                        withContext(Dispatchers.IO) {
+                                            vocabularyStore.clear(language)
+                                        }
+                                        if (selectedVocabularyLanguage == language) {
+                                            importedVocabularyCount = 0
+                                        }
+                                        vocabularyImportStatus =
+                                            "Removed imported " + language +
+                                                " vocabulary. Built-in cards were kept."
+                                    } catch (error: Exception) {
+                                        vocabularyImportStatus =
+                                            error.message ?: "Could not clear private vocabulary."
+                                    }
+                                }
+                            }) { Text("Delete custom words") }
+                        },
+                        dismissButton = {
+                            TextButton(onClick = {
+                                confirmClearVocabulary = false
+                            }) { Text("Cancel") }
+                        }
+                    )
+                }
+
                 if (confirmClearBooks) {
                     AlertDialog(
                         onDismissRequest = { confirmClearBooks = false },
