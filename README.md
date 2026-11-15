@@ -122,6 +122,29 @@ responsible for obtaining legal access to files and respecting their
 licenses. Astra does not redistribute imported books, mirror copyrighted
 libraries or bypass DRM. No paid inference endpoint is required.
 
+## Adaptive on-device explanation depth
+
+Astra's local Qwen3 inference no longer hard-limits every answer to 384
+tokens. The token allowance now reflects the **request's desired depth**
+and the **local model actually loaded**:
+
+| Response request | Qwen3 1.7B | Qwen3 0.6B fallback |
+| --- | ---: | ---: |
+| Brief | 256 tokens | 192 tokens |
+| Ordinary | 768 tokens | 448 tokens |
+| Detailed tutorial or grounded book response | 1,152 tokens | 672 tokens |
+
+An explicit request for brevity takes precedence, even when Astra
+retrieves passages from the user's private book library or free Russian
+reference material. These are strict caps enforced by the existing
+native inference backend. **This improves maximum answer completeness,
+not the underlying model's reasoning or linguistic understanding.**
+
+No paid AI service, online model or new large download is required.
+Longer responses can take more time and battery. The capability requires
+Android build verification and real-device inference tests before it can
+be considered stable.
+
 ## Real on-device language spot checks (experimental)
 
 Under **Settings → Conversation quality checks**, the user can run a
