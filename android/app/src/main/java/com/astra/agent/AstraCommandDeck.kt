@@ -46,6 +46,7 @@ import androidx.compose.ui.unit.dp
 internal object AstraDeck {
     val prompts = listOf(
         "Mission control",
+        "Workflow help",
         "What's next",
         "Memory overview",
         "Show tasks",
