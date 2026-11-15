@@ -5397,10 +5397,10 @@ class MainActivity :
                                             style = MaterialTheme.typography.titleSmall
                                         )
                                         Text(
-                                            "Runs four short prompts through the actual on-device " +
-                                                "language model: arithmetic, Russian translation, " +
-                                                "remembering a fictional word across two turns, " +
-                                                "and naming Russian grammatical cases. " +
+                                            "Runs seven checks through the actual on-device language " +
+                                                "model: arithmetic, Russian translation, two-turn " +
+                                                "recall, Russian grammar, compound interest, " +
+                                                "logical deduction and Setswana. " +
                                                 "Run with airplane mode on to verify offline behavior. " +
                                                 "This is a small spot check, not proof of unrestricted " +
                                                 "understanding or continual language-model training.",
