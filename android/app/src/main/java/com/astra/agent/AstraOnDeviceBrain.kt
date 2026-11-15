@@ -240,7 +240,12 @@ internal class AstraOnDeviceBrain(
                     },
                     restoringConversation
                 )
-                current.sendUserPrompt(requestPrompt, 384).collect { part ->
+                val answerBudget = AstraGenerationPolicy.maxAnswerTokens(
+                    finalMessage,
+                    advancedModel = modelPath.name == AstraModelImport.ADVANCED_NAME,
+                    hasReferences = bookReferences.isNotEmpty() || openReferences.isNotEmpty()
+                )
+                current.sendUserPrompt(requestPrompt, answerBudget).collect { part ->
                     // Restrict accumulated output and cap main-thread UI updates.
                     val space = (16_000 - answer.length).coerceAtLeast(0)
                     if (space > 0) answer.append(part.take(space))
