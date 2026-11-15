@@ -108,13 +108,30 @@ internal object AstraReplyLanguage {
                         return composed
                     }
                 }
-                // Keep the explicit current-question boundary when the
-                // history will not fit, rather than emitting half a quote.
+                // If even the current request is long, exclude previous
+                // chat entirely while retaining its explicit boundary.
                 if (currentSection.length <= budget) return directive + currentSection
+                return directive + CURRENT_HEADER + boundedHeadTail(
+                    current, budget - CURRENT_HEADER.length
+                )
             }
         }
-        // A single near-3,000-character user prompt has no earlier quotes
-        // to keep. Preserve the most recent request, as before.
-        return directive + modelPrompt.takeLast(budget)
+        // In a long pasted source, takeLast() silently discards the opening
+        // context. Retain a bounded head and the latest question, and mark
+        // any missing middle explicitly. Keep Qwen's trailing /no_think.
+        return directive + boundedHeadTail(modelPrompt, budget)
+    }
+
+    private const val OMITTED_MIDDLE =
+        "\n[Middle of source omitted to fit selected reply language.]\n"
+
+    private fun boundedHeadTail(prompt: String, maximum: Int): String {
+        if (prompt.length <= maximum) return prompt
+        require(maximum > OMITTED_MIDDLE.length + 100) {
+            "Not enough space for the selected language instruction."
+        }
+        val tailLength = minOf(1_800, maximum - OMITTED_MIDDLE.length - 100)
+        val headLength = maximum - OMITTED_MIDDLE.length - tailLength
+        return prompt.take(headLength) + OMITTED_MIDDLE + prompt.takeLast(tailLength)
     }
 }
