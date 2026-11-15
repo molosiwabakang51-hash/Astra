@@ -105,7 +105,9 @@ internal class AstraMultilingualTutor(
             .map { Card(it.target, it.english) }
         // The original first 12 cards stay in their existing order so
         // upgrades retain every user's exact quiz position.
-        (original + extra).distinctBy { it.phrase.lowercase(Locale.ROOT) }
+        // German nouns and verbs can differ only by capitalization:
+        // Essen (food) and essen (to eat) are different flashcards.
+        (original + extra).distinctBy { it.phrase }
     }
 
     companion object {
