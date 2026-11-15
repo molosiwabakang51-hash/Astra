@@ -122,6 +122,33 @@ responsible for obtaining legal access to files and respecting their
 licenses. Astra does not redistribute imported books, mirror copyrighted
 libraries or bypass DRM. No paid inference endpoint is required.
 
+## Real on-device language spot checks (experimental)
+
+Under **Settings → Conversation quality checks**, the user can run a
+short, reproducible four-part benchmark using the same native on-device
+Qwen3 engine as normal Astra chat. This is more informative than the
+existing two-word smoke test:
+
+- Arithmetic: `19 + 23`, expecting `42`.
+- Russian translation: `спасибо`, expecting *thank you* or *thanks*.
+- **Two-turn context:** teach an invented codeword, then ask Astra to recall
+  it in a follow-up using the same native model session.
+- Russian grammar: name at least two of the six principal cases.
+
+Astra reports each check's score, inference time, actual loaded model and
+a short excerpt when a probe fails. The owner can stop a running test and
+copy the result for bug reports. Fixed test prompts contain no private
+notes, saved chats or passwords; no paid AI service or network request
+is introduced. Previously enabled local knowledge may still affect a
+response, so these are **end-to-end Astra checks**, not an isolated
+scientific comparison of language-model weights.
+
+**Limitations:** four deterministic checks cannot establish open-ended
+understanding, comprehensive linguistic ability, continual training,
+or freedom from hallucinations. For an offline proof, put the phone in
+airplane mode before starting. Passing JVM tests or compiling the APK
+is not equivalent to running these checks on a physical phone.
+
 ## Working capabilities
 
 - Chat interface with **multiple persistent conversations**, an animated compact navigation dock, notes, tasks and completion tracking.
