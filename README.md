@@ -4,6 +4,26 @@ Astra is a **local-first Android/Kotlin Jetpack Compose assistant** with a futur
 
 **Release status: EXPERIMENTAL.** Compilation and APK checks pass, but stable status requires on-phone offline inference, one-time model import, chat/Stop usability, data-preserving same-key updates and privacy checks. See the [stable-release acceptance checklist](docs/stable-release-acceptance.md). Owner-signed builds remain GitHub **pre-releases** until those mandatory checks pass.
 
+## One-time private library folder authorization (experimental)
+
+In **Settings → Your private book library**, choose **Authorize library folder once**
+using Android's system folder picker. Astra retains a read-only
+Storage Access Framework (SAF) grant to that selected folder across restarts
+and correctly signed in-place updates; no permanent all-files permission is
+requested. On a later visit, tap **Import books from authorized folder** to
+index supported TXT, Markdown and EPUB files in the folder, without another
+file-selection prompt. Importing is explicit, never an automatic/background
+scan, and the original files remain untouched. Up to 30 books can be stored
+privately; input size and directory enumeration are bounded.
+
+**This does not provide blanket access to your entire phone.** Android 11+
+restricts choosing certain storage roots and protected folders. A grant may
+stop working if its backing folder is moved, deleted or revoked. Use
+**Forget folder authorization** to release the stored grant without deleting
+books already imported into Astra's private index. One-off model and
+vocabulary import retain their existing file-picker paths. The Android
+permission and provider behavior still need physical-device verification.
+
 ## Zero-fee offline model strategy
 
 **No mandatory paid AI API, subscription, remote model server, cloud GPU or paid hosting.**
