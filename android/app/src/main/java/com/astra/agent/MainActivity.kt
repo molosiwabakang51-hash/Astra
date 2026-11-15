@@ -3455,6 +3455,76 @@ class MainActivity :
                         }
                     }
 
+
+                val exportVocabularyBundleLauncher =
+                    rememberLauncherForActivityResult(
+                        ActivityResultContracts.CreateDocument("text/tab-separated-values")
+                    ) { uri ->
+                        if (uri != null && !vocabularyImportRunning) {
+                            vocabularyImportRunning = true
+                            vocabularyImportStatus = "Exporting all locally imported language cards..."
+                            researchScope.launch {
+                                try {
+                                    val cards = withContext(Dispatchers.IO) {
+                                        val output = contentResolver.openOutputStream(uri)
+                                            ?: error("Cannot write vocabulary backup.")
+                                        output.use {
+                                            AstraVocabularyBundle.export(vocabularyStore, it)
+                                        }
+                                    }
+                                    vocabularyImportStatus =
+                                        "Saved " + cards + " words across all nine languages. " +
+                                        "Keep this TSV archive together with your JSON backup."
+                                } catch (cancel: CancellationException) {
+                                    throw cancel
+                                } catch (error: Exception) {
+                                    vocabularyImportStatus = "Vocabulary backup failed: " +
+                                        (error.message ?: "Cannot write archive.")
+                                } finally {
+                                    vocabularyImportRunning = false
+                                }
+                            }
+                        }
+                    }
+
+                val restoreVocabularyBundleLauncher =
+                    rememberLauncherForActivityResult(
+                        ActivityResultContracts.OpenDocument()
+                    ) { uri ->
+                        if (uri != null && !vocabularyImportRunning) {
+                            vocabularyImportRunning = true
+                            vocabularyImportStatus = "Validating all language cards before restoring..."
+                            researchScope.launch {
+                                try {
+                                    val restored = withContext(Dispatchers.IO) {
+                                        val input = contentResolver.openInputStream(uri)
+                                            ?: error("Cannot open vocabulary archive.")
+                                        input.use {
+                                            AstraVocabularyBundle.restore(vocabularyStore, it)
+                                        }
+                                    }
+                                    importedVocabularyCount = withContext(Dispatchers.IO) {
+                                        vocabularyStore.list(selectedVocabularyLanguage).size
+                                    }
+                                    vocabularyImportStatus =
+                                        "Added " + restored.added + " vocabulary cards across " +
+                                        restored.languages + " language decks; " +
+                                        restored.skipped + " duplicates skipped. " +
+                                        "Quiz progress and existing words were preserved."
+                                } catch (cancel: CancellationException) {
+                                    throw cancel
+                                } catch (error: Exception) {
+                                    vocabularyImportStatus = "Vocabulary restore failed: " +
+                                        (error.message ?: "Archive invalid.") +
+                                        " If disk storage failed, retrying is safe; " +
+                                        "existing words were not deleted."
+                                } finally {
+                                    vocabularyImportRunning = false
+                                }
+                            }
+                        }
+                    }
+
                 if (confirmClearVocabulary) {
                     val language = selectedVocabularyLanguage
                     AlertDialog(
@@ -5594,8 +5664,10 @@ class MainActivity :
                                                 "Each line must contain two columns separated " +
                                                 "by a TAB: foreign phrase, then English meaning. " +
                                                 "An optional 'phrase TAB translation' header " +
-                                                "is accepted. Imported terms stay on this phone " +
-                                                "and are not included in regular JSON backups.",
+                                                "is accepted. Imported terms stay on this phone. " +
+                                                "The ordinary JSON backup saves progress, " +
+                                                "but a separate TSV bundle below preserves " +
+                                                "your entire imported vocabulary across upgrades.",
                                             style = MaterialTheme.typography.bodySmall
                                         )
                                         OutlinedButton(
@@ -5610,6 +5682,22 @@ class MainActivity :
                                                 else "Import extra vocabulary (TSV)"
                                             )
                                         }
+                                        OutlinedButton(
+                                            enabled = !vocabularyImportRunning,
+                                            onClick = {
+                                                exportVocabularyBundleLauncher.launch(
+                                                    "Astra-all-language-vocabulary.tsv"
+                                                )
+                                            }
+                                        ) { Text("Export all language vocabulary (TSV)") }
+                                        OutlinedButton(
+                                            enabled = !vocabularyImportRunning,
+                                            onClick = {
+                                                restoreVocabularyBundleLauncher.launch(
+                                                    arrayOf("text/tab-separated-values", "text/plain", "*/*")
+                                                )
+                                            }
+                                        ) { Text("Restore all language vocabulary (TSV)") }
                                         if (vocabularyImportStatus.isNotBlank()) {
                                             Text(
                                                 vocabularyImportStatus,
@@ -6202,7 +6290,9 @@ class MainActivity :
                                             "Export a local Astra JSON backup containing chat, notes, " +
                                             "tasks, shopping lists, habits, learning progress and settings. " +
                                             "The file is not encrypted, so store it privately. " +
-                                            "Import replaces the current saved data after confirmation."
+                                            "Import replaces the current saved data after confirmation. " +
+                                            "Export private vocabulary separately as an all-language " +
+                                            "TSV file in the language settings above."
                                         )
                                     }
 
