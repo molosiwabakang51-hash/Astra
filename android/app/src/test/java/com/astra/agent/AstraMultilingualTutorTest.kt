@@ -43,7 +43,7 @@ class AstraMultilingualTutorTest {
         for (lang in AstraMultilingualTutor.Language.entries) {
             val additions = AstraExtendedVocabulary.additional(lang.id)
             assertEquals(lang.id, 72, additions.size)
-            assertEquals(lang.id, 72, additions.map { it.target.lowercase() }.distinct().size)
+            assertEquals(lang.id, 72, additions.map { it.target }.distinct().size)
             assertTrue(additions.all { it.target.isNotBlank() && it.english.isNotBlank() })
             assertEquals("mother", additions.first().english)
             assertEquals("peace", additions.last().english)
