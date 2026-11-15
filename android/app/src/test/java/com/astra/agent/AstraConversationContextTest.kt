@@ -69,6 +69,21 @@ class AstraConversationContextTest {
         assertTrue(result.length <= 3010)
     }
 
+    @Test fun veryLongUserMessageKeepsTheFinalQuestionAfterModelReload() {
+        val message = "COURSE NOTES BEGIN. " + "Older lecture text. ".repeat(250) +
+            "FINAL QUESTION: Explain bond convexity in one paragraph."
+        val answer = AstraConversationContext.userPrompt(
+            message, listOf(turn("user", "SECRET_OLDER_NOTE")), true
+        )
+        assertTrue(answer.startsWith("COURSE NOTES BEGIN."))
+        assertTrue(answer.contains("Middle of long input omitted"))
+        assertTrue(answer.endsWith(
+            "FINAL QUESTION: Explain bond convexity in one paragraph.\n/no_think"
+        ))
+        assertFalse(answer.contains("SECRET_OLDER_NOTE"))
+        assertTrue(answer.length <= 3010)
+    }
+
     @Test fun boundedHistoryKeepsRecentMessagesAndExcludesUnknownRoles() {
         val old = turn("user", "OLDEST_MESSAGE_NEVER_REUSED")
         val recent = listOf(old) +

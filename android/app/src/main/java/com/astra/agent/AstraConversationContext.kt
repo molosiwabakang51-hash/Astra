@@ -43,7 +43,9 @@ internal object AstraConversationContext {
         earlier: List<Turn>,
         restoringContext: Boolean
     ): String {
-        val current = message.trim().take(MAX_USER_PROMPT)
+        // The actual question often comes after pasted source material.
+        // Keep a bounded head and tail rather than silently dropping it.
+        val current = AstraOfflinePolicy.boundedInput(message)
         if (!restoringContext || current.isEmpty() || earlier.isEmpty()) {
             return AstraOfflinePolicy.modelPrompt(current)
         }

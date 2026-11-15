@@ -25,6 +25,36 @@ class AstraOfflinePolicyTest {
         assertTrue(AstraOfflinePolicy.modelPrompt("a".repeat(10_000)).length <= 3010)
     }
 
+    @Test fun oversizedOfflinePromptKeepsCurrentQuestionAtTheEnd() {
+        val prefix = "Read these long hypothetical lecture notes. "
+        val middle = "Unrelated explanatory example. ".repeat(200)
+        val ending = "NOW ANSWER: What is modified duration, briefly?"
+        val bounded = AstraOfflinePolicy.modelPrompt(prefix + middle + ending)
+        assertTrue(bounded.startsWith(prefix))
+        assertTrue(bounded.contains("Middle of long input omitted"))
+        assertTrue(bounded.endsWith(ending + "\n/no_think"))
+        assertTrue(bounded.length <= 3010)
+    }
+
+    @Test fun ordinaryQuestionAndShortSourceAreNotSilentlyRewritten() {
+        for (length in listOf(1, 24, 1_800, 3_000)) {
+            val message = "A".repeat(length)
+            assertEquals(message, AstraOfflinePolicy.boundedInput(message))
+            assertEquals(message + "\n/no_think",
+                AstraOfflinePolicy.modelPrompt(message))
+        }
+    }
+
+    @Test fun oversizeInputHasClearBoundaryAndNoDuplicateMiddle() {
+        val text = "START-OF-NOTES " + "M".repeat(7_000) + " END-OF-QUESTION"
+        val bounded = AstraOfflinePolicy.boundedInput(text)
+        assertTrue(bounded.startsWith("START-OF-NOTES"))
+        assertTrue(bounded.endsWith("END-OF-QUESTION"))
+        assertEquals(1, bounded.split("Middle of long input omitted").size - 1)
+        assertTrue(bounded.length <= 3_000)
+        assertFalse(bounded.contains("M".repeat(4_000)))
+    }
+
     @Test fun interruptedThinkingMessageIsRecoveredAfterRestart() {
         assertEquals(
             "The response was interrupted when Astra closed.",
