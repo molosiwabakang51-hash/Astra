@@ -50,7 +50,17 @@ internal class RussianTutor(
         Card("Кто", "kto", "Who", setOf("who")),
         Card("Читать", "chitat", "To read", setOf("to read", "read")),
         Card("Писать", "pisat", "To write", setOf("to write", "write"))
-    )
+    ).plus(AstraExtendedVocabulary.additional("russian").map {
+        Card(it.target, "", it.english.replaceFirstChar { letter -> letter.uppercase() },
+            setOf(it.english.lowercase(Locale.ROOT)))
+    }).plus(listOf(
+        Card("Красный", "", "Red", setOf("red")),
+        Card("Синий", "", "Blue", setOf("blue")),
+        Card("Зелёный", "", "Green", setOf("green")),
+        Card("Жёлтый", "", "Yellow", setOf("yellow"))
+    )).distinctBy { it.russian.lowercase(Locale.ROOT) }
+
+    private val totalLessons: Int = 6 + (cards.size - 30 + 3) / 4
 
     fun respond(raw: String): String? {
         val input = raw.trim()
@@ -69,12 +79,14 @@ internal class RussianTutor(
             "russian lesson 5", "russian grammar", "russian cases" -> return lesson(5)
             "russian lesson 6", "russian verbs", "russian verb aspect" -> return lesson(6)
             "next russian lesson" ->
-                return lesson((readInt(KEY_LAST_LESSON, 1) + 1).coerceIn(1, 6))
+                return lesson((readInt(KEY_LAST_LESSON, 1) + 1).coerceIn(1, totalLessons))
             "russian course", "russian syllabus" ->
-                return "Six offline Russian lessons: 1 Greetings; 2 Everyday phrases; " +
-                    "3 Cyrillic; 4 Numbers and vocabulary; 5 The six cases; " +
-                    "6 Verbs and aspect. Say 'Russian lesson 3', 'next Russian lesson', " +
-                    "or 'Russian quiz'. These lessons work without an AI model."
+                return "Russian: " + totalLessons + " offline lessons and " + cards.size +
+                    " vocabulary cards. 1 Greetings; 2 Everyday phrases; " +
+                    "3 Cyrillic; 4 Numbers; 5 Cases; 6 Verbs and aspect; " +
+                    "7-" + totalLessons + " Family, places, food, nature, animals, " +
+                    "body parts, work, verbs and colors. Say 'Russian lesson 20', " +
+                    "'next Russian lesson' or 'Russian quiz'."
 
             "russian quiz", "quiz me in russian", "quiz me on russian",
             "practice russian", "russian practice" ->
@@ -82,13 +94,22 @@ internal class RussianTutor(
 
             "russian progress", "my russian progress" -> {
                 val answered = readInt(KEY_CORRECT, 0).coerceAtLeast(0)
-                val lastLesson = readInt(KEY_LAST_LESSON, 0).coerceIn(0, 6)
+                val lastLesson = readInt(KEY_LAST_LESSON, 0).coerceIn(0, totalLessons)
                 return "Russian practice: ${answered} correct answer(s). " +
                     "${cards.size} vocabulary cards available. " +
-                    "Last lesson: ${if (lastLesson == 0) "none" else "$lastLesson/6"}. " +
+                    "Last lesson: ${if (lastLesson == 0) "none" else "$lastLesson/$totalLessons"}. " +
                     "Say 'Russian quiz' to practise or 'Russian course' for the syllabus."
             }
         }
+
+        Regex("""^russian lesson (\\d{1,3})$""")
+            .matchEntire(input)?.groupValues?.getOrNull(1)?.toIntOrNull()?.let { n ->
+                if (n !in 1..totalLessons) {
+                    return "Russian has " + totalLessons +
+                        " lessons. Choose a number from 1 to " + totalLessons + "."
+                }
+                return lesson(n)
+            }
 
         val pendingIndex = readInt(KEY_PENDING, 0) - 1
         if (pendingIndex !in cards.indices) {
@@ -125,7 +146,9 @@ internal class RussianTutor(
             writeInt(KEY_CORRECT, readInt(KEY_CORRECT, 0).coerceAtLeast(0) + 1)
             writeInt(KEY_NEXT, (pendingIndex + 1) % cards.size)
             writeInt(KEY_PENDING, 0)
-            "Correct. ${card.russian} (${card.romanized}) means ${card.english}. Say 'Russian quiz' for the next word."
+            "Correct. ${card.russian}" +
+                (if (card.romanized.isBlank()) "" else " (${card.romanized})") +
+                " means ${card.english}. Say 'Russian quiz' for the next word."
         } else {
             "Not quite. Translate ${card.russian} into English. " +
                 "Reply with 'answer ...' or say 'skip Russian question'."
@@ -147,8 +170,34 @@ internal class RussianTutor(
             3 -> lessonThree()
             4 -> lessonFour()
             5 -> lessonFive()
-            else -> lessonSix()
+            6 -> lessonSix()
+            else -> extendedLesson(number)
         }
+    }
+
+    private fun extendedLesson(number: Int): String {
+        // First 30 cards retain their original study order and question IDs.
+        val content = cards.drop(30 + (number - 7) * 4).take(4)
+        val topic = when (number) {
+            in 7..8 -> "People and family"
+            in 9..10 -> "Places and travel"
+            in 11..12 -> "Food and meals"
+            in 13..14 -> "Nature and weather"
+            in 15..16 -> "Animals"
+            in 17..18 -> "Body and health"
+            in 19..20 -> "Work and everyday actions"
+            else -> "Time, actions and colors"
+        }
+        val entries = content.joinToString("\n") {
+            it.russian + " — " + it.english
+        }
+        return "Russian lesson " + number + "/" + totalLessons +
+            " — " + topic + "\n\n" + entries + "\n\n" +
+            if (number < totalLessons)
+                "Type 'next Russian lesson' or 'Russian quiz' to practise."
+            else
+                "Course complete. Type 'Russian quiz' to practise all " +
+                    cards.size + " vocabulary cards."
     }
 
     private fun lessonThree(): String =
