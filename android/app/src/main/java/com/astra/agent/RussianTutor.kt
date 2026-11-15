@@ -10,7 +10,8 @@ import java.util.Locale
  */
 internal class RussianTutor(
     private val readInt: (String, Int) -> Int,
-    private val writeInt: (String, Int) -> Unit
+    private val writeInt: (String, Int) -> Unit,
+    private val vocabularyStore: AstraVocabularyStore? = null
 ) {
     private data class Card(
         val russian: String,
@@ -19,7 +20,7 @@ internal class RussianTutor(
         val acceptedAnswers: Set<String>
     )
 
-    private val cards = listOf(
+    private val bundledCards = listOf(
         Card("Спасибо", "spasibo", "Thank you", setOf("thank you", "thanks")),
         Card("Да", "da", "Yes", setOf("yes")),
         Card("Нет", "net", "No", setOf("no")),
@@ -60,7 +61,19 @@ internal class RussianTutor(
         Card("Жёлтый", "", "Yellow", setOf("yellow"))
     )).distinctBy { it.russian.lowercase(Locale.ROOT) }
 
-    private val totalLessons: Int = 6 + (cards.size - 30 + 3) / 4
+    private val cards: List<Card>
+        get() {
+            val custom = vocabularyStore?.list("russian").orEmpty().map {
+                Card(it.phrase, "", it.translation.replaceFirstChar { character ->
+                    character.uppercase()
+                }, setOf(it.translation.lowercase(Locale.ROOT)))
+            }
+            return (bundledCards + custom)
+                .distinctBy { it.russian.lowercase(Locale.ROOT) }
+        }
+
+    private val totalLessons: Int
+        get() = 6 + (cards.size - 30 + 3) / 4
 
     fun respond(raw: String): String? {
         val input = raw.trim()
