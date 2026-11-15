@@ -4,6 +4,10 @@
 
     <!-- Online research is triggered only by explicit Wikipedia commands. -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Optional owner-enabled read-only shared-storage search. Android's
+         special access Settings page requires explicit consent; this does
+         not grant access to another application's private sandbox. -->
+    <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />
 
     <!-- Microphone permission for voice recognition -->
     <uses-permission
