@@ -19,7 +19,16 @@ class AssistantSimulationTest {
             { key, default -> state[key] ?: default },
             { key, value -> state[key] = value }
         )
-        val answers = listOf("thank you", "yes", "no", "hi", "please", "goodbye")
+        // Keep this full 5,000-turn state-machine test aligned with the
+        // preserved first-six order and the expanded 30-card Russian course.
+        val answers = listOf(
+            "thank you", "yes", "no", "hi", "please", "goodbye",
+            "good morning", "good evening", "how are you", "fine",
+            "excuse me", "water", "bread", "book", "house", "school",
+            "friend", "family", "one", "two", "three", "four", "five",
+            "today", "tomorrow", "yesterday", "where", "who",
+            "to read", "to write"
+        )
         val random = Random(0xA57A)
         var correct = 0
         repeat(5_000) { step ->
