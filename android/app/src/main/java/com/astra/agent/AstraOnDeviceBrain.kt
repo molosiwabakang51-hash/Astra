@@ -46,6 +46,8 @@ internal class AstraOnDeviceBrain(
     private var verifiedFile: File? = null
     @Volatile
     private var loadedModelPath: String? = null
+    // A change of consent must not leave old book snippets in native KV-cache.
+    private var previousBookContextAllowed: Boolean? = null
 
     /**
      * Only reports the last model successfully loaded into the native engine.
@@ -91,6 +93,12 @@ internal class AstraOnDeviceBrain(
                 val permittedBooks = explicitBookQuery != null ||
                     context.getSharedPreferences("astra", Context.MODE_PRIVATE)
                         .getBoolean("astra_use_books_in_chat", false)
+                if (previousBookContextAllowed != null &&
+                    previousBookContextAllowed != permittedBooks
+                ) {
+                    session.invalidate()
+                }
+                previousBookContextAllowed = permittedBooks
                 val bookReferences = if (permittedBooks)
                     books?.search(question, maxHits = 2).orEmpty()
                 else emptyList()
