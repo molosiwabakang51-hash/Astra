@@ -49,6 +49,9 @@ internal class AstraOnDeviceBrain(
     // A change of consent must not leave old book snippets in native KV-cache.
     private var previousBookContextAllowed: Boolean? = null
     private var previousReplyLanguageId: String? = null
+    // A failed native 1.7B load should not re-run on every subsequent turn.
+    // A newly imported file can be retried without restarting Astra.
+    private val failedAdvancedModels = AstraModelHealth()
 
     /**
      * Only reports the last model successfully loaded into the native engine.
@@ -117,11 +120,14 @@ internal class AstraOnDeviceBrain(
                 if (verifiedFile == null) {
                     onPartial("Verifying the local offline model...")
                 }
+                val advancedFile = AstraModelImport.advancedFile(context)
+                val compactAvailable = AstraModelImport.modelFile(context).isFile ||
+                    isBundled(ASSET_NAME)
                 val candidates = AstraModelChoice.candidates(
-                    advancedAvailable = AstraModelImport.advancedInstalled(context) ||
-                        isBundled(AstraModelImport.ADVANCED_NAME),
-                    compactAvailable = AstraModelImport.modelFile(context).isFile ||
-                        isBundled(ASSET_NAME)
+                    advancedAvailable = (AstraModelImport.advancedInstalled(context) ||
+                        isBundled(AstraModelImport.ADVANCED_NAME)) &&
+                        (!compactAvailable || failedAdvancedModels.shouldAttempt(advancedFile)),
+                    compactAvailable = compactAvailable
                 )
                 if (candidates.isEmpty()) {
                     error(
@@ -152,6 +158,9 @@ internal class AstraOnDeviceBrain(
                         throw cancel
                     } catch (failure: Exception) {
                         lastPreparationError = failure
+                        if (candidate == AstraModelChoice.Variant.ADVANCED) {
+                            failedAdvancedModels.recordFailure(advancedFile)
+                        }
                         if (candidate == AstraModelChoice.Variant.ADVANCED &&
                             AstraModelChoice.Variant.COMPACT in candidates
                         ) {
@@ -213,6 +222,7 @@ internal class AstraOnDeviceBrain(
                         if (modelPath.name != AstraModelImport.ADVANCED_NAME ||
                             AstraModelChoice.Variant.COMPACT !in candidates
                         ) throw loadError
+                        failedAdvancedModels.recordFailure(modelPath)
                         onPartial("Advanced model failed to load. Trying compact offline fallback...")
                         // JNI's Error state is resettable, but a process-level
                         // native crash cannot be recovered from Kotlin.
