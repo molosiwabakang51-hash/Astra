@@ -140,7 +140,9 @@ internal class AstraMultilingualTutor(
             "cards each (672 in total). Russian has a separate expanded course. " +
             "Type 'learn setswana', 'japanese lesson 21', 'french quiz', " +
             "'next language lesson', or 'language progress'. " +
-            "Answers are English translations; speech packs are optional."
+            "For offline dictionary lookups, try 'translate hello to french' " +
+            "or 'what does Bonjour mean in french'. Unknown words are not guessed. " +
+            "Quiz answers are English translations; speech packs are optional."
     }
 
     fun respond(raw: String): String? {
