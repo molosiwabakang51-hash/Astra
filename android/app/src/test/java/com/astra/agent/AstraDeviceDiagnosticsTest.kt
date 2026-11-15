@@ -111,19 +111,19 @@ class AstraDeviceDiagnosticsTest {
     }
 
     @Test fun languageScoresAreSanitizedWithoutArbitraryModelOutput() {
-        val raw = "ON-DEVICE LANGUAGE SPOT CHECKS\\n" +
-            "Model loaded: Qwen3 1.7B · Q4_K_M\\n" +
-            "5/7 checks passed.\\n" +
+        val raw = "ON-DEVICE LANGUAGE SPOT CHECKS\n" +
+            "Model loaded: Qwen3 1.7B · Q4_K_M\n" +
+            "5/7 checks passed.\n" +
             "Model output: MY_PRIVATE_SECRET_OR_TOKEN"
         val safe = AstraDeviceDiagnostics.summarizeLanguageBenchmark(raw)
         assertEquals("RECORDED (5/7 narrow checks; not a general AI score)", safe)
         assertFalse(safe.contains("PRIVATE_SECRET"))
         assertEquals("NOT RUN / UNVERIFIED",
             AstraDeviceDiagnostics.summarizeLanguageBenchmark(
-                "5/7 checks passed.\\nMY_PRIVATE_SECRET_OR_TOKEN"))
+                "5/7 checks passed.\nMY_PRIVATE_SECRET_OR_TOKEN"))
         assertEquals("NOT RUN / UNVERIFIED",
             AstraDeviceDiagnostics.summarizeLanguageBenchmark(
-                "ON-DEVICE LANGUAGE SPOT CHECKS\\n8/7 checks passed."))
+                "ON-DEVICE LANGUAGE SPOT CHECKS\n8/7 checks passed."))
         assertEquals("IN PROGRESS",
             AstraDeviceDiagnostics.summarizeLanguageBenchmark("Running Russian translation..."))
         assertEquals("INTERRUPTED",
