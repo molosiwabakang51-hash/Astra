@@ -66,14 +66,14 @@ internal object AstraConversationContext {
         val older = valid.dropLast(recent.size)
         val keywords = significantWords(current)
         val ownerRecall = Regex(
-            """(?i)\\b(?:what did i say|what did i tell|remind me|what was my|my earlier)\\b"""
+            """(?i)\b(?:what did i say|what did i tell|remind me|what was my|my earlier)\b"""
         ).containsMatchIn(current)
         val ranked = older.map { turn ->
             // Score only terms that can actually appear in the displayed
             // excerpt, rather than matching an invisible part of a long turn.
             val terms = significantWords(turn.value.content.take(MAX_TURN_CHARS))
             val matches = keywords.count(terms::contains)
-            val userTieBreak = if (ownerRecall && turn.value.role == "user") 1 else 0
+            val userTieBreak = if (matches > 0 && ownerRecall && turn.value.role == "user") 1 else 0
             turn to (matches * 2 + userTieBreak)
         }.filter { it.second > 0 }
             .sortedWith(compareByDescending<Pair<IndexedValue<Turn>, Int>> {
