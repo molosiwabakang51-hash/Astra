@@ -38,9 +38,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
-          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install \
-            "platforms;android-36" "ndk;29.0.13113456" "cmake;3.31.6"
+          bash scripts/install_android_sdk.sh
           python3 scripts/prepare_offline_android.py --lite
           python3 -m unittest discover -s scripts/tests -p "test_*.py" -v
           python3 scripts/harden_native_inference.py --verify
