@@ -50,6 +50,31 @@ class AstraDialogueTest {
         assertTrue(notes.isEmpty())
     }
 
+    @Test fun translationRequestsCannotBeSilentlySavedAsTasksOrNotes() {
+        val dialogue = AstraDialogue()
+        val tasks = mutableListOf<String>()
+        val notes = mutableListOf<String>()
+        val completed = mutableListOf<String>()
+
+        assertTrue(dialogue.respond("add task", tasks, notes, completed)!!
+            .contains("What task"))
+        assertNull(dialogue.respond("translate hello to French", tasks, notes, completed))
+        assertTrue(tasks.isEmpty())
+        assertFalse(dialogue.awaitingResponse)
+
+        assertTrue(dialogue.respond("remember", tasks, notes, completed)!!
+            .contains("What should I remember"))
+        assertNull(dialogue.respond("translate book to Russian", tasks, notes, completed))
+        assertTrue(notes.isEmpty())
+        assertFalse(dialogue.awaitingResponse)
+
+        // Ordinary free-text follow-ups remain supported.
+        dialogue.respond("add task", tasks, notes, completed)
+        assertTrue(dialogue.respond("Study grammar", tasks, notes, completed)!!
+            .startsWith("Task added"))
+        assertEquals(listOf("Study grammar"), tasks)
+    }
+
     @Test fun contextualPriorityAndConfirmationAreSafe() {
         val dialogue = AstraDialogue()
         val tasks = mutableListOf("Read reports", "Review bonds")
