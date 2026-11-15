@@ -70,10 +70,13 @@ class AstraVocabularyBundleTest {
         val target = newStore()
         val already = (1..5_000).joinToString("\n") { "item$it\tMeaning$it" }
         target.importTsv("spanish", input(already))
-        val archive = "language\tphrase\ttranslation\n" +
-            "setswana\tMaru\tClouds\nspanish\tnew_item\tNew meaning\n"
+        val source = newStore()
+        source.importTsv("setswana", input("Maru\tClouds\n"))
+        source.importTsv("spanish", input("new_item\tNew meaning\n"))
+        val archive = ByteArrayOutputStream()
+        AstraVocabularyBundle.export(source, archive)
         assertThrows(IllegalArgumentException::class.java) {
-            AstraVocabularyBundle.restore(target, input(archive))
+            AstraVocabularyBundle.restore(target, ByteArrayInputStream(archive.toByteArray()))
         }
         assertTrue(target.list("setswana").isEmpty())
         assertEquals(5_000, target.list("spanish").size)
@@ -93,6 +96,27 @@ class AstraVocabularyBundleTest {
         assertThrows(java.nio.charset.CharacterCodingException::class.java) {
             AstraVocabularyBundle.restore(target,
                 ByteArrayInputStream(byteArrayOf(0xFF.toByte(), 0x0A)))
+        }
+        assertTrue(target.list("french").isEmpty())
+    }
+
+    @Test fun checksumRejectsTruncatedAndTamperedArchivesBeforeRestoring() {
+        val source = newStore()
+        source.importTsv("french", input("Bonjour\tHello\nMerci\tThank you\n"))
+        val full = ByteArrayOutputStream()
+        AstraVocabularyBundle.export(source, full)
+        val archive = full.toString("UTF-8")
+        assertTrue(archive.contains("#astra-private-vocabulary-v1-end"))
+
+        val target = newStore()
+        val truncated = archive.substringBefore("#astra-private-vocabulary-v1-end")
+        assertThrows(IllegalArgumentException::class.java) {
+            AstraVocabularyBundle.restore(target, input(truncated))
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            AstraVocabularyBundle.restore(
+                target, input(archive.replace("Bonjour\tHello", "Bonjour\tGoodbye"))
+            )
         }
         assertTrue(target.list("french").isEmpty())
     }
