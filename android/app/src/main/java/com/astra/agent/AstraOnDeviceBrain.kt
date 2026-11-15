@@ -81,8 +81,9 @@ internal class AstraOnDeviceBrain(
     ): String = mutex.withLock {
             try {
                 withContext(Dispatchers.IO) {
-                val finalMessage = turns.lastOrNull { it.role == "user" }?.content
-                    ?.trim()?.take(3000).orEmpty()
+                val finalMessage = AstraConversationContext.currentUserMessage(
+                    turns.lastOrNull { it.role == "user" }?.content
+                )
                 require(finalMessage.isNotEmpty()) { "Message cannot be empty." }
                 val selectedReplyLanguageId = context.getSharedPreferences(
                     "astra", Context.MODE_PRIVATE
