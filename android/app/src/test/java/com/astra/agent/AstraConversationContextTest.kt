@@ -185,7 +185,7 @@ class AstraConversationContextTest {
         assertTrue(restored.contains("Actually, make it three years"))
         assertTrue(restored.indexOf("bond maturity is seven years") <
             restored.indexOf("Actually, make it three years"))
-        assertTrue(restored.endsWith("What was my bond maturity?\\n/no_think"))
+        assertTrue(restored.endsWith("What was my bond maturity?\n/no_think"))
         assertTrue(restored.length <= 3010)
     }
 
