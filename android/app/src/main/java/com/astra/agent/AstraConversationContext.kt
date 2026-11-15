@@ -65,9 +65,16 @@ internal object AstraConversationContext {
         val recent = valid.takeLast(3)
         val older = valid.dropLast(recent.size)
         val keywords = significantWords(current)
+        val ownerRecall = Regex(
+            """(?i)\\b(?:what did i say|what did i tell|remind me|what was my|my earlier)\\b"""
+        ).containsMatchIn(current)
         val ranked = older.map { turn ->
-            val terms = significantWords(turn.value.content.take(800))
-            turn to keywords.count(terms::contains)
+            // Score only terms that can actually appear in the displayed
+            // excerpt, rather than matching an invisible part of a long turn.
+            val terms = significantWords(turn.value.content.take(MAX_TURN_CHARS))
+            val matches = keywords.count(terms::contains)
+            val userTieBreak = if (ownerRecall && turn.value.role == "user") 1 else 0
+            turn to (matches * 2 + userTieBreak)
         }.filter { it.second > 0 }
             .sortedWith(compareByDescending<Pair<IndexedValue<Turn>, Int>> {
                 it.second
@@ -114,9 +121,24 @@ internal object AstraConversationContext {
         "mean", "does", "did", "the", "and", "you", "are", "was", "for"
     )
 
+    /**
+     * Small deterministic normalization for conversation-topic matching.
+     * "bond" can recover "bonds", and "maturity" can recover "maturities".
+     * This is retrieval only: it does not modify stored user text or model
+     * weights and cannot execute commands from older messages.
+     */
+    private fun stem(word: String): String = when {
+        word.length > 6 && word.endsWith("ies") -> word.dropLast(3) + "y"
+        word.length > 4 && word.endsWith('s') &&
+            !word.endsWith("ss") && !word.endsWith("sis") &&
+            !word.endsWith("us") -> word.dropLast(1)
+        else -> word
+    }
+
     private fun significantWords(text: String): Set<String> =
         topicWords.findAll(text.lowercase(java.util.Locale.ROOT))
-            .take(150).map { it.value }.filterNot(fillerWords::contains).toSet()
+            .take(150).map { it.value }.filterNot(fillerWords::contains)
+            .map(::stem).toSet()
 
     private fun quote(text: String): String =
         text.trim()
