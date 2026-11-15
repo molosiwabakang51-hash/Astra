@@ -89,6 +89,39 @@ Existing FULL and LITE distributions remain free of paid inference APIs.
 Android CI/unit tests and physical phone testing are required before this
 feature can be treated as stable.
 
+## Your private offline book library
+
+Astra can now index your **own downloaded UTF-8 TXT, Markdown and unencrypted
+EPUB** books on the phone. Open **Settings → Your private book library →
+Import book** and select a file through Android's system document picker.
+Book text stays under Astra's private no-backup storage; no book content,
+search terms or citations are sent to any cloud AI or external website.
+
+Astra divides imported books into bounded passages, builds an on-device
+keyword index and retrieves the most relevant matches for a question. Type
+`ask book Russian grammar` to explicitly query your imported books. For
+ordinary free-form AI conversations, the owner can separately enable
+**Use imported books in normal AI chat**, which is **off by default**. The
+assistant labels retrieved passages with the source book title and passage
+number so answers can be checked against the original.
+
+The file importer enforces input and decompressed EPUB limits, rejects
+unsupported formats and encrypted EPUB packages, bounds the on-disk index,
+and refuses unsafe archive paths. Selecting a book is a local read-only
+operation; the original downloaded file is not moved or deleted. The
+**Remove imported books** button requires confirmation and deletes only
+Astra's private indexed copy. If a large book exceeds indexing limits,
+the app reports that the index is partial rather than falsely claiming
+comprehensive coverage.
+
+**Not a model fine-tuner:** Imported paragraphs are transient reference
+context for Qwen3 and are not used to modify the GGUF's pretrained weights.
+The separate opt-in neural topic adapter still only trains on eligible
+conversation turns, not on the contents of imported books. The owner is
+responsible for obtaining legal access to files and respecting their
+licenses. Astra does not redistribute imported books, mirror copyrighted
+libraries or bypass DRM. No paid inference endpoint is required.
+
 ## Working capabilities
 
 - Chat interface with **multiple persistent conversations**, an animated compact navigation dock, notes, tasks and completion tracking.
