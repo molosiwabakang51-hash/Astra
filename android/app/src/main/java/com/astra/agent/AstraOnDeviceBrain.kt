@@ -26,7 +26,8 @@ import java.security.MessageDigest
  */
 internal class AstraOnDeviceBrain(
     private val context: Context,
-    private val learning: AstraContinualLearning? = null
+    private val learning: AstraContinualLearning? = null,
+    private val books: AstraBookLibrary? = null
 ) {
     data class Turn(val role: String, val content: String)
 
@@ -45,6 +46,8 @@ internal class AstraOnDeviceBrain(
     private var verifiedFile: File? = null
     @Volatile
     private var loadedModelPath: String? = null
+    // A change of consent must not leave old book snippets in native KV-cache.
+    private var previousBookContextAllowed: Boolean? = null
 
     /**
      * Only reports the last model successfully loaded into the native engine.
@@ -79,6 +82,24 @@ internal class AstraOnDeviceBrain(
                 val finalMessage = turns.lastOrNull { it.role == "user" }?.content
                     ?.trim()?.take(3000).orEmpty()
                 require(finalMessage.isNotEmpty()) { "Message cannot be empty." }
+                val explicitBookQuery = AstraBookQuery.extract(finalMessage)
+                val question = explicitBookQuery ?: finalMessage
+                val permittedBooks = explicitBookQuery != null ||
+                    context.getSharedPreferences("astra", Context.MODE_PRIVATE)
+                        .getBoolean("astra_use_books_in_chat", false)
+                if (previousBookContextAllowed != null &&
+                    previousBookContextAllowed != permittedBooks
+                ) {
+                    session.invalidate()
+                }
+                previousBookContextAllowed = permittedBooks
+                val bookReferences = if (permittedBooks)
+                    books?.search(question, maxHits = 2).orEmpty()
+                else emptyList()
+                if (explicitBookQuery != null && bookReferences.isEmpty()) {
+                    return@withContext "No relevant passage was found in your imported books. " +
+                        "Import a TXT, Markdown or EPUB book in Settings, then ask again."
+                }
                 if (verifiedFile == null) {
                     onPartial("Verifying the local offline model...")
                 }
@@ -198,16 +219,20 @@ internal class AstraOnDeviceBrain(
                     ).takeIf { it.isFile && it.length() <= 160_000L }
                         ?.inputStream()?.use(AstraOpenLibrary::load).orEmpty()
                     val learnedHint = learning?.takeIf { it.status().steps >= 25 }
-                        ?.predict(finalMessage)?.let {
+                        ?.predict(question)?.let {
                             it.topic == AstraContinualLearning.Topic.RUSSIAN &&
                                 it.confidence > 0.82
                         } == true
-                    AstraOpenLibrary.relevant(
-                        finalMessage, (synced + bundled).distinctBy { it.id },
-                        neuralRussianHint = learnedHint
-                    )
+                    if (bookReferences.isEmpty() && explicitBookQuery == null)
+                        AstraOpenLibrary.relevant(
+                            question, (synced + bundled).distinctBy { it.id },
+                            neuralRussianHint = learnedHint
+                        )
+                    else emptyList()
                 }.getOrElse { emptyList() }
-                val augmentedQuestion = AstraOpenLibrary.enrich(finalMessage, openReferences)
+                val augmentedQuestion = if (bookReferences.isNotEmpty())
+                    books?.enrich(question, bookReferences) ?: question
+                else AstraOpenLibrary.enrich(question, openReferences)
                 val requestPrompt = AstraConversationContext.userPrompt(
                     augmentedQuestion,
                     turns.dropLast(1).map {
@@ -230,6 +255,9 @@ internal class AstraOnDeviceBrain(
                 if (publicAnswer.isBlank()) {
                     session.invalidate()
                     "The offline model did not produce a usable answer. Please try again."
+                } else if (bookReferences.isNotEmpty()) {
+                    publicAnswer + "\n\nRetrieved local book passages (verify originals):\n" +
+                        (books?.citations(bookReferences) ?: "")
                 } else if (openReferences.isNotEmpty()) {
                     publicAnswer + "\n\nOpen-course references:\n" +
                         AstraOpenLibrary.citations(openReferences)
