@@ -55,16 +55,33 @@ internal object AstraConversationContext {
             .coerceAtMost(MAX_HISTORY)
         if (room < 70) return AstraOfflinePolicy.modelPrompt(current)
 
-        val selected = mutableListOf<String>()
+        val valid = earlier.withIndex().filter {
+            (it.value.role == "user" || it.value.role == "assistant") &&
+                it.value.content.isNotBlank()
+        }
+        // Keep the immediate dialogue first, then retrieve topic-relevant
+        // earlier turns. If no older turns match, fall back to recency.
+        // Selected snippets are still untrusted quotes, never instructions.
+        val recent = valid.takeLast(3)
+        val older = valid.dropLast(recent.size)
+        val keywords = significantWords(current)
+        val ranked = older.map { turn ->
+            val terms = significantWords(turn.value.content.take(800))
+            turn to keywords.count(terms::contains)
+        }.filter { it.second > 0 }
+            .sortedWith(compareByDescending<Pair<IndexedValue<Turn>, Int>> {
+                it.second
+            }.thenByDescending { it.first.index })
+            .map { it.first }
+        val priority = (recent.asReversed() + ranked + older.asReversed())
+            .distinctBy { it.index }
+        val selected = mutableListOf<Pair<Int, String>>()
         var remaining = room
-        for (turn in earlier.asReversed()) {
+        for (item in priority) {
             if (selected.size == MAX_TURNS || remaining < 42) break
-            val speaker = when (turn.role) {
-                "user" -> "Previous user"
-                "assistant" -> "Previous Astra"
-                else -> continue
-            }
-            val source = quote(turn.content)
+            val speaker = if (item.value.role == "user")
+                "Previous user" else "Previous Astra"
+            val source = quote(item.value.content)
             if (source.isBlank()) continue
             val prefix = "$speaker: \""
             val suffix = "\"\n"
@@ -72,14 +89,13 @@ internal object AstraConversationContext {
                 MAX_TURN_CHARS, remaining - prefix.length - suffix.length
             )
             if (availableText < 10) break
-            val truncated = source.take(availableText)
-            val line = prefix + truncated + suffix
-            selected.add(line)
-            remaining -= line.length
+            selected.add(item.index to (prefix + source.take(availableText) + suffix))
+            remaining -= selected.last().second.length
         }
         if (selected.isEmpty()) return AstraOfflinePolicy.modelPrompt(current)
 
-        val composed = HISTORY_HEADER + selected.asReversed().joinToString("") +
+        val composed = HISTORY_HEADER +
+            selected.sortedBy { it.first }.joinToString("") { it.second } +
             CURRENT_HEADER + current
         // This must be asserted rather than silently truncated by
         // modelPrompt: the actual user question is always at the end.
@@ -88,6 +104,19 @@ internal object AstraConversationContext {
         }
         return AstraOfflinePolicy.modelPrompt(composed)
     }
+
+    private val topicWords = Regex("""[\p{L}\p{N}]{3,}""")
+    private val fillerWords = setOf(
+        "what", "when", "where", "which", "about", "would", "could",
+        "should", "please", "tell", "said", "say", "that", "this", "there",
+        "with", "from", "have", "been", "your", "earlier", "previous",
+        "remember", "explain", "conversation", "message", "response",
+        "mean", "does", "did", "the", "and", "you", "are", "was", "for"
+    )
+
+    private fun significantWords(text: String): Set<String> =
+        topicWords.findAll(text.lowercase(java.util.Locale.ROOT))
+            .take(150).map { it.value }.filterNot(fillerWords::contains).toSet()
 
     private fun quote(text: String): String =
         text.trim()

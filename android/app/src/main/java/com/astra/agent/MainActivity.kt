@@ -2836,7 +2836,10 @@ class MainActivity :
                     } else emptyList()
                     val groundedArchived =
                         if (grounding != null) archivedChats.toList() else emptyList()
-                    val turns = history.takeLast(12).mapNotNull { entry ->
+                    // Look back across this chat when native inference restarts.
+                    // AstraConversationContext retains only eight bounded,
+                    // role-labelled excerpts; no cross-chat memory is injected.
+                    val turns = history.takeLast(160).mapNotNull { entry ->
                         val role = when (entry.role) {
                             "You" -> "user"
                             "Astra" -> "assistant"
