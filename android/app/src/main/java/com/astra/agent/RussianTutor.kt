@@ -76,6 +76,10 @@ internal class RussianTutor(
         get() = 6 + (cards.size - 30 + 3) / 4
 
     fun respond(raw: String): String? {
+        // Dictionary requests are routed before any pending flashcard answer.
+        // No text is sent to a server, and missing entries fall through to
+        // the local generative model rather than producing a made-up gloss.
+        dictionaryLookup(raw)?.let { return it }
         val input = raw.trim()
             .trimEnd('?', '!', '.')
             .lowercase(Locale.ROOT)
@@ -99,7 +103,9 @@ internal class RussianTutor(
                     "3 Cyrillic; 4 Numbers; 5 Cases; 6 Verbs and aspect; " +
                     "7-" + totalLessons + " Family, places, food, nature, animals, " +
                     "body parts, work, verbs and colors. Say 'Russian lesson 20', " +
-                    "'next Russian lesson' or 'Russian quiz'."
+                    "'next Russian lesson' or 'Russian quiz'. " +
+                    "Offline lookup: 'how do you say book in Russian' or " +
+                    "'what does книга mean in Russian'."
 
             "russian quiz", "quiz me in russian", "quiz me on russian",
             "practice russian", "russian practice" ->
@@ -166,6 +172,55 @@ internal class RussianTutor(
             "Not quite. Translate ${card.russian} into English. " +
                 "Reply with 'answer ...' or say 'skip Russian question'."
         }
+    }
+
+    /**
+     * Deterministic bidirectional Russian dictionary built from the same
+     * immutable course words and owner-imported private vocabulary.
+     * The optional on-phone model handles vocabulary not present here.
+     */
+    private fun dictionaryLookup(raw: String): String? {
+        val input = raw.trim().trimEnd('?', '!', '.').trim()
+        val englishToRussian = listOf(
+            Regex("""^(?:how (?:do|would) you say|translate)\s+(.{1,160}?)\s+(?:in|to|into)\s+russian$""",
+                RegexOption.IGNORE_CASE),
+            Regex("""^russian\s+for\s+(.{1,160})$""", RegexOption.IGNORE_CASE)
+        )
+        val russianToEnglish = listOf(
+            Regex("""^what does\s+(.{1,160}?)\s+mean in\s+russian$""",
+                RegexOption.IGNORE_CASE),
+            Regex("""^translate\s+(.{1,160}?)\s+from\s+russian$""",
+                RegexOption.IGNORE_CASE)
+        )
+        fun cleaned(value: String): String = value.trim()
+            .trim('"', '\'', '“', '”', '‘', '’')
+            .trim().lowercase(Locale.ROOT)
+
+        val forward = englishToRussian.firstNotNullOfOrNull { it.matchEntire(input) }
+        val reverse = if (forward == null) {
+            russianToEnglish.firstNotNullOfOrNull { it.matchEntire(input) }
+        } else null
+        val term = cleaned((forward ?: reverse)?.groupValues?.get(1) ?: return null)
+        if (term.isEmpty()) return null
+        val available = cards
+        val matching = if (forward != null) {
+            available.filter { word ->
+                cleaned(word.english) == term ||
+                    word.acceptedAnswers.any { cleaned(it) == term }
+            }
+        } else {
+            available.filter { cleaned(it.russian) == term }
+        }
+        if (matching.isEmpty()) return null
+        val head = matching.take(5).joinToString("; ") { word ->
+            word.russian +
+                (if (word.romanized.isBlank()) "" else " (" + word.romanized + ")") +
+                " — " + word.english
+        }
+        return "Russian offline dictionary: " + head +
+            (if (matching.size > 5)
+                "; and " + (matching.size - 5) + " more entries."
+            else ".")
     }
 
     private fun askQuestion(): String {
