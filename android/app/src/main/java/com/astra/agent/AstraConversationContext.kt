@@ -66,9 +66,14 @@ internal object AstraConversationContext {
         val older = valid.dropLast(recent.size)
         val keywords = significantWords(current)
         val ownerRecall = Regex(
-            """(?i)\b(?:what did i say|what did i tell|remind me|what was my|my earlier)\b"""
+            """(?i)\b(?:what did i say|what did i tell|what was my|my earlier|remind me of my)\b"""
         ).containsMatchIn(current)
-        val ranked = older.map { turn ->
+        // When asked specifically what the owner said, older assistant
+        // guesses are not evidence of the owner's statements. Keep the last
+        // three dialogue turns for immediate conversational coherence.
+        val candidates = if (ownerRecall)
+            older.filter { it.value.role == "user" } else older
+        val ranked = candidates.map { turn ->
             // Score only terms that can actually appear in the displayed
             // excerpt, rather than matching an invisible part of a long turn.
             val terms = significantWords(turn.value.content.take(MAX_TURN_CHARS))
@@ -80,7 +85,7 @@ internal object AstraConversationContext {
                 it.second
             }.thenByDescending { it.first.index })
             .map { it.first }
-        val priority = (recent.asReversed() + ranked + older.asReversed())
+        val priority = (recent.asReversed() + ranked + candidates.asReversed())
             .distinctBy { it.index }
         val selected = mutableListOf<Pair<Int, String>>()
         var remaining = room
