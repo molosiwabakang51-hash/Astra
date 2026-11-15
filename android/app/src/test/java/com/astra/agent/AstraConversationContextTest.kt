@@ -129,6 +129,48 @@ class AstraConversationContextTest {
         assertTrue(prompt.length <= 3010)
     }
 
+    @Test fun reloadMatchesSingularPluralsAndMaturityVariants() {
+        val older = listOf(
+            turn("user", "I hold government bonds."),
+            turn("user", "My preferred bond maturities are ten years.")
+        ) + (1..22).map { turn("assistant", "Unrelated vacation example $it.") }
+        val answer = AstraConversationContext.userPrompt(
+            "What was my bond maturity preference?", older, true
+        )
+        assertTrue(answer.contains("preferred bond maturities"))
+        assertTrue(answer.contains("government bonds"))
+        assertTrue(answer.endsWith("What was my bond maturity preference?\n/no_think"))
+    }
+
+    @Test fun firstPersonMemoryQuestionsPreferWhatOwnerSaidOverAssistantGuess() {
+        val original = listOf(
+            turn("user", "My portfolio allocation was 60 percent bonds. " + "U".repeat(175)),
+            turn("assistant", "My earlier answer wrongly guessed 80 percent bonds. " +
+                "A".repeat(180))
+        )
+        val recent = (1..3).map {
+            turn("assistant", "Unrelated recent material $it " + "X".repeat(220))
+        }
+        val answer = AstraConversationContext.userPrompt(
+            "Remind me what did I say about portfolio bonds?", original + recent, true
+        )
+        assertTrue(answer.contains("60 percent bonds"))
+        assertFalse(answer.contains("wrongly guessed 80 percent bonds"))
+        assertTrue(answer.length <= 3010)
+    }
+
+    @Test fun retrievalDoesNotMatchKeywordsOutsideActuallyQuotedExcerpt() {
+        val older = listOf(
+            turn("user", "Unrelated long note " + "Z".repeat(280) +
+                "SENSITIVE_BOND_FACT_DO_NOT_INCLUDE")
+        ) + (1..22).map { turn("assistant", "Recent unrelated dinner chat $it") }
+        val answer = AstraConversationContext.userPrompt(
+            "What was the bond fact?", older, true
+        )
+        assertFalse(answer.contains("SENSITIVE_BOND_FACT_DO_NOT_INCLUDE"))
+        assertTrue(answer.endsWith("What was the bond fact?\n/no_think"))
+    }
+
     @Test fun hugeHistoricMessagesCannotTruncateCurrentQuestion() {
         val history = (1..20).map { turn("user", "A".repeat(25_000) + "SECRET_DATA") }
         val result = AstraConversationContext.userPrompt(
