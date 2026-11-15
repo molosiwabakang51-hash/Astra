@@ -1487,6 +1487,13 @@ private class AstraProcessor(
             )
         }
 
+        // An explicit lesson or quiz answer takes precedence over an
+        // unfinished task/note dialogue. Never save a language command as
+        // a task merely because another prompt was pending.
+        multilingualTutor.respond(clean)?.let {
+            dialogue.dismissIncompletePrompt()
+            return AssistantResult(it)
+        }
         dialogue.respond(clean, tasks, notes, completed)?.let {
             return AssistantResult(it)
         }
@@ -1495,11 +1502,6 @@ private class AstraProcessor(
             return AssistantResult(it)
         }
 
-        // Explicit multilingual lesson/quiz commands are processed before
-        // Russian pending answers; no model-generated text can mutate progress.
-        multilingualTutor.respond(clean)?.let {
-            return AssistantResult(it)
-        }
         russianTutor.respond(clean)?.let {
             return AssistantResult(it)
         }
