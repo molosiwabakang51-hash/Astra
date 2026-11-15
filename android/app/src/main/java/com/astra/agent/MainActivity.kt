@@ -2981,6 +2981,54 @@ class MainActivity :
                     commandDeckExpanded = false
                     val normalized = AstraInput.normalize(message)
 
+                    // Only a user-authored, explicitly prefixed plan can trigger
+                    // local actions. Every step is simulated before the owner
+                    // types 'confirm workflow'; model-generated text never runs it.
+                    // Keep original newlines for multi-line plans.
+                    val workflowSnapshot = AstraWorkflow.Snapshot(
+                        tasks.toList(), completed.toList(), notes.toList(),
+                        AstraWorkflow.decodeItems(
+                            storage.getString("astra_shopping_items", "")
+                        ),
+                        AstraWorkflow.decodeItems(
+                            storage.getString("astra_habits", "")
+                        )
+                    )
+                    val workflow = workflowSession.handle(message, workflowSnapshot)
+                        ?: if (message != normalized) {
+                            workflowSession.handle(normalized, workflowSnapshot)
+                        } else null
+                    if (workflow != null) {
+                        var reply = workflow.text
+                        val next = workflow.apply
+                        dialogue.dismissIncompletePrompt()
+                        if (next != null) {
+                            try {
+                                // Persist first; only then replace UI collections.
+                                storage.commitWorkflow(next)
+                                tasks.clear()
+                                tasks.addAll(next.tasks)
+                                completed.clear()
+                                completed.addAll(next.completed)
+                                notes.clear()
+                                notes.addAll(next.notes)
+                                dialogue.reset()
+                                workflowSession.reset()
+                            } catch (failure: Exception) {
+                                reply = "Workflow could not be saved. " +
+                                    (failure.message ?: "No changes were applied.")
+                            }
+                        }
+                        dialogueAwaiting = reply.startsWith("WORKFLOW PREVIEW")
+                        history.add(ChatMessage("You", message))
+                        history.add(ChatMessage("Astra", reply))
+                        while (history.size > MAX_HISTORY) history.removeAt(0)
+                        input = ""
+                        persist()
+                        keyboard?.hide()
+                        return
+                    }
+
                     AstraReplyLanguage.parseCommand(normalized)?.let { chosen ->
                         aiReplyLanguage = chosen
                         storage.setString("astra_ai_reply_language", chosen.id)
@@ -3027,54 +3075,6 @@ class MainActivity :
                                 ". Updates: $neuralTrainingSteps. " +
                                 "Qwen3 language-model weights are unchanged."
                         }
-                        history.add(ChatMessage("You", message))
-                        history.add(ChatMessage("Astra", reply))
-                        while (history.size > MAX_HISTORY) history.removeAt(0)
-                        input = ""
-                        persist()
-                        keyboard?.hide()
-                        return
-                    }
-
-                    // Only a user-authored, explicitly prefixed plan can trigger
-                    // local actions. Every step is simulated before the owner
-                    // types 'confirm workflow'; model-generated text never runs it.
-                    // Keep original newlines for multi-line plans.
-                    val workflowSnapshot = AstraWorkflow.Snapshot(
-                        tasks.toList(), completed.toList(), notes.toList(),
-                        AstraWorkflow.decodeItems(
-                            storage.getString("astra_shopping_items", "")
-                        ),
-                        AstraWorkflow.decodeItems(
-                            storage.getString("astra_habits", "")
-                        )
-                    )
-                    val workflow = workflowSession.handle(message, workflowSnapshot)
-                        ?: if (message != normalized) {
-                            workflowSession.handle(normalized, workflowSnapshot)
-                        } else null
-                    if (workflow != null) {
-                        var reply = workflow.text
-                        val next = workflow.apply
-                        dialogue.dismissIncompletePrompt()
-                        if (next != null) {
-                            try {
-                                // Persist first; only then replace UI collections.
-                                storage.commitWorkflow(next)
-                                tasks.clear()
-                                tasks.addAll(next.tasks)
-                                completed.clear()
-                                completed.addAll(next.completed)
-                                notes.clear()
-                                notes.addAll(next.notes)
-                                dialogue.reset()
-                                workflowSession.reset()
-                            } catch (failure: Exception) {
-                                reply = "Workflow could not be saved. " +
-                                    (failure.message ?: "No changes were applied.")
-                            }
-                        }
-                        dialogueAwaiting = reply.startsWith("WORKFLOW PREVIEW")
                         history.add(ChatMessage("You", message))
                         history.add(ChatMessage("Astra", reply))
                         while (history.size > MAX_HISTORY) history.removeAt(0)
