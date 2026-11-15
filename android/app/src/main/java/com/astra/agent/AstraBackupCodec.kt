@@ -21,7 +21,7 @@ internal object AstraBackupCodec {
     private val strings = listOf(
         "astra_shopping_items", "astra_habits", "astra_habit_date",
         "astra_habit_completed_today", "speech_language", "astra_chat_archive",
-        "astra_active_chat_title"
+        "astra_active_chat_title", "astra_learning_language"
     )
     private val booleans = listOf(
         "auto_send_voice", "speak_responses", "local_only_tts", "allow_system_speech"
@@ -29,7 +29,7 @@ internal object AstraBackupCodec {
     private val ints = listOf(
         "russian_correct", "russian_next_question", "russian_pending_question",
         "russian_last_lesson"
-    )
+    ) + AstraMultilingualTutor.progressKeys()
 
     internal data class Payload(
         val values: Map<String, Any>,
@@ -41,7 +41,7 @@ internal object AstraBackupCodec {
         fun preview(): String =
             "$historyCount chat messages, $noteCount notes, $taskCount open tasks, " +
                 "$completedCount completed tasks, plus preferences, shopping lists, " +
-                "habits and Russian lesson progress."
+                "habits and locally saved language lesson progress."
     }
 
     fun encode(source: Map<String, *>): String {
@@ -130,7 +130,9 @@ internal object AstraBackupCodec {
             // absent; every older field retains strict validation.
             val value = if (!data.has(key) && key == "astra_chat_archive") {
                 "[]"
-            } else if (!data.has(key) && key == "astra_active_chat_title") {
+            } else if (!data.has(key) &&
+                key in setOf("astra_active_chat_title", "astra_learning_language")
+            ) {
                 ""
             } else {
                 data.opt(key)
@@ -151,8 +153,9 @@ internal object AstraBackupCodec {
         for (key in ints) {
             // Backups created before the expanded six-lesson course do not
             // contain this optional progress field; restore them unchanged.
-            val value = if (key == "russian_last_lesson" && !data.has(key))
-                0 else data.opt(key)
+            val value = if (!data.has(key) &&
+                (key == "russian_last_lesson" || key.startsWith("lang_"))
+            ) 0 else data.opt(key)
             if (value !is Number ||
                 value.toLong() !in 0L..10_000_000L ||
                 value.toDouble() != value.toLong().toDouble()
