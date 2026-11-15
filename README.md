@@ -4,6 +4,11 @@ Astra is a **local-first Android/Kotlin Jetpack Compose assistant** with a futur
 
 **Release status: EXPERIMENTAL.** Compilation and APK checks pass, but stable status requires on-phone offline inference, one-time model import, chat/Stop usability, data-preserving same-key updates and privacy checks. See the [stable-release acceptance checklist](docs/stable-release-acceptance.md). Owner-signed builds remain GitHub **pre-releases** until those mandatory checks pass.
 
+**AI quality target:** The 8.5/10 campaign is assessed against a separate
+[reproducible 100-point on-phone scorecard](docs/ai-quality-evaluation.md).
+Passing GitHub CI does not earn phone-only intelligence points.
+
+
 ## One-time private library folder authorization (experimental)
 
 In **Settings → Your private book library**, choose **Authorize library folder once**
