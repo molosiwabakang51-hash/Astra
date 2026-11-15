@@ -74,6 +74,42 @@ class AstraBackupCodecTest {
         ).values["russian_last_lesson"])
     }
 
+    @Test fun eightLanguageProgressAndSelectionRoundTripWithoutLeakingExamples() {
+        val source = example + mapOf(
+            "astra_learning_language" to "setswana",
+            "lang_setswana_correct" to 12,
+            "lang_setswana_lesson" to 3,
+            "lang_japanese_correct" to 7,
+            "lang_mandarin_next" to 6
+        )
+        val restored = AstraBackupCodec.parse(AstraBackupCodec.encode(source))
+        assertEquals("setswana", restored.values["astra_learning_language"])
+        assertEquals(12, restored.values["lang_setswana_correct"])
+        assertEquals(3, restored.values["lang_setswana_lesson"])
+        assertEquals(7, restored.values["lang_japanese_correct"])
+        assertEquals(6, restored.values["lang_mandarin_next"])
+    }
+
+    @Test fun oldBackupsMissingAllNewMultilingualFieldsStillRestore() {
+        val old = JSONObject(AstraBackupCodec.encode(example))
+        val data = old.getJSONObject("data")
+        data.remove("astra_learning_language")
+        for (key in AstraMultilingualTutor.progressKeys()) data.remove(key)
+        val restored = AstraBackupCodec.parse(old.toString())
+        assertEquals("", restored.values["astra_learning_language"])
+        assertEquals(0, restored.values["lang_setswana_correct"])
+        assertEquals(0, restored.values["lang_mandarin_lesson"])
+        assertEquals(7, restored.values["russian_correct"])
+    }
+
+    @Test fun malformedMultilingualProgressCannotBeInjectedIntoBackup() {
+        val root = JSONObject(AstraBackupCodec.encode(example))
+        root.getJSONObject("data").put("lang_setswana_correct", -5)
+        assertRejects { AstraBackupCodec.parse(root.toString()) }
+        root.getJSONObject("data").put("lang_setswana_correct", "five")
+        assertRejects { AstraBackupCodec.parse(root.toString()) }
+    }
+
     @Test fun excessiveConversationTitleInBackupIsRejected() {
         val source = JSONObject(AstraBackupCodec.encode(example))
         source.getJSONObject("data")

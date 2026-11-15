@@ -1379,6 +1379,7 @@ private object UtilityEngine {
 
 private class AstraProcessor(
     private val russianTutor: RussianTutor,
+    private val multilingualTutor: AstraMultilingualTutor,
     private val everydayAssistant: EverydayAssistant,
     private val dialogue: AstraDialogue
 ) {
@@ -1486,6 +1487,13 @@ private class AstraProcessor(
             )
         }
 
+        // An explicit lesson or quiz answer takes precedence over an
+        // unfinished task/note dialogue. Never save a language command as
+        // a task merely because another prompt was pending.
+        multilingualTutor.respond(clean)?.let {
+            dialogue.dismissIncompletePrompt()
+            return AssistantResult(it)
+        }
         dialogue.respond(clean, tasks, notes, completed)?.let {
             return AssistantResult(it)
         }
@@ -1856,8 +1864,19 @@ private class AstraProcessor(
                 convert 75 kg to lb
                 convert 2 hours to minutes
 
-                LANGUAGES
-                teach me Russian
+                LANGUAGES (entirely offline)
+                languages
+                learn setswana
+                setswana quiz
+                learn french
+                learn spanish
+                learn portuguese
+                learn german
+                learn swahili
+                learn japanese
+                learn mandarin
+                next language lesson
+                language progress
                 Russian lesson 2
                 Russian quiz
                 Russian progress
@@ -1886,7 +1905,8 @@ private class AstraProcessor(
         return AssistantResult(
             "I cannot answer that reliably with Astra's current offline tools. " +
                 "I can help with tasks, notes, shopping lists, daily habits, unit conversions, " +
-                "Russian practice, mathematics, and finance. Type 'help' for examples. " +
+                "Russian and multilingual practice, mathematics, and finance. " +
+                "Type 'languages' for courses or 'help' for examples. " +
                 "General open-ended questions are handled by the bundled offline language model."
         )
     }
@@ -2001,79 +2021,72 @@ class MainActivity :
 
         if (ttsReady) {
 
-            tts?.language =
-                Locale.ENGLISH
-
             selectOfflineVoice()
         }
     }
 
+    private fun selectedSpeechLanguage(): SpeechLanguage =
+        SpeechLanguage.fromTag(
+            getSharedPreferences("astra", Context.MODE_PRIVATE)
+                .getString("speech_language", "en-US")
+        )
+
+    /**
+     * Pick an installed non-network voice matching the user's language.
+     * Never silently read Japanese or Setswana through an English voice.
+     */
     private fun selectOfflineVoice() {
-
+        val target = Locale.forLanguageTag(selectedSpeechLanguage().tag)
+        offlineVoiceAvailable = false
+        offlineVoiceName = ""
+        if (!ttsReady) return
         try {
-
-            val voices =
-                tts?.voices ?: emptySet<Voice>()
-
-            val localVoice = voices
-                .filter {
-
-                    !it.isNetworkConnectionRequired &&
-                    it.locale.language == "en"
-                }
-                .firstOrNull()
-
-            if (localVoice != null) {
-
-                tts?.voice = localVoice
-
-                offlineVoiceAvailable = true
-
-                offlineVoiceName =
-                    localVoice.name
-
-            } else {
-
-                offlineVoiceAvailable = false
-
-                offlineVoiceName = ""
+            val options = tts?.voices.orEmpty().filter { voice ->
+                !voice.isNetworkConnectionRequired &&
+                    voice.locale.language.equals(target.language, ignoreCase = true)
             }
-
+            val picked = options.firstOrNull {
+                it.locale.country.equals(target.country, ignoreCase = true)
+            } ?: options.firstOrNull()
+            if (picked != null && tts?.setVoice(picked) == TextToSpeech.SUCCESS) {
+                offlineVoiceAvailable = true
+                offlineVoiceName = picked.name
+            }
         } catch (_: Exception) {
-
             offlineVoiceAvailable = false
+            offlineVoiceName = ""
         }
     }
 
-    private fun speak(
-        text: String,
-        offlineOnly: Boolean
-    ) {
-
-        if (!ttsReady) {
-            return
-        }
-
-        if (
-            offlineOnly &&
-            !offlineVoiceAvailable
-        ) {
-
+    private fun speak(text: String, offlineOnly: Boolean) {
+        if (!ttsReady) return
+        val selected = selectedSpeechLanguage()
+        selectOfflineVoice()
+        if (offlineOnly && !offlineVoiceAvailable) {
             Toast.makeText(
                 this,
-                "No offline English voice installed.",
+                "No offline " + selected.displayName + " voice installed. " +
+                    "Install its Android text-to-speech data or select another language.",
                 Toast.LENGTH_LONG
             ).show()
-
             return
         }
-
-        tts?.speak(
-            text,
-            TextToSpeech.QUEUE_FLUSH,
-            null,
-            "astra"
-        )
+        if (!offlineVoiceAvailable) {
+            val locale = Locale.forLanguageTag(selected.tag)
+            val status = tts?.setLanguage(locale)
+            if (status == TextToSpeech.LANG_NOT_SUPPORTED ||
+                status == TextToSpeech.LANG_MISSING_DATA
+            ) {
+                Toast.makeText(
+                    this,
+                    "No compatible " + selected.displayName +
+                        " speech voice installed.",
+                    Toast.LENGTH_LONG
+                ).show()
+                return
+            }
+        }
+        tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, "astra")
     }
 
     private fun initializeRecognizer() {
@@ -2317,6 +2330,10 @@ class MainActivity :
 
         val processor = AstraProcessor(
             RussianTutor(storage::getInt, storage::setInt),
+            AstraMultilingualTutor(
+                storage::getInt, storage::setInt,
+                storage::getString, storage::setString
+            ),
             EverydayAssistant(storage::getString, storage::setString),
             dialogue
         )
@@ -5648,13 +5665,16 @@ class MainActivity :
                                                                     "speech_language",
                                                                     language.tag
                                                                 )
+                                                                selectOfflineVoice()
                                                             }
                                                         )
                                                     }
                                                 }
                                             }
                                             Text(
-                                                "The selected language must be supported by the installed recognizer. System fallback may use the network even when offline recognition is preferred.",
+                                                "Recognition and text-to-speech need separately installed Android language packs. " +
+                                                    "A listed language is not proof of installed offline support. " +
+                                                    "System speech fallback may use the internet when allowed.",
                                                 style = MaterialTheme.typography.bodySmall,
                                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                                             )
