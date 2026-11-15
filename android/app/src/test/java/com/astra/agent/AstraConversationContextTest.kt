@@ -171,6 +171,70 @@ class AstraConversationContextTest {
         assertTrue(answer.endsWith("What was the bond fact?\n/no_think"))
     }
 
+    @Test fun firstPersonRecallIncludesNearbyTopicFreeCorrections() {
+        val earlier = listOf(
+            turn("user", "My fictional bond maturity is seven years."),
+            turn("assistant", "Noted, a seven-year bond."),
+            turn("user", "Actually, make it three years."),
+            turn("assistant", "Understood, three years.")
+        ) + (1..28).map { turn("assistant", "Unrelated weather comment $it.") }
+        val restored = AstraConversationContext.userPrompt(
+            "What was my bond maturity?", earlier, true
+        )
+        assertTrue(restored.contains("bond maturity is seven years"))
+        assertTrue(restored.contains("Actually, make it three years"))
+        assertTrue(restored.indexOf("bond maturity is seven years") <
+            restored.indexOf("Actually, make it three years"))
+        assertTrue(restored.endsWith("What was my bond maturity?\\n/no_think"))
+        assertTrue(restored.length <= 3010)
+    }
+
+    @Test fun twoNearbyCorrectionsSurviveButUnrelatedOwnerUpdateDoesNot() {
+        val earlier = listOf(
+            turn("user", "My portfolio target is 60 percent bonds."),
+            turn("assistant", "I understand."),
+            turn("user", "Correction: make it 55 percent."),
+            turn("assistant", "Noted."),
+            turn("user", "No, make it 50 percent."),
+            turn("user", "I also prefer vanilla ice cream."),
+            turn("user", "Actually, use chocolate for dessert.")
+        ) + (1..15).map { turn("assistant", "Noise sentence $it.") }
+        val restored = AstraConversationContext.userPrompt(
+            "What did I say about my portfolio bonds?", earlier, true
+        )
+        assertTrue(restored.contains("60 percent bonds"))
+        assertTrue(restored.contains("make it 55 percent"))
+        assertTrue(restored.contains("make it 50 percent"))
+        assertFalse(restored.contains("chocolate for dessert"))
+    }
+
+    @Test fun topicFreeCorrectionIsNotLinkedPastAnUnrelatedOwnerTurn() {
+        val earlier = listOf(
+            turn("user", "My bond maturity is five years."),
+            turn("assistant", "Understood."),
+            turn("user", "I am considering a new dinner menu."),
+            turn("user", "Actually, make it spicy noodles.")
+        ) + (1..21).map { turn("assistant", "Unrelated recent context $it") }
+        val restored = AstraConversationContext.userPrompt(
+            "What was my bond maturity?", earlier, true
+        )
+        assertTrue(restored.contains("bond maturity is five years"))
+        assertFalse(restored.contains("make it spicy noodles"))
+    }
+
+    @Test fun recalledExcerptNeverCutsAtEscapedQuoteBoundary() {
+        val old = "A".repeat(249) + "\"" + "more previous text"
+        val restored = AstraConversationContext.userPrompt(
+            "What did I say?", listOf(turn("user", old)), true
+        )
+        assertTrue(restored.contains("Previous user: \""))
+        assertFalse(restored.contains("A".repeat(249) + "\\\""))
+        val oldLine = restored.lineSequence().first { it.startsWith("Previous user:") }
+        assertTrue(oldLine.endsWith("\""))
+        assertFalse(oldLine.dropLast(1).endsWith("\\"))
+        assertTrue(restored.length <= 3010)
+    }
+
     @Test fun hugeHistoricMessagesCannotTruncateCurrentQuestion() {
         val history = (1..20).map { turn("user", "A".repeat(25_000) + "SECRET_DATA") }
         val result = AstraConversationContext.userPrompt(
