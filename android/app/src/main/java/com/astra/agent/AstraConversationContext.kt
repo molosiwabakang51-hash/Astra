@@ -92,7 +92,12 @@ internal object AstraConversationContext {
         val retrieved = if (ownerRecall) ranked.flatMap { anchor ->
             relatedCorrections(anchor, valid).asReversed() + anchor
         } else ranked
-        val priority = (recent.asReversed() + retrieved + candidates.asReversed())
+        // If a first-person recall query already has lexical matches,
+        // do not fill the prompt with unrelated older owner messages.
+        // Otherwise preserve limited recency fallback for vague questions.
+        val fallback = if (ownerRecall && ranked.isNotEmpty()) emptyList()
+            else candidates.asReversed()
+        val priority = (recent.asReversed() + retrieved + fallback)
             .distinctBy { it.index }
         val selected = mutableListOf<Pair<Int, String>>()
         var remaining = room
