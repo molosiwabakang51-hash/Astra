@@ -157,8 +157,11 @@ internal class AstraBookLibrary(private val directory: File) {
         val capacity = maxHits.coerceIn(1, 4) * 5
         val smallestFirst = compareBy<Passage> { it.score }
             .thenByDescending { it.bookId }.thenByDescending { it.number }
-        val best = java.util.PriorityQueue<Passage>(capacity, smallestFirst)
+        val best = mutableListOf<Passage>()
         for (book in listBooks()) {
+            // Retain a few candidates per source so a long first textbook
+            // cannot suppress all results from another relevant book.
+            val perBook = java.util.PriorityQueue<Passage>(capacity, smallestFirst)
             val file = File(directory, book.id + ".jsonl")
             runCatching {
                 file.bufferedReader(Charsets.UTF_8).use { reader ->
@@ -175,17 +178,18 @@ internal class AstraBookLibrary(private val directory: File) {
                             book.id, book.title, entry.optInt("n"),
                             passage, score
                         )
-                        if (best.size < capacity) {
-                            best.add(hit)
-                        } else if (smallestFirst.compare(hit, best.peek()) > 0) {
-                            best.poll()
-                            best.add(hit)
+                        if (perBook.size < capacity) {
+                            perBook.add(hit)
+                        } else if (smallestFirst.compare(hit, perBook.peek()) > 0) {
+                            perBook.poll()
+                            perBook.add(hit)
                         }
                     }
                 }
             }
+            best.addAll(perBook)
         }
-        val ordered = best.toList().sortedWith(
+        val ordered = best.sortedWith(
             compareByDescending<Passage> { it.score }
                 .thenBy { it.bookId }.thenBy { it.number }
         )
