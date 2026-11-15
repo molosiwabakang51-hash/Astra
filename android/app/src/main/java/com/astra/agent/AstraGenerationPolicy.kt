@@ -17,8 +17,19 @@ internal object AstraGenerationPolicy {
         """(?i)\b(?:in detail|detailed|thorough|comprehensive|step.by.step|explain fully|show your work|compare and contrast|derive|proof|analy[sz]e|essay|report|tutorial|teach me|walk me through|deep dive|write code|implement|give examples|course|lesson plan|study guide)\b"""
     )
 
+    // A long pasted source can contain its own instructions about brevity.
+    // When the owner explicitly marks the final request, apply response-length
+    // cues to that request rather than to quoted or pasted source material.
+    private val finalRequestMarker = Regex(
+        """(?i)\b(?:final question|now answer|my question|latest request)\s*:\s*"""
+    )
+
     fun depth(rawQuestion: String): Depth {
-        val question = rawQuestion.trim().lowercase(Locale.ROOT)
+        val full = rawQuestion.trim()
+        val latest = finalRequestMarker.findAll(full).lastOrNull()?.let {
+            full.substring(it.range.last + 1).trim()
+        }?.takeIf { it.isNotEmpty() } ?: full
+        val question = latest.lowercase(Locale.ROOT)
         if (question.isEmpty()) return Depth.BRIEF
         if (short.containsMatchIn(question)) return Depth.BRIEF
         if (long.containsMatchIn(question) || question.length > 700) {

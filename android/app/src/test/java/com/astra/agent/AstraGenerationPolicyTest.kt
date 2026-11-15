@@ -40,6 +40,28 @@ class AstraGenerationPolicyTest {
         }
     }
 
+    @Test fun finalExplicitQuestionOverridesOldSourceFormattingRequests() {
+        val notes = "SOURCE: briefly describe duration in one sentence. " +
+            "Reference content. ".repeat(150)
+        assertEquals(AstraGenerationPolicy.Depth.DETAILED,
+            AstraGenerationPolicy.depth(notes +
+                "\nFINAL QUESTION: Explain the calculation step by step and give examples."))
+        val detailedNotes = "OLD TASK: write a comprehensive tutorial. " +
+            "Lecture content. ".repeat(150)
+        assertEquals(AstraGenerationPolicy.Depth.BRIEF,
+            AstraGenerationPolicy.depth(detailedNotes +
+                "\nNOW ANSWER: In one sentence, what is bond convexity?"))
+    }
+
+    @Test fun unmarkedQuestionsAndEmptyFinalMarkerRetainExistingPolicy() {
+        assertEquals(AstraGenerationPolicy.Depth.BRIEF,
+            AstraGenerationPolicy.depth("Briefly explain the bond in detail."))
+        assertEquals(AstraGenerationPolicy.Depth.STANDARD,
+            AstraGenerationPolicy.depth("Final question: "))
+        assertEquals(AstraGenerationPolicy.Depth.STANDARD,
+            AstraGenerationPolicy.depth("What is duration?"))
+    }
+
     @Test fun fuzzedRequestsHaveStrictOfflineGenerationCap() {
         val rng = Random(1009009)
         val alphabet = "abc?!@#\$中文Привет 12345\n\t"
