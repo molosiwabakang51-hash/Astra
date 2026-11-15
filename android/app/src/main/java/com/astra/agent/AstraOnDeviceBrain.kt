@@ -110,8 +110,18 @@ internal class AstraOnDeviceBrain(
                     session.invalidate()
                 }
                 previousBookContextAllowed = permittedBooks
-                val bookReferences = if (permittedBooks)
-                    books?.search(question, maxHits = 2).orEmpty()
+                // Never append citations if question length prevents the
+                // matching source excerpts from entering Qwen's prompt.
+                if (explicitBookQuery != null &&
+                    !AstraReferenceFit.permitsBook(question)
+                ) {
+                    return@withContext "Your book question is too long to attach " +
+                        "relevant passages safely. Shorten it to 1,800 characters " +
+                        "or fewer and ask again."
+                }
+                val bookReferences = if (permittedBooks &&
+                    AstraReferenceFit.permitsBook(question)
+                ) books?.search(question, maxHits = 2).orEmpty()
                 else emptyList()
                 if (explicitBookQuery != null && bookReferences.isEmpty()) {
                     return@withContext "No relevant passage was found in your imported books. " +
@@ -247,8 +257,9 @@ internal class AstraOnDeviceBrain(
                             it.topic == AstraContinualLearning.Topic.RUSSIAN &&
                                 it.confidence > 0.82
                         } == true
-                    if (bookReferences.isEmpty() && explicitBookQuery == null)
-                        AstraOpenLibrary.relevant(
+                    if (bookReferences.isEmpty() && explicitBookQuery == null &&
+                        AstraReferenceFit.permitsOpenCourse(question)
+                    ) AstraOpenLibrary.relevant(
                             question, (synced + bundled).distinctBy { it.id },
                             neuralRussianHint = learnedHint
                         )
