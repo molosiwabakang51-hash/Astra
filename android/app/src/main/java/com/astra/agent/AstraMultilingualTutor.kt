@@ -162,6 +162,9 @@ internal class AstraMultilingualTutor(
                 } ?: "No additional course selected. ") +
                 "Type 'languages' to see the available courses."
         }
+        // This is a dictionary lookup over verified local course cards and
+        // owner-imported TSV data, not an invented fluent translation.
+        dictionaryAnswer(text)?.let { return it }
         for (language in Language.entries) {
             for (alias in language.aliases) {
                 if (lower == "learn " + alias || lower == "teach me " + alias ||
@@ -239,6 +242,83 @@ internal class AstraMultilingualTutor(
                 language.id + " quiz' for the next phrase."
         }
         return null
+    }
+
+    /**
+     * Look up known words in either direction with no server dependency.
+     * Unavailable terms must be reported as missing, never guessed.
+     * Exact matching preserves German Essen (food) versus essen (to eat).
+     */
+    private fun dictionaryAnswer(raw: String): String? {
+        val input = raw.trim().trimEnd('?', '!', '.').trim()
+        fun languageFor(name: String): Language? =
+            Language.entries.firstOrNull { language ->
+                language.aliases.any { it.equals(name.trim(), ignoreCase = true) }
+            }
+
+        val fromEnglish = Regex(
+            """^(?:how (?:do|would) you say|translate)\s+(.{1,160}?)\s+(?:in|to|into)\s+(.+)$""",
+            RegexOption.IGNORE_CASE
+        ).matchEntire(input)
+        if (fromEnglish != null) {
+            val language = languageFor(fromEnglish.groupValues[2])
+            if (language != null) {
+                return dictionaryLookup(language, fromEnglish.groupValues[1], fromEnglish = true)
+            }
+        }
+
+        val alternative = Regex(
+            """^(.+?)\s+for\s+(.{1,160})$""", RegexOption.IGNORE_CASE
+        ).matchEntire(input)
+        if (alternative != null) {
+            val language = languageFor(alternative.groupValues[1])
+            if (language != null) {
+                return dictionaryLookup(language, alternative.groupValues[2], fromEnglish = true)
+            }
+        }
+
+        val fromTarget = listOf(
+            Regex("""^what does\s+(.{1,160}?)\s+mean in\s+(.+)$""",
+                RegexOption.IGNORE_CASE),
+            Regex("""^translate\s+(.{1,160}?)\s+from\s+(.+)$""",
+                RegexOption.IGNORE_CASE)
+        )
+        for (pattern in fromTarget) {
+            val match = pattern.matchEntire(input) ?: continue
+            val language = languageFor(match.groupValues[2]) ?: continue
+            return dictionaryLookup(language, match.groupValues[1], fromEnglish = false)
+        }
+        return null
+    }
+
+    private fun dictionaryLookup(
+        language: Language,
+        requested: String,
+        fromEnglish: Boolean
+    ): String {
+        val term = requested.trim()
+        val cards = deck(language)
+        val matching = if (fromEnglish) {
+            cards.filter { card ->
+                canonical(card.english) == canonical(term) ||
+                    card.alternatives.any { canonical(it) == canonical(term) }
+            }
+        } else {
+            val exact = cards.filter { it.phrase == term }
+            if (exact.isNotEmpty()) exact
+            else cards.filter { canonical(it.phrase) == canonical(term) }
+        }
+        if (matching.isEmpty()) {
+            return "No matching offline " + language.display +
+                " vocabulary entry for '" + term +
+                "'. Import a trusted TSV pack in Settings to expand the dictionary."
+        }
+        val results = matching.take(5).joinToString("; ") {
+            it.phrase + " — " + it.english
+        }
+        return language.display + " offline dictionary: " + results +
+            (if (matching.size > 5) "; and " + (matching.size - 5) +
+                " more matching entries." else ".")
     }
 
     private fun activate(language: Language) {
