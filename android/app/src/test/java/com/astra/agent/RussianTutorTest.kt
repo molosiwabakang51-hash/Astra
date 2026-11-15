@@ -101,6 +101,51 @@ class RussianTutorTest {
         assertTrue(coach.respond("russian course")!!.contains("96 vocabulary cards"))
     }
 
+    @Test fun russianDictionaryUnderstandsNaturalTwoWayQuestionsOffline() {
+        val coach = tutor()
+        assertTrue(coach.respond("how do you say thank you in Russian")!!
+            .contains("Спасибо (spasibo) — Thank you"))
+        assertTrue(coach.respond("Russian for book")!!
+            .contains("Книга (kniga) — Book"))
+        assertTrue(coach.respond("translate mother to Russian")!!
+            .contains("мать — Mother"))
+        assertTrue(coach.respond("what does Привет mean in Russian")!!
+            .contains("Привет (privet) — Hi"))
+        assertTrue(coach.respond("translate 'книга' from russian")!!
+            .contains("Книга (kniga) — Book"))
+        // Unknown words remain eligible for the optional local Qwen3 model.
+        assertNull(coach.respond("translate astrophysics to Russian"))
+        assertNull(coach.respond("What is bond convexity?"))
+    }
+
+    @Test fun russianPrivateVocabularySupportsInstantDictionaryLookup() {
+        val s = AstraVocabularyStore(
+            java.nio.file.Files.createTempDirectory("astra-ru-dictionary").toFile()
+        )
+        s.importTsv("russian", java.io.ByteArrayInputStream(
+            "Самолёт\tAirplane\n".toByteArray(Charsets.UTF_8)
+        ))
+        val coach = RussianTutor(
+            { key, default -> state[key] ?: default },
+            { key, value -> state[key] = value }, s
+        )
+        assertTrue(coach.respond("how do you say airplane in Russian")!!
+            .contains("Самолёт — Airplane"))
+        assertTrue(coach.respond("what does Самолёт mean in Russian")!!
+            .contains("Самолёт — Airplane"))
+        assertTrue(coach.respond("Russian progress")!!
+            .contains("97 vocabulary cards"))
+    }
+
+    @Test fun dictionaryQueriesLeavePendingRussianQuizUnchanged() {
+        val coach = tutor()
+        coach.respond("Russian quiz")
+        assertTrue(coach.respond("translate book to Russian")!!
+            .contains("Книга (kniga) — Book"))
+        assertTrue(coach.respond("answer thank you")!!.startsWith("Correct."))
+        assertTrue(coach.respond("Russian progress")!!.contains("1 correct"))
+    }
+
     @Test fun unrelatedCommandsAreNotConsumed() {
         val coach = tutor()
         coach.respond("Russian quiz")
