@@ -27,6 +27,19 @@ internal object AstraGenerationPolicy {
         return Depth.STANDARD
     }
 
+    /** Short on-device diagnostics need a small, predictable output allowance. */
+    const val DIAGNOSTIC_TOKEN_LIMIT = 96
+
+    /**
+     * A diagnostic cap can reduce generation work but must never expand or
+     * disable the normal response budget. It is only applied for explicit
+     * owner-initiated spot checks, not ordinary chat.
+     */
+    fun effectiveBudget(normal: Int, diagnosticMaximum: Int?): Int {
+        require(normal in 32..1152) { "Invalid native model token budget." }
+        return diagnosticMaximum?.coerceIn(32, normal) ?: normal
+    }
+
     /**
      * Evidence-backed answers need sufficient tokens to discuss the quotes.
      * An explicit request for brevity always wins, and native inference
