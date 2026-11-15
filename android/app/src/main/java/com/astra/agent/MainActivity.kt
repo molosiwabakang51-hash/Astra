@@ -2327,12 +2327,16 @@ class MainActivity :
             AstraStorage(this)
 
         val dialogue = AstraDialogue()
+        val vocabularyStore = AstraVocabularyStore(
+            java.io.File(applicationContext.noBackupFilesDir, "languages/vocabulary")
+        )
 
         val processor = AstraProcessor(
-            RussianTutor(storage::getInt, storage::setInt),
+            RussianTutor(storage::getInt, storage::setInt, vocabularyStore),
             AstraMultilingualTutor(
                 storage::getInt, storage::setInt,
-                storage::getString, storage::setString
+                storage::getString, storage::setString,
+                vocabularyStore
             ),
             EverydayAssistant(storage::getString, storage::setString),
             dialogue
@@ -2441,6 +2445,18 @@ class MainActivity :
                 var bookImportRunning by remember { mutableStateOf(false) }
                 var bookImportStatus by remember { mutableStateOf("") }
                 var confirmClearBooks by remember { mutableStateOf(false) }
+                var selectedVocabularyLanguage by remember {
+                    mutableStateOf("setswana")
+                }
+                var vocabularyLanguageMenuOpen by remember { mutableStateOf(false) }
+                var vocabularyImportRunning by remember { mutableStateOf(false) }
+                var vocabularyImportStatus by remember { mutableStateOf("") }
+                var confirmClearVocabulary by remember { mutableStateOf(false) }
+                var importedVocabularyCount by remember {
+                    mutableIntStateOf(runCatching {
+                        vocabularyStore.list("setswana").size
+                    }.getOrDefault(0))
+                }
                 val onDeviceBrain = remember {
                     AstraOnDeviceBrain(applicationContext, neuralLearner, localBooks)
                 }
