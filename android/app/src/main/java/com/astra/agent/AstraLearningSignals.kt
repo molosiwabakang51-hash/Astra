@@ -11,7 +11,7 @@ internal object AstraLearningSignals {
         """(?i)\b(password|passcode|passphrase|secret|api key|token|access key|pin code|pin number|credit card|bank account|medical record|diagnosis|passport|identity number|social security|private key|seed phrase)\b"""
     )
     private val privateCommands = Regex(
-        """(?i)^(?:remember\b|note\b|save note\b|add task\b|create task\b|shopping list\b|add .* to shopping list|remove .* from shopping list|show notes\b|show tasks\b|copy chat\b|share chat\b|clear chat\b|ask my memory\b|search my memory\b|reset\b|learn(?:ing)? status\b|start neural learning\b|stop neural learning\b)"""
+        """(?i)^(?:remember\b|note\b|save note\b|add task\b|create task\b|shopping list\b|add .* to shopping list|remove .* from shopping list|show notes\b|show tasks\b|copy chat\b|share chat\b|clear chat\b|ask my memory\b|search my memory\b|ask book\b|ask my books\b|reset\b|learn(?:ing)? status\b|start neural learning\b|stop neural learning\b)"""
     )
 
     fun eligible(message: String): Boolean {
