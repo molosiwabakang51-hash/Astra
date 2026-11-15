@@ -62,6 +62,18 @@ class AstraBackupCodecTest {
         assertEquals(2, restored.historyCount)
     }
 
+    @Test fun expandedRussianLessonProgressRestoresFromOldBackups() {
+        val old = JSONObject(AstraBackupCodec.encode(example))
+        old.getJSONObject("data").remove("russian_last_lesson")
+        val restored = AstraBackupCodec.parse(old.toString())
+        assertEquals(0, restored.values["russian_last_lesson"])
+        assertEquals(7, restored.values["russian_correct"])
+        val newer = example + ("russian_last_lesson" to 5)
+        assertEquals(5, AstraBackupCodec.parse(
+            AstraBackupCodec.encode(newer)
+        ).values["russian_last_lesson"])
+    }
+
     @Test fun excessiveConversationTitleInBackupIsRejected() {
         val source = JSONObject(AstraBackupCodec.encode(example))
         source.getJSONObject("data")
