@@ -51,7 +51,7 @@ class RussianTutorTest {
         assertTrue(tutor().respond("answer")!!.contains("no active Russian question"))
     }
 
-    @Test fun allSixOfflineLessonsAreAvailableWithSequentialNavigation() {
+    @Test fun allTwentyThreeOfflineLessonsAreAvailableWithSequentialNavigation() {
         val coach = tutor()
         assertTrue(coach.respond("Russian course")!!.contains("Six offline Russian lessons"))
         assertTrue(coach.respond("russian lesson 1")!!.contains("Привет"))
@@ -60,8 +60,11 @@ class RussianTutorTest {
         assertTrue(coach.respond("next Russian lesson")!!.contains("Один"))
         assertTrue(coach.respond("next Russian lesson")!!.contains("Родительный"))
         assertTrue(coach.respond("next Russian lesson")!!.contains("написать"))
-        assertTrue(coach.respond("next Russian lesson")!!.contains("написать"))
-        assertTrue(tutor().respond("Russian progress")!!.contains("6/6"))
+        assertTrue(coach.respond("next Russian lesson")!!.contains("Russian lesson 7/23"))
+        assertTrue(coach.respond("russian lesson 23")!!.contains("Russian lesson 23/23"))
+        assertTrue(coach.respond("next Russian lesson")!!.contains("Russian lesson 23/23"))
+        assertTrue(coach.respond("russian lesson 24")!!.contains("23 lessons"))
+        assertTrue(tutor().respond("Russian progress")!!.contains("23/23"))
     }
 
     @Test fun RussianShorthandOpensTheMatchingCourseModule() {
@@ -81,7 +84,21 @@ class RussianTutorTest {
         assertTrue(coach.respond("Russian quiz")!!.contains("Доброе утро"))
         assertTrue(coach.respond("answer good morning")!!.startsWith("Correct."))
         assertTrue(coach.respond("Russian progress")!!.contains("7 correct"))
-        assertTrue(coach.respond("Russian progress")!!.contains("30 vocabulary cards"))
+        assertTrue(coach.respond("Russian progress")!!.contains("96 vocabulary cards"))
+    }
+
+    @Test fun russianCourseContainsNinetySixActualPracticeCards() {
+        val coach = tutor()
+        val found = mutableSetOf<String>()
+        repeat(96) {
+            val question = coach.respond("Russian quiz")!!
+            val term = question.substringAfter("What does '").substringBefore("' mean")
+            assertTrue("Repeated Russian word: " + term, found.add(term))
+            assertTrue(coach.respond("skip russian question")!!.startsWith("Skipped."))
+        }
+        assertEquals(96, found.size)
+        assertTrue(coach.respond("Russian quiz")!!.contains("Спасибо"))
+        assertTrue(coach.respond("russian course")!!.contains("96 vocabulary cards"))
     }
 
     @Test fun unrelatedCommandsAreNotConsumed() {
