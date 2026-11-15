@@ -21,6 +21,12 @@ Sources:
 - https://en.wikibooks.org/wiki/Russian/Grammar/Cases
 - https://en.wikibooks.org/wiki/Russian/Verbal_Aspect
 - https://en.wiktionary.org/wiki/здравствуй
+- https://en.wikibooks.org/wiki/Russian/Numbers
+- https://en.wikibooks.org/wiki/Russian/Lesson_2
+- https://en.wikibooks.org/wiki/Russian/Grammar/Verbs
+- https://en.wikibooks.org/wiki/Russian/Grammar/Prepositional_case
+- https://en.wiktionary.org/wiki/спасибо
+- https://en.wiktionary.org/wiki/пока
 
 Astra's opt-in on-device library updater fetches **only the named public pages**
 via Wikimedia's HTTPS read-only API, stores short extracts and attribution
