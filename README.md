@@ -89,6 +89,28 @@ Existing FULL and LITE distributions remain free of paid inference APIs.
 Android CI/unit tests and physical phone testing are required before this
 feature can be treated as stable.
 
+## Better relevance in longer offline books
+
+Private-book retrieval now ranks passages using **content evidence rather
+than book-title words alone**. A textbook named *Russian Grammar* no longer
+causes unrelated early chapters to be treated as evidence for genitive
+grammar; the requested subject must occur in the passage itself.
+Common English plural forms are normalized, with smaller weights for
+generic language words. Search retains bounded top candidates per book,
+so one large document cannot suppress every result from another useful
+source.
+
+Astra also selects a **question-relevant window inside each passage**
+instead of blindly quoting its first 320 characters. The private index now
+accommodates more passages per imported book (5,200 rather than 2,400)
+without unbounded in-memory search results. Import limits and per-book
+storage quotas remain in place; books may still be partially indexed.
+
+This is a deterministic lexical-relevance improvement, **not semantic
+embedding search, training of Qwen weights or a guarantee that a retrieved
+passage contains a correct answer**. Private document contents remain
+on-device and the existing opt-in retrieval permission is unchanged.
+
 ## Your private offline book library
 
 Astra can now index your **own downloaded UTF-8 TXT, Markdown and unencrypted
