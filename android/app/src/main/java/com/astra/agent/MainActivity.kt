@@ -5502,7 +5502,9 @@ class MainActivity :
                                                                         AstraOfflineSelfTest.CHALLENGE
                                                                     )
                                                                 ),
-                                                                Int.MIN_VALUE
+                                                                Int.MIN_VALUE,
+                                                                diagnosticMaxTokens =
+                                                                    AstraGenerationPolicy.DIAGNOSTIC_TOKEN_LIMIT
                                                             )
                                                             val elapsed =
                                                                 (System.nanoTime() - began) / 1_000_000
@@ -5596,7 +5598,9 @@ class MainActivity :
                                                                             "user", prompt
                                                                         )
                                                                     ),
-                                                                    generation
+                                                                    generation,
+                                                                    diagnosticMaxTokens =
+                                                                        AstraGenerationPolicy.DIAGNOSTIC_TOKEN_LIMIT
                                                                 )
                                                                 val elapsed =
                                                                     (System.nanoTime() -
@@ -5630,7 +5634,9 @@ class MainActivity :
                                                                         AstraLanguageBenchmark.MEMORY_SETUP
                                                                     )
                                                                 ),
-                                                                memoryGeneration
+                                                                memoryGeneration,
+                                                                diagnosticMaxTokens =
+                                                                    AstraGenerationPolicy.DIAGNOSTIC_TOKEN_LIMIT
                                                             )
                                                             val remembered = onDeviceBrain.reply(
                                                                 listOf(
@@ -5646,7 +5652,9 @@ class MainActivity :
                                                                         AstraLanguageBenchmark.MEMORY_QUESTION
                                                                     )
                                                                 ),
-                                                                memoryGeneration
+                                                                memoryGeneration,
+                                                                diagnosticMaxTokens =
+                                                                    AstraGenerationPolicy.DIAGNOSTIC_TOKEN_LIMIT
                                                             )
                                                             outcomes.add(
                                                                 AstraLanguageBenchmark.outcome(
