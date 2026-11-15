@@ -194,17 +194,18 @@ or freedom from hallucinations. For an offline proof, put the phone in
 airplane mode before starting. Passing JVM tests or compiling the APK
 is not equivalent to running these checks on a physical phone.
 
-## Offline Russian learning course (six lessons, thirty cards)
+## Offline Russian learning course (23 lessons, 96 cards)
 
-Even without Qwen3 loaded, Astra's deterministic tutor now offers **six
-local lessons** covering greetings, everyday phrases, Cyrillic, numbers
-and vocabulary, grammatical cases, and verb conjugation/aspect. The
+Even without Qwen3 loaded, Astra's deterministic tutor now offers **23
+local lessons** covering greetings, everyday phrases, Cyrillic, numbers,
+grammatical cases, verb conjugation/aspect, family, places, food, nature,
+animals, the body, work, actions and colors. The
 `russian` command still opens lesson one. Type `russian course` for the
 syllabus or `next russian lesson` to advance. Direct commands such as
 `russian alphabet`, `russian grammar`, `russian numbers` and
 `russian verbs` open the relevant material.
 
-Vocabulary practice now includes **30 cards** rather than only six,
+Vocabulary practice now includes **96 distinct cards** rather than only six,
 with early quiz order and existing correct-answer counts preserved.
 Astra saves the current lesson and quiz progress locally. Manual JSON
 backups include the additional lesson number, while older backups
@@ -240,9 +241,27 @@ Use the existing Android speech language settings independently to
 select installed recognition or synthesis packs. No cloud service,
 paid inference, or new GB-scale APK download is required.
 
+### Larger vocabulary without larger model downloads
+
+The upgraded courses cover nine themed groups: people and family, places
+and travel, food, nature, animals, body parts, work and time, everyday
+verbs, and dates. All lessons and all flashcards work entirely on the
+device without a GGUF model or mobile data. The Setswana word list was
+cross-checked against the
+[University of Botswana](https://www.ub.bw/study/international/learn-setswana),
+[Botswana Tourism](https://botswanatourism.co.bw/index.php/language) and
+[an independently published Setswana common-words glossary](https://bhala.app/languages/setswana).
+Entries are concise vocabulary equivalents, not copied paragraphs
+from books.
+
+The expanded content adds only compact source strings rather than
+pretrained model weights. Lesson numbers are real available content,
+not an unlimited lesson counter; Astra should report the actual
+maximum for each course if a larger lesson number is requested.
+
 ## Multilingual learning without paid services
 
-In addition to the existing **30-card Russian course**, Astra now contains
+In addition to the expanded **96-card Russian course**, Astra contains
 eight more entirely local starter courses:
 
 | Language | Chat command | Android speech locale |
@@ -256,10 +275,14 @@ eight more entirely local starter courses:
 | Japanese | `learn japanese` | `ja-JP` |
 | Mandarin Chinese | `learn mandarin` | `zh-CN` |
 
-Each additional language includes **three curated lessons and 12 vocabulary
-questions** (96 new cards in total), giving 126 practice cards across the
-nine courses. The commands `languages`, `<language> quiz`,
-`<language> progress`, `next language lesson`, `language progress`,
+Each additional language now includes **21 themed lessons and 84 distinct
+vocabulary questions**, resulting in **672 cards across the eight added
+languages, plus 96 Russian cards = 768 cards total**. That is **191
+available offline lessons** across the nine courses. The original 12 cards
+in each language and original 30 Russian cards retain their positions so
+existing quiz progress remains valid. The commands `languages`, `<language> quiz`,
+`<language> progress`, `<language> lesson 21`,
+`next language lesson`, `language progress`,
 `answer <English translation>`, and `skip language question` work
 directly in chat with no model or internet requirement. Setswana's starter
 greetings and usage were cross-checked against the

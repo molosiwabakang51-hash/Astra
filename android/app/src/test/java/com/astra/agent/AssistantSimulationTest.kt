@@ -19,8 +19,15 @@ class AssistantSimulationTest {
             { key, default -> state[key] ?: default },
             { key, value -> state[key] = value }
         )
-        // Keep this full 5,000-turn state-machine test aligned with the
-        // preserved first-six order and the expanded 30-card Russian course.
+        // Derive extra translations from the actual curated glossary;
+        // keep original quiz order and all 5,000 state transitions intact.
+        val originalPhrases = listOf(
+            "Спасибо", "Да", "Нет", "Привет", "Пожалуйста", "До свидания",
+            "Доброе утро", "Добрый вечер", "Как дела", "Хорошо",
+            "Извините", "Вода", "Хлеб", "Книга", "Дом", "Школа",
+            "Друг", "Семья", "Один", "Два", "Три", "Четыре", "Пять",
+            "Сегодня", "Завтра", "Вчера", "Где", "Кто", "Читать", "Писать"
+        ).map { it.lowercase() }.toSet()
         val answers = listOf(
             "thank you", "yes", "no", "hi", "please", "goodbye",
             "good morning", "good evening", "how are you", "fine",
@@ -28,7 +35,11 @@ class AssistantSimulationTest {
             "friend", "family", "one", "two", "three", "four", "five",
             "today", "tomorrow", "yesterday", "where", "who",
             "to read", "to write"
-        )
+        ) + AstraExtendedVocabulary.additional("russian")
+            .filterNot { it.target.lowercase() in originalPhrases }
+            .map { it.english.lowercase() } +
+            listOf("red", "blue", "green", "yellow")
+        assertEquals(96, answers.size)
         val random = Random(0xA57A)
         var correct = 0
         repeat(5_000) { step ->

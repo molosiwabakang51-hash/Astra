@@ -16,21 +16,64 @@ class AstraMultilingualTutorTest {
         { k, v -> strings[k] = v }
     )
 
-    @Test fun allEightLanguagesOfferThreeOfflineLessonsAndQuizzes() {
+    @Test fun allEightLanguagesOfferTwentyOneOfflineLessonsAndEightFourCards() {
         val coach = tutor()
         val catalog = coach.respond("languages")!!
         for (lang in AstraMultilingualTutor.Language.entries) {
             assertTrue("Missing " + lang.display, catalog.contains(lang.display.substringBefore(" (")))
             val first = coach.respond("learn " + lang.id)!!
-            assertTrue(first.contains("lesson 1/3"))
-            assertTrue(coach.respond("next language lesson")!!.contains("lesson 2/3"))
-            assertTrue(coach.respond(lang.id + " lesson 3")!!.contains("lesson 3/3"))
+            assertTrue(first.contains("lesson 1/21"))
+            assertTrue(coach.respond("next language lesson")!!.contains("lesson 2/21"))
+            assertTrue(coach.respond(lang.id + " lesson 3")!!.contains("lesson 3/21"))
+            val final = coach.respond(lang.id + " lesson 21")!!
+            assertTrue(final.contains("lesson 21/21"))
+            assertTrue(final.contains("Course lessons complete"))
+            assertTrue(coach.respond("next language lesson")!!.contains("lesson 21/21"))
+            assertTrue(coach.respond(lang.id + " lesson 22")!!.contains("has 21 lessons"))
             val quiz = coach.respond(lang.id + " quiz")!!
             assertTrue(quiz.contains("practice:"))
             assertTrue(coach.respond("answer hello")!!.startsWith("Correct."))
+            assertTrue(coach.respond(lang.id + " progress")!!.contains("84 vocabulary cards"))
             assertTrue(coach.respond(lang.id + " progress")!!.contains("1 correct"))
         }
         assertTrue(coach.respond("language progress")!!.contains("8 correct"))
+    }
+
+    @Test fun everyPackHasSeventyTwoWellFormedDistinctExtraTerms() {
+        for (lang in AstraMultilingualTutor.Language.entries) {
+            val additions = AstraExtendedVocabulary.additional(lang.id)
+            assertEquals(lang.id, 72, additions.size)
+            assertEquals(lang.id, 72, additions.map { it.target }.distinct().size)
+            assertTrue(additions.all { it.target.isNotBlank() && it.english.isNotBlank() })
+            assertEquals("mother", additions.first().english)
+            assertEquals("peace", additions.last().english)
+        }
+    }
+
+    @Test fun everyCardIsActuallyReachableThroughQuizAfterThousandsOfSteps() {
+        val coach = tutor()
+        for (lang in AstraMultilingualTutor.Language.entries) {
+            val seen = mutableSetOf<String>()
+            repeat(84) {
+                val prompt = coach.respond(lang.id + " quiz")!!
+                val phrase = prompt.substringAfter("What does '").substringBefore("' mean")
+                assertTrue(lang.id + " duplicate flashcard " + it, seen.add(phrase))
+                assertTrue(coach.respond("skip language question")!!.startsWith("Skipped."))
+            }
+            assertEquals(84, seen.size)
+            assertTrue(coach.respond(lang.id + " quiz")!!.contains(
+                when (lang) {
+                    AstraMultilingualTutor.Language.SETSWANA -> "Dumela"
+                    AstraMultilingualTutor.Language.FRENCH -> "Bonjour"
+                    AstraMultilingualTutor.Language.SPANISH -> "Hola"
+                    AstraMultilingualTutor.Language.PORTUGUESE -> "Olá"
+                    AstraMultilingualTutor.Language.GERMAN -> "Hallo"
+                    AstraMultilingualTutor.Language.SWAHILI -> "Jambo"
+                    AstraMultilingualTutor.Language.JAPANESE -> "こんにちは"
+                    AstraMultilingualTutor.Language.MANDARIN -> "你好"
+                }
+            ))
+        }
     }
 
     @Test fun BotswanaSetswanaHasCorrectContextualGreetingsAndSourcePhrases() {
