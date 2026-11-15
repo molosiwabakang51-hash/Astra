@@ -14,7 +14,20 @@ class AstraLanguageBenchmarkTest {
         assertFalse(AstraLanguageBenchmark.score(
             AstraLanguageBenchmark.Probe.ARITHMETIC, "43"))
         assertFalse(AstraLanguageBenchmark.score(
+            AstraLanguageBenchmark.Probe.ARITHMETIC,
+            "The answer is 43, not 42."))
+        assertFalse(AstraLanguageBenchmark.score(
             AstraLanguageBenchmark.Probe.ARITHMETIC, "The offline model did not produce a usable answer."))
+    }
+
+    @Test fun citedSourcesCannotMakeAnIncorrectModelAnswerPass() {
+        val misleading = "I cannot calculate that.\n\nOpen-course references:\n" +
+            "[K1] A source that mentions 42."
+        assertFalse(AstraLanguageBenchmark.score(
+            AstraLanguageBenchmark.Probe.ARITHMETIC, misleading))
+        val actualAnswer = "42.\n\nOpen-course references:\n[K1] Context"
+        assertTrue(AstraLanguageBenchmark.score(
+            AstraLanguageBenchmark.Probe.ARITHMETIC, actualAnswer))
     }
 
     @Test fun RussianTranslationSupportsCommonEnglishExpressions() {
