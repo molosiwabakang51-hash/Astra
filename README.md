@@ -131,6 +131,33 @@ embedding search, training of Qwen weights or a guarantee that a retrieved
 passage contains a correct answer**. Private document contents remain
 on-device and the existing opt-in retrieval permission is unchanged.
 
+## Optional one-time shared-storage access (experimental)
+
+Astra can optionally search **filenames** across accessible shared phone storage
+without asking you to select every file repeatedly. In Astra Settings,
+choose **Grant one-time shared-file access** and explicitly approve Android's
+**All files access** special permission. Once enabled, type `search phone report`
+or `search my phone for lecture`. Permission remains in force until you revoke
+it through Android Settings or it is reset. The search scans only on your
+explicit request, limits scan time and output, displays only filenames and
+sizes, and does not copy, upload, alter, transcribe or read file contents.
+
+**This is broad and sensitive permission.** Android grants the app read AND
+write capability across accessible shared storage, even though Astra's current
+search implementation reads filenames only and never modifies original files.
+Use it only if you need cross-folder filename search. The feature never scans in the background, excludes hidden
+and `Android/` directories, and cannot access another app's private files,
+messages, databases, or cloud accounts. It does not automatically understand
+PDFs, audio, videos, photos or documents: these require separate local import
+and analysis engines. Existing private-book imports remain a separate opt-in
+control. Revoke All files access at any time through Android Settings →
+Special app access.
+
+Google Play tightly restricts `MANAGE_EXTERNAL_STORAGE` to eligible app
+categories and may reject apps that do not justify broad access. GitHub
+distribution does not bypass Android's required user-grant dialog, and this
+capability is not production-verified on an actual phone.
+
 ## Your private offline book library
 
 Astra can now index your **own downloaded UTF-8 TXT, Markdown and unencrypted
