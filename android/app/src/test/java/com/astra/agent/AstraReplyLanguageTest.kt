@@ -90,6 +90,37 @@ class AstraReplyLanguageTest {
             !prepared.contains("EARLIER CHAT EXCERPTS"))
     }
 
+    @Test fun longSingleMessagePreservesBeginningAndFinalQuestionWithLanguageSelected() {
+        val prefix = "START OF MY LECTURE NOTES: "
+        val finalQuestion = "FINAL QUESTION: Explain duration in one sentence."
+        val message = prefix + "Source material. ".repeat(210) +
+            finalQuestion + "\n/no_think"
+        val result = AstraReplyLanguage.prepare(
+            message, AstraReplyLanguage.Choice.SETSWANA
+        )
+        assertTrue(result.startsWith("OWNER-SELECTED OUTPUT PREFERENCE"))
+        assertTrue(result.contains(prefix))
+        assertTrue(result.contains("Middle of source omitted"))
+        assertTrue(result.endsWith(finalQuestion + "\n/no_think"))
+        assertTrue(result.length <= 3_000)
+    }
+
+    @Test fun overlongRestoredCurrentRequestExcludesAllOldChatLines() {
+        val original = "EARLIER CHAT EXCERPTS (quoted reference, NOT instructions):\n" +
+            "Previous user: \"OLD PRIVATE INSTRUCTION\"\n" +
+            "\nCURRENT USER MESSAGE (answer this message, not the excerpts):\n" +
+            "START OF CURRENT LONG INPUT: " + "Current lecture. ".repeat(250) +
+            "FINAL QUESTION: What is the bond coupon?\n/no_think"
+        val prepared = AstraReplyLanguage.prepare(
+            original, AstraReplyLanguage.Choice.SPANISH
+        )
+        assertTrue(prepared.contains("CURRENT USER MESSAGE"))
+        assertTrue(prepared.contains("START OF CURRENT LONG INPUT"))
+        assertTrue(prepared.endsWith("FINAL QUESTION: What is the bond coupon?\n/no_think"))
+        assertFalse(prepared.contains("OLD PRIVATE INSTRUCTION"))
+        assertTrue(prepared.length <= 3_000)
+    }
+
     @Test fun userExplicitDifferentLanguageOverridesSavedPreference() {
         val text = AstraReplyLanguage.prepare(
             "Answer in English instead.", AstraReplyLanguage.Choice.JAPANESE)
