@@ -259,6 +259,54 @@ pretrained model weights. Lesson numbers are real available content,
 not an unlimited lesson counter; Astra should report the actual
 maximum for each course if a larger lesson number is requested.
 
+## Expand the curriculum without increasing the APK
+
+The built-in nine-language catalogue contains **191 actual offline lessons**
+and **768 vocabulary cards**. Astra now also accepts vocabulary supplied
+by the owner, using **Settings → Expand offline language lessons → Import
+extra vocabulary (TSV)**.
+
+Choose one of the nine languages, then select a locally saved **UTF-8 TSV**
+file with one foreign-language phrase and its English meaning per line:
+
+```tsv
+phrase	translation
+Maru	Clouds
+Pula	Rain
+Ke kopa thuso	I need help
+```
+
+The header row is optional. The same format works with any supported
+language; the owner must check spelling and translations before importing.
+Astra does not translate or verify imported terms automatically. The
+document picker can select a .tsv or .txt file that contains actual TAB
+separators, **not spaces or commas**.
+
+Each import is processed entirely on the device, accepts a bounded
+3 MB file, checks every line before changing saved data, and skips repeated
+terms (the first translation wins). Up to **5,000 custom cards per
+language** can be stored privately, on top of the built-in deck.
+Four-card lessons are then available automatically using existing
+`setswana lesson 22`, `russian lesson 24`, etc. commands. No arbitrary
+three-digit lesson ceiling prevents progress beyond lesson 999.
+
+At the per-language imported limit, the theoretical **combined capacity**
+is up to **45,768 vocabulary cards** across nine languages, corresponding
+to up to **11,441 lessons**. The actual count is lower if terms duplicate
+the built-in dictionary or one another. These are capacity limits,
+**not** a claim that 45,768 reviewed translations ship in the APK.
+
+Imported vocabulary resides in Astra's private **no-backup** app storage,
+remains available after correctly signed app upgrades, and is deleted on
+app uninstall or by the owner through the per-language removal control.
+The manual JSON conversation backup deliberately does **not** include
+these extra words; keep the original TSV if reinstalling or changing
+phones. Existing progress counters and built-in card indices are retained,
+but clearing a custom deck removes its custom questions.
+
+Nothing is uploaded or used to train Qwen3. This feature needs no paid
+model API, network connection, or new large model download.
+
 ## Multilingual learning without paid services
 
 In addition to the expanded **96-card Russian course**, Astra contains
