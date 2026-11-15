@@ -2575,6 +2575,13 @@ class MainActivity :
                     mutableStateOf(false)
                 }
 
+                var aiReplyLanguage by remember {
+                    mutableStateOf(AstraReplyLanguage.fromId(
+                        storage.getString("astra_ai_reply_language", "auto")
+                    ))
+                }
+                var aiReplyLanguageMenuOpen by remember { mutableStateOf(false) }
+
                 var toolInput by remember {
                     mutableStateOf("")
                 }
@@ -2936,6 +2943,20 @@ class MainActivity :
                     // Return the conversation to its spacious default after sending.
                     commandDeckExpanded = false
                     val normalized = AstraInput.normalize(message)
+
+                    AstraReplyLanguage.parseCommand(normalized)?.let { chosen ->
+                        aiReplyLanguage = chosen
+                        storage.setString("astra_ai_reply_language", chosen.id)
+                        history.add(ChatMessage("You", message))
+                        history.add(ChatMessage(
+                            "Astra", AstraReplyLanguage.selectionMessage(chosen)
+                        ))
+                        while (history.size > MAX_HISTORY) history.removeAt(0)
+                        input = ""
+                        persist()
+                        keyboard?.hide()
+                        return
+                    }
 
                     val neuralCommand = normalized.lowercase(Locale.ROOT).trim()
                     if (neuralCommand in setOf(
@@ -5627,6 +5648,56 @@ class MainActivity :
                                         Text(
                                             recognitionStatus
                                         )
+                                    }
+
+                                    item {
+                                        Column(
+                                            verticalArrangement =
+                                                Arrangement.spacedBy(6.dp)
+                                        ) {
+                                            Text(
+                                                "Preferred AI response language",
+                                                style = MaterialTheme.typography.titleSmall
+                                            )
+                                            Box {
+                                                OutlinedButton(
+                                                    onClick = {
+                                                        aiReplyLanguageMenuOpen = true
+                                                    }
+                                                ) {
+                                                    Text(aiReplyLanguage.display)
+                                                }
+                                                DropdownMenu(
+                                                    expanded = aiReplyLanguageMenuOpen,
+                                                    onDismissRequest = {
+                                                        aiReplyLanguageMenuOpen = false
+                                                    }
+                                                ) {
+                                                    AstraReplyLanguage.Choice.entries.forEach { choice ->
+                                                        DropdownMenuItem(
+                                                            text = { Text(choice.display) },
+                                                            onClick = {
+                                                                aiReplyLanguage = choice
+                                                                aiReplyLanguageMenuOpen = false
+                                                                storage.setString(
+                                                                    "astra_ai_reply_language",
+                                                                    choice.id
+                                                                )
+                                                            }
+                                                        )
+                                                    }
+                                                }
+                                            }
+                                            Text(
+                                                "Applies to open-ended on-device Qwen3 answers; " +
+                                                    "fixed skills and translated lesson cards are unchanged. " +
+                                                    "Try 'reply in Setswana', 'reply in French', " +
+                                                    "or 'reply in auto' in chat. " +
+                                                    "The smaller model may not produce fluent answers " +
+                                                    "in every language. Voice settings are independent.",
+                                                style = MaterialTheme.typography.bodySmall
+                                            )
+                                        }
                                     }
 
                                     item {
