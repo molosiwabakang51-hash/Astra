@@ -31,6 +31,15 @@ internal object AstraLanguageBenchmark {
     const val SETSWANA_PROMPT =
         "Translate the Setswana greeting 'Dumela' into English. " +
             "Reply with one English word only."
+    const val FRENCH_PROMPT =
+        "Translate the French greeting 'bonjour' into English. " +
+            "Reply with only a short English equivalent."
+    const val GERMAN_PROMPT =
+        "Translate the German word 'Danke' into English. " +
+            "Reply with only the English translation."
+    const val SPANISH_PROMPT =
+        "Translate the Spanish word 'gracias' into English. " +
+            "Reply with only the English translation."
 
     enum class Probe(val title: String) {
         ARITHMETIC("19 + 23"),
@@ -39,7 +48,10 @@ internal object AstraLanguageBenchmark {
         GRAMMAR("Russian grammar"),
         COMPOUND_INTEREST("Compound interest"),
         DEDUCTION("Logical deduction"),
-        SETSWANA("Setswana greeting")
+        SETSWANA("Setswana greeting"),
+        FRENCH("French translation"),
+        GERMAN("German translation"),
+        SPANISH("Spanish translation")
     }
 
     data class Outcome(
@@ -81,6 +93,10 @@ internal object AstraLanguageBenchmark {
                 Regex("""^no[.!]?$""").matches(text)
             Probe.SETSWANA ->
                 Regex("""^(?:hello|hi)[.!]?$""").matches(text)
+            Probe.FRENCH ->
+                Regex("""^(?:hello|hi|good morning)[.!]?$""").matches(text)
+            Probe.GERMAN, Probe.SPANISH ->
+                Regex("""^(?:thanks|thank(?:\s+|-)you)[.!]?$""").matches(text)
         }
     }
 
