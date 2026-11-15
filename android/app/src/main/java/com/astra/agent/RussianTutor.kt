@@ -102,7 +102,7 @@ internal class RussianTutor(
             }
         }
 
-        Regex("""^russian lesson (\\d{1,3})$""")
+        Regex("""^russian lesson (\d{1,3})$""")
             .matchEntire(input)?.groupValues?.getOrNull(1)?.toIntOrNull()?.let { n ->
                 if (n !in 1..totalLessons) {
                     return "Russian has " + totalLessons +
