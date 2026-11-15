@@ -79,6 +79,35 @@ class AstraVocabularyStoreTest {
         assertTrue(s.list("spanish").isEmpty())
     }
 
+    @Test fun maximumImportedSetsReachRealLessonsBeyondOneThousand() {
+        val s = store()
+        val extras = (1..5_000).joinToString("\n") {
+            "new_term_" + it + "\tMeaning " + it
+        }
+        s.importTsv("spanish", bytes(extras))
+        s.importTsv("russian", bytes(extras))
+        val state = mutableMapOf<String, Int>()
+        val flags = mutableMapOf<String, String>()
+        val multilingual = AstraMultilingualTutor(
+            { key, def -> state[key] ?: def },
+            { key, value -> state[key] = value },
+            { key, def -> flags[key] ?: def },
+            { key, value -> flags[key] = value }, s
+        )
+        val russian = RussianTutor(
+            { key, def -> state[key] ?: def },
+            { key, value -> state[key] = value }, s
+        )
+        assertTrue(multilingual.respond("spanish lesson 1271")!!
+            .contains("new_term_5000"))
+        assertTrue(multilingual.respond("spanish progress")!!
+            .contains("5084 vocabulary cards"))
+        assertTrue(russian.respond("russian lesson 1273")!!
+            .contains("new_term_5000"))
+        assertTrue(russian.respond("russian progress")!!
+            .contains("5096 vocabulary cards"))
+    }
+
     @Test fun existingUserCardsCanExtendMultilingualLessonCountsAndQuiz() {
         val s = store()
         s.importTsv("french", bytes(
