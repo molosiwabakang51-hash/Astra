@@ -5531,6 +5531,104 @@ class MainActivity :
                                     item {
                                         HorizontalDivider()
                                         Text(
+                                            "Expand offline language lessons",
+                                            style = MaterialTheme.typography.titleMedium
+                                        )
+                                        Text(
+                                            "Astra already includes 191 offline lessons and " +
+                                                "768 vocabulary cards across nine languages. " +
+                                                "Add up to 5,000 privately imported words for " +
+                                                "each language; new four-word lessons are " +
+                                                "generated automatically. No AI model download " +
+                                                "or internet connection is required.",
+                                            style = MaterialTheme.typography.bodySmall
+                                        )
+                                        Box {
+                                            OutlinedButton(
+                                                enabled = !vocabularyImportRunning,
+                                                onClick = {
+                                                    vocabularyLanguageMenuOpen = true
+                                                }
+                                            ) {
+                                                Text(
+                                                    "Vocabulary: " +
+                                                        selectedVocabularyLanguage.replaceFirstChar {
+                                                            it.uppercase()
+                                                        }
+                                                )
+                                            }
+                                            DropdownMenu(
+                                                expanded = vocabularyLanguageMenuOpen,
+                                                onDismissRequest = {
+                                                    vocabularyLanguageMenuOpen = false
+                                                }
+                                            ) {
+                                                AstraVocabularyStore.supportedLanguages.sorted()
+                                                    .forEach { language ->
+                                                        DropdownMenuItem(
+                                                            text = {
+                                                                Text(language.replaceFirstChar {
+                                                                    it.uppercase()
+                                                                })
+                                                            },
+                                                            onClick = {
+                                                                selectedVocabularyLanguage = language
+                                                                importedVocabularyCount =
+                                                                    runCatching {
+                                                                        vocabularyStore.list(language).size
+                                                                    }.getOrDefault(0)
+                                                                vocabularyLanguageMenuOpen = false
+                                                            }
+                                                        )
+                                                    }
+                                            }
+                                        }
+                                        Text(
+                                            "Imported words in this language: " +
+                                                importedVocabularyCount + " / " +
+                                                AstraVocabularyStore.MAX_CUSTOM_WORDS_PER_LANGUAGE,
+                                            style = MaterialTheme.typography.bodySmall
+                                        )
+                                        Text(
+                                            "Choose a local UTF-8 .tsv or .txt file. " +
+                                                "Each line must contain two columns separated " +
+                                                "by a TAB: foreign phrase, then English meaning. " +
+                                                "An optional 'phrase TAB translation' header " +
+                                                "is accepted. Imported terms stay on this phone " +
+                                                "and are not included in regular JSON backups.",
+                                            style = MaterialTheme.typography.bodySmall
+                                        )
+                                        OutlinedButton(
+                                            enabled = !vocabularyImportRunning,
+                                            onClick = {
+                                                importVocabularyLauncher.launch(arrayOf("*/*"))
+                                            }
+                                        ) {
+                                            Text(
+                                                if (vocabularyImportRunning)
+                                                    "Importing vocabulary..."
+                                                else "Import extra vocabulary (TSV)"
+                                            )
+                                        }
+                                        if (vocabularyImportStatus.isNotBlank()) {
+                                            Text(
+                                                vocabularyImportStatus,
+                                                style = MaterialTheme.typography.bodySmall
+                                            )
+                                        }
+                                        if (importedVocabularyCount > 0) {
+                                            TextButton(
+                                                enabled = !vocabularyImportRunning,
+                                                onClick = { confirmClearVocabulary = true }
+                                            ) {
+                                                Text("Remove imported words for this language")
+                                            }
+                                        }
+                                    }
+
+                                    item {
+                                        HorizontalDivider()
+                                        Text(
                                             "Your private book library",
                                             style = MaterialTheme.typography.titleMedium
                                         )
