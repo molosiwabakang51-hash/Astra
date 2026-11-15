@@ -5420,7 +5420,7 @@ class MainActivity :
                                                 onClick = {
                                                     languageBenchmarkRunning = true
                                                     languageBenchmarkStatus =
-                                                        "Running four local conversation checks..."
+                                                        "Running seven local conversation checks..."
                                                     languageBenchmarkJob = researchScope.launch {
                                                         val outcomes = mutableListOf<
                                                             AstraLanguageBenchmark.Outcome
@@ -5505,6 +5505,21 @@ class MainActivity :
                                                                 AstraLanguageBenchmark.Probe.GRAMMAR,
                                                                 AstraLanguageBenchmark.GRAMMAR_PROMPT,
                                                                 Int.MIN_VALUE + 213
+                                                            )
+                                                            sample(
+                                                                AstraLanguageBenchmark.Probe.COMPOUND_INTEREST,
+                                                                AstraLanguageBenchmark.COMPOUND_INTEREST_PROMPT,
+                                                                Int.MIN_VALUE + 214
+                                                            )
+                                                            sample(
+                                                                AstraLanguageBenchmark.Probe.DEDUCTION,
+                                                                AstraLanguageBenchmark.DEDUCTION_PROMPT,
+                                                                Int.MIN_VALUE + 215
+                                                            )
+                                                            sample(
+                                                                AstraLanguageBenchmark.Probe.SETSWANA,
+                                                                AstraLanguageBenchmark.SETSWANA_PROMPT,
+                                                                Int.MIN_VALUE + 216
                                                             )
                                                             languageBenchmarkStatus =
                                                                 AstraLanguageBenchmark.render(
