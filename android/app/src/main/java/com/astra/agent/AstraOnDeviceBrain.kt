@@ -82,13 +82,7 @@ internal class AstraOnDeviceBrain(
                 val finalMessage = turns.lastOrNull { it.role == "user" }?.content
                     ?.trim()?.take(3000).orEmpty()
                 require(finalMessage.isNotEmpty()) { "Message cannot be empty." }
-                val explicitBookQuery = when {
-                    finalMessage.startsWith("ask book ", ignoreCase = true) ->
-                        finalMessage.substring(9).trim()
-                    finalMessage.startsWith("ask my books ", ignoreCase = true) ->
-                        finalMessage.substring(13).trim()
-                    else -> null
-                }
+                val explicitBookQuery = AstraBookQuery.extract(finalMessage)
                 val question = explicitBookQuery ?: finalMessage
                 val permittedBooks = explicitBookQuery != null ||
                     context.getSharedPreferences("astra", Context.MODE_PRIVATE)
