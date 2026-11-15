@@ -59,5 +59,14 @@ class AstraOfflinePolicyTest {
         ))
         assertEquals("", AstraOfflinePolicy.publicReply("<think>unfinished internal note"))
         assertEquals("Normal response", AstraOfflinePolicy.publicReply(" Normal response "))
+        assertEquals("Answer.", AstraOfflinePolicy.publicReply(
+            "<think>first private segment</think>  <think>second private segment</think> Answer."
+        ))
+        assertEquals("", AstraOfflinePolicy.publicReply(
+            "<think>finished</think><think>unfinished private segment"
+        ))
+        assertEquals("Answer.", AstraOfflinePolicy.publicReply(
+            "<think>private</think>Answer."
+        ))
     }
 }
