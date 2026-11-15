@@ -2441,6 +2441,11 @@ class MainActivity :
                 var privateInferenceCounter by remember { mutableIntStateOf(0) }
                 var offlineModelTestStatus by remember { mutableStateOf("") }
                 var offlineModelTestRunning by remember { mutableStateOf(false) }
+                var languageBenchmarkRunning by remember { mutableStateOf(false) }
+                var languageBenchmarkStatus by remember { mutableStateOf("") }
+                var languageBenchmarkJob by remember {
+                    mutableStateOf<kotlinx.coroutines.Job?>(null)
+                }
                 var modelImportRunning by remember { mutableStateOf(false) }
                 var modelImportStatus by remember { mutableStateOf("") }
                 var confirmOneTimeModelDownload by remember { mutableStateOf(false) }
@@ -2899,6 +2904,10 @@ class MainActivity :
                 ) {
 
                     val message = raw.trim()
+
+                    // The benchmark uses the same native Qwen session. A real
+                    // user conversation takes priority over test generations.
+                    languageBenchmarkJob?.cancel()
 
                     if (message.isEmpty()) {
                         return
@@ -5119,6 +5128,7 @@ class MainActivity :
                                         ) {
                                             OutlinedButton(
                                                 enabled = !offlineModelTestRunning &&
+                                                    !languageBenchmarkRunning &&
                                                     !modelImportRunning &&
                                                     offlineJob?.isActive != true &&
                                                     onDeviceBrain.hasLocalModel(),
@@ -5179,6 +5189,165 @@ class MainActivity :
                                                 style = MaterialTheme.typography.bodySmall,
                                                 color = MaterialTheme.colorScheme.primary
                                             )
+                                        }
+                                        HorizontalDivider()
+                                        Text(
+                                            "Conversation quality checks",
+                                            style = MaterialTheme.typography.titleSmall
+                                        )
+                                        Text(
+                                            "Runs four short prompts through the actual on-device " +
+                                                "language model: arithmetic, Russian translation, " +
+                                                "remembering a fictional word across two turns, " +
+                                                "and naming Russian grammatical cases. " +
+                                                "Run with airplane mode on to verify offline behavior. " +
+                                                "This is a small spot check, not proof of unrestricted " +
+                                                "understanding or continual language-model training.",
+                                            style = MaterialTheme.typography.bodySmall
+                                        )
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                        ) {
+                                            OutlinedButton(
+                                                enabled = !languageBenchmarkRunning &&
+                                                    !offlineModelTestRunning &&
+                                                    !modelImportRunning &&
+                                                    offlineJob?.isActive != true &&
+                                                    onDeviceBrain.hasLocalModel(),
+                                                onClick = {
+                                                    languageBenchmarkRunning = true
+                                                    languageBenchmarkStatus =
+                                                        "Running four local conversation checks..."
+                                                    languageBenchmarkJob = researchScope.launch {
+                                                        val outcomes = mutableListOf<
+                                                            AstraLanguageBenchmark.Outcome
+                                                        >()
+                                                        try {
+                                                            suspend fun sample(
+                                                                probe: AstraLanguageBenchmark.Probe,
+                                                                prompt: String,
+                                                                generation: Int
+                                                            ) {
+                                                                languageBenchmarkStatus =
+                                                                    "Running " + probe.title + "..."
+                                                                val started = System.nanoTime()
+                                                                val result = onDeviceBrain.reply(
+                                                                    listOf(
+                                                                        AstraOnDeviceBrain.Turn(
+                                                                            "user", prompt
+                                                                        )
+                                                                    ),
+                                                                    generation
+                                                                )
+                                                                val elapsed =
+                                                                    (System.nanoTime() -
+                                                                        started) / 1_000_000
+                                                                outcomes.add(
+                                                                    AstraLanguageBenchmark.outcome(
+                                                                        probe, result, elapsed
+                                                                    )
+                                                                )
+                                                            }
+
+                                                            sample(
+                                                                AstraLanguageBenchmark.Probe.ARITHMETIC,
+                                                                AstraLanguageBenchmark.MATH_PROMPT,
+                                                                Int.MIN_VALUE + 210
+                                                            )
+                                                            sample(
+                                                                AstraLanguageBenchmark.Probe.RUSSIAN,
+                                                                AstraLanguageBenchmark.RUSSIAN_PROMPT,
+                                                                Int.MIN_VALUE + 211
+                                                            )
+
+                                                            languageBenchmarkStatus =
+                                                                "Running two-turn context check..."
+                                                            val beforeMemory = System.nanoTime()
+                                                            val memoryGeneration = Int.MIN_VALUE + 212
+                                                            val setup = onDeviceBrain.reply(
+                                                                listOf(
+                                                                    AstraOnDeviceBrain.Turn(
+                                                                        "user",
+                                                                        AstraLanguageBenchmark.MEMORY_SETUP
+                                                                    )
+                                                                ),
+                                                                memoryGeneration
+                                                            )
+                                                            val remembered = onDeviceBrain.reply(
+                                                                listOf(
+                                                                    AstraOnDeviceBrain.Turn(
+                                                                        "user",
+                                                                        AstraLanguageBenchmark.MEMORY_SETUP
+                                                                    ),
+                                                                    AstraOnDeviceBrain.Turn(
+                                                                        "assistant", setup
+                                                                    ),
+                                                                    AstraOnDeviceBrain.Turn(
+                                                                        "user",
+                                                                        AstraLanguageBenchmark.MEMORY_QUESTION
+                                                                    )
+                                                                ),
+                                                                memoryGeneration
+                                                            )
+                                                            outcomes.add(
+                                                                AstraLanguageBenchmark.outcome(
+                                                                    AstraLanguageBenchmark.Probe.CONTEXT,
+                                                                    remembered,
+                                                                    (System.nanoTime() -
+                                                                        beforeMemory) / 1_000_000
+                                                                )
+                                                            )
+
+                                                            sample(
+                                                                AstraLanguageBenchmark.Probe.GRAMMAR,
+                                                                AstraLanguageBenchmark.GRAMMAR_PROMPT,
+                                                                Int.MIN_VALUE + 213
+                                                            )
+                                                            languageBenchmarkStatus =
+                                                                AstraLanguageBenchmark.render(
+                                                                    outcomes,
+                                                                    onDeviceBrain.loadedModelLabel()
+                                                                )
+                                                        } catch (cancel: CancellationException) {
+                                                            languageBenchmarkStatus =
+                                                                "Conversation checks cancelled. " +
+                                                                    "Partial results are not scored."
+                                                            throw cancel
+                                                        } catch (error: Exception) {
+                                                            languageBenchmarkStatus =
+                                                                "Conversation checks interrupted: " +
+                                                                    (error.message ?: "Local inference error")
+                                                        } finally {
+                                                            languageBenchmarkRunning = false
+                                                            languageBenchmarkJob = null
+                                                        }
+                                                    }
+                                                }
+                                            ) {
+                                                Text("Run language checks")
+                                            }
+                                            if (languageBenchmarkRunning) {
+                                                TextButton(
+                                                    onClick = {
+                                                        languageBenchmarkJob?.cancel()
+                                                    }
+                                                ) { Text("Stop checks") }
+                                            }
+                                        }
+                                        if (languageBenchmarkStatus.isNotBlank()) {
+                                            Text(
+                                                languageBenchmarkStatus,
+                                                style = MaterialTheme.typography.bodySmall
+                                            )
+                                            if (!languageBenchmarkRunning) {
+                                                TextButton(
+                                                    onClick = {
+                                                        copyText(languageBenchmarkStatus)
+                                                    }
+                                                ) { Text("Copy check results") }
+                                            }
                                         }
                                         Text(
                                             "Device diagnostics",
