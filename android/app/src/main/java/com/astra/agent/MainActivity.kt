@@ -2463,6 +2463,10 @@ class MainActivity :
                 }
                 var bookImportRunning by remember { mutableStateOf(false) }
                 var bookImportStatus by remember { mutableStateOf("") }
+                var linkedLibraryFolder by remember {
+                    mutableStateOf(AstraFolderAccess.linked(applicationContext))
+                }
+                var folderImportStatus by remember { mutableStateOf("") }
                 var confirmClearBooks by remember { mutableStateOf(false) }
                 var selectedVocabularyLanguage by remember {
                     mutableStateOf("setswana")
@@ -3446,6 +3450,27 @@ class MainActivity :
                                         Toast.LENGTH_LONG
                                     ).show()
                                 }
+                            }
+                        }
+                    }
+
+                val linkLibraryFolderLauncher =
+                    rememberLauncherForActivityResult(
+                        ActivityResultContracts.OpenDocumentTree()
+                    ) { selected ->
+                        if (selected != null) {
+                            try {
+                                AstraFolderAccess.link(applicationContext, selected)
+                                linkedLibraryFolder = true
+                                folderImportStatus =
+                                    "Folder connected. Astra remembers this read-only " +
+                                    "authorization across phone restarts and signed updates."
+                            } catch (failure: Exception) {
+                                linkedLibraryFolder =
+                                    AstraFolderAccess.linked(applicationContext)
+                                folderImportStatus =
+                                    "Could not retain folder access: " +
+                                    (failure.message ?: "Android rejected access.")
                             }
                         }
                     }
@@ -5849,6 +5874,79 @@ class MainActivity :
                                                 "local model; no remote search or paid service is used.",
                                             style = MaterialTheme.typography.bodySmall
                                         )
+                                        Text(
+                                            "Optional: authorize one Astra Library folder once. " +
+                                                "Astra remembers read-only access to that folder, " +
+                                                "not your entire phone. Android may prevent " +
+                                                "selecting protected folders or storage roots. " +
+                                                "Files are scanned only when you tap Import.",
+                                            style = MaterialTheme.typography.bodySmall
+                                        )
+                                        OutlinedButton(
+                                            enabled = !bookImportRunning,
+                                            onClick = {
+                                                linkLibraryFolderLauncher.launch(null)
+                                            }
+                                        ) {
+                                            Text(if (linkedLibraryFolder)
+                                                "Change authorized library folder"
+                                            else "Authorize library folder once")
+                                        }
+                                        if (linkedLibraryFolder) {
+                                            OutlinedButton(
+                                                enabled = !bookImportRunning,
+                                                onClick = {
+                                                    bookImportRunning = true
+                                                    folderImportStatus =
+                                                        "Importing books from authorized folder..."
+                                                    researchScope.launch {
+                                                        try {
+                                                            val result = withContext(
+                                                                Dispatchers.IO
+                                                            ) {
+                                                                AstraFolderAccess.importBooks(
+                                                                    applicationContext, localBooks
+                                                                )
+                                                            }
+                                                            importedBookCount =
+                                                                localBooks.listBooks().size
+                                                            folderImportStatus = result.message()
+                                                        } catch (cancel: CancellationException) {
+                                                            throw cancel
+                                                        } catch (failure: Exception) {
+                                                            linkedLibraryFolder =
+                                                                AstraFolderAccess.linked(
+                                                                    applicationContext
+                                                                )
+                                                            folderImportStatus =
+                                                                "Folder import failed: " +
+                                                                    (failure.message ?:
+                                                                        "The folder was unavailable.")
+                                                        } finally {
+                                                            bookImportRunning = false
+                                                        }
+                                                    }
+                                                }
+                                            ) { Text("Import books from authorized folder") }
+                                            TextButton(onClick = {
+                                                try {
+                                                    AstraFolderAccess.unlink(
+                                                        applicationContext
+                                                    )
+                                                    linkedLibraryFolder = false
+                                                    folderImportStatus =
+                                                        "Folder access revoked. " +
+                                                        "Already imported private books remain."
+                                                } catch (failure: Exception) {
+                                                    folderImportStatus =
+                                                        failure.message ?: "Cannot revoke access."
+                                                }
+                                            }) { Text("Forget folder authorization") }
+                                        }
+                                        if (folderImportStatus.isNotBlank()) {
+                                            Text(folderImportStatus,
+                                                style = MaterialTheme.typography.bodySmall)
+                                        }
                                         OutlinedButton(
                                             enabled = !bookImportRunning,
                                             onClick = {
@@ -5856,7 +5954,7 @@ class MainActivity :
                                             }
                                         ) {
                                             Text(if (bookImportRunning) "Importing book..."
-                                                else "Import book (TXT / MD / EPUB)")
+                                                else "Import one book (TXT / MD / EPUB)")
                                         }
                                         if (bookImportStatus.isNotBlank()) {
                                             Text(bookImportStatus,
