@@ -51,7 +51,7 @@ internal class AstraDialogue {
         """(?i)^(?:(?:make|mark|set)\s+(?:it|that|this\s+task)\s+(?:(?:priority)\s+)?|(?:set|change)\s+(?:its|that\s+task's)\s+priority\s+(?:to\s+)?)(high|medium|low)$"""
     )
     private val commands = Regex(
-        """(?i)^(?:add\s+(?:a\s+)?task|create\s+task|task\s+|done\s+\d+|complete\s+task\s+\d+|show\s+|list\s+|set\s+task\s+|prioriti[sz]e\s+task\s+|remember\s+|note\s+|search\s+|find\s+|research\s+|wikipedia\s+|calculate\s+|compute\s+|convert\s+|russian\s+|teach\s+|help$|mission\s+control$|plan\s+my\s+day$|open\s+|clear\s+chat$|share\s+chat$|copy\s+chat$).*"""
+        """(?i)^(?:add\s+(?:a\s+)?task|create\s+task|task\s+|done\s+\d+|complete\s+task\s+\d+|show\s+|list\s+|set\s+task\s+|prioriti[sz]e\s+task\s+|remember\s+|note\s+|search\s+|find\s+|research\s+|wikipedia\s+|calculate\s+|compute\s+|convert\s+|russian\s+|teach\s+|translate\s+|help$|mission\s+control$|plan\s+my\s+day$|open\s+|clear\s+chat$|share\s+chat$|copy\s+chat$).*"""
     )
 
     fun respond(
