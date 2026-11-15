@@ -50,7 +50,9 @@ internal object AstraBookRanking {
         if (requiresSubject && matched.none { it !in generic }) return 0
 
         val titleWords = tokens(title).toSet()
-        val contentScore = matched.sumOf { if (it in generic) 2 else 12 }
+        val contentScore = matched.fold(0) { total: Int, term: String ->
+            total + (if (term in generic) 2 else 12)
+        }
         val coverage = (matched.size - 1).coerceAtLeast(0) * 4
         val titleBonus = matched.count { it in titleWords } * 2
 
@@ -92,8 +94,9 @@ internal object AstraBookRanking {
             val covered = matches.asSequence()
                 .filter { it.first in candidate until candidate + limit }
                 .map { it.second }.toSet()
-            val rank = covered.sumOf { if (it in generic) 1 else 5 } +
-                covered.size
+            val rank = covered.fold(0) { total: Int, term: String ->
+                total + (if (term in generic) 1 else 5)
+            } + covered.size
             if (rank > bestScore) {
                 start = candidate
                 bestScore = rank
