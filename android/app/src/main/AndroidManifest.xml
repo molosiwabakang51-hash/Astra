@@ -4,9 +4,9 @@
 
     <!-- Online research is triggered only by explicit Wikipedia commands. -->
     <uses-permission android:name="android.permission.INTERNET" />
-    <!-- Optional owner-enabled read-only shared-storage search. Android's
-         special access Settings page requires explicit consent; this does
-         not grant access to another application's private sandbox. -->
+    <!-- Optional owner-enabled broad shared-storage permission. Android grants
+         read/write capability across shared storage; Astra's current file
+         search code reads only metadata. User consent in Settings is mandatory. -->
     <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />
 
     <!-- Microphone permission for voice recognition -->
