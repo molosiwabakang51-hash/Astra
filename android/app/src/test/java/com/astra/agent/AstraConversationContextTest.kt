@@ -80,12 +80,12 @@ class AstraConversationContextTest {
         assertTrue(entry.length <= 3_000)
         // The message passed into local inference must match the context
         // builder's question in both fresh and restored model sessions.
-        assertEquals(entry + "\\n/no_think",
+        assertEquals(entry + "\n/no_think",
             AstraConversationContext.userPrompt(raw, emptyList(), false))
         val restored = AstraConversationContext.userPrompt(
             entry, listOf(turn("user", "OLD_PRIVATE_NOTE")), true
         )
-        assertTrue(restored.endsWith(finalQuestion + "\\n/no_think"))
+        assertTrue(restored.endsWith(finalQuestion + "\n/no_think"))
         assertFalse(restored.contains("OLD_PRIVATE_NOTE"))
     }
 
