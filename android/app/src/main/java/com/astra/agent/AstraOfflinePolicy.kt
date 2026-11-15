@@ -28,11 +28,15 @@ internal object AstraOfflinePolicy {
         var reply = modelOutput.trim()
         // Reasoning is not a user-facing answer. Do not display a partial
         // thinking block if generation ends before the closing tag.
-        if (reply.startsWith("<think>")) {
+        // Some models emit more than one leading reasoning segment, or a
+        // complete segment followed by a second unfinished one. Never expose
+        // either segment in streaming updates or the final saved response.
+        while (reply.startsWith("<think>")) {
             val end = reply.indexOf("</think>")
             if (end < 0) return ""
-            reply = reply.substring(end + "</think>".length).trim()
+            reply = reply.substring(end + "</think>".length).trimStart()
         }
+        reply = reply.trimEnd()
         return reply.take(16_000)
     }
 }
