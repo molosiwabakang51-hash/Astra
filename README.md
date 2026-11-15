@@ -122,8 +122,10 @@ it through Android Settings or it is reset. The search scans only on your
 explicit request, limits scan time and output, displays only filenames and
 sizes, and does not copy, upload, alter, transcribe or read file contents.
 
-**This is broad and sensitive permission.** Use it only if you need cross-folder
-filename search. The feature never scans in the background, excludes hidden
+**This is broad and sensitive permission.** Android grants the app read AND
+write capability across accessible shared storage, even though Astra's current
+search implementation reads filenames only and never modifies original files.
+Use it only if you need cross-folder filename search. The feature never scans in the background, excludes hidden
 and `Android/` directories, and cannot access another app's private files,
 messages, databases, or cloud accounts. It does not automatically understand
 PDFs, audio, videos, photos or documents: these require separate local import
