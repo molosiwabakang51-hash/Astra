@@ -3364,10 +3364,16 @@ class MainActivity :
                                 confirmClearBooks = false
                                 useBooksInChat = false
                                 storage.setBoolean("astra_use_books_in_chat", false)
+                                offlineJob?.cancel()
                                 researchScope.launch {
-                                    withContext(Dispatchers.IO) { localBooks.clear() }
-                                    importedBookCount = 0
-                                    bookImportStatus = "Private book library cleared."
+                                    try {
+                                        withContext(Dispatchers.IO) { localBooks.clear() }
+                                        importedBookCount = 0
+                                        bookImportStatus = "Private book library cleared."
+                                    } catch (error: Exception) {
+                                        bookImportStatus = "Could not delete all books: " +
+                                            (error.message ?: "Unknown local storage error.")
+                                    }
                                 }
                             }) { Text("Delete imported books") }
                         },
@@ -5247,6 +5253,9 @@ class MainActivity :
                                                 checked = useBooksInChat,
                                                 enabled = importedBookCount > 0,
                                                 onCheckedChange = { value ->
+                                                    // Stop an active answer before retracting
+                                                    // permission to include private books.
+                                                    if (!value) offlineJob?.cancel()
                                                     useBooksInChat = value
                                                     storage.setBoolean(
                                                         "astra_use_books_in_chat", value
@@ -5283,6 +5292,7 @@ class MainActivity :
                                                 )
                                             }
                                             OutlinedButton(
+                                                enabled = !bookImportRunning,
                                                 onClick = { confirmClearBooks = true }
                                             ) { Text("Remove imported books") }
                                         }
