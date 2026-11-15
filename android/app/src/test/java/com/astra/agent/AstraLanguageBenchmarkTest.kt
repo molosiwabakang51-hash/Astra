@@ -99,6 +99,31 @@ class AstraLanguageBenchmarkTest {
             AstraLanguageBenchmark.Probe.SETSWANA, "Dumela does not mean hello"))
     }
 
+    @Test fun frenchTranslationMustBeConciseAndCorrect() {
+        assertTrue(AstraLanguageBenchmark.score(
+            AstraLanguageBenchmark.Probe.FRENCH, "Hello."))
+        assertTrue(AstraLanguageBenchmark.score(
+            AstraLanguageBenchmark.Probe.FRENCH, "Good morning"))
+        assertFalse(AstraLanguageBenchmark.score(
+            AstraLanguageBenchmark.Probe.FRENCH, "Goodbye."))
+        assertFalse(AstraLanguageBenchmark.score(
+            AstraLanguageBenchmark.Probe.FRENCH, "Not hello, goodbye."))
+    }
+
+    @Test fun germanAndSpanishTestsRejectQuotedIncorrectOrNegatedResponses() {
+        for (probe in listOf(
+            AstraLanguageBenchmark.Probe.GERMAN,
+            AstraLanguageBenchmark.Probe.SPANISH
+        )) {
+            assertTrue(AstraLanguageBenchmark.score(probe, "Thanks."))
+            assertTrue(AstraLanguageBenchmark.score(probe, "Thank you!"))
+            assertFalse(AstraLanguageBenchmark.score(probe, "Hello"))
+            assertFalse(AstraLanguageBenchmark.score(probe, "It is not thank you"))
+            assertFalse(AstraLanguageBenchmark.score(probe,
+                "Goodbye (not thanks)"))
+        }
+    }
+
     @Test fun negativeOrQuotedAnswersDoNotInflateTranslationOrMemoryScore() {
         assertFalse(AstraLanguageBenchmark.score(
             AstraLanguageBenchmark.Probe.RUSSIAN, "Not thank you."))
@@ -108,16 +133,20 @@ class AstraLanguageBenchmarkTest {
             AstraLanguageBenchmark.Probe.CONTEXT, "\"NIMBORA\""))
     }
 
-    @Test fun expandedReportHasSevenDistinctProbeSlots() {
-        assertEquals(7, AstraLanguageBenchmark.Probe.entries.size)
+    @Test fun expandedReportHasTenDistinctProbeSlots() {
+        assertEquals(10, AstraLanguageBenchmark.Probe.entries.size)
         val outcomes = AstraLanguageBenchmark.Probe.entries.map { probe ->
             AstraLanguageBenchmark.outcome(probe, "", 100L)
         }
         val report = AstraLanguageBenchmark.render(outcomes, null)
-        assertTrue(report.contains("0/7"))
+        assertTrue(report.contains("0/10"))
         assertTrue(report.contains("Compound interest"))
         assertTrue(report.contains("Logical deduction"))
         assertTrue(report.contains("Setswana greeting"))
+        assertTrue(report.contains("French translation"))
+        assertTrue(report.contains("German translation"))
+        assertTrue(report.contains("Spanish translation"))
+        assertEquals(10, AstraLanguageBenchmark.Probe.entries.distinct().size)
     }
 
     @Test fun errorOutputsNeverCountAsSuccessfulUnderstanding() {
