@@ -300,9 +300,20 @@ Imported vocabulary resides in Astra's private **no-backup** app storage,
 remains available after correctly signed app upgrades, and is deleted on
 app uninstall or by the owner through the per-language removal control.
 The manual JSON conversation backup deliberately does **not** include
-these extra words; keep the original TSV if reinstalling or changing
-phones. Existing progress counters and built-in card indices are retained,
-but clearing a custom deck removes its custom questions.
+these extra words. Instead, **Settings → Expand offline language lessons →
+Export all language vocabulary (TSV)** saves every imported language deck
+into one portable, checksum-verified UTF-8 file. Keep this file alongside
+the ordinary JSON backup when changing devices or reinstalling.
+
+Use **Restore all language vocabulary (TSV)** to load the combined archive
+offline. It validates every row and the final SHA-256 integrity marker
+before changing any saved vocabulary, rejects incomplete or modified files,
+and merges cards without overwriting previous translations or resetting
+lesson progress. An interrupted storage write can be retried safely;
+restoration never deletes an existing deck. These exported TSV files are
+not encrypted, so store them privately. Existing progress counters and
+built-in card indices are retained, but manually clearing a custom deck
+removes its custom questions.
 
 Nothing is uploaded or used to train Qwen3. This feature needs no paid
 model API, network connection, or new large model download.
