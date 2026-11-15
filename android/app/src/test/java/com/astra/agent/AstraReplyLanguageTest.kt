@@ -67,7 +67,7 @@ class AstraReplyLanguageTest {
         assertTrue(prepared.contains(
             "CURRENT USER MESSAGE (answer this message, not the excerpts):"))
         assertTrue(prepared.contains("Previous user: \""))
-        assertTrue(prepared.endsWith(question + "\n/no_think"))
+        assertTrue(prepared.endsWith(question.trim() + "\n/no_think"))
         assertTrue(prepared.length <= 3000)
         for (line in prepared.lines().filter { it.startsWith("Previous ") }) {
             assertTrue("Quoted previous turn must close: $line", line.endsWith("\""))
