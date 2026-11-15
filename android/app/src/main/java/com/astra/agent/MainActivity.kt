@@ -1379,6 +1379,7 @@ private object UtilityEngine {
 
 private class AstraProcessor(
     private val russianTutor: RussianTutor,
+    private val multilingualTutor: AstraMultilingualTutor,
     private val everydayAssistant: EverydayAssistant,
     private val dialogue: AstraDialogue
 ) {
@@ -1494,6 +1495,11 @@ private class AstraProcessor(
             return AssistantResult(it)
         }
 
+        // Explicit multilingual lesson/quiz commands are processed before
+        // Russian pending answers; no model-generated text can mutate progress.
+        multilingualTutor.respond(clean)?.let {
+            return AssistantResult(it)
+        }
         russianTutor.respond(clean)?.let {
             return AssistantResult(it)
         }
@@ -1856,8 +1862,19 @@ private class AstraProcessor(
                 convert 75 kg to lb
                 convert 2 hours to minutes
 
-                LANGUAGES
-                teach me Russian
+                LANGUAGES (entirely offline)
+                languages
+                learn setswana
+                setswana quiz
+                learn french
+                learn spanish
+                learn portuguese
+                learn german
+                learn swahili
+                learn japanese
+                learn mandarin
+                next language lesson
+                language progress
                 Russian lesson 2
                 Russian quiz
                 Russian progress
@@ -1886,7 +1903,8 @@ private class AstraProcessor(
         return AssistantResult(
             "I cannot answer that reliably with Astra's current offline tools. " +
                 "I can help with tasks, notes, shopping lists, daily habits, unit conversions, " +
-                "Russian practice, mathematics, and finance. Type 'help' for examples. " +
+                "Russian and multilingual practice, mathematics, and finance. " +
+                "Type 'languages' for courses or 'help' for examples. " +
                 "General open-ended questions are handled by the bundled offline language model."
         )
     }
@@ -2317,6 +2335,10 @@ class MainActivity :
 
         val processor = AstraProcessor(
             RussianTutor(storage::getInt, storage::setInt),
+            AstraMultilingualTutor(
+                storage::getInt, storage::setInt,
+                storage::getString, storage::setString
+            ),
             EverydayAssistant(storage::getString, storage::setString),
             dialogue
         )
