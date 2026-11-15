@@ -105,7 +105,7 @@ internal object AstraConversationContext {
         return AstraOfflinePolicy.modelPrompt(composed)
     }
 
-    private val topicWords = Regex("""[\\p{L}\\p{N}]{3,}""")
+    private val topicWords = Regex("""[\p{L}\p{N}]{3,}""")
     private val fillerWords = setOf(
         "what", "when", "where", "which", "about", "would", "could",
         "should", "please", "tell", "said", "say", "that", "this", "there",
