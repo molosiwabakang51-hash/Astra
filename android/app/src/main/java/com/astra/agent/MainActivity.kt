@@ -5868,9 +5868,11 @@ class MainActivity :
                                                 "shared filenames under phone storage without " +
                                                 "selecting each file. Astra only reads file " +
                                                 "names when you type 'search phone report'. " +
-                                                "No background scanning, media copying, uploads " +
-                                                "or modification. Other apps' private data " +
-                                                "is not accessible. Revoke in Android Settings.",
+                                                "Android grants broad read/write permission, " +
+                                                "but Astra's filename search only reads metadata. " +
+                                                "No background scanning, copying or uploads. " +
+                                                "Other apps' private data is inaccessible. " +
+                                                "Revoke the grant in Android Settings.",
                                             style = MaterialTheme.typography.bodySmall
                                         )
                                         Text(
