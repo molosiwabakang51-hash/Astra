@@ -69,6 +69,33 @@ class AstraConversationContextTest {
         assertTrue(result.length <= 3010)
     }
 
+    @Test fun actualNativeMessageEntryRetainsTailOfLongPastedQuestion() {
+        val finalQuestion = "FINAL QUESTION: Compare bond duration and convexity."
+        val raw = "START OF STUDY NOTES. " + "Historic price notes. ".repeat(500) +
+            finalQuestion
+        val entry = AstraConversationContext.currentUserMessage(raw)
+        assertTrue(entry.startsWith("START OF STUDY NOTES."))
+        assertTrue(entry.contains("Middle of long input omitted"))
+        assertTrue(entry.endsWith(finalQuestion))
+        assertTrue(entry.length <= 3_000)
+        // The message passed into local inference must match the context
+        // builder's question in both fresh and restored model sessions.
+        assertEquals(entry + "\\n/no_think",
+            AstraConversationContext.userPrompt(raw, emptyList(), false))
+        val restored = AstraConversationContext.userPrompt(
+            entry, listOf(turn("user", "OLD_PRIVATE_NOTE")), true
+        )
+        assertTrue(restored.endsWith(finalQuestion + "\\n/no_think"))
+        assertFalse(restored.contains("OLD_PRIVATE_NOTE"))
+    }
+
+    @Test fun nativeMessageEntryPreservesShortRequestsAndRejectableEmptyText() {
+        assertEquals("What is duration?",
+            AstraConversationContext.currentUserMessage(" What is duration? "))
+        assertEquals("", AstraConversationContext.currentUserMessage(null))
+        assertEquals("", AstraConversationContext.currentUserMessage("  "))
+    }
+
     @Test fun veryLongUserMessageKeepsTheFinalQuestionAfterModelReload() {
         val message = "COURSE NOTES BEGIN. " + "Older lecture text. ".repeat(250) +
             "FINAL QUESTION: Explain bond convexity in one paragraph."
