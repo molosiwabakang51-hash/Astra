@@ -57,6 +57,11 @@ internal object AstraOfflinePolicy {
                     }
                 }
                 index = cursor
+                // Keep one separator when both sides of a hidden block had
+                // spaces, instead of displaying a doubled gap mid-sentence.
+                if (visible.isNotEmpty() && visible[visible.length - 1] == ' ' &&
+                    raw.getOrNull(index) == ' '
+                ) index++
             } else if (end >= 0) {
                 // When an opening marker was lost in a partial stream, text
                 // before an unmatched closing marker cannot be trusted.
