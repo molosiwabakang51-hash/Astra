@@ -8,6 +8,7 @@ import java.io.OutputStreamWriter
 import java.nio.ByteBuffer
 import java.nio.charset.CodingErrorAction
 import java.nio.charset.StandardCharsets
+import java.security.MessageDigest
 
 /**
  * Portable, user-initiated offline backup for all nine private vocabulary decks.
@@ -21,6 +22,7 @@ import java.nio.charset.StandardCharsets
  */
 internal object AstraVocabularyBundle {
     private const val HEADER = "language\tphrase\ttranslation"
+    private const val FOOTER = "#astra-private-vocabulary-v1-end"
     private const val MAX_BUNDLE_BYTES = 32 * 1024 * 1024
     private const val MAX_LANGUAGE_BYTES = 3 * 1024 * 1024
     private const val MAX_CARD_CHARS = 160
@@ -35,21 +37,32 @@ internal object AstraVocabularyBundle {
     /** Do not close the caller-owned output stream. */
     fun export(store: AstraVocabularyStore, output: OutputStream): Int {
         val writer = OutputStreamWriter(output, utf8).buffered()
-        writer.write(HEADER)
-        writer.newLine()
-        var totalBytes = (HEADER + "\n").toByteArray(utf8).size
+        val digest = MessageDigest.getInstance("SHA-256")
+        val headerBytes = (HEADER + "\n").toByteArray(utf8)
+        digest.update(headerBytes)
+        writer.write(HEADER + "\n")
+        var totalBytes = headerBytes.size
         var cards = 0
         for (language in AstraVocabularyStore.supportedLanguages.sorted()) {
             for (word in store.list(language)) {
                 val line = "$language\t${word.phrase}\t${word.translation}\n"
-                totalBytes += line.toByteArray(utf8).size
+                val bytes = line.toByteArray(utf8)
+                totalBytes += bytes.size
                 require(totalBytes <= MAX_BUNDLE_BYTES) {
                     "Vocabulary archive exceeds the 32 MB safety limit."
                 }
+                digest.update(bytes)
                 writer.write(line)
                 cards++
             }
         }
+        // A complete footer prevents truncated, still-valid TSV prefixes from
+        // masquerading as a successful full backup.
+        val marker = FOOTER + "\t" + cards + "\t" + digest.digest().toHex() + "\n"
+        require(totalBytes + marker.toByteArray(utf8).size <= MAX_BUNDLE_BYTES) {
+            "Vocabulary archive exceeds the 32 MB safety limit."
+        }
+        writer.write(marker)
         writer.flush()
         return cards
     }
@@ -78,6 +91,9 @@ internal object AstraVocabularyBundle {
             .removePrefix("\uFEFF")
 
         val byLanguage = linkedMapOf<String, MutableList<AstraVocabularyStore.Word>>()
+        val digest = MessageDigest.getInstance("SHA-256")
+        digest.update((HEADER + "\n").toByteArray(utf8))
+        var footerSeen = false
         var rows = 0
         text.lineSequence().forEachIndexed { index, raw ->
             val line = raw.removeSuffix("\r")
@@ -88,6 +104,15 @@ internal object AstraVocabularyBundle {
                 return@forEachIndexed
             }
             if (line.isEmpty()) return@forEachIndexed
+            require(!footerSeen) { "Unexpected text after the vocabulary backup checksum." }
+            if (line.startsWith(FOOTER + "\t")) {
+                val marker = line.split('\t')
+                require(marker.size == 3 && marker[1].toIntOrNull() == rows &&
+                    marker[2] == digest.digest().toHex()
+                ) { "Vocabulary backup is incomplete or its checksum does not match." }
+                footerSeen = true
+                return@forEachIndexed
+            }
             val parts = line.split('\t')
             require(parts.size == 3) {
                 "Invalid vocabulary bundle at line ${index + 1}: expected three tab-separated fields."
@@ -111,8 +136,9 @@ internal object AstraVocabularyBundle {
             require(deck.size <= AstraVocabularyStore.MAX_CUSTOM_WORDS_PER_LANGUAGE) {
                 "Vocabulary archive exceeds 5,000 cards for $language."
             }
+            digest.update((line + "\n").toByteArray(utf8))
         }
-        require(text.startsWith(HEADER)) { "Vocabulary bundle header is missing." }
+        require(footerSeen) { "Incomplete Astra vocabulary backup: checksum footer missing." }
 
         // Validate every merge and its eventual disk representation before
         // modifying any private deck. Exact case matters for German nouns.
@@ -149,4 +175,7 @@ internal object AstraVocabularyBundle {
         }
         return RestoreResult(added, skipped, imports.size)
     }
+
+    private fun ByteArray.toHex(): String =
+        joinToString("") { "%02x".format(it.toInt() and 0xff) }
 }
