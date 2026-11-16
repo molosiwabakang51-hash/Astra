@@ -160,6 +160,43 @@ class AstraBookLibraryTest {
         assertEquals(2, result.map { it.bookId }.distinct().size)
     }
 
+
+    @Test fun importedBookCitationsRequireExactCompleteExcerptInFinalPrompt() {
+        val lib = library()
+        val passage = AstraBookLibrary.Passage(
+            "id", "Bond risk and return", 7,
+            "Modified duration estimates first-order bond price changes from yields.", 15
+        )
+        val question = "Explain modified duration."
+        val source = listOf(passage)
+        val enriched = lib.enrich(question, source)
+        assertEquals(source, lib.includedEvidence(question, source, enriched))
+        assertTrue(enriched.contains("CURRENT QUESTION:\n" + question))
+        assertTrue(lib.includedEvidence(question, source,
+            enriched.replace("first-order bond price", "price")
+        ).isEmpty())
+        assertTrue(lib.includedEvidence(question, source, question).isEmpty())
+    }
+
+    @Test fun longImportedBookExcerptsNeverLeavePartialReferenceQuotation() {
+        val lib = library()
+        val sources = (1..2).map { index ->
+            AstraBookLibrary.Passage(
+                "book-$index", "LONG_FINANCE_TITLE_" + "Z".repeat(120), index,
+                "Bond duration example $index. " + "Sensitivity sentence. ".repeat(70),
+                11
+            )
+        }
+        val question = "Explain bond duration."
+        val prompt = lib.enrich(question, sources)
+        val used = lib.includedEvidence(question, sources, prompt)
+        assertTrue(used.isNotEmpty())
+        assertEquals(sources.take(used.size), used)
+        assertEquals(used.size, Regex("""(?m)^\[B\d+\] """).findAll(prompt).count())
+        assertTrue(prompt.length <= 1_000 + question.length)
+        assertTrue(prompt.endsWith(question))
+    }
+
     @Test fun generalUnrelatedQuestionDoesNotAutomaticallyLeakBook() {
         val lib = library()
         lib.importBook("russian.md", input(
