@@ -63,6 +63,75 @@ class AstraKnowledgeLearningTest {
         assertTrue(AstraOpenLibrary.relevant("Explain bond convexity", passages).isEmpty())
     }
 
+
+    @Test fun openCoursePromptContainsOnlyWholeCitableEvidence() {
+        val large = (1..3).map { index ->
+            AstraOpenLibrary.Entry(
+                "course-$index", "Russian grammar course $index: vocabulary " +
+                    "A".repeat(90), "https://en.wikibooks.org/wiki/Russian/" +
+                    "long-source-".repeat(35),
+                "CC BY-SA 4.0", "Case detail $index: " + "noun ending ".repeat(90),
+                "russian grammar"
+            )
+        }
+        val question = "Explain Russian cases."
+        val prompt = AstraOpenLibrary.enrich(question, large)
+        val cited = AstraOpenLibrary.includedEvidence(large, prompt)
+        assertTrue(cited.isNotEmpty())
+        assertTrue(cited.size < large.size)
+        assertTrue(prompt.contains("QUESTION:\n" + question))
+        assertTrue(prompt.length <= 1_250 + question.length)
+        // An excerpt excluded by the 1,250-character limit cannot earn
+        // a citation or leave a half-closed quote in the user's answer.
+        assertEquals(large.take(cited.size), cited)
+        assertEquals(cited.size, Regex("""(?m)^\[K\d+\] """).findAll(prompt).count())
+        assertFalse(AstraOpenLibrary.citations(cited).contains("course 3"))
+    }
+
+    @Test fun savedResponseLanguageNeverCitesAnExcerptCutFromNativePrompt() {
+        val sources = (1..3).map { index ->
+            AstraOpenLibrary.Entry(
+                "lesson-$index", "Russian grammar lesson $index",
+                "https://en.wikibooks.org/wiki/Russian/Lesson_$index",
+                "CC BY-SA 4.0",
+                "Russian lesson number $index. " + "Case and ending. ".repeat(14),
+                "russian grammar"
+            )
+        }
+        val question = "Russian: " + "x".repeat(1_630)
+        val enriched = AstraOpenLibrary.enrich(question, sources)
+        val native = AstraReplyLanguage.prepare(
+            AstraConversationContext.userPrompt(enriched, emptyList(), false),
+            AstraReplyLanguage.Choice.FRENCH
+        )
+        val included = AstraOpenLibrary.includedEvidence(sources, native)
+        assertTrue(native.length <= 3_000)
+        assertTrue(native.endsWith(question + "\n/no_think"))
+        assertTrue(included.size <= sources.size)
+        assertEquals(sources.take(included.size), included)
+        // A source line must be intact in the final model prompt, not merely
+        // present in the earlier unbounded RAG candidate list.
+        for (entry in included) {
+            assertTrue(native.contains("Russian lesson number " +
+                entry.id.substringAfterLast('-') + "."))
+        }
+    }
+
+    @Test fun changedOrTrimmedOpenCourseQuotationCannotClaimGrounding() {
+        val entry = AstraOpenLibrary.Entry(
+            "russian-grammar", "Russian grammar", "https://en.wikibooks.org/wiki/Russian/Grammar",
+            "CC BY-SA 4.0", "Russian cases vary by grammatical role.", "russian cases"
+        )
+        val source = listOf(entry)
+        val question = "What are Russian cases?"
+        val prompt = AstraOpenLibrary.enrich(question, source)
+        assertEquals(source, AstraOpenLibrary.includedEvidence(source, prompt))
+        val damaged = prompt.replace("Russian cases vary by grammatical role.",
+            "Russian cases vary by gramma...")
+        assertTrue(AstraOpenLibrary.includedEvidence(source, damaged).isEmpty())
+        assertTrue(AstraOpenLibrary.includedEvidence(source, question).isEmpty())
+    }
+
     @Test fun userQuestionAlwaysSurvivesBoundedContext() {
         val example = AstraOpenLibrary.Entry(
             "test", "Russian dictionary", "https://en.wiktionary.org/wiki/тест",

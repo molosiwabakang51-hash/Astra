@@ -278,11 +278,23 @@ internal class AstraOnDeviceBrain(
                     ),
                     AstraReplyLanguage.fromId(selectedReplyLanguageId)
                 )
+                // Attribution must reflect the exact prompt after language
+                // preferences, recovery and truncation have been applied.
+                val citedBooks = if (bookReferences.isNotEmpty()) {
+                    books?.includedEvidence(question, bookReferences, requestPrompt).orEmpty()
+                } else emptyList()
+                val citedOpenCourse = if (bookReferences.isEmpty()) {
+                    AstraOpenLibrary.includedEvidence(openReferences, requestPrompt)
+                } else emptyList()
+                if (explicitBookQuery != null && citedBooks.isEmpty()) {
+                    return@withContext "Your book excerpts could not fit safely in " +
+                        "the offline model prompt. Ask a shorter, more specific question."
+                }
                 val answerBudget = AstraGenerationPolicy.effectiveBudget(
                     AstraGenerationPolicy.maxAnswerTokens(
                         finalMessage,
                         advancedModel = modelPath.name == AstraModelImport.ADVANCED_NAME,
-                        hasReferences = bookReferences.isNotEmpty() || openReferences.isNotEmpty()
+                        hasReferences = citedBooks.isNotEmpty() || citedOpenCourse.isNotEmpty()
                     ),
                     diagnosticMaxTokens
                 )
@@ -301,12 +313,12 @@ internal class AstraOnDeviceBrain(
                 if (publicAnswer.isBlank()) {
                     session.invalidate()
                     "The offline model did not produce a usable answer. Please try again."
-                } else if (bookReferences.isNotEmpty()) {
+                } else if (citedBooks.isNotEmpty()) {
                     publicAnswer + "\n\nRetrieved local book passages (verify originals):\n" +
-                        (books?.citations(bookReferences) ?: "")
-                } else if (openReferences.isNotEmpty()) {
+                        (books?.citations(citedBooks) ?: "")
+                } else if (citedOpenCourse.isNotEmpty()) {
                     publicAnswer + "\n\nOpen-course references:\n" +
-                        AstraOpenLibrary.citations(openReferences)
+                        AstraOpenLibrary.citations(citedOpenCourse)
                 } else {
                     publicAnswer
                 }
