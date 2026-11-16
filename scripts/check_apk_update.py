@@ -24,10 +24,15 @@ INSTALLED_VERSION_RE = re.compile(r"\bversionCode=(\d+)")
 
 
 def cert_fingerprint(output: str) -> str:
-    match = CERT_RE.search(output)
-    if not match:
-        raise ValueError("APK certificate SHA-256 digest not found.")
-    fingerprint = match.group(1).replace(":", "").lower()
+    # An APK may have multiple signers. Checking only signer #1 can produce
+    # false compatibility when Android requires an exact signer set.
+    matches = re.findall(
+        r"Signer #([0-9]+) certificate SHA-256 digest:\s*([^\r\n]+)",
+        output,
+    )
+    if len(matches) != 1 or matches[0][0] != "1":
+        raise ValueError("Expected exactly one APK signing certificate.")
+    fingerprint = matches[0][1].strip().replace(":", "").lower()
     if not re.fullmatch(r"[0-9a-f]{64}", fingerprint):
         raise ValueError("Invalid APK certificate digest.")
     return fingerprint

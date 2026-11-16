@@ -42,6 +42,22 @@ class UpdatePreflightTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             module.cert_fingerprint("Signer #1 certificate SHA-256 digest: broken")
 
+    def test_multiple_signers_never_pass_as_single_signer(self):
+        metadata = (
+            "Signer #1 certificate SHA-256 digest: " + CERT_A + "\n" +
+            "Signer #2 certificate SHA-256 digest: " + CERT_B + "\n"
+        )
+        with self.assertRaisesRegex(ValueError, "exactly one"):
+            module.cert_fingerprint(metadata)
+
+    def test_missing_signer_one_or_duplicate_signer_one_is_rejected(self):
+        with self.assertRaisesRegex(ValueError, "exactly one"):
+            module.cert_fingerprint("Signer #2 certificate SHA-256 digest: " + CERT_A)
+        duplicate = ("Signer #1 certificate SHA-256 digest: " + CERT_A + "\n" +
+                     "Signer #1 certificate SHA-256 digest: " + CERT_A)
+        with self.assertRaisesRegex(ValueError, "exactly one"):
+            module.cert_fingerprint(duplicate)
+
     def test_package_identity_is_read_from_package_line(self):
         self.assertEqual(("com.astra.agent", 29), module.apk_identity(
             "package: name='com.astra.agent' versionCode='29' versionName='test'\n"))
