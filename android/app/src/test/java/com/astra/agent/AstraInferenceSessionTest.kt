@@ -26,6 +26,8 @@ class AstraInferenceSessionTest {
         val session = AstraInferenceSession()
         session.markLoaded(3)
         assertTrue(session.requiresLoad(3, false))
+        assertTrue(session.requiresLoad(3, true))
+        session.markLoaded(3)
         assertFalse(session.requiresLoad(3, true))
     }
 
