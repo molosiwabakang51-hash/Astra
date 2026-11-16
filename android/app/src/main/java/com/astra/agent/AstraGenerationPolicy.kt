@@ -21,7 +21,7 @@ internal object AstraGenerationPolicy {
     // When the owner explicitly marks the final request, apply response-length
     // cues to that request rather than to quoted or pasted source material.
     private val finalRequestMarker = Regex(
-        """(?i)\b(?:final question|now answer|my question|latest request)\s*:\s*"""
+        """(?im)^[ \t]{0,12}(?:final question|now answer|my question|latest request)[ \t]*:[ \t]*"""
     )
 
     fun depth(rawQuestion: String): Depth {
