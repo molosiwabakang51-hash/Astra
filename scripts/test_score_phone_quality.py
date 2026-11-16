@@ -7,6 +7,8 @@ def full_run():
     metadata = {key: "verified" for key in REQUIRED_METADATA}
     metadata["airplane_mode"] = True
     metadata["wifi_disabled"] = True
+    metadata.update(time_to_first_token_ms=1200, response_time_ms=4000,
+                    ram_peak_mib=1200, battery_drain_percent=3)
     return {"metadata": metadata, "cases": {
         f"{domain}{n}": "pass"
         for domain, (count, _) in WEIGHTS.items()
@@ -48,6 +50,37 @@ class PhoneQualityScoreTest(unittest.TestCase):
         run = full_run()
         del run["metadata"]["time_to_first_token_ms"]
         self.assertIsNone(evaluate({"runs": [run]})["runs"][0]["points"])
+
+    def test_impossible_phone_telemetry_never_awards_perfect_score(self):
+        invalid = (
+            ("time_to_first_token_ms", -1),
+            ("time_to_first_token_ms", float("nan")),
+            ("response_time_ms", "fast"),
+            ("ram_peak_mib", 0),
+            ("ram_peak_mib", -250),
+            ("battery_drain_percent", -2),
+            ("battery_drain_percent", 101),
+            ("battery_drain_percent", True),
+        )
+        for key, value in invalid:
+            with self.subTest(key=key, value=value):
+                run = full_run()
+                run["metadata"][key] = value
+                with self.assertRaises(ValueError):
+                    evaluate({"runs": [run, run]})
+
+    def test_first_token_cannot_arrive_after_response_completion(self):
+        run = full_run()
+        run["metadata"]["time_to_first_token_ms"] = 9000
+        run["metadata"]["response_time_ms"] = 2000
+        with self.assertRaisesRegex(ValueError, "first token"):
+            evaluate({"runs": [run, run]})
+
+    def test_zero_latency_and_zero_battery_drain_are_valid_measurements(self):
+        run = full_run()
+        run["metadata"]["time_to_first_token_ms"] = 0
+        run["metadata"]["battery_drain_percent"] = 0
+        self.assertEqual(100, evaluate({"runs": [run, run]})["runs"][0]["points"])
 
     def test_unknown_case_rejected(self):
         run = full_run()
