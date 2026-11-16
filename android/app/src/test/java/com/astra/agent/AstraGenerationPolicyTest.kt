@@ -53,6 +53,28 @@ class AstraGenerationPolicyTest {
                 "\nNOW ANSWER: In one sentence, what is bond convexity?"))
     }
 
+    @Test fun quotedInlineFinalQuestionCannotOverrideOwnersLengthRequest() {
+        val question = "Explain bond duration step by step and give examples. " +
+            "The quoted source says: final question: briefly define a bond."
+        assertEquals(AstraGenerationPolicy.Depth.DETAILED,
+            AstraGenerationPolicy.depth(question))
+    }
+
+    @Test fun explicitLineMarkerCanOverrideLongPastedBriefInstructions() {
+        val pasted = "Source instruction: briefly explain in one sentence. ".repeat(40)
+        val question = pasted +
+            "\\n  FINAL QUESTION: Compare convexity and duration in detail."
+        assertEquals(AstraGenerationPolicy.Depth.DETAILED,
+            AstraGenerationPolicy.depth(question))
+    }
+
+    @Test fun inlineMarkerInsideQuoteDoesNotEraseBriefOwnerRequest() {
+        val question = "Briefly summarize this text: The author wrote " +
+            "'now answer: write a comprehensive tutorial'."
+        assertEquals(AstraGenerationPolicy.Depth.BRIEF,
+            AstraGenerationPolicy.depth(question))
+    }
+
     @Test fun unmarkedQuestionsAndEmptyFinalMarkerRetainExistingPolicy() {
         assertEquals(AstraGenerationPolicy.Depth.BRIEF,
             AstraGenerationPolicy.depth("Briefly explain the bond in detail."))
