@@ -44,8 +44,8 @@ class UpdatePreflightTest(unittest.TestCase):
 
     def test_multiple_signers_never_pass_as_single_signer(self):
         metadata = (
-            "Signer #1 certificate SHA-256 digest: " + CERT_A + "\\n" +
-            "Signer #2 certificate SHA-256 digest: " + CERT_B + "\\n"
+            "Signer #1 certificate SHA-256 digest: " + CERT_A + "\n" +
+            "Signer #2 certificate SHA-256 digest: " + CERT_B + "\n"
         )
         with self.assertRaisesRegex(ValueError, "exactly one"):
             module.cert_fingerprint(metadata)
@@ -53,7 +53,7 @@ class UpdatePreflightTest(unittest.TestCase):
     def test_missing_signer_one_or_duplicate_signer_one_is_rejected(self):
         with self.assertRaisesRegex(ValueError, "exactly one"):
             module.cert_fingerprint("Signer #2 certificate SHA-256 digest: " + CERT_A)
-        duplicate = ("Signer #1 certificate SHA-256 digest: " + CERT_A + "\\n" +
+        duplicate = ("Signer #1 certificate SHA-256 digest: " + CERT_A + "\n" +
                      "Signer #1 certificate SHA-256 digest: " + CERT_A)
         with self.assertRaisesRegex(ValueError, "exactly one"):
             module.cert_fingerprint(duplicate)
