@@ -240,8 +240,15 @@ jobs:
           signer="$(find "${ANDROID_HOME}/build-tools" -maxdepth 2 -type f -name apksigner | sort -V | tail -n 1)"
           test -x "$signer"
           "$signer" verify "$apk"
-          certificate="$("$signer" verify --print-certs "$apk" |
-            sed -n 's/^Signer #1 certificate SHA-256 digest: //p' | head -n 1)"
+          # apksigner output can differ in leading whitespace/capitalization
+          # across Android Build Tools revisions. Capture the full output,
+          # extract only the public signer fingerprint, and fail closed.
+          cert_output="$("$signer" verify --print-certs "$apk")"
+          certificate="$(printf '%s\n' "$cert_output" |
+            sed -nE '/[Ss]igner[[:space:]]*#[[:space:]]*1[[:space:]]+certificate[[:space:]]+SHA-256[[:space:]]+digest:/ {
+              s/.*digest:[[:space:]]*//
+              p
+            }' | head -n 1)"
           certificate="$(printf '%s' "$certificate" | tr -d '[:space:]:' | tr '[:upper:]' '[:lower:]')"
           [[ "$certificate" =~ ^[0-9a-f]{64}$ ]] || {
             echo "::error::Missing or invalid LITE signing certificate"; exit 1;
