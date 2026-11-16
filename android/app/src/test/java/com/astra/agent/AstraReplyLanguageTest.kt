@@ -7,8 +7,8 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class AstraReplyLanguageTest {
-    @Test fun allElevenAnswerModesAreSelectableWithoutNetwork() {
-        assertEquals(11, AstraReplyLanguage.Choice.entries.size)
+    @Test fun allSeventeenAnswerModesAreSelectableWithoutNetwork() {
+        assertEquals(17, AstraReplyLanguage.Choice.entries.size)
         for (choice in AstraReplyLanguage.Choice.entries) {
             val selected = AstraReplyLanguage.parseCommand("reply in " + choice.id)
             assertEquals(choice, selected)

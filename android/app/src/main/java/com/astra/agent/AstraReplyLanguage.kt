@@ -19,7 +19,13 @@ internal object AstraReplyLanguage {
         GERMAN("german", "German", "German"),
         SWAHILI("swahili", "Swahili", "Swahili"),
         JAPANESE("japanese", "Japanese", "Japanese"),
-        MANDARIN("mandarin", "Mandarin Chinese", "Mandarin Chinese")
+        MANDARIN("mandarin", "Mandarin Chinese", "Mandarin Chinese"),
+        ARABIC("arabic", "Arabic", "Arabic"),
+        HINDI("hindi", "Hindi", "Hindi"),
+        KOREAN("korean", "Korean", "Korean"),
+        ITALIAN("italian", "Italian", "Italian"),
+        TURKISH("turkish", "Turkish", "Turkish"),
+        URDU("urdu", "Urdu", "Urdu")
     }
 
     private const val MAX_PROMPT = 3_000
