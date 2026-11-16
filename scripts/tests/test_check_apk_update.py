@@ -143,6 +143,30 @@ class UpdatePreflightTest(unittest.TestCase):
         self.assertIn("not currently installed", message)
         self.assertIn("imported GGUF", message)
 
+    def test_finds_adb_in_sdk_platform_tools_without_path(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            sdk = Path(tmp)
+            adb = sdk / "platform-tools" / "adb"
+            adb.parent.mkdir()
+            adb.write_text("stub")
+            with patch.dict("os.environ", {"ANDROID_HOME": str(sdk),
+                                            "ANDROID_SDK_ROOT": ""}):
+                with patch.object(module.shutil, "which", return_value=None):
+                    self.assertEqual(str(adb), module.find_tool("adb", None))
+
+    def test_sdk_build_tools_uses_numeric_version_order(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            sdk = Path(tmp)
+            old = sdk / "build-tools" / "9.0" / "aapt"
+            new = sdk / "build-tools" / "35.0" / "aapt"
+            for path in (old, new):
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text("stub")
+            with patch.dict("os.environ", {"ANDROID_HOME": str(sdk),
+                                            "ANDROID_SDK_ROOT": ""}):
+                with patch.object(module.shutil, "which", return_value=None):
+                    self.assertEqual(str(new), module.find_tool("aapt", None))
+
     def test_missing_device_refuses_check(self):
         with tempfile.TemporaryDirectory() as tmp:
             apk = Path(tmp) / "new.apk"
