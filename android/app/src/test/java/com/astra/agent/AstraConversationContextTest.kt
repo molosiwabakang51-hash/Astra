@@ -323,6 +323,21 @@ class AstraConversationContextTest {
         assertTrue(result.endsWith("Give me a short answer, please.\n/no_think"))
     }
 
+    @Test fun ownerPronounsDoNotCrowdOutTopicSpecificRecall() {
+        val earlier = listOf(
+            turn("user", "My fictional bond maturity preference is five years."),
+            turn("user", "My UNRELATED_PERSONAL_NOTE about cooking has no finance details.")
+        ) + (1..3).map {
+            turn("assistant", "Recent unrelated conversation " + "X".repeat(180))
+        }
+        val prompt = AstraConversationContext.userPrompt(
+            "What was my bond maturity preference?", earlier, true
+        )
+        assertTrue(prompt.contains("bond maturity preference is five years"))
+        assertFalse(prompt.contains("UNRELATED_PERSONAL_NOTE"))
+        assertTrue(prompt.endsWith("What was my bond maturity preference?\n/no_think"))
+    }
+
     @Test fun blankAndUnsupportedPriorTurnsAreIgnored() {
         val result = AstraConversationContext.userPrompt(
             "Hello", listOf(turn("assistant", " "), turn("tool", "Developer secret")),

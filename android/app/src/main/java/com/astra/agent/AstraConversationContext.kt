@@ -183,7 +183,10 @@ internal object AstraConversationContext {
         "should", "please", "tell", "said", "say", "that", "this", "there",
         "with", "from", "have", "been", "your", "earlier", "previous",
         "remember", "explain", "conversation", "message", "response",
-        "mean", "does", "did", "the", "and", "you", "are", "was", "for"
+        "mean", "does", "did", "the", "and", "you", "are", "was", "for",
+        // Recall questions often contain these pronouns and helper words.
+        // Matching them in unrelated owner messages creates false memories.
+        "my", "our", "how", "why", "who", "can", "had", "has", "were"
     )
 
     /**
