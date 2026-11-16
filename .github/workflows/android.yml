@@ -248,8 +248,8 @@ jobs:
           import os, re, sys
           lines = os.environ["CERT_OUTPUT"].splitlines()
           patterns = (
-              r"^Signer #1 certificate SHA-256 digest:\\s*([0-9a-fA-F:]+)$",
-              r"^V[1-4] Signer: certificate SHA-256 digest:\\s*([0-9a-fA-F:]+)$",
+              r"^Signer #1 certificate SHA-256 digest:\s*([0-9a-fA-F:]+)$",
+              r"^V[1-4] Signer: certificate SHA-256 digest:\s*([0-9a-fA-F:]+)$",
           )
           matches = [m.group(1) for line in lines for pattern in patterns
                      if (m := re.fullmatch(pattern, line.strip()))]
