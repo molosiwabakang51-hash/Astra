@@ -58,6 +58,26 @@ class UpdatePreflightTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "exactly one"):
             module.cert_fingerprint(duplicate)
 
+    def test_real_apksigner_v2_output_is_accepted(self):
+        output = (
+            "V2 Signer: certificate DN: C=US, O=Android, CN=Android Debug\n"
+            "V2 Signer: certificate SHA-256 digest: " + CERT_A + "\n"
+            "V2 Signer: certificate SHA-1 digest: deadbeef\n"
+        )
+        self.assertEqual(CERT_A, module.cert_fingerprint(output))
+
+    def test_multiple_v2_signers_fail_closed(self):
+        output = (
+            "V2 Signer: certificate SHA-256 digest: " + CERT_A + "\n"
+            "V2 Signer: certificate SHA-256 digest: " + CERT_B
+        )
+        with self.assertRaisesRegex(ValueError, "exactly one"):
+            module.cert_fingerprint(output)
+
+    def test_unrecognized_certificate_format_fails_closed(self):
+        with self.assertRaisesRegex(ValueError, "exactly one"):
+            module.cert_fingerprint("Signer certificate digest: " + CERT_A)
+
     def test_package_identity_is_read_from_package_line(self):
         self.assertEqual(("com.astra.agent", 29), module.apk_identity(
             "package: name='com.astra.agent' versionCode='29' versionName='test'\n"))
