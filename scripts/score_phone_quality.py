@@ -2,6 +2,7 @@
 """Score only recorded, complete real-phone Astra evaluations. No network/deps."""
 import argparse
 import json
+import math
 import sys
 from pathlib import Path
 
@@ -39,6 +40,24 @@ def evaluate(document):
         for key in ("airplane_mode", "wifi_disabled"):
             if key in metadata and type(metadata[key]) is not bool:
                 raise ValueError(f"Run {index}: {key} must be a boolean")
+        # Reject physically impossible or non-numeric telemetry. Missing
+        # metrics already make a run unverified; invalid supplied metrics
+        # must not be converted into a perfect 10/10 phone score.
+        for key in ("time_to_first_token_ms", "response_time_ms",
+                    "ram_peak_mib", "battery_drain_percent"):
+            value = metadata.get(key)
+            if value is None or value == "":
+                continue
+            if type(value) not in (int, float) or not math.isfinite(value):
+                raise ValueError(f"Run {index}: {key} must be a finite number")
+            if value < 0 or (key == "ram_peak_mib" and value == 0):
+                raise ValueError(f"Run {index}: {key} is physically invalid")
+            if key == "battery_drain_percent" and value > 100:
+                raise ValueError(f"Run {index}: battery drain exceeds 100%")
+        if (type(metadata.get("time_to_first_token_ms")) in (int, float)
+                and type(metadata.get("response_time_ms")) in (int, float)
+                and metadata["time_to_first_token_ms"] > metadata["response_time_ms"]):
+            raise ValueError(f"Run {index}: first token arrives after response ends")
         offline = metadata.get("airplane_mode") is True and metadata.get("wifi_disabled") is True
         complete = not missing and not unverified and not absent_metadata and offline
         points = sum(expected[key] for key, value in cases.items() if value == "pass")
