@@ -32,6 +32,9 @@ internal object AstraModelImport {
     // Official ggml-org Qwen3-1.7B Q4_K_M GGUF SHA-256.
     const val ADVANCED_SHA256 = "d2387ca2dbfee2ffabce7120d3770dadca0b293052bc2f0e138fdc940d9bc7b5"
     private const val FREE_HEADROOM = 64L * 1024 * 1024
+    // Prevent untrusted ZIPs with enormous entry tables from keeping the
+    // importer busy indefinitely before reaching a real model asset.
+    private const val MAX_ARCHIVE_ENTRIES = 4_096
     private const val ASSET_PATH = "assets/" + AstraOnDeviceBrain.ASSET_NAME
 
     fun modelFile(context: Context): File =
@@ -128,9 +131,13 @@ internal object AstraModelImport {
         depth: Int,
         onProgress: suspend (Long) -> Unit
     ): Long {
+        var examined = 0
         while (true) {
             currentCoroutineContext().ensureActive()
             val entry = zip.nextEntry ?: break
+            require(++examined <= MAX_ARCHIVE_ENTRIES) {
+                "Selected archive has too many entries to inspect safely."
+            }
             val name = entry.name.replace('\\', '/').trimStart('/')
             if (!entry.isDirectory && (name == ASSET_PATH ||
                     name == AstraOnDeviceBrain.ASSET_NAME ||
