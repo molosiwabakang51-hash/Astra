@@ -245,25 +245,25 @@ jobs:
           # display the public metadata when validation cannot succeed.
           cert_output="$("$signer" verify --print-certs "$apk")"
           certificate="$(CERT_OUTPUT="$cert_output" python3 - <<'PY'
-import os
-import re
-import sys
-output = os.environ["CERT_OUTPUT"]
-matches = re.findall(
-    r"(?im)^\\s*Signer\\s*#\\s*(\\d+)\\s+certificate\\s+SHA-256\\s+digest\\s*:\\s*([0-9a-f:]+)\\s*$",
-    output,
-)
-if len(matches) != 1 or matches[0][0] != "1":
-    print("Could not identify exactly one signer certificate.", file=sys.stderr)
-    print(output, file=sys.stderr)
-    sys.exit(1)
-digest = matches[0][1].replace(":", "").lower()
-if not re.fullmatch(r"[0-9a-f]{64}", digest):
-    print("Signer certificate was not a valid SHA-256 fingerprint.", file=sys.stderr)
-    print(output, file=sys.stderr)
-    sys.exit(1)
-print(digest)
-PY
+          import os
+          import re
+          import sys
+          output = os.environ["CERT_OUTPUT"]
+          matches = re.findall(
+              r"(?im)^\\s*Signer\\s*#\\s*(\\d+)\\s+certificate\\s+SHA-256\\s+digest\\s*:\\s*([0-9a-f:]+)\\s*$",
+              output,
+          )
+          if len(matches) != 1 or matches[0][0] != "1":
+              print("Could not identify exactly one signer certificate.", file=sys.stderr)
+              print(output, file=sys.stderr)
+              sys.exit(1)
+          digest = matches[0][1].replace(":", "").lower()
+          if not re.fullmatch(r"[0-9a-f]{64}", digest):
+              print("Signer certificate was not a valid SHA-256 fingerprint.", file=sys.stderr)
+              print(output, file=sys.stderr)
+              sys.exit(1)
+          print(digest)
+          PY
           )"
           # The debug certificate is runner-local and is NOT guaranteed to
           # match any previous Astra install. Never claim in-place compatibility.
