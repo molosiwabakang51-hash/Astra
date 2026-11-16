@@ -6637,6 +6637,10 @@ class MainActivity :
                                             "tasks, shopping lists, habits, learning progress and settings. " +
                                             "The file is not encrypted, so store it privately. " +
                                             "Import replaces the current saved data after confirmation. " +
+                                            "IMPORTANT: This JSON backup does NOT include imported GGUF " +
+                                            "model weights. Before uninstalling Astra for a signing-key " +
+                                            "change, keep the original GGUF or FULL APK outside app-private " +
+                                            "storage so you can re-import it without downloading again. " +
                                             "Export private vocabulary separately as an all-language " +
                                             "TSV file in the language settings above."
                                         )
