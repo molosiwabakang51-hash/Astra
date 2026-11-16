@@ -95,17 +95,17 @@ fails if the signature differs.
 
 A successful run creates both:
 
-- A 30-day **Astra-v0.11.2-Owner-Signed-LITE** workflow artifact.
+- A 30-day **Astra-v0.12.1-Owner-Signed-LITE** workflow artifact.
 - A **persistent GitHub Release** with an APK
-  `Astra-v0.11.2-LITE-owner-signed.apk` under a versioned tag such as
-  `v0.11.2.123`.
+  `Astra-v0.12.1-LITE-owner-signed.apk` under a versioned tag such as
+  `v0.12.1.123`.
 
 Get the release from:
 https://github.com/molosiwabakang51-hash/Astra/releases
 
 The workflow uses monotonically increasing Android version codes based on
 the workflow run number (`100000 + GITHUB_RUN_NUMBER`). It uses a version name
-such as `0.11.2.123`. When the source version changes in a future release,
+such as `0.12.1.123`. When the source version changes in a future release,
 the workflow's pinned release/version text must also be updated.
 
 **Status:** An unconfigured or mismatched signing key prevents this process.
@@ -117,6 +117,8 @@ APKs for testing. Those use disposable GitHub-runner signing certificates
 and should not be installed as though they were stable release updates.
 
 ## 4. Upgrade without losing Astra data
+
+**Before a first owner-signed install:** Run the read-only `python scripts/check_apk_update.py PATH_TO_APK` compatibility check with an attached authorized device and Android SDK Build Tools. If it says `BLOCKED`, do not try to bypass Android's signature enforcement by uninstalling before you have exported a verified chat backup and retained the original GGUF/FULL APK externally. The JSON backup does **not** contain model weights. Keep the original full APK or GGUF on a phone folder or computer that is not erased with Astra's application data.
 
 **If you have a debug build installed:** Its signing certificate is different.
 Android cannot install the first owner-signed release over that debug build.
