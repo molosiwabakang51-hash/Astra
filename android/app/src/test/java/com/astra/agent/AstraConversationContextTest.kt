@@ -335,7 +335,7 @@ class AstraConversationContextTest {
         )
         assertTrue(prompt.contains("bond maturity preference is five years"))
         assertFalse(prompt.contains("UNRELATED_PERSONAL_NOTE"))
-        assertTrue(prompt.endsWith("What was my bond maturity preference?\\n/no_think"))
+        assertTrue(prompt.endsWith("What was my bond maturity preference?\n/no_think"))
     }
 
     @Test fun blankAndUnsupportedPriorTurnsAreIgnored() {
