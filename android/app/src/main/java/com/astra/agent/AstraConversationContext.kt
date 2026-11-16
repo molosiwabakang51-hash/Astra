@@ -106,8 +106,16 @@ internal object AstraConversationContext {
         // Otherwise preserve limited recency fallback for vague questions.
         val fallback = if (ownerRecall && ranked.isNotEmpty()) emptyList()
             else candidates.asReversed()
-        val priority = (recent.asReversed() + retrieved + fallback)
-            .distinctBy { it.index }
+        // When the owner asks what THEY said, relevant owner statements and
+        // their corrections outrank unrelated recent assistant chatter.
+        // Otherwise retain the existing recency-first behavior.
+        val priority = (
+            if (ownerRecall && ranked.isNotEmpty()) {
+                retrieved + recent.asReversed()
+            } else {
+                recent.asReversed() + retrieved + fallback
+            }
+        ).distinctBy { it.index }
         val selected = mutableListOf<Pair<Int, String>>()
         var remaining = room
         for (item in priority) {
