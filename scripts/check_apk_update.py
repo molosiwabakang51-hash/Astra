@@ -27,7 +27,7 @@ def cert_fingerprint(output: str) -> str:
     # An APK may have multiple signers. Checking only signer #1 can produce
     # false compatibility when Android requires an exact signer set.
     matches = re.findall(
-        r"Signer #([0-9]+) certificate SHA-256 digest:\\s*([^\\r\\n]+)",
+        r"Signer #([0-9]+) certificate SHA-256 digest:\s*([^\r\n]+)",
         output,
     )
     if len(matches) != 1 or matches[0][0] != "1":
