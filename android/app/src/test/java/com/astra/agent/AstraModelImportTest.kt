@@ -72,4 +72,32 @@ class AstraModelImportTest {
         assertTrue(error is IllegalStateException)
         assertTrue(error?.message.orEmpty().contains("No bundled Qwen3"))
     }
+    @Test fun rejectsOversizedArchiveEntryTableBeforeReachingModel() = runBlocking {
+        val bytes = ByteArrayOutputStream()
+        ZipOutputStream(bytes).use { output ->
+            repeat(4_097) { index ->
+                output.putNextEntry(ZipEntry("unrelated/entry-$index.txt"))
+                output.closeEntry()
+            }
+            output.putNextEntry(ZipEntry("assets/qwen3-0.6b-q4km.gguf"))
+            output.write("GGUF ignored".toByteArray())
+            output.closeEntry()
+        }
+        val failure = runCatching { extract(bytes.toByteArray()) }.exceptionOrNull()
+        assertTrue(failure is IllegalArgumentException)
+        assertTrue(failure?.message.orEmpty().contains("too many entries"))
+    }
+
+    @Test fun smallArchiveWithUnrelatedEntriesStillImportsModel() = runBlocking {
+        val model = "GGUF bounded archive".toByteArray()
+        val archive = zip(
+            "META-INF/MANIFEST.MF" to "manifest".toByteArray(),
+            "assets/unrelated.txt" to "other".toByteArray(),
+            "assets/qwen3-0.6b-q4km.gguf" to model
+        )
+        val (extracted, count) = extract(archive)
+        assertArrayEquals(model, extracted)
+        assertEquals(model.size.toLong(), count)
+    }
+
 }
