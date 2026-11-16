@@ -21,7 +21,7 @@ internal object AstraGenerationPolicy {
     // When the owner explicitly marks the final request, apply response-length
     // cues to that request rather than to quoted or pasted source material.
     private val finalRequestMarker = Regex(
-        """(?i)\b(?:final question|now answer|my question|latest request)\s*:\s*"""
+        """(?im)^[ \t]{0,12}(?:final question|now answer|my question|latest request)[ \t]*:[ \t]*"""
     )
 
     fun depth(rawQuestion: String): Depth {
@@ -31,8 +31,16 @@ internal object AstraGenerationPolicy {
         }?.takeIf { it.isNotEmpty() } ?: full
         val question = latest.lowercase(Locale.ROOT)
         if (question.isEmpty()) return Depth.BRIEF
-        if (short.containsMatchIn(question)) return Depth.BRIEF
-        if (long.containsMatchIn(question) || question.length > 700) {
+        // When source material contains competing length instructions, the
+        // first explicit cue in the active request wins. This also preserves
+        // "Briefly explain ... in detail" as a brief owner request.
+        val briefCue = short.find(question)
+        val detailedCue = long.find(question)
+        if (briefCue != null && (detailedCue == null ||
+                briefCue.range.first <= detailedCue.range.first)) {
+            return Depth.BRIEF
+        }
+        if (detailedCue != null || question.length > 700) {
             return Depth.DETAILED
         }
         return Depth.STANDARD
