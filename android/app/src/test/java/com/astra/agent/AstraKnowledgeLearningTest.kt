@@ -67,7 +67,7 @@ class AstraKnowledgeLearningTest {
     @Test fun openCoursePromptContainsOnlyWholeCitableEvidence() {
         val large = (1..3).map { index ->
             AstraOpenLibrary.Entry(
-                "course-$index", "Russian grammatical cases and vocabulary " +
+                "course-$index", "Russian grammar course $index: vocabulary " +
                     "A".repeat(90), "https://en.wikibooks.org/wiki/Russian/" +
                     "long-source-".repeat(35),
                 "CC BY-SA 4.0", "Case detail $index: " + "noun ending ".repeat(90),
@@ -86,6 +86,35 @@ class AstraKnowledgeLearningTest {
         assertEquals(large.take(cited.size), cited)
         assertEquals(cited.size, Regex("""(?m)^\[K\d+\] """).findAll(prompt).count())
         assertFalse(AstraOpenLibrary.citations(cited).contains("course-3"))
+    }
+
+    @Test fun savedResponseLanguageNeverCitesAnExcerptCutFromNativePrompt() {
+        val sources = (1..3).map { index ->
+            AstraOpenLibrary.Entry(
+                "lesson-$index", "Russian grammar lesson $index",
+                "https://en.wikibooks.org/wiki/Russian/Lesson_$index",
+                "CC BY-SA 4.0",
+                "Russian lesson number $index. " + "Case and ending. ".repeat(14),
+                "russian grammar"
+            )
+        }
+        val question = "Russian: " + "x".repeat(1_630)
+        val enriched = AstraOpenLibrary.enrich(question, sources)
+        val native = AstraReplyLanguage.prepare(
+            AstraConversationContext.userPrompt(enriched, emptyList(), false),
+            AstraReplyLanguage.Choice.FRENCH
+        )
+        val included = AstraOpenLibrary.includedEvidence(sources, native)
+        assertTrue(native.length <= 3_000)
+        assertTrue(native.endsWith(question + "\n/no_think"))
+        assertTrue(included.size <= sources.size)
+        assertEquals(sources.take(included.size), included)
+        // A source line must be intact in the final model prompt, not merely
+        // present in the earlier unbounded RAG candidate list.
+        for (entry in included) {
+            assertTrue(native.contains("Russian lesson number " +
+                entry.id.substringAfterLast('-') + "."))
+        }
     }
 
     @Test fun changedOrTrimmedOpenCourseQuotationCannotClaimGrounding() {
