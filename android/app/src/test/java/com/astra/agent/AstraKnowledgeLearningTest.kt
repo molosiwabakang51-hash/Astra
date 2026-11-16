@@ -85,7 +85,7 @@ class AstraKnowledgeLearningTest {
         // a citation or leave a half-closed quote in the user's answer.
         assertEquals(large.take(cited.size), cited)
         assertEquals(cited.size, Regex("""(?m)^\[K\d+\] """).findAll(prompt).count())
-        assertFalse(AstraOpenLibrary.citations(cited).contains("course-3"))
+        assertFalse(AstraOpenLibrary.citations(cited).contains("course 3"))
     }
 
     @Test fun savedResponseLanguageNeverCitesAnExcerptCutFromNativePrompt() {
