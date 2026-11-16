@@ -63,7 +63,7 @@ class AstraGenerationPolicyTest {
     @Test fun explicitLineMarkerCanOverrideLongPastedBriefInstructions() {
         val pasted = "Source instruction: briefly explain in one sentence. ".repeat(40)
         val question = pasted +
-            "\\n  FINAL QUESTION: Compare convexity and duration in detail."
+            "\n  FINAL QUESTION: Compare convexity and duration in detail."
         assertEquals(AstraGenerationPolicy.Depth.DETAILED,
             AstraGenerationPolicy.depth(question))
     }
