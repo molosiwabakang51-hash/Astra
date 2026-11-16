@@ -210,6 +210,36 @@ class AstraConversationContextTest {
         assertTrue(answer.length <= 3010)
     }
 
+    @Test fun firstPersonRecallExcludesRecentAssistantGuessesAfterModelReload() {
+        val history = listOf(
+            turn("user", "My retirement portfolio allocation is 60 percent bonds."),
+            turn("assistant", "Acknowledged, sixty percent bonds."),
+            turn("user", "Let us discuss dinner tonight."),
+            turn("assistant", "I guessed that your portfolio is 90 percent bonds.")
+        )
+        val restored = AstraConversationContext.userPrompt(
+            "What did I say about my retirement portfolio allocation?",
+            history, true
+        )
+        assertTrue(restored.contains("60 percent bonds"))
+        assertFalse(restored.contains("90 percent bonds"))
+        assertTrue(restored.endsWith(
+            "What did I say about my retirement portfolio allocation?\n/no_think"
+        ))
+    }
+
+    @Test fun ordinaryConversationalFollowupStillIncludesRecentAssistantReply() {
+        val earlier = listOf(
+            turn("user", "I want to learn about bond duration."),
+            turn("assistant", "Duration measures sensitivity to yield changes.")
+        )
+        val restored = AstraConversationContext.userPrompt(
+            "Can you explain that with an example?", earlier, true
+        )
+        assertTrue(restored.contains("Previous Astra:"))
+        assertTrue(restored.contains("sensitivity to yield changes"))
+    }
+
     @Test fun retrievalDoesNotMatchKeywordsOutsideActuallyQuotedExcerpt() {
         val older = listOf(
             turn("user", "Unrelated long note " + "Z".repeat(280) +
