@@ -276,6 +276,22 @@ class AstraConversationContextTest {
         assertTrue(restored.length <= 3010)
     }
 
+    @Test fun bareMakeItCorrectionSurvivesOfflineModelReload() {
+        val earlier = listOf(
+            turn("user", "My bond maturity is seven years."),
+            turn("assistant", "Acknowledged."),
+            turn("user", "Make it five years."),
+            turn("assistant", "Now five years.")
+        ) + (1..23).map { turn("assistant", "Unrelated notes $" + "{it}.") }
+        val restored = AstraConversationContext.userPrompt(
+            "What was my bond maturity?", earlier, true
+        )
+        assertTrue(restored.contains("bond maturity is seven years"))
+        assertTrue(restored.contains("Make it five years"))
+        assertTrue(restored.indexOf("bond maturity is seven years") <
+            restored.indexOf("Make it five years"))
+    }
+
     @Test fun twoNearbyCorrectionsSurviveButUnrelatedOwnerUpdateDoesNot() {
         val earlier = listOf(
             turn("user", "My portfolio target is 60 percent bonds."),
