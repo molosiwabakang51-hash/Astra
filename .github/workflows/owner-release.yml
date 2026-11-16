@@ -99,8 +99,14 @@ jobs:
           signer="$(find "$ANDROID_HOME/build-tools" -maxdepth 2 -type f -name apksigner | sort -V | tail -n 1)"
           test -x "$signer"
           "$signer" verify "$apk"
-          actual="$("$signer" verify --print-certs "$apk" |
-            sed -n 's/^Signer #1 certificate SHA-256 digest: //p' | head -n 1)"
+          # Reuse the tested parser for both 'V2 Signer' and 'Signer #1'
+          # output. This stays fail-closed on multiple or invalid signers.
+          cert_output="$("$signer" verify --print-certs "$apk")"
+          actual="$(ASTRA_APK_CERT_OUTPUT="$cert_output" python3 -c '
+          import os
+          from scripts.check_apk_update import cert_fingerprint
+          print(cert_fingerprint(os.environ["ASTRA_APK_CERT_OUTPUT"]))
+          ')"
           expected="$(printf '%s' "$ASTRA_RELEASE_CERT_SHA256" |
             tr -d '[:space:]:' | tr '[:upper:]' '[:lower:]')"
           actual="$(printf '%s' "$actual" |

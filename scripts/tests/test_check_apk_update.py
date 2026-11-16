@@ -36,6 +36,14 @@ def fake_run_for(cert_installed=CERT_A, cert_new=CERT_A,
 
 
 class UpdatePreflightTest(unittest.TestCase):
+    def test_owner_release_reuses_verified_certificate_parser(self):
+        workflow = (Path(__file__).resolve().parents[2] /
+                    ".github/workflows/owner-release.yml").read_text(
+                        encoding="utf-8")
+        self.assertIn("from scripts.check_apk_update import cert_fingerprint", workflow)
+        self.assertIn("ASTRA_APK_CERT_OUTPUT", workflow)
+        self.assertNotIn("sed -n 's/^Signer #1", workflow)
+
     def test_certificate_fingerprint_requires_64_hex_digits(self):
         self.assertEqual(CERT_A, module.cert_fingerprint(
             "Signer #1 certificate SHA-256 digest: " + CERT_A.upper()))
