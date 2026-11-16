@@ -150,11 +150,32 @@ internal object AstraConversationContext {
         return AstraOfflinePolicy.modelPrompt(composed)
     }
 
-    private val correctionCue = Regex(
-        """(?i)^\s*(?:(?:actually|correction|instead|rather|sorry)\s*[:,.]?\s+|""" +
-            """i\s+meant\b|no\s*[,;:]?\s+(?:make|change|use|it|that|\d)|""" +
-            """(?:make|change|update|set|use)\s+(?:it|that|the|my)\b)"""
-    )
+    // Use literal prefix checks instead of a complex regular expression.
+    // Android ICU rejected the former regex during class initialization,
+    // crashing open-ended chat before the offline model was invoked.
+    private fun startsWithPhrase(message: String, phrase: String): Boolean =
+        message.startsWith(phrase) &&
+            (message.length == phrase.length ||
+                !message[phrase.length].isLetterOrDigit())
+
+    private fun isCorrection(text: String): Boolean {
+        val message = text.trim().lowercase(java.util.Locale.ROOT)
+        if (listOf("actually", "correction", "instead", "rather", "sorry",
+                "i meant").any { startsWithPhrase(message, it) }) return true
+
+        if (startsWithPhrase(message, "no")) {
+            val rest = message.drop(2).trimStart(' ', ',', ';', ':')
+            if (listOf("make", "change", "use", "it", "that").any {
+                    startsWithPhrase(rest, it)
+                } || rest.firstOrNull()?.isDigit() == true) return true
+        }
+
+        return listOf("make", "change", "update", "set", "use").any { verb ->
+            listOf("it", "that", "the", "my").any { target ->
+                startsWithPhrase(message, "$" + "{verb} $" + "{target}")
+            }
+        }
+    }
 
     /**
      * Follow short owner-authored correction chains immediately after an
@@ -170,7 +191,7 @@ internal object AstraConversationContext {
             if (turn.index <= anchor.index) continue
             if (turn.index > anchor.index + 6) break
             if (turn.value.role != "user") continue
-            if (!correctionCue.containsMatchIn(turn.value.content.trim())) break
+            if (!isCorrection(turn.value.content)) break
             result.add(turn)
             if (result.size >= 2) break
         }

@@ -20,6 +20,15 @@ class AstraConversationContextTest {
         assertFalse(prompt.contains("saved private bond strategy"))
     }
 
+    @Test fun plainFinanceTeachingPromptInitializesOfflineContextWithoutCrash() {
+        // Reproduces the real-device request that previously triggered
+        // ExceptionInInitializerError while compiling the correction regex.
+        assertEquals(
+            "teach me finance\n/no_think",
+            AstraConversationContext.userPrompt("teach me finance", emptyList(), false)
+        )
+    }
+
     @Test fun normalFollowupDoesNotDuplicateOldTurns() {
         val question = "What about duration?"
         val previous = listOf(turn("user", "My private bond strategy"),
