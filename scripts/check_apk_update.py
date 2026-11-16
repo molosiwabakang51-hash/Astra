@@ -121,8 +121,12 @@ def check(apk: Path, adb: str, apksigner: str, aapt: str,
 
     pm_output = run(adb_cmd + ["shell", "pm", "path", PACKAGE])
     if not pm_output.strip():
-        return True, ("Astra is not installed. This is a fresh installation; "
-                      "no existing imported model or chat data will be retained.")
+        # This tool is an update-safety checker, not an installer. A fresh
+        # install cannot preserve application-private chats or model weights.
+        return False, ("BLOCKED: Astra is not currently installed. "
+                       "A fresh installation cannot recover existing app-private "
+                       "chats or imported GGUF weights. Verify your backup and "
+                       "model source before proceeding separately.")
     try:
         path = package_apk_path(pm_output)
     except ValueError as exc:

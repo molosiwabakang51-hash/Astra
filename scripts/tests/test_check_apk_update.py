@@ -98,6 +98,23 @@ class UpdatePreflightTest(unittest.TestCase):
         self.assertFalse(allowed)
         self.assertIn("not com.astra.agent", message)
 
+    def test_missing_installed_app_is_not_called_safe_upgrade(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            apk = Path(tmp) / "new.apk"
+            apk.write_bytes(b"test")
+            original = fake_run_for()
+
+            def no_installed_app(command, **kwargs):
+                if command[-3:] == ["pm", "path", "com.astra.agent"]:
+                    return ""
+                return original(command, **kwargs)
+
+            with patch.object(module, "run", side_effect=no_installed_app):
+                allowed, message = module.check(apk, "adb", "apksigner", "aapt")
+        self.assertFalse(allowed)
+        self.assertIn("not currently installed", message)
+        self.assertIn("imported GGUF", message)
+
     def test_missing_device_refuses_check(self):
         with tempfile.TemporaryDirectory() as tmp:
             apk = Path(tmp) / "new.apk"
