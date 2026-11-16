@@ -172,7 +172,7 @@ internal object AstraConversationContext {
 
         return listOf("make", "change", "update", "set", "use").any { verb ->
             listOf("it", "that", "the", "my").any { target ->
-                startsWithPhrase(message, "$" + "{verb} $" + "{target}")
+                startsWithPhrase(message, "${verb} ${target}")
             }
         }
     }
