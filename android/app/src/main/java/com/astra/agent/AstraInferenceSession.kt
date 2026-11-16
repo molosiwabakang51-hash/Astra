@@ -12,8 +12,15 @@ internal class AstraInferenceSession {
     private var loadedGeneration: Int? = null
     private var invalidated: Boolean = false
 
-    fun requiresLoad(conversationGeneration: Int, nativeModelReady: Boolean): Boolean =
-        invalidated || !nativeModelReady || loadedGeneration != conversationGeneration
+    fun requiresLoad(conversationGeneration: Int, nativeModelReady: Boolean): Boolean {
+        if (!nativeModelReady) {
+            // Native readiness was lost. Even if the engine later reports ready,
+            // its KV-cache/session continuity cannot be assumed.
+            invalidate()
+            return true
+        }
+        return invalidated || loadedGeneration != conversationGeneration
+    }
 
     fun markLoaded(conversationGeneration: Int) {
         loadedGeneration = conversationGeneration
