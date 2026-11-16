@@ -230,13 +230,59 @@ jobs:
           printf "# Lite APK\n\nSize: %s bytes\n\n" "$(wc -c < "$apk")" > ../dist/LITE-size-report.md
           echo "LITE APK ready; existing model can be imported from previous APK/ZIP."
 
+      - name: Record LITE APK checksum and public signing fingerprint
+        working-directory: android
+        shell: bash
+        run: |
+          set -euo pipefail
+          apk="../dist/Astra-v0.12.1-LITE-offline-arm64-debug.apk"
+          test -s "$apk"
+          signer="$(find "${ANDROID_HOME}/build-tools" -maxdepth 2 -type f -name apksigner | sort -V | tail -n 1)"
+          test -x "$signer"
+          "$signer" verify "$apk"
+          # Android Build Tools versions vary in signer metadata wording.
+          # Parse only a single signer #1 certificate SHA-256 digest, and
+          # display the public metadata when validation cannot succeed.
+          cert_output="$("$signer" verify --print-certs "$apk")"
+          certificate="$(CERT_OUTPUT="$cert_output" python3 -c '
+          import os, re, sys
+          lines = os.environ["CERT_OUTPUT"].splitlines()
+          patterns = (
+              r"^Signer #1 certificate SHA-256 digest:\s*([0-9a-fA-F:]+)$",
+              r"^V[1-4] Signer: certificate SHA-256 digest:\s*([0-9a-fA-F:]+)$",
+          )
+          matches = [m.group(1) for line in lines for pattern in patterns
+                     if (m := re.fullmatch(pattern, line.strip()))]
+          if len(matches) != 1:
+              sys.exit("Expected one recognizable signer certificate; got " + str(len(matches)))
+          digest = matches[0].replace(":", "").lower()
+          if not re.fullmatch(r"[0-9a-f]{64}", digest):
+              sys.exit("Invalid APK certificate fingerprint")
+          print(digest)
+          ')"
+          # The debug certificate is runner-local and is NOT guaranteed to
+          # match any previous Astra install. Never claim in-place compatibility.
+          digest="$(sha256sum "$apk" | cut -d ' ' -f 1)"
+          {
+            echo "Application ID: com.astra.agent"
+            echo "Version: 0.12.1 (versionCode 28)"
+            echo "Variant: LITE offline arm64 debug"
+            echo "APK SHA-256: $digest"
+            echo "Signer certificate SHA-256: $certificate"
+            echo "Signing policy: ephemeral CI debug key; in-place updates require the same signer as the installed app."
+            echo "Safety: do not uninstall or clear app data just to work around INSTALL_FAILED_UPDATE_INCOMPATIBLE."
+          } > ../dist/LITE-signing-integrity-report.txt
+          cat ../dist/LITE-signing-integrity-report.txt
+
       - name: Publish APK size analysis
         if: success()
         uses: actions/upload-artifact@v4
         with:
           name: Astra-v0.12.1-Sizes
           retention-days: 7
-          path: dist/*-size-report.md
+          path: |
+            dist/*-size-report.md
+            dist/LITE-signing-integrity-report.txt
           if-no-files-found: error
 
       - name: Publish lightweight APK for low-data updates
