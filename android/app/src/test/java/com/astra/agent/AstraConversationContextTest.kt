@@ -216,11 +216,12 @@ class AstraConversationContextTest {
 
     @Test fun longRecentAssistantRepliesCannotEvictOwnerFactAndCorrections() {
         val earlier = listOf(
-            turn("user", "My fictional bond maturity was nine years."),
+            turn("user", "My fictional bond maturity was nine years. " +
+                "OWNER_FACT".repeat(24)),
             turn("assistant", "Understood."),
-            turn("user", "Actually, make it six years."),
+            turn("user", "Actually, make it six years. " + "CORRECTION".repeat(24)),
             turn("assistant", "Noted."),
-            turn("user", "No, make it four years.")
+            turn("user", "No, make it four years. " + "LATEST_CHANGE".repeat(22))
         ) + (1..20).map { number ->
             turn("assistant", "Unrelated recent conversation $number: " + "X".repeat(230))
         }
