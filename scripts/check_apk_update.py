@@ -17,22 +17,28 @@ import sys
 import tempfile
 
 PACKAGE = "com.astra.agent"
-CERT_RE = re.compile(r"Signer #1 certificate SHA-256 digest:\s*([0-9a-fA-F:]{64,95})")
 VERSION_RE = re.compile(r"\bversionCode='(\d+)'")
 PACKAGE_RE = re.compile(r"\bname='([^']+)'")
 INSTALLED_VERSION_RE = re.compile(r"\bversionCode=(\d+)")
 
 
 def cert_fingerprint(output: str) -> str:
-    # An APK may have multiple signers. Checking only signer #1 can produce
-    # false compatibility when Android requires an exact signer set.
-    matches = re.findall(
-        r"Signer #([0-9]+) certificate SHA-256 digest:\s*([^\r\n]+)",
-        output,
+    # Build Tools may emit either "Signer #1" or "V2 Signer" metadata.
+    # Refuse ambiguous or multi-signer reports instead of making a false
+    # claim that an existing installation can be upgraded in place.
+    patterns = (
+        r"^Signer #([0-9]+) certificate SHA-256 digest:\\s*([0-9a-fA-F:]+)$",
+        r"^V[1-4] Signer(?: #([0-9]+))?: certificate SHA-256 digest:\\s*([0-9a-fA-F:]+)$",
     )
-    if len(matches) != 1 or matches[0][0] != "1":
+    matches = []
+    for line in output.splitlines():
+        for pattern in patterns:
+            match = re.fullmatch(pattern, line.strip(), flags=re.IGNORECASE)
+            if match:
+                matches.append((match.group(1), match.group(2)))
+    if len(matches) != 1 or (matches[0][0] not in (None, "1")):
         raise ValueError("Expected exactly one APK signing certificate.")
-    fingerprint = matches[0][1].strip().replace(":", "").lower()
+    fingerprint = matches[0][1].replace(":", "").lower()
     if not re.fullmatch(r"[0-9a-f]{64}", fingerprint):
         raise ValueError("Invalid APK certificate digest.")
     return fingerprint
