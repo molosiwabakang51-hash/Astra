@@ -77,22 +77,44 @@ def find_tool(name: str, explicit: str | None) -> str:
         if candidate.is_file():
             return str(candidate)
         raise ValueError(f"{name} not found at the supplied path.")
-    found = shutil.which(name) or (shutil.which(name + ".bat") if os.name == "nt" else None)
-    if found:
-        return found
+    suffixes = (
+        (".exe", ".bat", "")
+        if os.name == "nt"
+        else ("",)
+    )
+    for candidate_name in (name, *(name + suffix for suffix in suffixes)):
+        found = shutil.which(candidate_name)
+        if found:
+            return found
     roots = [
         os.environ.get("ANDROID_HOME"),
         os.environ.get("ANDROID_SDK_ROOT"),
         str(Path.home() / "AppData/Local/Android/Sdk") if os.name == "nt" else None,
     ]
     for root in filter(None, roots):
-        build_tools = Path(root) / "build-tools"
+        sdk = Path(root).expanduser()
+        if name == "adb":
+            # adb belongs to platform-tools, not build-tools. Android Studio
+            # typically installs it here even when the user has no PATH entry.
+            for suffix in suffixes:
+                candidate = sdk / "platform-tools" / (name + suffix)
+                if candidate.is_file():
+                    return str(candidate)
+            continue
+        build_tools = sdk / "build-tools"
         if not build_tools.is_dir():
             continue
-        candidates = sorted(build_tools.glob("*/" + name + (".bat" if os.name == "nt" and name == "apksigner" else ".exe" if os.name == "nt" else "")), reverse=True)
-        if candidates:
-            return str(candidates[0])
-    raise ValueError(f"{name} not found. Install Android SDK Build Tools or supply --{name}.")
+        # apksigner is a .bat launcher on Windows; aapt is an .exe.
+        for folder in sorted((p for p in build_tools.iterdir() if p.is_dir()),
+                             key=lambda p: tuple(int(v) for v in
+                                 __import__("re").findall(r"\\d+", p.name)),
+                             reverse=True):
+            for suffix in suffixes:
+                candidate = folder / (name + suffix)
+                if candidate.is_file():
+                    return str(candidate)
+    raise ValueError(f"{name} not found in PATH or Android SDK. "
+                     f"Install Android SDK platform-tools/build-tools or supply --{name}.")
 
 
 def run(command: list[str], *, timeout: int = 30) -> str:
