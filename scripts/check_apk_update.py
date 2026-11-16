@@ -27,8 +27,8 @@ def cert_fingerprint(output: str) -> str:
     # Refuse ambiguous or multi-signer reports instead of making a false
     # claim that an existing installation can be upgraded in place.
     patterns = (
-        r"^Signer #([0-9]+) certificate SHA-256 digest:\\s*([0-9a-fA-F:]+)$",
-        r"^V[1-4] Signer(?: #([0-9]+))?: certificate SHA-256 digest:\\s*([0-9a-fA-F:]+)$",
+        r"^Signer #([0-9]+) certificate SHA-256 digest:\s*([0-9a-fA-F:]+)$",
+        r"^V[1-4] Signer(?: #([0-9]+))?: certificate SHA-256 digest:\s*([0-9a-fA-F:]+)$",
     )
     matches = []
     for line in output.splitlines():
