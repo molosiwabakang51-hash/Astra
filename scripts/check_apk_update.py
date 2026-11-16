@@ -107,7 +107,7 @@ def find_tool(name: str, explicit: str | None) -> str:
         # apksigner is a .bat launcher on Windows; aapt is an .exe.
         for folder in sorted((p for p in build_tools.iterdir() if p.is_dir()),
                              key=lambda p: tuple(int(v) for v in
-                                 __import__("re").findall(r"\\d+", p.name)),
+                                 re.findall(r"\d+", p.name)),
                              reverse=True):
             for suffix in suffixes:
                 candidate = folder / (name + suffix)
