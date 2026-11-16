@@ -24,7 +24,7 @@ class AstraConversationContextTest {
         // Reproduces the real-device request that previously triggered
         // ExceptionInInitializerError while compiling the correction regex.
         assertEquals(
-            "teach me finance\\n/no_think",
+            "teach me finance\n/no_think",
             AstraConversationContext.userPrompt("teach me finance", emptyList(), false)
         )
     }
