@@ -29,6 +29,18 @@ class AstraInferenceSessionTest {
         assertFalse(session.requiresLoad(3, true))
     }
 
+    @Test fun lostNativeReadinessRequiresFreshLoadEvenIfReadyReturns() {
+        val session = AstraInferenceSession()
+        session.markLoaded(7)
+        assertFalse(session.requiresLoad(7, true))
+        assertTrue(session.requiresLoad(7, false))
+        // A transient native-ready signal must not silently re-use
+        // an unknown KV-cache after the engine went unavailable.
+        assertTrue(session.requiresLoad(7, true))
+        session.markLoaded(7)
+        assertFalse(session.requiresLoad(7, true))
+    }
+
     @Test fun multipleFailuresDoNotClearInvalidation() {
         val session = AstraInferenceSession()
         session.markLoaded(-3)
