@@ -1,8 +1,8 @@
 name: Build Astra APK
 
+# Heavy FULL/model download is reserved for PR validation, manual audits
+# and weekly smoke checks. Main-branch delivery uses lite.yml instead.
 on:
-  push:
-    branches: [main]
   pull_request:
     branches: [main]
   workflow_dispatch:
