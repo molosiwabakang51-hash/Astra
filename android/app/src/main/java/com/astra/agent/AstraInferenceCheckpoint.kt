@@ -63,15 +63,22 @@ internal object AstraInferenceCheckpoint {
      */
     fun shouldTryCompactRecovery(context: Context): Boolean {
         val p = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-        if (!p.getBoolean(ACTIVE, false) || !p.getBoolean(ADVANCED, false)) {
-            return false
-        }
-        val phase = p.getString(PHASE, null)
-        if (phase != MODEL_LOADING && phase != TOKEN_GENERATION) return false
+        if (!eligibleForCompactRecovery(
+                p.getBoolean(ACTIVE, false),
+                p.getBoolean(ADVANCED, false),
+                p.getString(PHASE, null)
+            )
+        ) return false
         return AstraProcessExitReason.nativeOrMemoryExitSince(
             context, p.getLong(STARTED_MS, 0L)
         )
     }
+
+    /** Pure, fail-closed state policy for normal stops and compact inference. */
+    internal fun eligibleForCompactRecovery(
+        active: Boolean, advancedSelected: Boolean, phase: String?
+    ): Boolean = active && advancedSelected &&
+        (phase == MODEL_LOADING || phase == TOKEN_GENERATION)
 
     /** Available after app restart. No prompt, generated answer or file path. */
     fun interruptedSummary(context: Context): String? {
