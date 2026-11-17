@@ -18,7 +18,7 @@ internal object AstraAppLock {
     private const val PREFS = "astra"
     private const val ENABLED_KEY = "astra_app_lock_enabled"
 
-    private const val AUTHENTICATORS =
+    private val AUTHENTICATORS =
         BiometricManager.Authenticators.BIOMETRIC_STRONG or
             BiometricManager.Authenticators.DEVICE_CREDENTIAL
 
