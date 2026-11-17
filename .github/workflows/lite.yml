@@ -1,6 +1,10 @@
 name: Build standard Astra LITE APK
 
+# Every new main revision publishes a small model-free APK.
+# Manual dispatch remains available for an explicit owner-requested rebuild.
 on:
+  push:
+    branches: [main]
   workflow_dispatch:
 
 permissions:
