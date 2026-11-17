@@ -309,10 +309,15 @@ internal class AstraOnDeviceBrain(
                 AstraInferenceCheckpoint.mark(
                     context, AstraInferenceCheckpoint.TOKEN_GENERATION
                 )
+                var outputTruncated = false
                 current.sendUserPrompt(requestPrompt, answerBudget).collect { part ->
-                    // Restrict accumulated output and cap main-thread UI updates.
-                    val space = (16_000 - answer.length).coerceAtLeast(0)
-                    if (space > 0) answer.append(part.take(space))
+                    // Keep the existing UTF-16 cap without bisecting an emoji
+                    // or changing earlier streamed text after truncation.
+                    if (!outputTruncated) {
+                        outputTruncated = AstraStreamUnicode.appendCapped(
+                            answer, part, 16_000
+                        )
+                    }
                     val now = System.nanoTime()
                     if (now - lastUiUpdate >= 200_000_000L) {
                         val partial = AstraOfflinePolicy.publicReply(answer.toString())
