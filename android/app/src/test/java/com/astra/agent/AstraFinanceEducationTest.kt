@@ -7,6 +7,27 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class AstraFinanceEducationTest {
+    @Test fun originalShillerQuestionUsesVerifiedOfflineIdentity() {
+        val response = AstraFinanceEducation.respond(
+            "what does Shiller say about irrational exuberance"
+        )!!
+        assertTrue(response.contains("Robert J. Shiller"))
+        assertTrue(response.contains("Irrational Exuberance (2000)"))
+        assertTrue(response.contains("investor psychology"))
+        assertTrue(response.contains("Princeton University Press"))
+        assertFalse(response.contains("University of Chicago"))
+    }
+
+    @Test fun shortOwnerCorrectionDoesNotInventNiallShiller() {
+        val response = AstraFinanceEducation.respond("Robert Stiller?")!!
+        assertTrue(response.contains("Robert J. Shiller"))
+        assertTrue(response.contains("not Niall Shiller"))
+        assertTrue(AstraFinanceEducation.respond("Niall Shiller?")!!
+            .contains("Robert J. Shiller"))
+        assertNull(AstraFinanceEducation.respond("Tell me about Ben Stiller"))
+        assertNull(AstraFinanceEducation.respond("What did my Shiller book say?"))
+    }
+
     @Test fun compoundInterestQuestionFromUserScreenshotWorksWithoutModel() {
         val reply = AstraFinanceEducation.respond("explain compound interest")
         assertNotNull(reply)
