@@ -7,6 +7,16 @@ import java.util.Random
 
 /** Pure JVM safety tests; retained Android URI permissions require a handset. */
 class AstraFolderRulesTest {
+    @Test fun recursiveLibraryScanHasStrictDepthAndFolderBudget() {
+        assertTrue(AstraFolderRules.canDescend(0, 1))
+        assertTrue(AstraFolderRules.canDescend(3, 63))
+        assertFalse(AstraFolderRules.canDescend(4, 1))
+        assertFalse(AstraFolderRules.canDescend(10, 1))
+        assertFalse(AstraFolderRules.canDescend(0, 64))
+        assertFalse(AstraFolderRules.canDescend(-1, 1))
+        assertFalse(AstraFolderRules.canDescend(0, -1))
+    }
+
     @Test fun onlySupportedReadingFilesCanBeIndexed() {
         for (name in listOf(
             "finance.txt", "bond duration.MD", "course.markdown",
