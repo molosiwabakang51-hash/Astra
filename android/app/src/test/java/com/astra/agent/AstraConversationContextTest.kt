@@ -40,7 +40,7 @@ class AstraConversationContextTest {
         )
         assertTrue(prompt.contains("what are bonds and how can I invest"))
         assertTrue(prompt.contains("Treasury bonds can be accessed"))
-        assertTrue(prompt.endsWith("put this theory into practice\\n/no_think"))
+        assertTrue(prompt.endsWith("put this theory into practice\n/no_think"))
     }
 
     @Test fun plainFinanceTeachingPromptInitializesOfflineContextWithoutCrash() {
