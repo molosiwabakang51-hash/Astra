@@ -27,7 +27,7 @@ class AstraStreamUnicodeTest {
         val out = StringBuilder()
         assertFalse(AstraStreamUnicode.appendCapped(out, "Привет 世界 ", 70))
         assertTrue(AstraStreamUnicode.appendCapped(out, "bond yield and duration", 19))
-        assertEquals("Привет 世界 bond yie", out.toString())
+        assertEquals("Привет 世界 bond yiel", out.toString())
     }
 
     @Test fun emptyAndZeroCapacityChunksRemainSafe() {
