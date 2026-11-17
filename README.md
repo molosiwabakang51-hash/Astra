@@ -16,8 +16,8 @@ using Android's system folder picker. Astra retains a read-only
 Storage Access Framework (SAF) grant to that selected folder across restarts
 and correctly signed in-place updates; no permanent all-files permission is
 requested. On a later visit, tap **Import books from authorized folder** to
-index supported TXT, Markdown, EPUB, HTML, CSV/TSV, JSON, XML, DOCX and RTF
-text documents in the folder, without another file-selection prompt. Importing is explicit, never an automatic/background
+index supported TXT, Markdown, EPUB, HTML, CSV/TSV, JSON, XML, DOCX, RTF
+and XLSX text or spreadsheet documents in the folder, without another file-selection prompt. Importing is explicit, never an automatic/background
 scan, and the original files remain untouched. Up to 30 books can be stored
 privately; input size and directory enumeration are bounded.
 
@@ -166,7 +166,7 @@ capability is not production-verified on an actual phone.
 ## Your private offline book library
 
 Astra can now index text from your **own downloaded UTF-8 TXT, Markdown,
-unencrypted EPUB, HTML, CSV/TSV, JSON, XML, DOCX and RTF** documents on the phone. Open **Settings → Your private book library →
+unencrypted EPUB, HTML, CSV/TSV, JSON, XML, DOCX, RTF and XLSX** documents on the phone. Open **Settings → Your private book library →
 Import book** and select a file through Android's system document picker.
 Book text stays under Astra's private no-backup storage; no book content,
 search terms or citations are sent to any cloud AI or external website.
