@@ -6057,8 +6057,8 @@ class MainActivity :
                                             style = MaterialTheme.typography.titleMedium
                                         )
                                         Text(
-                                            "Import a downloaded UTF-8 TXT, Markdown or " +
-                                                "unencrypted EPUB book. Astra indexes it entirely " +
+                                            "Import offline reading files: " + AstraDocumentText.FORMATS +
+                                                ". Astra indexes them permanently " +
                                                 "on this phone and never uploads its contents. " +
                                                 "The book is reference context for the offline AI, " +
                                                 "not training data for Qwen3's model weights.",
@@ -6123,7 +6123,7 @@ class MainActivity :
                                                 onClick = {
                                                     bookImportRunning = true
                                                     folderImportStatus =
-                                                        "Importing books from authorized folder..."
+                                                        "Importing documents from authorized folder..."
                                                     researchScope.launch {
                                                         try {
                                                             val result = withContext(
@@ -6152,7 +6152,7 @@ class MainActivity :
                                                         }
                                                     }
                                                 }
-                                            ) { Text("Import books from authorized folder") }
+                                            ) { Text("Import documents from authorized folder") }
                                             TextButton(onClick = {
                                                 try {
                                                     AstraFolderAccess.unlink(
@@ -6178,8 +6178,8 @@ class MainActivity :
                                                 importBookLauncher.launch(arrayOf("*/*"))
                                             }
                                         ) {
-                                            Text(if (bookImportRunning) "Importing book..."
-                                                else "Import document (TXT, EPUB, HTML, CSV, JSON, XML, DOCX…)")
+                                            Text(if (bookImportRunning) "Importing document..."
+                                                else "Import offline document or spreadsheet")
                                         }
                                         if (bookImportStatus.isNotBlank()) {
                                             Text(bookImportStatus,
