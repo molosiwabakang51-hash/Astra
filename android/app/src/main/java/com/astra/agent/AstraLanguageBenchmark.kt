@@ -70,7 +70,7 @@ internal object AstraLanguageBenchmark {
         // evidence. Source footers may use CRLF, mixed case or extra spaces.
         // Score only the answer before the first complete footer heading.
         val footer = Regex(
-            """(?im)^\\s*(?:Open-course references:|Retrieved local book passages)\\s*$"""
+            """(?im)^\s*(?:Open-course references:|Retrieved local book passages)\s*$"""
         )
         val text = visible.substring(0, footer.find(visible)?.range?.first
             ?: visible.length).trim().lowercase(Locale.ROOT)
