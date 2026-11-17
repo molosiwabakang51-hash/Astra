@@ -2,6 +2,7 @@ package com.astra.agent
 
 import android.content.Context
 import android.net.Uri
+import android.provider.OpenableColumns
 import android.os.StatFs
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
@@ -40,6 +41,17 @@ internal object AstraModelImport {
     /** A compact model may be imported without reserving 1.4 GB upfront. */
     internal fun hasImportStartingSpace(availableBytes: Long): Boolean =
         availableBytes >= MIN_BYTES + FREE_HEADROOM
+
+    /**
+     * For an ordinary GGUF SAF document, Android may report its size upfront.
+     * Reject known impossible imports before reading 1.2 GB into a partial file.
+     * Unknown or unreliable provider sizes fall back to streamed headroom
+     * checks; ZIP/APK imports remain streamed because compressed size is not
+     * a reliable estimate of the extracted model's space requirement.
+     */
+    internal fun hasSpaceForKnownGguf(availableBytes: Long, sizeBytes: Long): Boolean =
+        sizeBytes > 0L && sizeBytes <= MAX_BYTES &&
+            availableBytes >= maxOf(MIN_BYTES, sizeBytes) + FREE_HEADROOM
 
     fun modelFile(context: Context): File =
         AstraModelStorage.activeModel(
@@ -95,20 +107,44 @@ internal object AstraModelImport {
                     buffered.mark(4)
                     val signatureSize = buffered.read(signature)
                     buffered.reset()
+                    val isArchive = signatureSize == 4 &&
+                        signature[0] == 'P'.code.toByte() &&
+                        signature[1] == 'K'.code.toByte()
+                    val isGguf = signatureSize == 4 &&
+                        signature.contentEquals("GGUF".toByteArray(Charsets.US_ASCII))
+                    if (isGguf) {
+                        // A SAF provider can omit SIZE. Never trust it as an
+                        // integrity check; SHA-256 is still required after copy.
+                        val declaredBytes = runCatching {
+                            context.contentResolver.query(
+                                uri, arrayOf(OpenableColumns.SIZE), null, null, null
+                            )?.use { cursor ->
+                                val column = cursor.getColumnIndex(OpenableColumns.SIZE)
+                                if (column >= 0 && cursor.moveToFirst() &&
+                                    !cursor.isNull(column)
+                                ) cursor.getLong(column).takeIf { it > 0L } else null
+                            }
+                        }.getOrNull()
+                        if (declaredBytes != null) {
+                            val available = StatFs(dir.absolutePath).availableBytes
+                            require(hasSpaceForKnownGguf(available, declaredBytes)) {
+                                val required = maxOf(MIN_BYTES, declaredBytes) + FREE_HEADROOM
+                                "Not enough phone storage for this local GGUF. " +
+                                    "Need at least ${(required + 1048575) / 1048576} MiB free; " +
+                                    "currently ${available / 1048576} MiB free. " +
+                                    "The selected model was not modified."
+                            }
+                        }
+                    }
                     FileOutputStream(partial).use { output ->
-                        val bytes = if (
-                            signatureSize == 4 &&
-                            signature[0] == 'P'.code.toByte() &&
-                            signature[1] == 'K'.code.toByte()
-                        ) {
+                        val bytes = if (isArchive) {
                             // ZIP/APK: process directly as a stream, without
                             // extracting a second 500 MB archive to storage.
                             copyFromArchive(
                                 ZipInputStream(buffered), output, digest, 0, safeProgress
                             )
                         } else {
-                            require(signatureSize == 4 &&
-                                signature.contentEquals("GGUF".toByteArray(Charsets.US_ASCII))) {
+                            require(isGguf) {
                                 "Select Qwen3 GGUF, a previous Astra APK or its GitHub ZIP."
                             }
                             copyBounded(buffered, output, digest, safeProgress)
