@@ -50,6 +50,38 @@ class AstraBookLibraryTest {
         assertTrue(library.search(question).isEmpty())
     }
 
+    @Test fun importedBookChunksNeverSplitUnicodeSurrogatePairs() {
+        val directory = Files.createTempDirectory("astra-unicode-passages").toFile()
+        val library = AstraBookLibrary(directory)
+        // The old 850-unit boundary landed between the two UTF-16 units
+        // of this emoji, corrupting the private book-index passages.
+        val document = "f".repeat(849) + "🚀" +
+            (" Russian genitive grammar: слова and pronunciation matter.").repeat(9)
+        val book = library.importBook("unicode-russian.txt", input(document))
+        val passages = java.io.File(directory, book.id + ".jsonl")
+            .readLines(Charsets.UTF_8).drop(1)
+            .map { org.json.JSONObject(it).getString("text") }
+
+        assertTrue(passages.size >= 2)
+        assertEquals("f".repeat(849), passages[0])
+        assertTrue(passages[1].startsWith("🚀"))
+        assertTrue(passages.any { it.contains("🚀") })
+        for (passage in passages) {
+            for (index in passage.indices) {
+                val char = passage[index]
+                if (Character.isHighSurrogate(char)) {
+                    assertTrue(index + 1 < passage.length &&
+                        Character.isLowSurrogate(passage[index + 1]))
+                }
+                if (Character.isLowSurrogate(char)) {
+                    assertTrue(index > 0 &&
+                        Character.isHighSurrogate(passage[index - 1]))
+                }
+            }
+        }
+        assertTrue(library.search("Russian genitive grammar").isNotEmpty())
+    }
+
     @Test fun importedTextHasNoLinksAndCannotEscapeAppPrivateStorage() {
         val lib = library()
         val book = lib.importBook("C:/books/grammar.md", input(
