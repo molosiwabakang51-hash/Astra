@@ -1,0 +1,99 @@
+name: Build standard Astra LITE APK
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: astra-standard-lite
+  cancel-in-progress: true
+
+jobs:
+  lite:
+    name: Standard model-free Astra LITE
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Configure Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Configure Gradle 8.13
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.13'
+
+      - name: Prepare offline native inference without model download
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash scripts/install_android_sdk.sh
+          python3 scripts/prepare_offline_android.py --lite
+          python3 -m unittest discover -s scripts/tests -p "test_*.py" -v
+          python3 scripts/verify_ui_contract.py
+          python3 scripts/verify_open_library.py
+          python3 scripts/harden_native_inference.py --verify
+          python3 scripts/fix_native_prompt_error.py --verify
+          python3 scripts/fix_native_generation_budget.py --verify
+          python3 scripts/fix_native_chat_continuity.py --verify
+          python3 scripts/reduce_native_context_memory.py --verify
+
+      - name: Unit test and compile standard Astra LITE APK
+        working-directory: android
+        env:
+          ASTRA_BUNDLE_MODEL: 'false'
+        shell: bash
+        run: |
+          set -euo pipefail
+          gradle --no-daemon testDebugUnitTest :app:assembleDebug
+          python3 ../scripts/verify_lite_apk.py app/build/outputs/apk/debug/app-debug.apk
+
+      - name: Verify package identity, certificate and manual-import build
+        shell: bash
+        run: |
+          set -euo pipefail
+          apk="android/app/build/outputs/apk/debug/app-debug.apk"
+          test -s "$apk"
+          aapt="$(find "$ANDROID_HOME/build-tools" -maxdepth 2 -name aapt -type f | sort -V | tail -n 1)"
+          signer="$(find "$ANDROID_HOME/build-tools" -maxdepth 2 -name apksigner -type f | sort -V | tail -n 1)"
+          test -x "$aapt" && test -x "$signer"
+          "$signer" verify "$apk"
+          identity="$("$aapt" dump badging "$apk")"
+          printf '%s\n' "$identity" | grep -m 1 "^package:"
+          [[ "$identity" == *"name='com.astra.agent'"* &&
+             "$identity" == *"versionCode='28'"* &&
+             "$identity" == *"versionName='0.12.1'"* ]] || {
+            echo "::error::Standard LITE must keep the original Astra application ID/version"; exit 1;
+          }
+          mkdir -p dist
+          cp "$apk" dist/Astra-v0.12.1-LITE-offline-arm64.apk
+          sha256sum dist/Astra-v0.12.1-LITE-offline-arm64.apk             > dist/Astra-v0.12.1-LITE-offline-arm64.apk.sha256
+          "$signer" verify --print-certs "$apk"             > dist/Astra-v0.12.1-LITE-signer.txt
+          {
+            echo "## Standard Astra LITE APK"
+            echo ""
+            echo "Package: com.astra.agent (original, not Preview)."
+            echo "Model weights: not included. Import saved 0.6B/1.7B GGUF manually in Settings."
+            echo "Offline native engine: verified by the model-free APK check."
+            echo "Signing: disposable CI debug key, NOT guaranteed to match installed Astra."
+            echo "On INSTALL_FAILED_UPDATE_INCOMPATIBLE, DO NOT UNINSTALL before backing up owner data."
+            echo "APK file size: $(du -h dist/Astra-v0.12.1-LITE-offline-arm64.apk | cut -f1)"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload only the small standard LITE APK and identity files
+        uses: actions/upload-artifact@v4
+        with:
+          name: Astra-v0.12.1-LITE-manual-model-import
+          path: |
+            dist/Astra-v0.12.1-LITE-offline-arm64.apk
+            dist/Astra-v0.12.1-LITE-offline-arm64.apk.sha256
+            dist/Astra-v0.12.1-LITE-signer.txt
+          if-no-files-found: error
+          retention-days: 30
