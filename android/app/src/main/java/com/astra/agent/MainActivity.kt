@@ -6164,7 +6164,7 @@ class MainActivity :
                                             }
                                         ) {
                                             Text(if (bookImportRunning) "Importing book..."
-                                                else "Import one book (TXT / MD / EPUB)")
+                                                else "Import document (TXT, EPUB, HTML, CSV, JSON, XML, DOCX…)")
                                         }
                                         if (bookImportStatus.isNotBlank()) {
                                             Text(bookImportStatus,
