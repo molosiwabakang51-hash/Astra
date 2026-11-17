@@ -2505,7 +2505,7 @@ class MainActivity :
                     applicationContext.getSharedPreferences("astra", Context.MODE_PRIVATE)
                 }
                 var offlineModelTestStatus by remember {
-                    mutableStateOf(
+                    val selfTestWarning =
                         if (offlineTestPrefs.getBoolean("astra_offline_test_incomplete", false))
                             "PREVIOUS OFFLINE TEST WAS INTERRUPTED. The Android process may " +
                                 "have crashed or been stopped during native inference. " +
@@ -2514,6 +2514,11 @@ class MainActivity :
                                 ". " + AstraProcessExitReason.latest(applicationContext) +
                                 " Keep the imported model; collect a crash log before retrying."
                         else ""
+                    mutableStateOf(
+                        listOfNotNull(
+                            selfTestWarning.takeIf { it.isNotBlank() },
+                            AstraInferenceCheckpoint.interruptedSummary(applicationContext)
+                        ).joinToString("\n\n")
                     )
                 }
                 var offlineModelTestRunning by remember { mutableStateOf(false) }
