@@ -274,6 +274,15 @@ jobs:
             echo "Safety: do not uninstall or clear app data just to work around INSTALL_FAILED_UPDATE_INCOMPATIBLE."
           } > ../dist/LITE-signing-integrity-report.txt
           cat ../dist/LITE-signing-integrity-report.txt
+          {
+            echo "## CI DEBUG APK — NOT AN IN-PLACE UPDATE"
+            echo ""
+            echo "This diagnostic LITE artifact is v0.12.1 (versionCode 28), signed with a disposable runner-local debug key."
+            echo "The separate **Build standard Astra LITE APK** workflow publishes v0.12.2 (versionCode 29), also debug-signed."
+            echo "Neither disposable-key artifact is guaranteed to upgrade an installed Astra without deleting private data."
+            echo "**For same-key upgrades**, use an owner-signed GitHub Release and verify the installed certificate before installing."
+            echo "**Never uninstall Astra to bypass a signature mismatch** unless its data and GGUF have been backed up and verified."
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Publish APK size analysis
         if: success()
@@ -286,11 +295,11 @@ jobs:
             dist/LITE-signing-integrity-report.txt
           if-no-files-found: error
 
-      - name: Publish lightweight APK for low-data updates
+      - name: Publish CI diagnostic LITE APK (not an update installer)
         if: success()
         uses: actions/upload-artifact@v6
         with:
-          name: Astra-v0.12.1-LITE-Offline-APK
+          name: Astra-v0.12.1-DEBUG-LITE-NOT-FOR-UPGRADES
           retention-days: 7
           path: dist/Astra-v0.12.1-LITE-offline-arm64-debug.apk
           if-no-files-found: error

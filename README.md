@@ -531,18 +531,22 @@ The **Test on-device AI** control now requires the model to generate the expecte
 
 ## Avoid downloading a 539 MiB APK after every change
 
-**Astra v0.12.1** has two installable Android options built automatically on GitHub:
+**Different GitHub workflows publish different APKs. Do not treat a CI debug APK as an in-place update.**
 
-| Variant | What you download | Best for |
+| Workflow | Downloadable output | Safe use |
 | --- | --- | --- |
-| **LITE** | Android UI, tasks and llama.cpp native inference, **without** GGUF model weights (enforced under 150 MiB) | Regular app updates over mobile data. |
-| **FULL** | The same Android app with Qwen3 Q4_K_M included (~539 MiB) | First installation when no model file is available. |
+| **Build standard Astra LITE APK** | `Astra-v0.12.2-LITE-manual-model-import`, containing versionCode 29, no GGUF weights | Small **debug-signed test installation** or manual model import, **not** a guaranteed update over a previous installation. |
+| **Build Astra APK** | `Astra-v0.12.1-DEBUG-LITE-NOT-FOR-UPGRADES`, versionCode 28 | CI diagnostics only; do **not** install as an update over v0.12.2 or a differently signed APK. |
+| **Build Astra APK** (owner-dispatched/weekly FULL) | `Astra-v0.12.1-FULL-Offline-APK`, including verified Qwen3 0.6B weights | Large first-install/testing option; also debug-signed, not a safe in-place update. |
+| **Publish owner-signed Astra LITE update** | Owner-signed GitHub **pre-release** once protected signing credentials are configured | Intended low-data **in-place upgrades**, but only when the installed APK has the same owner signing key and a lower versionCode. |
 
-Open [GitHub Actions](https://github.com/molosiwabakang51-hash/Astra/actions), choose a **successful v0.12.1 build**, and under Artifacts select **`Astra-v0.12.1-LITE-Offline-APK`** for the much smaller download. The full alternative is **`Astra-v0.12.1-FULL-Offline-APK`**. Extract the downloaded artifact ZIP; inside is the versioned APK. Both have the same app ID and UI but do **not** have the same bundled assets.
+Open [GitHub Actions](https://github.com/molosiwabakang51-hash/Astra/actions), choose the correct named workflow, open a **successful run**, and download its artifact ZIP. The standard LITE build does not contain weights, but it is still signed using a disposable CI debug key; smaller APK size does **not** mean it is upgrade-compatible. The private GGUF remains preserved only across correctly signed updates.
 
 **Import the model once without using internet data:** In the LITE app, tap **Astra icon → Settings → Import offline model once**. Choose a GGUF file already saved on the phone, a **previously downloaded large Astra APK**, or its original **GitHub artifact ZIP containing that APK**. Astra extracts the Qwen3 weights locally, checks their exact SHA-256, and stores the model privately. The original selected file is not modified. Once imported, airplane-mode chat works entirely on-device, subject to real-phone performance.
 
 If you already downloaded a 500+ MB Astra APK, **retain the APK or artifact ZIP in Downloads** instead of downloading another copy of Qwen3. The import feature can reuse it directly. If you do not have any old model source saved, use Wi-Fi once to get the GGUF or FULL variant rather than repeatedly using cellular bundles.
+
+**Never uninstall Astra just to bypass `INSTALL_FAILED_UPDATE_INCOMPATIBLE`. Back up the owner's private data and verified GGUF before planning any migration.**
 
 **Signing is essential for preserving data and the imported model across app updates.** GitHub Actions test/debug APKs often use **different signing keys** across workflow runs. Android will not install one as an update over a differently signed version. Export your chat/task backup **before uninstalling** a debug build, and retain the GGUF/APK/ZIP in Downloads for offline re-import. After a one-time migration, use the **protected owner-signed LITE release workflow** with the same permanent keystore for every new version; the signed installers are published to [GitHub Releases](https://github.com/molosiwabakang51-hash/Astra/releases) and support in-place upgrades. This workflow cannot publish until the owner privately configures the signing environment in [release-signing.md](docs/release-signing.md).
 
@@ -604,7 +608,7 @@ GitHub Actions performs both builds and verifies their contents. The GGUF stays 
 The previous `gateway/` server remains as historical code but is **not invoked by Astra v0.10.0**. It is not required for offline conversation.
 ## Builds
 
-The workflow at `.github/workflows/android.yml` builds **FULL and LITE** on pushes, PRs, manual dispatch and weekly schedule. Successful [GitHub Actions runs](https://github.com/molosiwabakang51-hash/Astra/actions) publish separate versioned APK artifacts and size reports. LITE must be under 150 MiB and exclude the model, while FULL must pass Qwen3 checksum verification.
+The heavy `.github/workflows/android.yml` builds **FULL and diagnostic LITE** for pull requests, manual dispatch and weekly schedules; it does **not** publish routine main-branch updates. The separate `.github/workflows/lite.yml` builds **standard LITE** on main-branch pushes. Both are debug-signed CI artifacts, **not** authenticated same-key upgrades. Only protected `.github/workflows/owner-release.yml` can publish owner-signed GitHub pre-releases after the owner configures the signing secrets. LITE excludes model weights and must remain under 150 MiB; FULL must pass Qwen3 checksum verification.
 
 The Android project is in `android/`, with application ID `com.astra.agent`, Android API 33 minimum, Java 17 and Gradle 8.13 on CI.
 
