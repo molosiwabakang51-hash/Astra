@@ -32,10 +32,10 @@ class AstraLanguageBenchmarkTest {
 
     @Test fun sourceFootersCannotSupplyAnswersWithCrLfOrMixedCase() {
         val misleading = listOf(
-            "Cannot calculate.\\r\\n\\r\\nOPEN-COURSE REFERENCES:\\r\\n[K1] 42",
-            "Cannot calculate.\\n\\n  open-course references:  \\n[K1] 42",
-            "Cannot calculate.\\r\\nRetrieved Local Book Passages\\r\\n42",
-            "Cannot calculate.\\n  RETRIEVED LOCAL BOOK PASSAGES  \\n42"
+            "Cannot calculate.\r\n\r\nOPEN-COURSE REFERENCES:\r\n[K1] 42",
+            "Cannot calculate.\n\n  open-course references:  \n[K1] 42",
+            "Cannot calculate.\r\nRetrieved Local Book Passages\r\n42",
+            "Cannot calculate.\n  RETRIEVED LOCAL BOOK PASSAGES  \n42"
         )
         for (output in misleading) {
             assertFalse("Footer must not supply benchmark answer: $output",
@@ -46,9 +46,9 @@ class AstraLanguageBenchmarkTest {
 
     @Test fun correctAnswersBeforeSourceFootersStillPass() {
         val answers = listOf(
-            "42\\r\\n\\r\\nOPEN-COURSE REFERENCES:\\r\\n[K1] other context",
-            "42\\nRetrieved Local Book Passages\\n[K1] unrelated context",
-            "42\\n  open-course references:  \\n[K1] 43"
+            "42\r\n\r\nOPEN-COURSE REFERENCES:\r\n[K1] other context",
+            "42\nRetrieved Local Book Passages\n[K1] unrelated context",
+            "42\n  open-course references:  \n[K1] 43"
         )
         for (output in answers) {
             assertTrue(AstraLanguageBenchmark.score(
