@@ -45,6 +45,7 @@ jobs:
           python3 scripts/fix_native_prompt_error.py --verify
           python3 scripts/fix_native_generation_budget.py --verify
           python3 scripts/fix_native_chat_continuity.py --verify
+          python3 scripts/reduce_native_context_memory.py --verify
           python3 scripts/verify_ui_contract.py
           python3 scripts/verify_open_library.py
 
