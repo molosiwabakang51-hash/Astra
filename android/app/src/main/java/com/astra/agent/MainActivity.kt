@@ -1947,6 +1947,12 @@ private fun MessageBubble(
 
     val isUser =
         message.role == "You"
+    // Render only assistant markup. Keep raw message text intact for
+    // persistence, clipboard/share and local text-to-speech.
+    val renderedMessage = remember(message.text, isUser) {
+        if (isUser) androidx.compose.ui.text.AnnotatedString(message.text)
+        else AstraMessageMarkup.render(message.text)
+    }
 
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -1989,7 +1995,7 @@ private fun MessageBubble(
                 )
 
                 Text(
-                    message.text,
+                    renderedMessage,
                     style = MaterialTheme.typography.bodyLarge
                 )
             }
