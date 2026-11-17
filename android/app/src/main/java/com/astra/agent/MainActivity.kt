@@ -2372,6 +2372,7 @@ class MainActivity :
         setContent {
 
             MaterialTheme(
+                typography = AstraReadableTypography,
                 colorScheme = darkColorScheme(
                     primary = AstraAurora.cyan,
                     onPrimary = AstraAurora.background,
