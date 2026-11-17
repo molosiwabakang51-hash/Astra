@@ -65,10 +65,15 @@ internal object AstraLanguageBenchmark {
         // Attribution footers are not part of the generated answer. A wrong
         // response should never pass just because a cited excerpt contains
         // the expected word or number.
-        val text = AstraOfflinePolicy.publicReply(answer)
-            .substringBefore("\n\nOpen-course references:")
-            .substringBefore("\n\nRetrieved local book passages")
-            .trim().lowercase(Locale.ROOT)
+        val visible = AstraOfflinePolicy.publicReply(answer)
+        // Generated answers and appended local-source citations are different
+        // evidence. Source footers may use CRLF, mixed case or extra spaces.
+        // Score only the answer before the first complete footer heading.
+        val footer = Regex(
+            """(?im)^\\s*(?:Open-course references:|Retrieved local book passages)\\s*$"""
+        )
+        val text = visible.substring(0, footer.find(visible)?.range?.first
+            ?: visible.length).trim().lowercase(Locale.ROOT)
         if (text.isBlank() ||
             text.startsWith("the offline model did not produce") ||
             text.startsWith("offline model unavailable")
