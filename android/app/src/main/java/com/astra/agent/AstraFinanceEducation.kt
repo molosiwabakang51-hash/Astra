@@ -76,16 +76,16 @@ internal object AstraFinanceEducation {
         }
 
     private const val shillerExuberance =
-        "ROBERT J. SHILLER — IRRATIONAL EXUBERANCE\\n" +
+        "ROBERT J. SHILLER — IRRATIONAL EXUBERANCE\n" +
         "The economist is Robert J. Shiller, not Niall Shiller. " +
         "Shiller is associated with Yale University and wrote " +
-        "Irrational Exuberance (2000).\\n\\n" +
+        "Irrational Exuberance (2000).\n\n" +
         "His central argument: asset prices can rise far beyond what " +
         "economic fundamentals justify when investor psychology, " +
         "herding and reinforcing price expectations fuel speculative bubbles. " +
         "Rising prices attract more buyers, which can drive prices even " +
         "higher until confidence changes. This is a warning about " +
-        "valuation and crowd behaviour, not a precise crash prediction.\\n\\n" +
+        "valuation and crowd behaviour, not a precise crash prediction.\n\n" +
         "Offline reference: Robert J. Shiller, Irrational Exuberance " +
         "(Princeton University Press, 2000)."
 
