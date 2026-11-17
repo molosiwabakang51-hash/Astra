@@ -25,12 +25,14 @@ internal object AstraProcessExitReason {
         exitAtMs >= inferenceStartedAtMs &&
         exitAtMs <= observedAtMs
 
-    fun latest(context: Context, inferenceStartedAtMs: Long): String {
+    fun latest(context: Context, inferenceStartedAtMs: Long? = null): String {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
             return "Android process exit reason unavailable on this OS."
         }
         val observedAtMs = System.currentTimeMillis()
-        if (inferenceStartedAtMs <= 0L || inferenceStartedAtMs > observedAtMs) {
+        if (inferenceStartedAtMs != null &&
+            (inferenceStartedAtMs <= 0L || inferenceStartedAtMs > observedAtMs)
+        ) {
             return "Inference start timestamp unavailable; no exit cause attributed."
         }
         return try {
@@ -40,18 +42,28 @@ internal object AstraProcessExitReason {
                 context.packageName, 0, 10
             ).firstOrNull {
                 it.processName == context.packageName &&
-                    matchesCheckpointExit(
+                    (inferenceStartedAtMs == null || matchesCheckpointExit(
                         inferenceStartedAtMs, it.timestamp, observedAtMs
-                    )
-            } ?: return "No matching Android process exit was recorded after " +
-                "the interrupted inference began."
-            describe(exit.reason)
+                    ))
+            } ?: return if (inferenceStartedAtMs == null) {
+                "No historical Astra process exit was recorded."
+            } else {
+                "No matching Android process exit was recorded after " +
+                    "the interrupted inference began."
+            }
+            labelForContext(exit.reason, inferenceStartedAtMs != null)
         } catch (_: SecurityException) {
             "Android did not permit reading the process exit reason."
         } catch (_: RuntimeException) {
             "Android could not provide a process exit reason."
         }
     }
+
+    /** General Settings history is never attributed to the current chat. */
+    internal fun labelForContext(reason: Int, correlatedWithInference: Boolean): String =
+        if (correlatedWithInference) describe(reason)
+        else "Latest historical Astra process exit (not linked to this chat): " +
+            describe(reason)
 
     fun describe(reason: Int): String = when (reason) {
         ApplicationExitInfo.REASON_CRASH_NATIVE ->
