@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -24,7 +25,10 @@ import androidx.compose.ui.unit.dp
 
 /** No saved private chat, note, task or document content is composed here. */
 @Composable
-internal fun AstraLockedWorkspace(onRequestUnlock: () -> Unit) {
+internal fun AstraLockedWorkspace(
+    onRequestUnlock: () -> Unit,
+    onOpenDeviceSecurity: () -> Unit
+) {
     Box(
         Modifier.fillMaxSize().background(
             Brush.verticalGradient(
@@ -60,6 +64,10 @@ internal fun AstraLockedWorkspace(onRequestUnlock: () -> Unit) {
                     .semantics { contentDescription = "Unlock with fingerprint or device PIN" }
             ) {
                 Text("Unlock with fingerprint or PIN")
+            }
+            Spacer(Modifier.height(9.dp))
+            TextButton(onClick = onOpenDeviceSecurity) {
+                Text("Set up Android screen lock")
             }
         }
     }
