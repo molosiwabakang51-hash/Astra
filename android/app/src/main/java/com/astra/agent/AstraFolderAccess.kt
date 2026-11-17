@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.provider.DocumentsContract
+import java.util.ArrayDeque
 import java.util.Locale
 
 /**
@@ -18,7 +19,6 @@ internal object AstraFolderAccess {
     private const val TREE_KEY = "astra_authorized_library_tree"
     private const val MAX_INSPECTED = 500
     private const val MAX_IMPORTS = 30
-
     data class Document(val name: String, val uri: Uri, val size: Long?)
     data class Result(
         val imported: Int,
@@ -95,54 +95,73 @@ internal object AstraFolderAccess {
         }
     }
 
+    /**
+     * Bounded breadth-first scan of the owner-authorized tree.
+     * Previously only the top-level directory was checked, so a course
+     * library organised into subject folders appeared to have zero books.
+     * No background scan, extra permission or write access is introduced.
+     */
     fun books(context: Context): List<Document> {
         val folder = treeUri(context)
             ?: throw IllegalStateException(
                 "Linked folder access was revoked or moved. Choose the folder again."
             )
         val resolver = context.contentResolver
-        val children = DocumentsContract.buildChildDocumentsUriUsingTree(
-            folder, DocumentsContract.getTreeDocumentId(folder)
-        )
         val projection = arrayOf(
             DocumentsContract.Document.COLUMN_DOCUMENT_ID,
             DocumentsContract.Document.COLUMN_DISPLAY_NAME,
             DocumentsContract.Document.COLUMN_MIME_TYPE,
             DocumentsContract.Document.COLUMN_SIZE
         )
+        val pending = ArrayDeque<Pair<String, Int>>()
+        pending.addLast(DocumentsContract.getTreeDocumentId(folder) to 0)
+        val visitedFolders = mutableSetOf<String>()
         val candidates = mutableListOf<Document>()
-        val cursor = resolver.query(children, projection, null, null, null)
-            ?: throw IllegalStateException("The selected folder cannot be read.")
-        cursor.use { rows ->
-            val idIndex = rows.getColumnIndexOrThrow(
-                DocumentsContract.Document.COLUMN_DOCUMENT_ID
-            )
-            val nameIndex = rows.getColumnIndexOrThrow(
-                DocumentsContract.Document.COLUMN_DISPLAY_NAME
-            )
-            val mimeIndex = rows.getColumnIndexOrThrow(
-                DocumentsContract.Document.COLUMN_MIME_TYPE
-            )
-            val sizeIndex = rows.getColumnIndexOrThrow(
-                DocumentsContract.Document.COLUMN_SIZE
-            )
-            var visited = 0
-            while (visited < MAX_INSPECTED && rows.moveToNext()) {
-                visited++
-                val mime = if (rows.isNull(mimeIndex)) "" else rows.getString(mimeIndex)
-                if (mime == DocumentsContract.Document.MIME_TYPE_DIR) continue
-                val name = rows.getString(nameIndex) ?: continue
-                val size = if (rows.isNull(sizeIndex)) null else rows.getLong(sizeIndex)
-                if (!AstraFolderRules.bookNameAllowed(name, size)) continue
-                val id = rows.getString(idIndex) ?: continue
-                val fileUri = DocumentsContract.buildDocumentUriUsingTree(folder, id)
-                candidates.add(Document(name, fileUri, size))
+        var inspected = 0
+        while (pending.isNotEmpty() && inspected < MAX_INSPECTED) {
+            val (folderId, depth) = pending.removeFirst()
+            if (!visitedFolders.add(folderId)) continue
+            val children = DocumentsContract.buildChildDocumentsUriUsingTree(folder, folderId)
+            val cursor = resolver.query(children, projection, null, null, null)
+                ?: throw IllegalStateException(
+                    "Cannot read a selected library subfolder; check its authorization."
+                )
+            cursor.use { rows ->
+                val idIndex = rows.getColumnIndexOrThrow(
+                    DocumentsContract.Document.COLUMN_DOCUMENT_ID
+                )
+                val nameIndex = rows.getColumnIndexOrThrow(
+                    DocumentsContract.Document.COLUMN_DISPLAY_NAME
+                )
+                val mimeIndex = rows.getColumnIndexOrThrow(
+                    DocumentsContract.Document.COLUMN_MIME_TYPE
+                )
+                val sizeIndex = rows.getColumnIndexOrThrow(
+                    DocumentsContract.Document.COLUMN_SIZE
+                )
+                while (inspected < MAX_INSPECTED && rows.moveToNext()) {
+                    inspected++
+                    val id = rows.getString(idIndex) ?: continue
+                    val mime = if (rows.isNull(mimeIndex)) "" else rows.getString(mimeIndex)
+                    if (mime == DocumentsContract.Document.MIME_TYPE_DIR) {
+                        if (AstraFolderRules.canDescend(
+                                depth, visitedFolders.size + pending.size
+                            ) && id !in visitedFolders
+                        ) pending.addLast(id to (depth + 1))
+                        continue
+                    }
+                    val name = rows.getString(nameIndex) ?: continue
+                    val size = if (rows.isNull(sizeIndex)) null else rows.getLong(sizeIndex)
+                    if (!AstraFolderRules.bookNameAllowed(name, size)) continue
+                    val fileUri = DocumentsContract.buildDocumentUriUsingTree(folder, id)
+                    candidates.add(Document(name, fileUri, size))
+                }
             }
         }
         return candidates.sortedWith(
             compareBy<Document> { it.name.lowercase(Locale.ROOT) }
                 .thenBy { it.uri.toString() }
-        ).take(MAX_INSPECTED)
+        )
     }
 
     /** Explicit bulk import; sources are read-only, copied into private indexes. */
@@ -153,7 +172,9 @@ internal object AstraFolderAccess {
         var duplicates = 0
         var inspected = 0
         val errors = mutableListOf<String>()
-        for (entry in eligible.take(MAX_IMPORTS)) {
+        // Scan up to the bounded eligible list: duplicate books must not
+        // prevent later new books from reaching the 30-book capacity.
+        for (entry in eligible) {
             if (existingCount >= MAX_IMPORTS) break
             inspected++
             try {
@@ -180,6 +201,12 @@ internal object AstraFolderAccess {
 /** JVM-testable minimum-privilege filters; never trust provider names/sizes. */
 internal object AstraFolderRules {
     private const val MAX_BYTES = 10L * 1024 * 1024
+    private const val MAX_FOLDER_DEPTH = 4
+    private const val MAX_FOLDERS = 64
+
+    fun canDescend(parentDepth: Int, knownFolderCount: Int): Boolean =
+        parentDepth in 0 until MAX_FOLDER_DEPTH &&
+            knownFolderCount in 0 until MAX_FOLDERS
     fun bookNameAllowed(filename: String, size: Long?): Boolean {
         if (filename.isBlank() || filename.length > 180 ||
             filename.any { it.isISOControl() || it == '/' || it == '\\' }) return false
