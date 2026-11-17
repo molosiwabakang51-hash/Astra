@@ -43,6 +43,17 @@ android {
             }
         }
     }
+    // Temporary parallel-install QA build. Separate application ID means Android
+    // never replaces or clears the owner's existing com.astra.agent installation.
+    // The Preview APK still requires a separately imported local GGUF to chat.
+    buildTypes {
+        create("preview") {
+            initWith(getByName("debug"))
+            applicationIdSuffix = ".preview"
+            versionNameSuffix = "-preview"
+            matchingFallbacks += listOf("debug")
+        }
+    }
     buildFeatures { compose = true; buildConfig = true }
     compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
     kotlinOptions { jvmTarget = "17" }
