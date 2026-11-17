@@ -95,17 +95,17 @@ fails if the signature differs.
 
 A successful run creates both:
 
-- A 30-day **Astra-v0.12.1-Owner-Signed-LITE** workflow artifact.
+- A 30-day **Astra-v0.12.2-Owner-Signed-LITE** workflow artifact.
 - A **persistent GitHub Release** with an APK
-  `Astra-v0.12.1-LITE-owner-signed.apk` under a versioned tag such as
-  `v0.12.1.123`.
+  `Astra-v0.12.2-LITE-owner-signed.apk` under a versioned tag such as
+  `v0.12.2.123`.
 
 Get the release from:
 https://github.com/molosiwabakang51-hash/Astra/releases
 
 The workflow uses monotonically increasing Android version codes based on
 the workflow run number (`100000 + GITHUB_RUN_NUMBER`). It uses a version name
-such as `0.12.1.123`. When the source version changes in a future release,
+such as `0.12.2.123`. When the source version changes in a future release,
 the workflow's pinned release/version text must also be updated.
 
 **Status:** An unconfigured or mismatched signing key prevents this process.
