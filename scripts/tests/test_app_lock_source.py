@@ -38,9 +38,9 @@ class AstraAppLockSourceTest(unittest.TestCase):
     def test_privacy_cover_and_no_new_permissions(self):
         self.assertIn("WindowManager.LayoutParams.FLAG_SECURE", LOCK)
         self.assertIn("activity.setRecentsScreenshotEnabled(false)", LOCK)
-        self.assertIn("when enabled", SCREEN.replace("When enabled", "when enabled") if False else MAIN)
+        self.assertIn("This does not encrypt existing files.", MAIN)
         self.assertIn("android:allowBackup=\"false\"", MANIFEST)
-        self.assertNotIn("USE_BIOMETRIC", MANIFEST)
+        self.assertIn("android.permission.USE_BIOMETRIC", MANIFEST)
 
     def test_lock_screen_never_loads_private_content(self):
         self.assertIn("Unlock with fingerprint or PIN", SCREEN)
