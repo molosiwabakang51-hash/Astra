@@ -87,7 +87,29 @@ internal object AstraStudyCatalog {
             Topic("Lesson two", "Progress to lesson two.", "mandarin lesson 2"),
             Topic("Vocabulary quiz", "Practice your knowledge.", "mandarin quiz")
         ))
-    )
+    ).map { subject ->
+        // The existing multilingual tutor already supports 21 offline lessons
+        // per included course. Surface those *real* chapters instead of
+        // disguising a three-button preview as the whole curriculum.
+        if (subject.id in setOf("setswana", "french", "spanish", "portuguese",
+                "german", "swahili", "japanese", "mandarin")) {
+            subject.copy(
+                topics = listOf(subject.topics.first()) +
+                    (2..21).map { number ->
+                        Topic(
+                            "Lesson " + number,
+                            "Open offline vocabulary lesson " + number + " of 21.",
+                            subject.id + " lesson " + number
+                        )
+                    } +
+                    listOf(
+                        subject.topics.last(),
+                        Topic("Course progress", "Check stored quiz and lesson progress.",
+                            subject.id + " progress")
+                    )
+            )
+        } else subject
+    }
     fun find(id: String?): Subject? = subjects.firstOrNull { it.id == id }
     fun topic(subjectId: String, title: String): Topic? =
         find(subjectId)?.topics?.firstOrNull { it.title == title }
