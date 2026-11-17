@@ -197,6 +197,9 @@ internal object AstraModelImport {
                 nextUpdate = total + 32L * 1024 * 1024
             }
         }
+        // Recheck remaining disk space after the final, potentially partial
+        // 32 MiB interval, before promoting the verified new model file.
+        if (total > 0L) onProgress(total)
         return total
     }
 }
