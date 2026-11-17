@@ -12,7 +12,7 @@ class AstraFolderRulesTest {
             "finance.txt", "bond duration.MD", "course.markdown",
             "Russki.epub", "setswana reading.EPUB",
             "finance.csv", "notes.json", "manual.DOCX", "webpage.html",
-            "financial_data.xml", "curriculum.tsv", "vocabulary.tsv"
+            "financial_data.xml", "curriculum.tsv", "vocabulary.tsv", "lecture.rtf"
         )) {
             assertTrue(name, AstraFolderRules.bookNameAllowed(name, 1024L))
         }
