@@ -22,7 +22,7 @@ class StandardLiteWorkflowTest(unittest.TestCase):
         self.assertIn("prepare_offline_android.py --lite", content)
         self.assertIn("ASTRA_BUNDLE_MODEL: 'false'", content)
         self.assertIn("verify_lite_apk.py", content)
-        self.assertIn("actions/upload-artifact@v4", content)
+        self.assertIn("actions/upload-artifact@v6", content)
         self.assertIn("Astra-v0.12.2-LITE-manual-model-import", content)
         self.assertNotIn("assemblePreview", content)
         self.assertNotIn("com.astra.agent.preview", content)
