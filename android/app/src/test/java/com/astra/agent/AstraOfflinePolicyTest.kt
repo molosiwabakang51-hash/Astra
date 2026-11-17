@@ -60,7 +60,7 @@ class AstraOfflinePolicyTest {
             "\n[Middle of long input omitted to fit the offline model context.]\n".length
         val headLength = 3_000 - markerLength - 1_800
         val headBoundary = "a".repeat(headLength - 1) + "😀" + "b".repeat(5_000)
-        val tailBoundary = "a".repeat(5_000 - 1_800 - 1) + "😀" + "b".repeat(1_800)
+        val tailBoundary = "a".repeat(5_000 - 1_800 - 1) + "😀" + "b".repeat(1_799)
         for (input in listOf(headBoundary, tailBoundary)) {
             val result = AstraOfflinePolicy.boundedInput(input)
             assertTrue(result.length <= 3_000)
