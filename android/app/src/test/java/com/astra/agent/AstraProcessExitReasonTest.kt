@@ -52,6 +52,18 @@ class AstraProcessExitReasonTest {
         assertTrue(AstraProcessExitReason.matchesCheckpointExit(now, now, now))
     }
 
+    @Test fun generalExitHistoryIsExplicitlyUnrelatedToCurrentChat() {
+        val historical = AstraProcessExitReason.labelForContext(
+            ApplicationExitInfo.REASON_CRASH_NATIVE, false
+        )
+        val correlated = AstraProcessExitReason.labelForContext(
+            ApplicationExitInfo.REASON_CRASH_NATIVE, true
+        )
+        assertTrue(historical.contains("not linked to this chat"))
+        assertTrue(correlated.contains("native crash"))
+        assertTrue(!correlated.contains("not linked to this chat"))
+    }
+
     @Test fun userRequestedExitIsNotClaimedAsCrash() {
         val reason = AstraProcessExitReason.describe(
             ApplicationExitInfo.REASON_USER_REQUESTED
