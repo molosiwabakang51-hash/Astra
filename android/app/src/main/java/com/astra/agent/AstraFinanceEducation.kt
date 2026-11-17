@@ -27,8 +27,17 @@ internal object AstraFinanceEducation {
         val query = raw.trim().replace(Regex("""\s+"""), " ")
             .lowercase(Locale.ROOT)
             .trimEnd('.', '?', '!', ' ')
-        if (query.length > 180 || !explanatoryBeginning.containsMatchIn(query)) return null
-        if (privateContext.containsMatchIn(query)) return null
+        if (query.length > 180 || privateContext.containsMatchIn(query)) return null
+        // The owner reported that Qwen invented "Niall Shiller" when asked
+        // about Irrational Exuberance. Answer only this narrow, independently
+        // documented identity/book fact deterministically, even for a short
+        // correction such as "Robert Stiller?" that lacks a question verb.
+        val correctedName = query == "robert stiller" ||
+            query == "robert shiller" || query == "niall shiller"
+        if (correctedName ||
+            (mentions(query, "shiller", "stiller") &&
+                mentions(query, "irrational exuberance"))) return shillerExuberance
+        if (!explanatoryBeginning.containsMatchIn(query)) return null
 
         return when {
             mentions(query, "compound interest", "compounding interest",
@@ -65,6 +74,20 @@ internal object AstraFinanceEducation {
             Regex("""(?<![a-z])""" + Regex.escape(expression) + """(?![a-z])""")
                 .containsMatchIn(text)
         }
+
+    private const val shillerExuberance =
+        "ROBERT J. SHILLER — IRRATIONAL EXUBERANCE\\n" +
+        "The economist is Robert J. Shiller, not Niall Shiller. " +
+        "Shiller is associated with Yale University and wrote " +
+        "Irrational Exuberance (2000).\\n\\n" +
+        "His central argument: asset prices can rise far beyond what " +
+        "economic fundamentals justify when investor psychology, " +
+        "herding and reinforcing price expectations fuel speculative bubbles. " +
+        "Rising prices attract more buyers, which can drive prices even " +
+        "higher until confidence changes. This is a warning about " +
+        "valuation and crowd behaviour, not a precise crash prediction.\\n\\n" +
+        "Offline reference: Robert J. Shiller, Irrational Exuberance " +
+        "(Princeton University Press, 2000)."
 
     private const val compoundInterest =
         "COMPOUND INTEREST\n" +
