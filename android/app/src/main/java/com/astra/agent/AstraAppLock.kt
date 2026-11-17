@@ -33,9 +33,10 @@ internal object AstraAppLock {
         }
     }
 
-    fun canUnlock(context: Context): Boolean =
+    fun canUnlock(context: Context): Boolean = runCatching {
         context.getSystemService(BiometricManager::class.java)
             ?.canAuthenticate(AUTHENTICATORS) == BiometricManager.BIOMETRIC_SUCCESS
+    }.getOrDefault(false)
 
     fun protectRecentsAndScreenshots(activity: Activity, lockedFeatureEnabled: Boolean) {
         if (lockedFeatureEnabled) {
@@ -56,12 +57,12 @@ internal object AstraAppLock {
             onUnavailable()
             return
         }
-        val prompt = BiometricPrompt.Builder(activity)
-            .setTitle("Unlock Astra")
-            .setSubtitle("Use your fingerprint or Android screen lock")
-            .setAllowedAuthenticators(AUTHENTICATORS)
-            .build()
         try {
+            val prompt = BiometricPrompt.Builder(activity)
+                .setTitle("Unlock Astra")
+                .setSubtitle("Use your fingerprint or Android screen lock")
+                .setAllowedAuthenticators(AUTHENTICATORS)
+                .build()
             prompt.authenticate(
                 CancellationSignal(),
                 activity.mainExecutor,
