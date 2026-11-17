@@ -33,7 +33,7 @@ internal object AstraDocumentText {
         "epub" to "epub", "html" to "html", "htm" to "html",
         "csv" to "csv", "tsv" to "tsv",
         "json" to "json", "xml" to "xml", "docx" to "docx",
-        "rtf" to "rtf"
+        "rtf" to "rtf", "xlsx" to "xlsx"
     )
 
     fun format(filename: String): String? {
@@ -42,7 +42,7 @@ internal object AstraDocumentText {
         return supported[ext]?.takeIf { name.length > ext.length + 1 }
     }
 
-    const val FORMATS = "TXT, MD, EPUB, HTML, CSV, TSV, JSON, XML, DOCX or RTF"
+    const val FORMATS = "TXT, MD, EPUB, HTML, CSV, TSV, JSON, XML, DOCX, RTF or XLSX"
 
     fun extract(format: String, input: InputStream): String = when (format) {
         "html" -> html(decode(readBounded(input, MAX_TEXT_BYTES)))
@@ -52,6 +52,7 @@ internal object AstraDocumentText {
         "xml" -> xml(readBounded(input, MAX_TEXT_BYTES), office = false)
         "docx" -> docx(input)
         "rtf" -> AstraRtfText.extract(input)
+        "xlsx" -> AstraSpreadsheetText.extract(input)
         else -> throw IllegalArgumentException("Unsupported document format: $format.")
     }
 

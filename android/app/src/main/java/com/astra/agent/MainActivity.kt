@@ -6062,8 +6062,8 @@ class MainActivity :
                                             style = MaterialTheme.typography.titleMedium
                                         )
                                         Text(
-                                            "Import a downloaded TXT, Markdown, EPUB, RTF or other " +
-                                                "supported text document. Astra indexes it entirely " +
+                                            "Import an offline document: " + AstraDocumentText.FORMATS +
+                                                ". Astra indexes its extracted text entirely " +
                                                 "on this phone and never uploads its contents. " +
                                                 "The book is reference context for the offline AI, " +
                                                 "not training data for Qwen3's model weights.",
@@ -6184,7 +6184,7 @@ class MainActivity :
                                             }
                                         ) {
                                             Text(if (bookImportRunning) "Importing book..."
-                                                else "Import document (TXT, EPUB, RTF, HTML, CSV, JSON, XML, DOCX…)")
+                                                else "Import offline document or spreadsheet")
                                         }
                                         if (bookImportStatus.isNotBlank()) {
                                             Text(bookImportStatus,
