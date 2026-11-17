@@ -61,7 +61,8 @@ class AstraSpreadsheetTextTest {
     }
 
     @Test fun importedWorkbookRemainsSearchableInPermanentPrivateLibrary() {
-        val lib = AstraBookLibrary(Files.createTempDirectory("astra-xlsx-library").toFile())
+        val directory = Files.createTempDirectory("astra-xlsx-library").toFile()
+        val lib = AstraBookLibrary(directory)
         val input = archive(
             "xl/worksheets/sheet1.xml" to worksheet,
             "xl/sharedStrings.xml" to shared
@@ -70,6 +71,11 @@ class AstraSpreadsheetTextTest {
         assertEquals("xlsx", book.format)
         assertTrue(lib.search("Treasury government bond duration").isNotEmpty())
         assertEquals(1, lib.listBooks().size)
+        // Simulate a later app launch: indexes remain on the phone's disk
+        // and can be searched by a new library instance without reimport.
+        val reopened = AstraBookLibrary(directory)
+        assertEquals(1, reopened.listBooks().size)
+        assertTrue(reopened.search("Treasury government bond duration").isNotEmpty())
     }
 
     @Test fun rejectsArchiveTraversalAndExternalXmlEntities() {
