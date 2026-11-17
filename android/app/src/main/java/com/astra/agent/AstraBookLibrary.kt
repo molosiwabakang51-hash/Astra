@@ -19,7 +19,7 @@ import kotlin.math.min
 /**
  * Private, locally indexed user-selected reading material.
  *
- * - Accepts UTF-8 TXT, Markdown and unencrypted EPUB.
+ * - Accepts TXT, Markdown, EPUB and bounded offline document formats.
  * - No network requests, no cloud backup, no access to files beyond the picked one.
  * - Source text is untrusted context, never instructions or actions.
  * - Files remain private until the owner deletes them; no original book is shared.
@@ -53,16 +53,15 @@ internal class AstraBookLibrary(private val directory: File) {
     fun importBook(filename: String, input: InputStream): Book {
         val title = filename.substringAfterLast('/').substringAfterLast('\\')
             .replace(Regex("""[\u0000-\u001f]"""), " ").trim().take(110)
-        val format = when {
-            title.endsWith(".txt", true) -> "txt"
-            title.endsWith(".md", true) || title.endsWith(".markdown", true) -> "markdown"
-            title.endsWith(".epub", true) -> "epub"
-            else -> throw IllegalArgumentException("Choose a UTF-8 TXT, Markdown or EPUB book.")
-        }
+        val format = AstraDocumentText.format(title)
+            ?: throw IllegalArgumentException(
+                "Choose " + AstraDocumentText.FORMATS + "."
+            )
         require(title.isNotBlank()) { "Book filename is missing." }
         val body = when (format) {
             "epub" -> epubText(input)
-            else -> decode(readBounded(input, MAX_INPUT_BYTES))
+            "txt", "markdown" -> decode(readBounded(input, MAX_INPUT_BYTES))
+            else -> AstraDocumentText.extract(format, input)
         }.trim()
         require(body.length >= 60) { "This book contains too little readable text." }
         val all = chunks(body)
