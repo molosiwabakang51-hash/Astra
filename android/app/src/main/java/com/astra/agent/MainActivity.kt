@@ -2501,7 +2501,20 @@ class MainActivity :
                 var offlineAnswerMessageIndex by remember { mutableIntStateOf(-1) }
                 // Grounded-memory prompts use an isolated local model context.
                 var privateInferenceCounter by remember { mutableIntStateOf(0) }
-                var offlineModelTestStatus by remember { mutableStateOf("") }
+                val offlineTestPrefs = remember {
+                    applicationContext.getSharedPreferences("astra", Context.MODE_PRIVATE)
+                }
+                var offlineModelTestStatus by remember {
+                    mutableStateOf(
+                        if (offlineTestPrefs.getBoolean("astra_offline_test_incomplete", false))
+                            "PREVIOUS OFFLINE TEST WAS INTERRUPTED. The Android process may " +
+                                "have crashed or been stopped during native inference. " +
+                                "Last stage: " +
+                                offlineTestPrefs.getString("astra_offline_test_stage", "unknown") +
+                                ". Keep the imported model; collect a crash log before retrying."
+                        else ""
+                    )
+                }
                 var offlineModelTestRunning by remember { mutableStateOf(false) }
                 var languageBenchmarkRunning by remember { mutableStateOf(false) }
                 var languageBenchmarkStatus by remember { mutableStateOf("") }
@@ -5496,8 +5509,15 @@ class MainActivity :
                                                 onClick = {
                                                     offlineModelTestRunning = true
                                                     offlineModelTestStatus = "LOADING AND TESTING LOCAL MODEL..."
+                                                    // Commit synchronously before JNI starts: a fatal native
+                                                    // signal terminates the process without reaching catch/finally.
+                                                    offlineTestPrefs.edit()
+                                                        .putBoolean("astra_offline_test_incomplete", true)
+                                                        .putString("astra_offline_test_stage", "starting")
+                                                        .commit()
                                                     val began = System.nanoTime()
                                                     researchScope.launch {
+                                                        var recordedGeneration = false
                                                         try {
                                                             val answer = onDeviceBrain.reply(
                                                                 listOf(
@@ -5508,7 +5528,28 @@ class MainActivity :
                                                                 ),
                                                                 Int.MIN_VALUE,
                                                                 diagnosticMaxTokens =
-                                                                    AstraGenerationPolicy.DIAGNOSTIC_TOKEN_LIMIT
+                                                                    AstraGenerationPolicy.DIAGNOSTIC_TOKEN_LIMIT,
+                                                                onPartial = { progress ->
+                                                                    // Store only generic model stage, never
+                                                                    // private model output or chat prompts.
+                                                                    if (progress.startsWith("Verifying the local offline model") ||
+                                                                        progress.startsWith("Loading the language model")) {
+                                                                        offlineTestPrefs.edit()
+                                                                            .putString("astra_offline_test_stage",
+                                                                                if (progress.startsWith("Loading"))
+                                                                                    "native model loading"
+                                                                                else "model verification")
+                                                                            .commit()
+                                                                    } else if (!recordedGeneration &&
+                                                                        progress.isNotBlank()) {
+                                                                        // Do not persist the generated content.
+                                                                        recordedGeneration = true
+                                                                        offlineTestPrefs.edit()
+                                                                            .putString("astra_offline_test_stage",
+                                                                                "token generation")
+                                                                            .commit()
+                                                                    }
+                                                                }
                                                             )
                                                             val elapsed =
                                                                 (System.nanoTime() - began) / 1_000_000
@@ -5526,6 +5567,12 @@ class MainActivity :
                                                                 "OFFLINE TEST FAILED: " +
                                                                     (error.message ?: "Unknown inference error")
                                                         } finally {
+                                                            // A Kotlin exception is recoverable. Only a
+                                                            // process-level crash leaves the checkpoint set.
+                                                            offlineTestPrefs.edit()
+                                                                .putBoolean("astra_offline_test_incomplete", false)
+                                                                .remove("astra_offline_test_stage")
+                                                                .commit()
                                                             offlineModelTestRunning = false
                                                         }
                                                     }
