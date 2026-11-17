@@ -1965,15 +1965,15 @@ private fun MessageBubble(
     ) {
 
         Surface(
-            color =
-                if (isUser) {
-                    MaterialTheme.colorScheme.primaryContainer
-                } else {
-                    MaterialTheme.colorScheme.surfaceVariant
-                },
-            shape = RoundedCornerShape(18.dp),
+            color = if (isUser) MaterialTheme.colorScheme.primaryContainer
+                else AstraAurora.surface,
+            shape = RoundedCornerShape(if (isUser) 22.dp else 18.dp),
+            border = androidx.compose.foundation.BorderStroke(
+                1.dp, (if (isUser) AstraAurora.violet else AstraAurora.cyan)
+                    .copy(alpha = if (isUser) 0.25f else 0.17f)
+            ),
             modifier = Modifier
-                .fillMaxWidth(0.88f)
+                .fillMaxWidth(if (isUser) 0.86f else 0.96f)
                 .combinedClickable(
                     onClick = {},
                     onLongClick = onLongPress
@@ -2372,18 +2372,23 @@ class MainActivity :
         setContent {
 
             MaterialTheme(
+                typography = AstraReadableTypography,
                 colorScheme = darkColorScheme(
-                    primary = Color(0xFF79BFFF),
-                    onPrimary = Color(0xFF061626),
-                    primaryContainer = Color(0xFF153653),
-                    onPrimaryContainer = Color(0xFFE6F3FF),
-                    background = Color(0xFF090D14),
-                    onBackground = Color(0xFFE8F0F9),
-                    surface = Color(0xFF111925),
-                    onSurface = Color(0xFFE8F0F9),
-                    surfaceVariant = Color(0xFF253341),
-                    onSurfaceVariant = Color(0xFFD0DDE9),
-                    secondary = Color(0xFFBACBDD)
+                    primary = AstraAurora.cyan,
+                    onPrimary = AstraAurora.background,
+                    primaryContainer = Color(0xFF263E58),
+                    onPrimaryContainer = AstraAurora.ink,
+                    background = AstraAurora.background,
+                    onBackground = AstraAurora.ink,
+                    surface = AstraAurora.surface,
+                    onSurface = AstraAurora.ink,
+                    surfaceVariant = AstraAurora.raised,
+                    onSurfaceVariant = AstraAurora.muted,
+                    secondary = AstraAurora.violet,
+                    onSecondary = AstraAurora.background,
+                    secondaryContainer = Color(0xFF303451),
+                    tertiary = AstraAurora.mint,
+                    outline = Color(0xFF566A86)
                 )
             ) {
 
@@ -2547,6 +2552,8 @@ class MainActivity :
                 var tab by remember {
                     mutableIntStateOf(0)
                 }
+                // Re-open the subject catalog instead of retaining an old topic.
+                var studyOpenToken by remember { mutableIntStateOf(0) }
 
                 var showFindInChat by remember { mutableStateOf(false) }
                 var findInChatQuery by remember { mutableStateOf("") }
@@ -4734,9 +4741,9 @@ class MainActivity :
                     modifier = Modifier.background(
                         androidx.compose.ui.graphics.Brush.verticalGradient(
                             listOf(
-                                Color(0xFF080E19),
-                                Color(0xFF0A1424),
-                                Color(0xFF070B13)
+                                AstraAurora.background,
+                                AstraAurora.night,
+                                AstraAurora.background
                             )
                         )
                     ),
@@ -4773,7 +4780,7 @@ class MainActivity :
                                     onDismissRequest = { navigationPopupOpen = false }
                                 ) {
                                     listOf(
-                                        "Chat", "Tasks", "Notes", "Tools", "Settings"
+                                        "Chat", "Tasks", "Notes", "Tools", "Settings", "Study"
                                     ).forEachIndexed { index, title ->
                                         DropdownMenuItem(
                                             text = {
@@ -4782,7 +4789,7 @@ class MainActivity :
                                                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                                                 ) {
                                                     Text(
-                                                        listOf("◌", "✓", "▤", "⌘", "⚙")[index],
+                                                        listOf("◌", "✓", "▤", "⌘", "⚙", "✦")[index],
                                                         color = MaterialTheme.colorScheme.primary
                                                     )
                                                     Text(title, style = MaterialTheme.typography.bodyMedium)
@@ -4790,6 +4797,7 @@ class MainActivity :
                                                 }
                                             },
                                             onClick = {
+                                                if (index == 5) studyOpenToken++
                                                 tab = index
                                                 navigationPopupOpen = false
                                             }
@@ -4920,12 +4928,14 @@ class MainActivity :
                             // Visible build identification makes old APKs unmistakable.
                             // This is a label, never a second navigation control.
                             Text(
-                                text = "v" + ASTRA_VERSION + "  ·  OFFLINE AI",
+                                text = "●  LOCAL  ·  v" + ASTRA_VERSION,
                                 style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.primary,
+                                color = AstraAurora.mint,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
-                                modifier = Modifier.padding(start = 8.dp)
+                                modifier = Modifier
+                                    .background(AstraAurora.raised, RoundedCornerShape(50))
+                                    .padding(horizontal = 9.dp, vertical = 7.dp)
                             )
 
                         }
@@ -4987,11 +4997,16 @@ class MainActivity :
                                     // A small interactive landing surface is shown only
                                     // before the first user turn. Ongoing chats keep
                                     // the full-height transcript and input area.
-                                    if (AstraWelcomePolicy.show(history.map { it.role })) {
+                                    val showWelcome = AstraWelcomePolicy.show(history.map { it.role })
+                                    if (showWelcome) {
                                         item(key = "astra-welcome") {
                                             AstraWelcomePanel(
                                                 onOpenNavigation = {
                                                     navigationPopupOpen = true
+                                                },
+                                                onOpenStudy = {
+                                                    studyOpenToken++
+                                                    tab = 5
                                                 },
                                                 onCommand = { command -> submit(command) }
                                             )
@@ -4999,7 +5014,11 @@ class MainActivity :
                                     }
 
                                     itemsIndexed(
-                                        history
+                                        history.filterNot { message ->
+                                            AstraWelcomePolicy.hideInitialGreeting(
+                                                showWelcome, message.role, message.text
+                                            )
+                                        }
                                     ) { _, message ->
 
                                         MessageBubble(
@@ -5098,7 +5117,10 @@ class MainActivity :
                                                 else "Start voice dictation"
                                         }
                                     ) {
-                                        Text(if (listening) "■" else "🎙")
+                                        AstraControlGlyph(
+                                            if (listening) AstraControl.STOP else AstraControl.VOICE,
+                                            tint = if (listening) AstraAurora.mint else AstraAurora.cyan
+                                        )
                                     }
                                     OutlinedTextField(
                                         value = input,
@@ -5107,9 +5129,15 @@ class MainActivity :
                                             if (it.isNotBlank()) commandDeckExpanded = false
                                         },
                                         modifier = Modifier.weight(1f),
-                                        placeholder = { Text("Message Astra...") },
+                                        placeholder = { Text("Ask Astra anything...") },
                                         maxLines = 4,
                                         shape = RoundedCornerShape(24.dp),
+                                        colors = OutlinedTextFieldDefaults.colors(
+                                            focusedBorderColor = AstraAurora.cyan,
+                                            unfocusedBorderColor = AstraAurora.violet.copy(alpha = 0.40f),
+                                            focusedContainerColor = AstraAurora.surface,
+                                            unfocusedContainerColor = AstraAurora.surface
+                                        ),
                                         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
                                         keyboardActions = KeyboardActions(onSend = {
                                             if (offlineJob?.isActive != true) submit(input)
@@ -5122,7 +5150,7 @@ class MainActivity :
                                                 contentDescription = "Stop offline response"
                                             }
                                         ) {
-                                            Text("■")
+                                            AstraControlGlyph(AstraControl.STOP)
                                         }
                                     } else {
                                         FilledIconButton(
@@ -5132,7 +5160,7 @@ class MainActivity :
                                                 contentDescription = "Send message"
                                             }
                                         ) {
-                                            Text("➤")
+                                            AstraControlGlyph(AstraControl.SEND)
                                         }
                                     }
                                 }
@@ -5410,6 +5438,23 @@ class MainActivity :
                                 )
 
                                 Text(toolOutput)
+                            }
+
+                            // ========================================
+                            // STUDY HUB
+                            // ========================================
+
+                            5 -> {
+                                key(studyOpenToken) {
+                                    AstraStudyHub(
+                                        onBackToChat = { tab = 0 },
+                                        onLesson = { topic ->
+                                            // Show the resulting offline lesson in Chat.
+                                            tab = 0
+                                            submit(topic.command)
+                                        }
+                                    )
+                                }
                             }
 
                             // ========================================

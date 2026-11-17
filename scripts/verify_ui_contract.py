@@ -23,7 +23,7 @@ def main():
 
     required = {
         "Astra icon opens navigation": 'clickable { navigationPopupOpen = true }',
-        "Astra logo contains chat/settings options": 'listOf(\n                                        "Chat", "Tasks", "Notes", "Tools", "Settings"',
+        "Astra logo contains chat/settings options": 'listOf(\n                                        "Chat", "Tasks", "Notes", "Tools", "Settings", "Study"',
         "Chat deck starts collapsed": 'var commandDeckExpanded by remember { mutableStateOf(false) }',
         "Chat takes remaining space": 'Modifier.weight(1f)',
         "Qwen is installed on device": 'AstraOnDeviceBrain(applicationContext',
@@ -37,7 +37,7 @@ def main():
         "Memory recall stays off-device model prompt": 'AstraMemoryRecall.find(',
         "Compact logo offers memory search": 'Text("Search all local memory")',
         "Strict on-device AI challenge is wired in": 'AstraOfflineSelfTest.evaluate(',
-        "Build identity is in the chat header": '"v" + ASTRA_VERSION + "  ·  OFFLINE AI"',
+        "Build identity is in the chat header": '"●  LOCAL  ·  v" + ASTRA_VERSION',
     }
 
     forbidden = {
@@ -52,6 +52,13 @@ def main():
     for description, pattern in forbidden.items():
         if re.search(pattern, app):
             raise RuntimeError(f"Regression: {description}")
+
+    study = (ROOT / "android/app/src/main/java/com/astra/agent/AstraStudyCatalog.kt").read_text(encoding="utf-8")
+    welcome = (ROOT / "android/app/src/main/java/com/astra/agent/AstraWelcomePanel.kt").read_text(encoding="utf-8")
+    if ('AstraStudyHub(' not in app or 'onOpenStudy =' not in app or
+            '"Study"' not in welcome or '"Teach me finance"' in welcome or
+            '"finance"' not in study or '"day_trading"' not in study):
+        raise RuntimeError("Study must open an explicit subject picker without auto-launching finance")
 
     if "session.invalidate()" not in brain or "AstraInferenceSession()" not in brain:
         raise RuntimeError("Offline native inference must reset its KV-cache after errors")

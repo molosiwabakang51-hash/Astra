@@ -28,7 +28,7 @@ class AstraWelcomePolicyTest {
 
     @Test fun shortcutsMatchExistingLocalCommands() {
         assertEquals(
-            listOf("Teach me finance", "Memory overview", "Show tasks", "Show notes"),
+            listOf("Study", "Memory overview", "Show tasks", "Show notes"),
             AstraWelcomePolicy.commands
         )
     }

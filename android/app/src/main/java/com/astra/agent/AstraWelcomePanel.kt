@@ -1,14 +1,7 @@
 package com.astra.agent
 
-import android.provider.Settings
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -24,31 +17,25 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import kotlin.math.cos
-import kotlin.math.sin
+import androidx.compose.ui.unit.sp
 
 /**
- * New-conversation welcome surface, visible only until the first user turn.
- * Quick actions are real existing offline commands; no simulated intelligence.
+ * A unique, expressive start surface without sacrificing chat space.
+ * It disappears after the first user turn and its actions execute existing
+ * local commands, never pretend that an uninstalled model is responding.
  */
 internal object AstraWelcomePolicy {
     val commands = listOf(
-        "Teach me finance",
+        "Study",
         "Memory overview",
         "Show tasks",
         "Show notes"
@@ -56,163 +43,151 @@ internal object AstraWelcomePolicy {
 
     fun show(roles: List<String>): Boolean = roles.none { it == "You" || it == "user" }
 
-    /** Treat Android's disabled animator scale as a hard stop for the orbit. */
-    fun animateForScale(scale: Float): Boolean = scale.isFinite() && scale > 0f
+    fun animateForScale(scale: Float): Boolean = AstraAurora.motionEnabled(scale)
+
+    /** Hide the duplicate built-in greeting only when the full welcome is visible. */
+    fun hideInitialGreeting(showWelcome: Boolean, role: String, text: String): Boolean =
+        showWelcome && role == "Astra" && text == "Hello. How can I help you?"
 }
 
 @Composable
 internal fun AstraWelcomePanel(
     onOpenNavigation: () -> Unit,
+    onOpenStudy: () -> Unit,
     onCommand: (String) -> Unit
 ) {
-    val context = LocalContext.current
-    val animate = remember(context) {
-        // Respect the owner's Android accessibility / developer animation
-        // settings. No permission or persistent tracking is introduced.
-        val scale = runCatching {
-            Settings.Global.getFloat(
-                context.contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f
-            )
-        }.getOrDefault(1f)
-        AstraWelcomePolicy.animateForScale(scale)
-    }
-    val orbit = if (animate) {
-        val transition = rememberInfiniteTransition(label = "astra-welcome")
-        val angle by transition.animateFloat(
-            initialValue = 0f,
-            targetValue = 360f,
-            animationSpec = infiniteRepeatable(
-                animation = tween(durationMillis = 9000, easing = LinearEasing),
-                repeatMode = RepeatMode.Restart
-            ),
-            label = "welcome-orbit"
-        )
-        angle
-    } else 0f
-
+    val card = RoundedCornerShape(28.dp)
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .background(
-                brush = Brush.verticalGradient(
-                    listOf(Color(0xFF15253D), Color(0xFF0F1A2D), Color(0xFF0D1524))
+                brush = Brush.linearGradient(
+                    listOf(
+                        Color(0xFF16243B),
+                        Color(0xFF12233E),
+                        Color(0xFF101629)
+                    )
                 ),
-                shape = RoundedCornerShape(24.dp)
+                shape = card
             )
-            .padding(horizontal = 16.dp, vertical = 20.dp),
+            .border(
+                width = 1.dp,
+                brush = Brush.linearGradient(
+                    listOf(
+                        AstraAurora.cyan.copy(alpha = 0.43f),
+                        AstraAurora.violet.copy(alpha = 0.22f),
+                        AstraAurora.cyan.copy(alpha = 0.08f)
+                    )
+                ),
+                shape = card
+            )
+            .padding(horizontal = 17.dp, vertical = 16.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
+        Text(
+            "YOUR SPACE TO THINK",
+            color = AstraAurora.mint,
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = FontWeight.SemiBold,
+            letterSpacing = 2.sp
+        )
+        Spacer(Modifier.height(2.dp))
         Box(
             modifier = Modifier
-                .size(94.dp)
-                .semantics { contentDescription = "Open Astra navigation" }
+                .size(148.dp)
+                .semantics { contentDescription = "Open Astra navigation and workspace" }
                 .clickable(onClick = onOpenNavigation),
             contentAlignment = Alignment.Center
         ) {
-            Canvas(modifier = Modifier.size(88.dp)) {
-                val radius = size.minDimension * 0.36f
-                drawCircle(
-                    brush = Brush.radialGradient(
-                        listOf(Color(0xFF386CB5).copy(alpha = 0.46f), Color.Transparent),
-                        center = center,
-                        radius = size.minDimension * 0.5f
-                    ),
-                    radius = size.minDimension * 0.5f
-                )
-                drawCircle(
-                    color = Color(0xFF4B86BE).copy(alpha = 0.78f),
-                    radius = radius,
-                    style = Stroke(width = 1.6.dp.toPx())
-                )
-                val angle = Math.toRadians(orbit.toDouble())
-                val point = Offset(
-                    center.x + radius * cos(angle).toFloat(),
-                    center.y + radius * sin(angle).toFloat()
-                )
-                drawCircle(Color(0xFF8BD9FF), radius = 4.dp.toPx(), center = point)
-                drawCircle(
-                    brush = Brush.radialGradient(
-                        listOf(Color(0xFF75CAFF), Color(0xFF20528B)),
-                        center = center,
-                        radius = size.minDimension * 0.14f
-                    ),
-                    radius = size.minDimension * 0.13f
-                )
-                drawLine(
-                    color = Color(0xFFE5F6FF),
-                    start = Offset(center.x - 5.dp.toPx(), center.y + 5.dp.toPx()),
-                    end = Offset(center.x, center.y - 6.dp.toPx()),
-                    strokeWidth = 2.dp.toPx(),
-                    cap = StrokeCap.Round
-                )
-                drawLine(
-                    color = Color(0xFFE5F6FF),
-                    start = Offset(center.x, center.y - 6.dp.toPx()),
-                    end = Offset(center.x + 5.dp.toPx(), center.y + 5.dp.toPx()),
-                    strokeWidth = 2.dp.toPx(),
-                    cap = StrokeCap.Round
-                )
-            }
+            AstraOrb(diameter = 146.dp)
         }
         Text(
-            "Your offline workspace",
-            color = Color(0xFFE7F4FF),
-            style = MaterialTheme.typography.titleMedium,
+            "Ideas, in your orbit.",
+            color = AstraAurora.ink,
+            style = MaterialTheme.typography.titleLarge,
             fontWeight = FontWeight.SemiBold,
             textAlign = TextAlign.Center
         )
         Spacer(Modifier.height(5.dp))
         Text(
-            "Ask a question or explore your local notes and tools. " +
-                "Tap the orb to open navigation.",
-            color = Color(0xFFADC4D8),
+            "Ask anything. Explore your knowledge. Move from thought to action.",
+            color = AstraAurora.muted,
             style = MaterialTheme.typography.bodySmall,
             textAlign = TextAlign.Center
         )
-        Spacer(Modifier.height(17.dp))
+        Spacer(Modifier.height(16.dp))
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+            horizontalArrangement = Arrangement.spacedBy(9.dp)
         ) {
-            AstraStarterAction("✦  Study", AstraWelcomePolicy.commands[0], onCommand,
-                Modifier.weight(1f))
-            AstraStarterAction("◌  Recall", AstraWelcomePolicy.commands[1], onCommand,
-                Modifier.weight(1f))
+            AstraStarterAction("✦", "Study", "Choose a subject",
+                AstraWelcomePolicy.commands[0], { _ -> onOpenStudy() },
+                Modifier.weight(1f), AstraAurora.cyan)
+            AstraStarterAction("◎", "Recall", "Private memory",
+                AstraWelcomePolicy.commands[1], onCommand, Modifier.weight(1f), AstraAurora.violet)
         }
-        Spacer(Modifier.height(8.dp))
+        Spacer(Modifier.height(9.dp))
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+            horizontalArrangement = Arrangement.spacedBy(9.dp)
         ) {
-            AstraStarterAction("☷  Tasks", AstraWelcomePolicy.commands[2], onCommand,
-                Modifier.weight(1f))
-            AstraStarterAction("▤  Notes", AstraWelcomePolicy.commands[3], onCommand,
-                Modifier.weight(1f))
+            AstraStarterAction("☷", "Tasks", "Your next move",
+                AstraWelcomePolicy.commands[2], onCommand, Modifier.weight(1f), AstraAurora.mint)
+            AstraStarterAction("▤", "Notes", "Your ideas, saved",
+                AstraWelcomePolicy.commands[3], onCommand, Modifier.weight(1f), AstraAurora.cyan)
         }
+        Spacer(Modifier.height(13.dp))
+        Text(
+            "Tap the core to open your workspace",
+            color = AstraAurora.muted.copy(alpha = 0.82f),
+            style = MaterialTheme.typography.labelSmall,
+            textAlign = TextAlign.Center
+        )
     }
 }
 
 @Composable
 private fun AstraStarterAction(
-    label: String,
+    glyph: String,
+    title: String,
+    subtitle: String,
     command: String,
     onCommand: (String) -> Unit,
-    modifier: Modifier
+    modifier: Modifier,
+    accent: Color
 ) {
-    Box(
+    val shape = RoundedCornerShape(17.dp)
+    Row(
         modifier = modifier
-            .heightIn(min = 48.dp)
-            .background(Color(0xFF213852), RoundedCornerShape(14.dp))
-            .semantics { contentDescription = "$label: $command" }
+            .heightIn(min = 68.dp)
+            .background(AstraAurora.raised.copy(alpha = 0.81f), shape)
+            .border(1.dp, accent.copy(alpha = 0.19f), shape)
+            .semantics { contentDescription = "$title: $subtitle. $command" }
             .clickable { onCommand(command) }
-            .padding(horizontal = 10.dp, vertical = 12.dp),
-        contentAlignment = Alignment.Center
+            .padding(horizontal = 9.dp, vertical = 11.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(7.dp)
     ) {
         Text(
-            label,
-            color = Color(0xFFDBEEFF),
-            style = MaterialTheme.typography.labelLarge,
+            glyph,
+            color = accent,
+            style = MaterialTheme.typography.titleMedium,
             maxLines = 1
         )
+        Column {
+            Text(
+                title,
+                color = AstraAurora.ink,
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1
+            )
+            Text(
+                subtitle,
+                color = AstraAurora.muted,
+                style = MaterialTheme.typography.labelSmall,
+                maxLines = 2
+            )
+        }
     }
 }
