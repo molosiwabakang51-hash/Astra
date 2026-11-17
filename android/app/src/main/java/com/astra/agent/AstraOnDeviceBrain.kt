@@ -82,6 +82,8 @@ internal class AstraOnDeviceBrain(
         diagnosticMaxTokens: Int? = null,
         onPartial: suspend (String) -> Unit = {}
     ): String = mutex.withLock {
+            // Durable but content-free checkpoint survives a fatal JNI signal.
+            AstraInferenceCheckpoint.begin(context)
             try {
                 withContext(Dispatchers.IO) {
                 val finalMessage = AstraConversationContext.currentUserMessage(
@@ -183,6 +185,9 @@ internal class AstraOnDeviceBrain(
                         "Re-import a model from Settings.",
                     lastPreparationError
                 )
+                AstraInferenceCheckpoint.mark(
+                    context, AstraInferenceCheckpoint.ENGINE_SETUP
+                )
                 val current = engine ?: AiChat.getInferenceEngine(
                     context.applicationContext
                 ).also { engine = it }
@@ -209,6 +214,9 @@ internal class AstraOnDeviceBrain(
                 ) {
                     onPartial("Loading the language model on this phone...")
                     suspend fun loadPreparedModel(path: File) {
+                        AstraInferenceCheckpoint.mark(
+                            context, AstraInferenceCheckpoint.MODEL_LOADING
+                        )
                         // Unload stale native KV-cache when changing conversations
                         // or switching model weights. No network call is involved.
                         if (current.state.value is InferenceEngine.State.ModelReady) {
@@ -298,6 +306,9 @@ internal class AstraOnDeviceBrain(
                     ),
                     diagnosticMaxTokens
                 )
+                AstraInferenceCheckpoint.mark(
+                    context, AstraInferenceCheckpoint.TOKEN_GENERATION
+                )
                 current.sendUserPrompt(requestPrompt, answerBudget).collect { part ->
                     // Restrict accumulated output and cap main-thread UI updates.
                     val space = (16_000 - answer.length).coerceAtLeast(0)
@@ -330,6 +341,10 @@ internal class AstraOnDeviceBrain(
                 session.invalidate()
                 loadedModelPath = null
                 throw error
+            } finally {
+                // Does not run on fatal native process death. Cancelled and
+                // recoverable requests clear the checkpoint normally.
+                AstraInferenceCheckpoint.clear(context)
             }
         }
 
