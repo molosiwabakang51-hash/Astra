@@ -111,7 +111,10 @@ internal object AstraConversationContext {
         // Otherwise retain the existing recency-first behavior.
         val priority = (
             if (ownerRecall && ranked.isNotEmpty()) {
-                retrieved + recent.asReversed()
+                // First-person recall is evidence about the owner's words.
+                // Recent assistant guesses are not such evidence and must
+                // not compete for the limited 1,150-character history window.
+                retrieved + recent.asReversed().filter { it.value.role == "user" }
             } else {
                 recent.asReversed() + retrieved + fallback
             }
