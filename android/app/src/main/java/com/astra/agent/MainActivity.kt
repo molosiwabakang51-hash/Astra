@@ -4993,7 +4993,8 @@ class MainActivity :
                                     // A small interactive landing surface is shown only
                                     // before the first user turn. Ongoing chats keep
                                     // the full-height transcript and input area.
-                                    if (AstraWelcomePolicy.show(history.map { it.role })) {
+                                    val showWelcome = AstraWelcomePolicy.show(history.map { it.role })
+                                    if (showWelcome) {
                                         item(key = "astra-welcome") {
                                             AstraWelcomePanel(
                                                 onOpenNavigation = {
@@ -5005,7 +5006,11 @@ class MainActivity :
                                     }
 
                                     itemsIndexed(
-                                        history
+                                        history.filterNot { message ->
+                                            AstraWelcomePolicy.hideInitialGreeting(
+                                                showWelcome, message.role, message.text
+                                            )
+                                        }
                                     ) { _, message ->
 
                                         MessageBubble(
@@ -5104,7 +5109,10 @@ class MainActivity :
                                                 else "Start voice dictation"
                                         }
                                     ) {
-                                        Text(if (listening) "■" else "🎙")
+                                        AstraControlGlyph(
+                                            if (listening) AstraControl.STOP else AstraControl.VOICE,
+                                            tint = if (listening) AstraAurora.mint else AstraAurora.cyan
+                                        )
                                     }
                                     OutlinedTextField(
                                         value = input,
@@ -5113,9 +5121,15 @@ class MainActivity :
                                             if (it.isNotBlank()) commandDeckExpanded = false
                                         },
                                         modifier = Modifier.weight(1f),
-                                        placeholder = { Text("Message Astra...") },
+                                        placeholder = { Text("Ask Astra anything...") },
                                         maxLines = 4,
                                         shape = RoundedCornerShape(24.dp),
+                                        colors = OutlinedTextFieldDefaults.colors(
+                                            focusedBorderColor = AstraAurora.cyan,
+                                            unfocusedBorderColor = AstraAurora.violet.copy(alpha = 0.40f),
+                                            focusedContainerColor = AstraAurora.surface,
+                                            unfocusedContainerColor = AstraAurora.surface
+                                        ),
                                         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
                                         keyboardActions = KeyboardActions(onSend = {
                                             if (offlineJob?.isActive != true) submit(input)
@@ -5128,7 +5142,7 @@ class MainActivity :
                                                 contentDescription = "Stop offline response"
                                             }
                                         ) {
-                                            Text("■")
+                                            AstraControlGlyph(AstraControl.STOP)
                                         }
                                     } else {
                                         FilledIconButton(
@@ -5138,7 +5152,7 @@ class MainActivity :
                                                 contentDescription = "Send message"
                                             }
                                         ) {
-                                            Text("➤")
+                                            AstraControlGlyph(AstraControl.SEND)
                                         }
                                     }
                                 }
