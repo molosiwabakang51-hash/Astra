@@ -30,6 +30,44 @@ internal object AstraProcessExitReason {
         }
     }
 
+    /**
+     * Restrict model fallback to an OS-confirmed native crash / low-memory
+     * termination *after* the interrupted inference checkpoint began.
+     * Do not confuse older crashes, user force-stop, Java exceptions or
+     * an absent process-exit record with evidence of a model crash.
+     */
+    internal fun nativeOrMemoryExitSince(
+        context: Context, inferenceBeganMs: Long
+    ): Boolean {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R || inferenceBeganMs <= 0L) {
+            return false
+        }
+        return runCatching {
+            val manager = context.getSystemService(Context.ACTIVITY_SERVICE)
+                as? ActivityManager ?: return@runCatching false
+            val now = System.currentTimeMillis()
+            manager.getHistoricalProcessExitReasons(context.packageName, 0, 5)
+                .firstOrNull { it.processName == context.packageName }
+                ?.let { wasNativeOrMemoryCrashDuringInference(
+                    it.reason, inferenceBeganMs, it.timestamp, now
+                ) } ?: false
+        }.getOrDefault(false)
+    }
+
+    /** Pure time/reason validation, independently JVM-tested. */
+    internal fun wasNativeOrMemoryCrashDuringInference(
+        reason: Int, beganMs: Long, exitMs: Long, nowMs: Long
+    ): Boolean =
+        reason in setOf(
+            ApplicationExitInfo.REASON_CRASH_NATIVE,
+            ApplicationExitInfo.REASON_LOW_MEMORY
+        ) &&
+            beganMs > 0L &&
+            nowMs >= beganMs &&
+            exitMs >= beganMs &&
+            exitMs <= nowMs + 30_000L &&
+            exitMs - beganMs <= 24L * 60 * 60 * 1000
+
     fun describe(reason: Int): String = when (reason) {
         ApplicationExitInfo.REASON_CRASH_NATIVE ->
             "Android recorded a native crash (JNI/C++); capture the crash log."
