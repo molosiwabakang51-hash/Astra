@@ -2023,6 +2023,32 @@ class MainActivity :
 
     private var listening by mutableStateOf(false)
 
+    private var secureLockEnabled by mutableStateOf(false)
+    private var workspaceUnlocked by mutableStateOf(true)
+    private var authenticationInProgress = false
+
+    private fun requestWorkspaceAuthentication(onAccepted: () -> Unit = {
+        workspaceUnlocked = true
+    }) {
+        if (authenticationInProgress) return
+        authenticationInProgress = true
+        AstraAppLock.authenticate(
+            this,
+            onSuccess = {
+                authenticationInProgress = false
+                onAccepted()
+            },
+            onUnavailable = {
+                authenticationInProgress = false
+                Toast.makeText(
+                    this,
+                    "Authentication cancelled or unavailable. Use Android's secure screen lock.",
+                    Toast.LENGTH_LONG
+                ).show()
+            }
+        )
+    }
+
     private var recognitionStatus by mutableStateOf(
         "Not initialized"
     )
@@ -2342,6 +2368,10 @@ class MainActivity :
 
         super.onCreate(savedInstanceState)
 
+        secureLockEnabled = AstraAppLock.enabled(this)
+        workspaceUnlocked = AstraAppLockPolicy.unlockedOnColdLaunch(secureLockEnabled)
+        AstraAppLock.protectRecentsAndScreenshots(this, secureLockEnabled)
+
         tts = TextToSpeech(
             this,
             this
@@ -2391,6 +2421,19 @@ class MainActivity :
                     outline = Color(0xFF566A86)
                 )
             ) {
+                // Gate before composing or loading any personal chats or notes.
+                // Only the public, content-free locked surface renders here.
+                if (AstraAppLockPolicy.requiresUnlock(
+                        secureLockEnabled, workspaceUnlocked
+                    )) {
+                    AstraLockedWorkspace(
+                        onRequestUnlock = { requestWorkspaceAuthentication() },
+                        onOpenDeviceSecurity = {
+                            startActivity(Intent(Settings.ACTION_SECURITY_SETTINGS))
+                        }
+                    )
+                    return@MaterialTheme
+                }
 
                 val history = remember {
 
@@ -5477,6 +5520,66 @@ class MainActivity :
 
                                     item {
                                         Text(
+                                            "Security",
+                                            style = MaterialTheme.typography.titleLarge
+                                        )
+                                        Text(
+                                            "Optional Android fingerprint or device PIN unlock. " +
+                                                "When enabled, Astra hides private screens when " +
+                                                "backgrounded and blocks screenshots and app previews. " +
+                                                "This does not encrypt existing files."
+                                        )
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.SpaceBetween
+                                        ) {
+                                            Text(
+                                                "Require fingerprint or PIN",
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                modifier = Modifier.weight(1f)
+                                            )
+                                            Switch(
+                                                checked = secureLockEnabled,
+                                                onCheckedChange = { requested ->
+                                                    if (!AstraAppLock.canUnlock(this@MainActivity)) {
+                                                        Toast.makeText(
+                                                            this@MainActivity,
+                                                            "Set up an Android screen lock first.",
+                                                            Toast.LENGTH_LONG
+                                                        ).show()
+                                                    } else {
+                                                        requestWorkspaceAuthentication {
+                                                            try {
+                                                                AstraAppLock.setEnabled(
+                                                                    applicationContext, requested
+                                                                )
+                                                                secureLockEnabled = requested
+                                                                workspaceUnlocked = true
+                                                                AstraAppLock.protectRecentsAndScreenshots(
+                                                                    this@MainActivity, requested
+                                                                )
+                                                            } catch (failure: Exception) {
+                                                                Toast.makeText(
+                                                                    this@MainActivity,
+                                                                    "Cannot save app lock setting.",
+                                                                    Toast.LENGTH_LONG
+                                                                ).show()
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            )
+                                        }
+                                        if (secureLockEnabled) {
+                                            OutlinedButton(onClick = {
+                                                workspaceUnlocked = false
+                                            }) { Text("Lock Astra now") }
+                                        }
+                                    }
+
+                                    item {
+                                        Text(
                                             "Offline AI models",
                                             style = MaterialTheme.typography.titleMedium
                                         )
@@ -6876,6 +6979,15 @@ class MainActivity :
             }
 
         }.trim()
+    }
+
+    override fun onStop() {
+        // Lock when backgrounded; next foreground composition sees only
+        // the public lock surface until the Android system authenticates.
+        if (secureLockEnabled) {
+            workspaceUnlocked = AstraAppLockPolicy.unlockedAfterBackground(true)
+        }
+        super.onStop()
     }
 
     override fun onDestroy() {
