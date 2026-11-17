@@ -41,7 +41,7 @@ internal object AstraFolderAccess {
                 append(failures.take(2).joinToString(" | "))
             } else append(".")
             if (atCapacity) append(" Astra's private book library is full (30 books).")
-            if (inspected == 0) append(" No supported TXT, MD or EPUB files were found.")
+            if (inspected == 0) append(" No supported offline reading documents were found.")
         }
     }
 
@@ -184,7 +184,6 @@ internal object AstraFolderRules {
         if (filename.isBlank() || filename.length > 180 ||
             filename.any { it.isISOControl() || it == '/' || it == '\\' }) return false
         if (size != null && size !in 1..MAX_BYTES) return false
-        return listOf(".txt", ".md", ".markdown", ".epub")
-            .any { filename.endsWith(it, ignoreCase = true) && filename.length > it.length }
+        return AstraDocumentText.format(filename) != null
     }
 }
