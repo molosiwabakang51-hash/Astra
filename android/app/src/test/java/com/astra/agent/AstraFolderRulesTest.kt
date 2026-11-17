@@ -12,13 +12,13 @@ class AstraFolderRulesTest {
             "finance.txt", "bond duration.MD", "course.markdown",
             "Russki.epub", "setswana reading.EPUB",
             "finance.csv", "notes.json", "manual.DOCX", "webpage.html",
-            "financial_data.xml", "curriculum.tsv"
+            "financial_data.xml", "curriculum.tsv", "vocabulary.tsv"
         )) {
             assertTrue(name, AstraFolderRules.bookNameAllowed(name, 1024L))
         }
         for (name in listOf(
             "model.gguf", "private.pdf", "backup.zip", "app.apk",
-            "vocabulary.tsv", "fakes.txt.exe", "no extension", ".txt",
+            "fakes.txt.exe", "no extension", ".txt",
             "../secret.md", "folder\\escape.txt", "bad\u0000title.md", ""
         )) {
             assertFalse(name, AstraFolderRules.bookNameAllowed(name, 1024L))
