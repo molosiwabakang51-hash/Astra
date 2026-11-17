@@ -26,8 +26,16 @@ internal object AstraOfflinePolicy {
         val input = raw.trim()
         if (input.length <= MAX_INPUT_CHARS) return input
         val headLength = MAX_INPUT_CHARS - OMITTED_MARKER.length - TAIL_CHARS
-        val head = input.take(headLength).trimEnd()
-        val tail = input.takeLast(TAIL_CHARS).trimStart()
+        // UTF-16 offsets must not split an emoji or other surrogate pair.
+        val headEnd = if (input[headLength - 1].isHighSurrogate() &&
+            input[headLength].isLowSurrogate()
+        ) headLength - 1 else headLength
+        val tailStart = input.length - TAIL_CHARS
+        val safeTailStart = if (input[tailStart - 1].isHighSurrogate() &&
+            input[tailStart].isLowSurrogate()
+        ) tailStart + 1 else tailStart
+        val head = input.substring(0, headEnd).trimEnd()
+        val tail = input.substring(safeTailStart).trimStart()
         return head + OMITTED_MARKER + tail
     }
 
