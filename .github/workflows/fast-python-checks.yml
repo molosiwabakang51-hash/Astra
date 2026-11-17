@@ -5,12 +5,12 @@ on:
     branches: [main]
     paths:
       - 'scripts/**'
-      - '.github/workflows/fast-python-checks.yml'
+      - '.github/workflows/**'
   pull_request:
     branches: [main]
     paths:
       - 'scripts/**'
-      - '.github/workflows/fast-python-checks.yml'
+      - '.github/workflows/**'
   workflow_dispatch:
 
 permissions:
