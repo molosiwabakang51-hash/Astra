@@ -43,6 +43,32 @@ class AstraModelImportTest {
         assertTrue(550L * mib < 1_400_000_000L + 64L * mib)
     }
 
+    @Test fun advancedGgufFailsEarlyWhenOnlyCompactFreeSpaceIsAvailable() {
+        val mib = 1024L * 1024L
+        val advancedFileSize = 1223L * mib
+        val available = 700L * mib
+        assertTrue(AstraModelImport.hasImportStartingSpace(available))
+        assertTrue(!AstraModelImport.hasSpaceForKnownGguf(available, advancedFileSize))
+        assertTrue(AstraModelImport.hasSpaceForKnownGguf(
+            availableBytes = advancedFileSize + 64L * mib,
+            sizeBytes = advancedFileSize
+        ))
+    }
+
+    @Test fun knownCompactGgufStillRequiresRealFileSizePlusHeadroom() {
+        val mib = 1024L * 1024L
+        val compactSize = 523L * mib
+        assertTrue(!AstraModelImport.hasSpaceForKnownGguf(550L * mib, compactSize))
+        assertTrue(AstraModelImport.hasSpaceForKnownGguf(600L * mib, compactSize))
+    }
+
+    @Test fun invalidOrMissingGgufSizeCannotBypassSafeImportChecks() {
+        val free = 2_000_000_000L
+        assertTrue(!AstraModelImport.hasSpaceForKnownGguf(free, 0L))
+        assertTrue(!AstraModelImport.hasSpaceForKnownGguf(free, -1L))
+        assertTrue(!AstraModelImport.hasSpaceForKnownGguf(free, 1_400_000_001L))
+    }
+
     @Test fun importsExistingModelFromFullApkWithoutNetwork() = runBlocking {
         val gguf = byteArrayOf(0x47, 0x47, 0x55, 0x46, 1, 2, 3, 4)
         val apk = zip(
