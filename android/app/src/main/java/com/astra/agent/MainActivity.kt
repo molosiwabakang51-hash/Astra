@@ -2511,7 +2511,8 @@ class MainActivity :
                                 "have crashed or been stopped during native inference. " +
                                 "Last stage: " +
                                 offlineTestPrefs.getString("astra_offline_test_stage", "unknown") +
-                                ". Keep the imported model; collect a crash log before retrying."
+                                ". " + AstraProcessExitReason.latest(applicationContext) +
+                                " Keep the imported model; collect a crash log before retrying."
                         else ""
                     )
                 }
