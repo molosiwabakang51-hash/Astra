@@ -87,7 +87,9 @@ internal fun AstraOrb(
             )
         }.getOrDefault(1f))
     }
-    val rotation = if (motion) {
+    // Keep the persistent header mark static until voice input is active.
+    // The large new-chat hero animates only while that panel is visible.
+    val rotation = if (motion && (!compact || listening)) {
         val transition = rememberInfiniteTransition(label = "astra-aurora")
         val value by transition.animateFloat(
             initialValue = 0f,
@@ -134,7 +136,7 @@ internal fun AstraOrb(
                     useCenter = false,
                     topLeft = Offset(cx - radius, cy - radius),
                     size = Size(radius * 2f, radius * 2f),
-                    style = Stroke(width = unit * if (compact) 0.017f else 0.012f,
+                    style = Stroke(width = unit * (if (compact) 0.017f else 0.012f),
                         cap = StrokeCap.Round)
                 )
             }
