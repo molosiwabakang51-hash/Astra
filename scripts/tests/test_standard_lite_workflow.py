@@ -28,6 +28,23 @@ class StandardLiteWorkflowTest(unittest.TestCase):
         self.assertNotIn("com.astra.agent.preview", content)
         self.assertNotIn("adb uninstall", content)
 
+    def test_main_branch_builds_small_lite_without_large_model_download(self):
+        lite = LITE.read_text(encoding="utf-8")
+        full = (ROOT / ".github/workflows/android.yml").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("  push:\n    branches: [main]", lite)
+        self.assertIn("  workflow_dispatch:", lite)
+        self.assertIn("prepare_offline_android.py --lite", lite)
+        self.assertNotIn("prepare_offline_android.py\n", lite)
+        self.assertIn("testDebugUnitTest", lite)
+        self.assertNotIn("  push:\n    branches: [main]", full)
+        self.assertIn("  pull_request:\n    branches: [main]", full)
+        self.assertIn("  schedule:\n", full)
+        self.assertIn("  workflow_dispatch:", full)
+        self.assertIn("prepare_offline_android.py\n", full)
+        self.assertIn("verify_offline_apk.py", full)
+
     def test_version_is_bumped_from_existing_install(self):
         content = LITE.read_text(encoding="utf-8")
         self.assertIn("ASTRA_RELEASE_VERSION_CODE: '29'", content)
