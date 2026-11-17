@@ -127,7 +127,7 @@ internal class AstraOnDeviceBrain(
                 else emptyList()
                 if (explicitBookQuery != null && bookReferences.isEmpty()) {
                     return@withContext "No relevant passage was found in your imported books. " +
-                        "Import a TXT, Markdown or EPUB book in Settings, then ask again."
+                        "Import a supported TXT, EPUB, RTF or document file in Settings, then ask again."
                 }
                 if (!verifiedModels.hasVerifiedFile()) {
                     onPartial("Verifying the local offline model...")
