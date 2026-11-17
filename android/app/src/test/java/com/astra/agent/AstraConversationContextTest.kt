@@ -20,6 +20,29 @@ class AstraConversationContextTest {
         assertFalse(prompt.contains("saved private bond strategy"))
     }
 
+    @Test fun systemPromptExplicitlyPrioritizesLatestReferentAndFactualCorrections() {
+        val prompt = AstraConversationContext.systemPrompt()
+        assertTrue(prompt.contains("most recent relevant topic"))
+        assertTrue(prompt.contains("not a superseded earlier topic"))
+        assertTrue(prompt.contains("When a user corrects a person's name"))
+        assertTrue(prompt.contains("never invent an academic affiliation"))
+    }
+
+    @Test fun financeFollowupRecoveryIncludesMostRecentBondsContext() {
+        val earlier = listOf(
+            turn("user", "what is leverage exactly?"),
+            turn("assistant", "Leverage means borrowing to amplify exposure."),
+            turn("user", "what are bonds and how can I invest in American bonds while in Africa?"),
+            turn("assistant", "U.S. Treasury bonds can be accessed through eligible international brokers.")
+        )
+        val prompt = AstraConversationContext.userPrompt(
+            "put this theory into practice", earlier, true
+        )
+        assertTrue(prompt.contains("what are bonds and how can I invest"))
+        assertTrue(prompt.contains("Treasury bonds can be accessed"))
+        assertTrue(prompt.endsWith("put this theory into practice\\n/no_think"))
+    }
+
     @Test fun plainFinanceTeachingPromptInitializesOfflineContextWithoutCrash() {
         // Reproduces the real-device request that previously triggered
         // ExceptionInInitializerError while compiling the correction regex.
