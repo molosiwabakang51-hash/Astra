@@ -65,6 +65,7 @@ class AstraRtfTextTest {
     @Test fun rejectsMalformedRtfAndOversizedInputWithoutSilentIndexing() {
         for (content in listOf(
             "not an rtf document",
+            "{\\rtfake1 fake header}",
             """{\rtf1\ansi broken """,
             """{\rtf1\ansi } }""",
             """{\rtf1\ansi \u999999? bad}""",
@@ -75,6 +76,10 @@ class AstraRtfTextTest {
         val depthBomb = "{\\rtf1" + "{".repeat(40) + "x" + "}".repeat(41)
         assertThrows(IllegalArgumentException::class.java) {
             AstraRtfText.extract(stream(depthBomb))
+        }
+        val overflowText = "{\\rtf1 " + "a".repeat(900_001) + "}"
+        assertThrows(IllegalArgumentException::class.java) {
+            AstraRtfText.extract(stream(overflowText))
         }
         val oversized = "{\\rtf1 " + "a".repeat(2 * 1024 * 1024) + "}"
         assertThrows(IllegalArgumentException::class.java) {
