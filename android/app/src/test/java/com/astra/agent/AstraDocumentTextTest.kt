@@ -29,7 +29,7 @@ class AstraDocumentTextTest {
 
     @Test fun supportedFormatsUseRealDocumentExtensions() {
         for (name in listOf("lecture.HTML", "table.csv", "book.tsv", "study.json",
-            "manual.xml", "notes.DOCX", "course.epub", "study.md")) {
+            "manual.xml", "notes.DOCX", "course.epub", "study.md", "handout.RTF")) {
             assertTrue(name, AstraDocumentText.format(name) != null)
         }
         for (name in listOf("bad.pdf", "photo.jpg", "audio.mp3",
