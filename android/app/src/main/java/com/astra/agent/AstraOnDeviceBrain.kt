@@ -53,6 +53,18 @@ internal class AstraOnDeviceBrain(
     // A newly imported file can be retried without restarting Astra.
     private val failedAdvancedModels = AstraModelHealth()
 
+    init {
+        // Do not retry an OS-confirmed 1.7B native crash / low-memory exit
+        // immediately after restart if a compact offline GGUF is available.
+        // This is session-local only: no model is deleted, overwritten, or
+        // permanently disabled, and an imported replacement can be retried.
+        val compactAvailable = AstraModelImport.modelFile(context).isFile ||
+            isBundled(ASSET_NAME)
+        if (compactAvailable && AstraInferenceCheckpoint.shouldTryCompactRecovery(context)) {
+            failedAdvancedModels.recordFailure(AstraModelImport.advancedFile(context))
+        }
+    }
+
     /**
      * Only reports the last model successfully loaded into the native engine.
      * The on-device self-test independently determines if it produced an answer.
@@ -185,6 +197,10 @@ internal class AstraOnDeviceBrain(
                         "Re-import a model from Settings.",
                     lastPreparationError
                 )
+                AstraInferenceCheckpoint.markSelectedModel(
+                    context,
+                    modelPath.name == AstraModelImport.ADVANCED_NAME
+                )
                 AstraInferenceCheckpoint.mark(
                     context, AstraInferenceCheckpoint.ENGINE_SETUP
                 )
@@ -246,6 +262,7 @@ internal class AstraOnDeviceBrain(
                         // native crash cannot be recovered from Kotlin.
                         current.cleanUp()
                         modelPath = ensureModel(ASSET_NAME, MODEL_SHA256, MIN_SIZE_BYTES)
+                        AstraInferenceCheckpoint.markSelectedModel(context, false)
                         loadPreparedModel(modelPath)
                     }
                 }
