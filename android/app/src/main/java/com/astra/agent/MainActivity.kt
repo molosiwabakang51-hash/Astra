@@ -2514,7 +2514,12 @@ class MainActivity :
                                 ". " + AstraProcessExitReason.latest(applicationContext) +
                                 " Keep the imported model; collect a crash log before retrying."
                         else ""
-                    )
+                    ).let { selfTestWarning ->
+                        listOfNotNull(
+                            selfTestWarning.takeIf { it.isNotBlank() },
+                            AstraInferenceCheckpoint.interruptedSummary(applicationContext)
+                        ).joinToString("\n\n")
+                    }
                 }
                 var offlineModelTestRunning by remember { mutableStateOf(false) }
                 var languageBenchmarkRunning by remember { mutableStateOf(false) }
