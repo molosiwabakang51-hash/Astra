@@ -11,17 +11,40 @@ import android.os.Build
  * A reason is a diagnostic hint, not proof of the inference root cause.
  */
 internal object AstraProcessExitReason {
-    fun latest(context: Context): String {
+    /**
+     * Match an Android process exit to the current persisted inference only.
+     * An unrelated crash from a previous app launch must not be presented as
+     * evidence for this interruption. Invalid timestamps fail closed.
+     */
+    internal fun matchesCheckpointExit(
+        inferenceStartedAtMs: Long,
+        exitAtMs: Long,
+        observedAtMs: Long
+    ): Boolean = inferenceStartedAtMs > 0L &&
+        inferenceStartedAtMs <= observedAtMs &&
+        exitAtMs >= inferenceStartedAtMs &&
+        exitAtMs <= observedAtMs
+
+    fun latest(context: Context, inferenceStartedAtMs: Long): String {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
             return "Android process exit reason unavailable on this OS."
+        }
+        val observedAtMs = System.currentTimeMillis()
+        if (inferenceStartedAtMs <= 0L || inferenceStartedAtMs > observedAtMs) {
+            return "Inference start timestamp unavailable; no exit cause attributed."
         }
         return try {
             val manager = context.getSystemService(Context.ACTIVITY_SERVICE)
                 as? ActivityManager ?: return "Android process exit reason unavailable."
             val exit = manager.getHistoricalProcessExitReasons(
-                context.packageName, 0, 5
-            ).firstOrNull { it.processName == context.packageName }
-                ?: return "No matching historical Astra process exit was recorded."
+                context.packageName, 0, 10
+            ).firstOrNull {
+                it.processName == context.packageName &&
+                    matchesCheckpointExit(
+                        inferenceStartedAtMs, it.timestamp, observedAtMs
+                    )
+            } ?: return "No matching Android process exit was recorded after " +
+                "the interrupted inference began."
             describe(exit.reason)
         } catch (_: SecurityException) {
             "Android did not permit reading the process exit reason."
