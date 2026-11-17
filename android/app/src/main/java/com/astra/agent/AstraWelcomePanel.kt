@@ -1,5 +1,6 @@
 package com.astra.agent
 
+import android.provider.Settings
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -24,7 +25,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
@@ -52,6 +55,9 @@ internal object AstraWelcomePolicy {
     )
 
     fun show(roles: List<String>): Boolean = roles.none { it == "You" || it == "user" }
+
+    /** Treat Android's disabled animator scale as a hard stop for the orbit. */
+    fun animateForScale(scale: Float): Boolean = scale.isFinite() && scale > 0f
 }
 
 @Composable
@@ -59,16 +65,30 @@ internal fun AstraWelcomePanel(
     onOpenNavigation: () -> Unit,
     onCommand: (String) -> Unit
 ) {
-    val transition = rememberInfiniteTransition(label = "astra-welcome")
-    val orbit by transition.animateFloat(
-        initialValue = 0f,
-        targetValue = 360f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 9000, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "welcome-orbit"
-    )
+    val context = LocalContext.current
+    val animate = remember(context) {
+        // Respect the owner's Android accessibility / developer animation
+        // settings. No permission or persistent tracking is introduced.
+        val scale = runCatching {
+            Settings.Global.getFloat(
+                context.contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f
+            )
+        }.getOrDefault(1f)
+        AstraWelcomePolicy.animateForScale(scale)
+    }
+    val orbit = if (animate) {
+        val transition = rememberInfiniteTransition(label = "astra-welcome")
+        val angle by transition.animateFloat(
+            initialValue = 0f,
+            targetValue = 360f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(durationMillis = 9000, easing = LinearEasing),
+                repeatMode = RepeatMode.Restart
+            ),
+            label = "welcome-orbit"
+        )
+        angle
+    } else 0f
 
     Column(
         modifier = Modifier
