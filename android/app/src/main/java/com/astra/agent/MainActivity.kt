@@ -1965,15 +1965,15 @@ private fun MessageBubble(
     ) {
 
         Surface(
-            color =
-                if (isUser) {
-                    MaterialTheme.colorScheme.primaryContainer
-                } else {
-                    MaterialTheme.colorScheme.surfaceVariant
-                },
-            shape = RoundedCornerShape(18.dp),
+            color = if (isUser) MaterialTheme.colorScheme.primaryContainer
+                else AstraAurora.surface,
+            shape = RoundedCornerShape(if (isUser) 22.dp else 18.dp),
+            border = androidx.compose.foundation.BorderStroke(
+                1.dp, (if (isUser) AstraAurora.violet else AstraAurora.cyan)
+                    .copy(alpha = if (isUser) 0.25f else 0.17f)
+            ),
             modifier = Modifier
-                .fillMaxWidth(0.88f)
+                .fillMaxWidth(if (isUser) 0.86f else 0.96f)
                 .combinedClickable(
                     onClick = {},
                     onLongClick = onLongPress
@@ -2373,17 +2373,21 @@ class MainActivity :
 
             MaterialTheme(
                 colorScheme = darkColorScheme(
-                    primary = Color(0xFF79BFFF),
-                    onPrimary = Color(0xFF061626),
-                    primaryContainer = Color(0xFF153653),
-                    onPrimaryContainer = Color(0xFFE6F3FF),
-                    background = Color(0xFF090D14),
-                    onBackground = Color(0xFFE8F0F9),
-                    surface = Color(0xFF111925),
-                    onSurface = Color(0xFFE8F0F9),
-                    surfaceVariant = Color(0xFF253341),
-                    onSurfaceVariant = Color(0xFFD0DDE9),
-                    secondary = Color(0xFFBACBDD)
+                    primary = AstraAurora.cyan,
+                    onPrimary = AstraAurora.background,
+                    primaryContainer = Color(0xFF263E58),
+                    onPrimaryContainer = AstraAurora.ink,
+                    background = AstraAurora.background,
+                    onBackground = AstraAurora.ink,
+                    surface = AstraAurora.surface,
+                    onSurface = AstraAurora.ink,
+                    surfaceVariant = AstraAurora.raised,
+                    onSurfaceVariant = AstraAurora.muted,
+                    secondary = AstraAurora.violet,
+                    onSecondary = AstraAurora.background,
+                    secondaryContainer = Color(0xFF303451),
+                    tertiary = AstraAurora.mint,
+                    outline = Color(0xFF566A86)
                 )
             ) {
 
@@ -4734,9 +4738,9 @@ class MainActivity :
                     modifier = Modifier.background(
                         androidx.compose.ui.graphics.Brush.verticalGradient(
                             listOf(
-                                Color(0xFF080E19),
-                                Color(0xFF0A1424),
-                                Color(0xFF070B13)
+                                AstraAurora.background,
+                                AstraAurora.night,
+                                AstraAurora.background
                             )
                         )
                     ),
@@ -4920,12 +4924,14 @@ class MainActivity :
                             // Visible build identification makes old APKs unmistakable.
                             // This is a label, never a second navigation control.
                             Text(
-                                text = "v" + ASTRA_VERSION + "  ·  OFFLINE AI",
+                                text = "●  LOCAL  ·  v" + ASTRA_VERSION,
                                 style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.primary,
+                                color = AstraAurora.mint,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
-                                modifier = Modifier.padding(start = 8.dp)
+                                modifier = Modifier
+                                    .background(AstraAurora.raised, RoundedCornerShape(50))
+                                    .padding(horizontal = 9.dp, vertical = 7.dp)
                             )
 
                         }
