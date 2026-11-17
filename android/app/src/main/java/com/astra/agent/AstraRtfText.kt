@@ -104,8 +104,8 @@ internal object AstraRtfText {
                         command.isLetter() && command.code < 128 -> {
                             val begin = position
                             while (position < source.length &&
-                                source[position] in 'A'..'Z' ||
-                                (position < source.length && source[position] in 'a'..'z')
+                                (source[position] in 'A'..'Z' ||
+                                    source[position] in 'a'..'z')
                             ) position++
                             val word = source.substring(begin, position).lowercase()
                             val signedStart = position
