@@ -5517,6 +5517,7 @@ class MainActivity :
                                                         .commit()
                                                     val began = System.nanoTime()
                                                     researchScope.launch {
+                                                        var recordedGeneration = false
                                                         try {
                                                             val answer = onDeviceBrain.reply(
                                                                 listOf(
@@ -5538,6 +5539,14 @@ class MainActivity :
                                                                                 if (progress.startsWith("Loading"))
                                                                                     "native model loading"
                                                                                 else "model verification")
+                                                                            .commit()
+                                                                    } else if (!recordedGeneration &&
+                                                                        progress.isNotBlank()) {
+                                                                        // Do not persist the generated content.
+                                                                        recordedGeneration = true
+                                                                        offlineTestPrefs.edit()
+                                                                            .putString("astra_offline_test_stage",
+                                                                                "token generation")
                                                                             .commit()
                                                                     }
                                                                 }
@@ -5563,7 +5572,7 @@ class MainActivity :
                                                             offlineTestPrefs.edit()
                                                                 .putBoolean("astra_offline_test_incomplete", false)
                                                                 .remove("astra_offline_test_stage")
-                                                                .apply()
+                                                                .commit()
                                                             offlineModelTestRunning = false
                                                         }
                                                     }
