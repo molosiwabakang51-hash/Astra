@@ -14,6 +14,7 @@ internal object AstraInferenceCheckpoint {
     private const val PREFS = "astra"
     private const val ACTIVE = "astra_chat_native_inference_active"
     private const val PHASE = "astra_chat_native_inference_phase"
+    private const val STARTED_AT = "astra_chat_native_inference_started_at_ms"
 
     const val PREPARING = "preparing"
     const val ENGINE_SETUP = "engine_setup"
@@ -24,6 +25,7 @@ internal object AstraInferenceCheckpoint {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
             .putBoolean(ACTIVE, true)
             .putString(PHASE, PREPARING)
+            .putLong(STARTED_AT, System.currentTimeMillis())
             .commit()
     }
 
@@ -38,6 +40,7 @@ internal object AstraInferenceCheckpoint {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
             .remove(ACTIVE)
             .remove(PHASE)
+            .remove(STARTED_AT)
             .commit()
     }
 
@@ -49,7 +52,9 @@ internal object AstraInferenceCheckpoint {
             phaseLabel(prefs.getString(PHASE, null)) + ". " +
             "This may have been a native crash, memory pressure or a force-stop; " +
             "the phase alone does not establish a cause. " +
-            AstraProcessExitReason.latest(context) +
+            AstraProcessExitReason.latest(
+                context, prefs.getLong(STARTED_AT, 0L)
+            ) +
             " Keep your model and conversation history; collect a redacted " +
             "Android crash-buffer log if this occurs again."
     }
