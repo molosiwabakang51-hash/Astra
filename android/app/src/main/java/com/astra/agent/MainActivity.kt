@@ -6985,6 +6985,10 @@ class MainActivity :
         // Lock when backgrounded; next foreground composition sees only
         // the public lock surface until the Android system authenticates.
         if (secureLockEnabled) {
+            // Never leave a voice session listening behind a locked surface.
+            recognizer?.cancel()
+            listening = false
+            tts?.stop()
             workspaceUnlocked = AstraAppLockPolicy.unlockedAfterBackground(true)
         }
         super.onStop()
