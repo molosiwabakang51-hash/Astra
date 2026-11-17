@@ -96,6 +96,45 @@ class AstraModelImportTest {
         assertTrue(failure?.message.orEmpty().contains("too many entries"))
     }
 
+    @Test fun nestedApkEntriesShareOuterArchiveScanLimit() = runBlocking {
+        fun crowdedApk(count: Int, withModel: Boolean): ByteArray {
+            val data = ByteArrayOutputStream()
+            ZipOutputStream(data).use { output ->
+                repeat(count) { index ->
+                    output.putNextEntry(ZipEntry("unrelated/part-$index.txt"))
+                    output.closeEntry()
+                }
+                if (withModel) {
+                    output.putNextEntry(ZipEntry("assets/qwen3-0.6b-q4km.gguf"))
+                    output.write("GGUF should not be reached".toByteArray())
+                    output.closeEntry()
+                }
+            }
+            return data.toByteArray()
+        }
+        // Each nested APK individually has fewer than 4096 entries, and
+        // the outer ZIP has only two. Combined scanning must still stop.
+        val archive = zip(
+            "part-one.apk" to crowdedApk(2_050, false),
+            "part-two.apk" to crowdedApk(2_050, true)
+        )
+        val failure = runCatching { extract(archive) }.exceptionOrNull()
+        assertTrue(failure is IllegalArgumentException)
+        assertTrue(failure?.message.orEmpty().contains("too many entries"))
+    }
+
+    @Test fun nestedApkUnderSharedBudgetStillImportsModel() = runBlocking {
+        val model = "GGUF shared budget".toByteArray()
+        val apk = zip(
+            "META-INF/manifest" to byteArrayOf(1),
+            "assets/qwen3-0.6b-q4km.gguf" to model
+        )
+        val outer = zip("notes.txt" to byteArrayOf(2), "model.apk" to apk)
+        val (extracted, count) = extract(outer)
+        assertArrayEquals(model, extracted)
+        assertEquals(model.size.toLong(), count)
+    }
+
     @Test fun smallArchiveWithUnrelatedEntriesStillImportsModel() = runBlocking {
         val model = "GGUF bounded archive".toByteArray()
         val archive = zip(
