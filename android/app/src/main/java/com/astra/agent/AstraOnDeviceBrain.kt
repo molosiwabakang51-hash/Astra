@@ -43,7 +43,7 @@ internal class AstraOnDeviceBrain(
     private val mutex = Mutex()
     private var engine: InferenceEngine? = null
     private val session = AstraInferenceSession()
-    private var verifiedFile: File? = null
+    private val verifiedModels = AstraVerifiedModelCache()
     @Volatile
     private var loadedModelPath: String? = null
     // A change of consent must not leave old book snippets in native KV-cache.
@@ -127,7 +127,7 @@ internal class AstraOnDeviceBrain(
                     return@withContext "No relevant passage was found in your imported books. " +
                         "Import a TXT, Markdown or EPUB book in Settings, then ask again."
                 }
-                if (verifiedFile == null) {
+                if (!verifiedModels.hasVerifiedFile()) {
                     onPartial("Verifying the local offline model...")
                 }
                 val advancedFile = AstraModelImport.advancedFile(context)
@@ -344,7 +344,14 @@ internal class AstraOnDeviceBrain(
         minimumBytes: Long
     ): File {
         val workContext = currentCoroutineContext()
-        verifiedFile?.takeIf { it.isFile && it.name == name }?.let { return it }
+        verifiedModels.matching(name, expectedSha256)?.let { return it }
+        // A manually imported GGUF may atomically replace the verified file
+        // while Astra is open. The previous native model and KV cache must
+        // not be reused against the new file, even at the same pathname.
+        if (verifiedModels.changed(name)) {
+            session.invalidate()
+            loadedModelPath = null
+        }
         val directory = File(context.noBackupFilesDir, "offline-models")
         require(directory.isDirectory || directory.mkdirs()) {
             "Cannot create private model storage."
@@ -353,7 +360,7 @@ internal class AstraOnDeviceBrain(
         if (target.isFile && target.length() >= minimumBytes &&
             sha256(target).equals(expectedSha256, ignoreCase = true)
         ) {
-            verifiedFile = target
+            verifiedModels.rememberVerified(target, expectedSha256)
             return target
         }
         if (!isBundled(name)) {
@@ -388,7 +395,7 @@ internal class AstraOnDeviceBrain(
                 sha256(temporary).equals(expectedSha256, ignoreCase = true)
             ) { "Bundled language model failed SHA-256 integrity verification." }
             AstraModelStorage.installVerified(temporary, target)
-            verifiedFile = target
+            verifiedModels.rememberVerified(target, expectedSha256)
             return target
         } finally {
             if (temporary.exists()) temporary.delete()
