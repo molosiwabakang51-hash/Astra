@@ -38,7 +38,8 @@ internal object AstraRtfText {
         // Latin-1 maps each original byte onto one code unit. This allows
         // exact byte-count skipping for RTF's \binN data sections.
         val source = String(data.toByteArray(), StandardCharsets.ISO_8859_1)
-        require(source.trimStart().startsWith("{\\rtf")) {
+        val header = source.trimStart()
+        require(header.startsWith("{\\rtf") && header.getOrNull(5)?.isDigit() == true) {
             "This file is not a supported RTF text document."
         }
         val output = StringBuilder()
@@ -50,9 +51,11 @@ internal object AstraRtfText {
         var position = 0
 
         fun emit(text: String) {
-            if (hidden || text.isEmpty() || output.length >= MAX_CHARS) return
-            val remaining = MAX_CHARS - output.length
-            output.append(text.take(remaining))
+            if (hidden || text.isEmpty()) return
+            require(text.length <= MAX_CHARS - output.length) {
+                "RTF readable text exceeds the safe indexing limit; no partial import was saved."
+            }
+            output.append(text)
         }
         fun emitChar(char: Char) {
             if (fallback > 0) {
@@ -101,8 +104,8 @@ internal object AstraRtfText {
                         command.isLetter() && command.code < 128 -> {
                             val begin = position
                             while (position < source.length &&
-                                source[position] in 'a'..'z' ||
-                                (position < source.length && source[position] in 'A'..'Z')
+                                source[position] in 'A'..'Z' ||
+                                (position < source.length && source[position] in 'a'..'z')
                             ) position++
                             val word = source.substring(begin, position).lowercase()
                             val signedStart = position
