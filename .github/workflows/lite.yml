@@ -49,6 +49,8 @@ jobs:
         working-directory: android
         env:
           ASTRA_BUNDLE_MODEL: 'false'
+          ASTRA_RELEASE_VERSION_CODE: '29'
+          ASTRA_RELEASE_VERSION_NAME: '0.12.2'
         shell: bash
         run: |
           set -euo pipefail
@@ -68,14 +70,14 @@ jobs:
           identity="$("$aapt" dump badging "$apk")"
           printf '%s\n' "$identity" | grep -m 1 "^package:"
           [[ "$identity" == *"name='com.astra.agent'"* &&
-             "$identity" == *"versionCode='28'"* &&
-             "$identity" == *"versionName='0.12.1'"* ]] || {
+             "$identity" == *"versionCode='29'"* &&
+             "$identity" == *"versionName='0.12.2'"* ]] || {
             echo "::error::Standard LITE must keep the original Astra application ID/version"; exit 1;
           }
           mkdir -p dist
-          cp "$apk" dist/Astra-v0.12.1-LITE-offline-arm64.apk
-          sha256sum dist/Astra-v0.12.1-LITE-offline-arm64.apk             > dist/Astra-v0.12.1-LITE-offline-arm64.apk.sha256
-          "$signer" verify --print-certs "$apk"             > dist/Astra-v0.12.1-LITE-signer.txt
+          cp "$apk" dist/Astra-v0.12.2-LITE-offline-arm64.apk
+          sha256sum dist/Astra-v0.12.2-LITE-offline-arm64.apk             > dist/Astra-v0.12.2-LITE-offline-arm64.apk.sha256
+          "$signer" verify --print-certs "$apk"             > dist/Astra-v0.12.2-LITE-signer.txt
           {
             echo "## Standard Astra LITE APK"
             echo ""
@@ -84,16 +86,16 @@ jobs:
             echo "Offline native engine: verified by the model-free APK check."
             echo "Signing: disposable CI debug key, NOT guaranteed to match installed Astra."
             echo "On INSTALL_FAILED_UPDATE_INCOMPATIBLE, DO NOT UNINSTALL before backing up owner data."
-            echo "APK file size: $(du -h dist/Astra-v0.12.1-LITE-offline-arm64.apk | cut -f1)"
+            echo "APK file size: $(du -h dist/Astra-v0.12.2-LITE-offline-arm64.apk | cut -f1)"
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload only the small standard LITE APK and identity files
         uses: actions/upload-artifact@v4
         with:
-          name: Astra-v0.12.1-LITE-manual-model-import
+          name: Astra-v0.12.2-LITE-manual-model-import
           path: |
-            dist/Astra-v0.12.1-LITE-offline-arm64.apk
-            dist/Astra-v0.12.1-LITE-offline-arm64.apk.sha256
-            dist/Astra-v0.12.1-LITE-signer.txt
+            dist/Astra-v0.12.2-LITE-offline-arm64.apk
+            dist/Astra-v0.12.2-LITE-offline-arm64.apk.sha256
+            dist/Astra-v0.12.2-LITE-signer.txt
           if-no-files-found: error
           retention-days: 30
