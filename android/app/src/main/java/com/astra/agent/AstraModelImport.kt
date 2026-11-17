@@ -37,6 +37,10 @@ internal object AstraModelImport {
     private const val MAX_ARCHIVE_ENTRIES = 4_096
     private const val ASSET_PATH = "assets/" + AstraOnDeviceBrain.ASSET_NAME
 
+    /** A compact model may be imported without reserving 1.4 GB upfront. */
+    internal fun hasImportStartingSpace(availableBytes: Long): Boolean =
+        availableBytes >= MIN_BYTES + FREE_HEADROOM
+
     fun modelFile(context: Context): File =
         AstraModelStorage.activeModel(
             File(context.noBackupFilesDir, "offline-models"),
@@ -64,8 +68,19 @@ internal object AstraModelImport {
     ): Long = withContext(Dispatchers.IO) {
         val dir = modelFile(context).parentFile ?: throw IllegalStateException("Model storage unavailable.")
         require(dir.isDirectory || dir.mkdirs()) { "Cannot create model storage." }
-        require(StatFs(dir.absolutePath).availableBytes >= MAX_BYTES + FREE_HEADROOM) {
-            "Not enough free phone space. Keep at least 1.5 GB available."
+        // The previous 1.5 GB blanket check prevented importing a compact
+        // 0.6B GGUF on phones with sufficient room for that model. Accept a
+        // compact-sized starting budget, then enforce the remaining headroom
+        // throughout the copy (including ZIP/APK extraction).
+        require(hasImportStartingSpace(StatFs(dir.absolutePath).availableBytes)) {
+            "Not enough free phone space to start a model import. " +
+                "Free at least 520 MB; larger models need more room."
+        }
+        val safeProgress: suspend (Long) -> Unit = { copied ->
+            require(StatFs(dir.absolutePath).availableBytes >= FREE_HEADROOM) {
+                "Insufficient free phone storage to finish importing the model safely."
+            }
+            onProgress(copied)
         }
 
         val partial = File(dir, "qwen3-model.importing")
@@ -89,14 +104,14 @@ internal object AstraModelImport {
                             // ZIP/APK: process directly as a stream, without
                             // extracting a second 500 MB archive to storage.
                             copyFromArchive(
-                                ZipInputStream(buffered), output, digest, 0, onProgress
+                                ZipInputStream(buffered), output, digest, 0, safeProgress
                             )
                         } else {
                             require(signatureSize == 4 &&
                                 signature.contentEquals("GGUF".toByteArray(Charsets.US_ASCII))) {
                                 "Select Qwen3 GGUF, a previous Astra APK or its GitHub ZIP."
                             }
-                            copyBounded(buffered, output, digest, onProgress)
+                            copyBounded(buffered, output, digest, safeProgress)
                         }
                         output.fd.sync()
                         bytes
@@ -182,6 +197,9 @@ internal object AstraModelImport {
                 nextUpdate = total + 32L * 1024 * 1024
             }
         }
+        // Recheck remaining disk space after the final, potentially partial
+        // 32 MiB interval, before promoting the verified new model file.
+        if (total > 0L) onProgress(total)
         return total
     }
 }
