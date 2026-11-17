@@ -273,6 +273,14 @@ internal class AstraBookLibrary(private val directory: File) {
                 val lastSpace = text.lastIndexOf(' ', end)
                 if (lastSpace > position + 550) end = lastSpace
             }
+            // An index passage must not end halfway through a Unicode
+            // supplementary character. Splitting a surrogate pair can turn
+            // an imported word or emoji into replacement characters when
+            // each JSONL passage is separately encoded to UTF-8.
+            if (end < text.length && end > position &&
+                Character.isHighSurrogate(text[end - 1]) &&
+                Character.isLowSurrogate(text[end])
+            ) end--
             val segment = text.substring(position, end).trim()
             if (segment.length >= 35) result.add(segment to end)
             position = end
