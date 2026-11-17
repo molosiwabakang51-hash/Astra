@@ -121,9 +121,9 @@ internal object AstraFinanceEducation {
         "also includes changes in the share price. Dividends are not guaranteed."
 
     private const val leverage =
-        "FINANCIAL LEVERAGE\\n" +
+        "FINANCIAL LEVERAGE\n" +
         "Leverage uses borrowed money or derivatives to increase the exposure " +
-        "relative to the investor's own capital. It magnifies BOTH gains and losses.\\n\\n" +
+        "relative to the investor's own capital. It magnifies BOTH gains and losses.\n\n" +
         "Example (ignoring interest and fees): you contribute 10,000 and borrow 10,000, " +
         "buying 20,000 of investments. If their value rises 10% to 22,000, " +
         "your equity is 12,000 after repaying the 10,000 loan: a 20% gain " +
@@ -132,21 +132,21 @@ internal object AstraFinanceEducation {
         "Margin calls, borrowing costs and forced sales can worsen outcomes."
 
     private const val foreignExchangeRisk =
-        "FOREIGN-EXCHANGE RISK\\n" +
+        "FOREIGN-EXCHANGE RISK\n" +
         "Holding assets in a foreign currency creates exchange-rate exposure " +
         "against the currency in which you spend or measure your wealth. " +
-        "Converting local savings into US dollars does NOT eliminate currency risk.\\n\\n" +
+        "Converting local savings into US dollars does NOT eliminate currency risk.\n\n" +
         "For example, a USD bond can gain in dollars but lose value in home-currency " +
         "terms if the dollar weakens enough. Currency hedging may reduce some risk " +
         "but has costs and is not always available. Consider exchange fees, taxes " +
         "and the investor's liabilities before making a decision."
 
     private const val crossBorderBonds =
-        "US BONDS FROM OUTSIDE THE UNITED STATES\\n" +
+        "US BONDS FROM OUTSIDE THE UNITED STATES\n" +
         "US Treasury securities are government debt instruments, and US corporate " +
         "bonds carry issuer credit risk. An investor outside the US may be able to " +
         "buy eligible securities or regulated bond funds through a broker that " +
-        "accepts residents of their specific country.\\n\\n" +
+        "accepts residents of their specific country.\n\n" +
         "Before choosing a platform, verify that it accepts your country of residence, " +
         "offers the instrument and account type, and complies with local rules. " +
         "Check identity requirements, custody, tax treatment, minimums, fees, " +
