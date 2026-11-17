@@ -29,7 +29,7 @@ class AstraRtfTextTest {
     }
 
     @Test fun extractsUnicodeAndCp1252EscapesWithoutDuplicateFallbackCharacters() {
-        val rtf = """{\rtf1\ansi Russian: \u1046? \u1080? \u1074? \par
+        val rtf = """{\rtf1\ansi Russian: \u1046?\u1080?\u1074? \par
           French: caf\'e9 and apostrophe \u8217? end.}"""
         val result = AstraRtfText.extract(stream(rtf))
         assertTrue(result.contains("Жив"))
