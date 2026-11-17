@@ -17,6 +17,15 @@ class AstraWelcomePolicyTest {
         assertFalse(AstraWelcomePolicy.show(listOf("assistant", "user", "assistant")))
     }
 
+    @Test fun respectsAndroidDisabledOrInvalidAnimatorScale() {
+        assertFalse(AstraWelcomePolicy.animateForScale(0f))
+        assertFalse(AstraWelcomePolicy.animateForScale(-1f))
+        assertFalse(AstraWelcomePolicy.animateForScale(Float.NaN))
+        assertFalse(AstraWelcomePolicy.animateForScale(Float.POSITIVE_INFINITY))
+        assertTrue(AstraWelcomePolicy.animateForScale(0.5f))
+        assertTrue(AstraWelcomePolicy.animateForScale(1f))
+    }
+
     @Test fun shortcutsMatchExistingLocalCommands() {
         assertEquals(
             listOf("Teach me finance", "Memory overview", "Show tasks", "Show notes"),
