@@ -35,6 +35,14 @@ class AstraModelImportTest {
         return extracted.toByteArray() to copied
     }
 
+    @Test fun compactImportStartsWithoutRequiringFullAdvancedModelSpace() {
+        val mib = 1024L * 1024L
+        assertTrue(AstraModelImport.hasImportStartingSpace(550L * mib))
+        assertTrue(!AstraModelImport.hasImportStartingSpace(450L * mib))
+        // The old blanket 1.5 GB requirement would incorrectly block 550 MiB.
+        assertTrue(550L * mib < 1_400_000_000L + 64L * mib)
+    }
+
     @Test fun importsExistingModelFromFullApkWithoutNetwork() = runBlocking {
         val gguf = byteArrayOf(0x47, 0x47, 0x55, 0x46, 1, 2, 3, 4)
         val apk = zip(
