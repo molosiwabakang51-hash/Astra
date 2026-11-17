@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+    <!-- Label clearly distinguishes the test app from the owner's original.
+         No data, permissions or model files are shared with the original. -->
+    <application android:label="Astra Preview"
+        tools:replace="android:label" />
+</manifest>
