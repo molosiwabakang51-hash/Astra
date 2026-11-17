@@ -145,12 +145,25 @@ internal object AstraModelImport {
         digest: MessageDigest,
         depth: Int,
         onProgress: suspend (Long) -> Unit
+    ): Long = copyFromArchiveBudgeted(
+        zip, out, digest, depth, onProgress, intArrayOf(0)
+    )
+
+    // One budget covers the outer artifact and every nested APK. A per-ZIP
+    // counter would let a malicious artifact multiply the 4096-entry limit
+    // by packing thousands of small APKs into its outer ZIP.
+    private suspend fun copyFromArchiveBudgeted(
+        zip: ZipInputStream,
+        out: OutputStream,
+        digest: MessageDigest,
+        depth: Int,
+        onProgress: suspend (Long) -> Unit,
+        examined: IntArray
     ): Long {
-        var examined = 0
         while (true) {
             currentCoroutineContext().ensureActive()
             val entry = zip.nextEntry ?: break
-            require(++examined <= MAX_ARCHIVE_ENTRIES) {
+            require(++examined[0] <= MAX_ARCHIVE_ENTRIES) {
                 "Selected archive has too many entries to inspect safely."
             }
             val name = entry.name.replace('\\', '/').trimStart('/')
@@ -164,8 +177,8 @@ internal object AstraModelImport {
             // without needing to save/extract the APK first.
             if (depth == 0 && !entry.isDirectory &&
                 name.endsWith(".apk", ignoreCase = true)) {
-                val nested = copyFromArchive(
-                    ZipInputStream(zip), out, digest, depth + 1, onProgress
+                val nested = copyFromArchiveBudgeted(
+                    ZipInputStream(zip), out, digest, depth + 1, onProgress, examined
                 )
                 if (nested > 0L) return nested
             }
