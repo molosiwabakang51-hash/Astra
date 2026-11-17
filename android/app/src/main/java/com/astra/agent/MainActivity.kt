@@ -4750,8 +4750,10 @@ class MainActivity :
                             Box {
                                 Box(
                                     modifier = Modifier
+                                        .heightIn(min = 48.dp)
                                         .semantics { contentDescription = "Open Astra navigation and chat options" }
-                                        .clickable { navigationPopupOpen = true }
+                                        .clickable { navigationPopupOpen = true },
+                                    contentAlignment = Alignment.CenterStart
                                 ) {
                                     AstraBrand(listening = listening)
                                 }
@@ -4971,6 +4973,19 @@ class MainActivity :
                                             vertical = 12.dp
                                         )
                                 ) {
+                                    // A small interactive landing surface is shown only
+                                    // before the first user turn. Ongoing chats keep
+                                    // the full-height transcript and input area.
+                                    if (AstraWelcomePolicy.show(history.map { it.role })) {
+                                        item(key = "astra-welcome") {
+                                            AstraWelcomePanel(
+                                                onOpenNavigation = {
+                                                    navigationPopupOpen = true
+                                                },
+                                                onCommand = { command -> submit(command) }
+                                            )
+                                        }
+                                    }
 
                                     itemsIndexed(
                                         history
