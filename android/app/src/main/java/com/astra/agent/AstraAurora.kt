@@ -127,7 +127,7 @@ internal fun AstraOrb(
                     color = AstraAurora.cyan.copy(alpha = 0.08f + index * 0.035f),
                     radius = radius, style = Stroke(width = unit * 0.006f)
                 )
-                val start = rotation * (if (index % 2 == 0) 1 else -0.7f) +
+                val start = rotation * (if (index % 2 == 0) 1f else -0.7f) +
                     35f + index * 115f
                 drawArc(
                     color = if (index == 1) AstraAurora.violet else AstraAurora.cyan,
