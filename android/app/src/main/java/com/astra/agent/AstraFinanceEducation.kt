@@ -43,6 +43,13 @@ internal object AstraFinanceEducation {
             mentions(query, "convexity", "bond convexity") -> convexity
             mentions(query, "yield to maturity", "ytm") -> yieldToMaturity
             mentions(query, "dividend yield") -> dividendYield
+            mentions(query, "leverage", "margin borrowing", "financial leverage") -> leverage
+            mentions(query, "foreign exchange risk", "currency risk",
+                "exchange rate risk", "currency conversion risk") -> foreignExchangeRisk
+            mentions(query, "american bonds", "us treasury bonds",
+                "u.s. bonds", "us government bonds", "united states bonds") &&
+                mentions(query, "africa", "abroad", "non-us", "outside the us",
+                    "another country", "international investor") -> crossBorderBonds
             mentions(query, "diversification", "diversify a portfolio") -> diversification
             mentions(query, "annuity", "annuities") -> annuity
             mentions(query, "present value", "discounting future cash flows") -> presentValue
@@ -112,6 +119,41 @@ internal object AstraFinanceEducation {
         "Example: a share priced at P100 paying P5 in yearly dividends has a 5% yield.\n" +
         "Dividend yield is only an income measure; total shareholder return " +
         "also includes changes in the share price. Dividends are not guaranteed."
+
+    private const val leverage =
+        "FINANCIAL LEVERAGE\\n" +
+        "Leverage uses borrowed money or derivatives to increase the exposure " +
+        "relative to the investor's own capital. It magnifies BOTH gains and losses.\\n\\n" +
+        "Example (ignoring interest and fees): you contribute 10,000 and borrow 10,000, " +
+        "buying 20,000 of investments. If their value rises 10% to 22,000, " +
+        "your equity is 12,000 after repaying the 10,000 loan: a 20% gain " +
+        "on your starting equity. If value falls 10% to 18,000, your equity " +
+        "is 8,000: a 20% loss. At a 50% fall, equity is exhausted. " +
+        "Margin calls, borrowing costs and forced sales can worsen outcomes."
+
+    private const val foreignExchangeRisk =
+        "FOREIGN-EXCHANGE RISK\\n" +
+        "Holding assets in a foreign currency creates exchange-rate exposure " +
+        "against the currency in which you spend or measure your wealth. " +
+        "Converting local savings into US dollars does NOT eliminate currency risk.\\n\\n" +
+        "For example, a USD bond can gain in dollars but lose value in home-currency " +
+        "terms if the dollar weakens enough. Currency hedging may reduce some risk " +
+        "but has costs and is not always available. Consider exchange fees, taxes " +
+        "and the investor's liabilities before making a decision."
+
+    private const val crossBorderBonds =
+        "US BONDS FROM OUTSIDE THE UNITED STATES\\n" +
+        "US Treasury securities are government debt instruments, and US corporate " +
+        "bonds carry issuer credit risk. An investor outside the US may be able to " +
+        "buy eligible securities or regulated bond funds through a broker that " +
+        "accepts residents of their specific country.\\n\\n" +
+        "Before choosing a platform, verify that it accepts your country of residence, " +
+        "offers the instrument and account type, and complies with local rules. " +
+        "Check identity requirements, custody, tax treatment, minimums, fees, " +
+        "liquidity, interest-rate risk, and USD exchange-rate exposure. " +
+        "Converting your local currency to USD does NOT remove currency risk. " +
+        "Availability and prices cannot be verified while offline; never assume " +
+        "a named US bank or broker opens accounts for all African residents."
 
     private const val diversification =
         "PORTFOLIO DIVERSIFICATION\n" +
