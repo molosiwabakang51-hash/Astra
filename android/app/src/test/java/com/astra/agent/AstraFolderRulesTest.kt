@@ -10,12 +10,14 @@ class AstraFolderRulesTest {
     @Test fun onlySupportedReadingFilesCanBeIndexed() {
         for (name in listOf(
             "finance.txt", "bond duration.MD", "course.markdown",
-            "Russki.epub", "setswana reading.EPUB"
+            "Russki.epub", "setswana reading.EPUB",
+            "finance.csv", "notes.json", "manual.DOCX", "webpage.html",
+            "financial_data.xml", "curriculum.tsv"
         )) {
             assertTrue(name, AstraFolderRules.bookNameAllowed(name, 1024L))
         }
         for (name in listOf(
-            "model.gguf", "personal.json", "backup.zip", "app.apk",
+            "model.gguf", "private.pdf", "backup.zip", "app.apk",
             "vocabulary.tsv", "fakes.txt.exe", "no extension", ".txt",
             "../secret.md", "folder\\escape.txt", "bad\u0000title.md", ""
         )) {
@@ -47,10 +49,7 @@ class AstraFolderRulesTest {
             if (allowed) {
                 assertTrue(value.length in 5..180)
                 assertTrue(value.none { it.isISOControl() || it == '/' || it == '\\' })
-                assertTrue(value.endsWith(".txt", true) ||
-                    value.endsWith(".md", true) ||
-                    value.endsWith(".markdown", true) ||
-                    value.endsWith(".epub", true))
+                assertTrue(AstraDocumentText.format(value) != null)
             }
         }
     }
