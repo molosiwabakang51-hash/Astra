@@ -108,9 +108,12 @@ def save_verified_stream(
             raise ValueError("Incomplete or incorrectly sized model backup.")
         if digest.hexdigest() != expected_sha256.lower():
             raise ValueError("Model SHA-256 mismatch. Backup was not published.")
-        if destination.exists():
-            raise FileExistsError(f"Output file appeared while backing up: {destination}")
-        os.replace(stage, destination)
+        # os.replace() overwrites a file created after the check above.
+        # Publish using an atomic hard-link instead: link() fails with
+        # FileExistsError if another process has claimed the destination.
+        # Both paths are in the same directory, so no cross-volume move.
+        os.link(stage, destination)
+        stage.unlink()
         stage = None
         return total
     finally:

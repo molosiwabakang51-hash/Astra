@@ -71,6 +71,33 @@ class UsbBackupTests(unittest.TestCase):
                 )
             self.assertEqual(b"existing personal backup", dest.read_bytes())
 
+    def test_backup_never_overwrites_destination_created_during_verification(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            dest = Path(tmp) / "backup.gguf"
+
+            def competing_writer():
+                dest.write_bytes(b"another verified backup")
+
+            with self.assertRaises(FileExistsError):
+                backup.save_verified_stream(
+                    io.BytesIO(MODEL_FIXTURE), dest,
+                    SHA, minimum_bytes=1, maximum_bytes=500,
+                    completed=competing_writer
+                )
+            self.assertEqual(b"another verified backup", dest.read_bytes())
+            self.assertEqual([], list(Path(tmp).glob("*.partial")))
+
+    def test_publish_uses_no_clobber_operation(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            dest = Path(tmp) / "backup.gguf"
+            with patch.object(backup.os, "link", wraps=backup.os.link) as link:
+                backup.save_verified_stream(
+                    io.BytesIO(MODEL_FIXTURE), dest,
+                    SHA, minimum_bytes=1, maximum_bytes=500
+                )
+                link.assert_called_once()
+            self.assertEqual(MODEL_FIXTURE, dest.read_bytes())
+
     def test_adb_stream_must_complete_successfully(self):
         with tempfile.TemporaryDirectory() as tmp:
             dest = Path(tmp) / "backup.gguf"
