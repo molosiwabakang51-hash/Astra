@@ -4750,8 +4750,10 @@ class MainActivity :
                             Box {
                                 Box(
                                     modifier = Modifier
+                                        .heightIn(min = 48.dp)
                                         .semantics { contentDescription = "Open Astra navigation and chat options" }
-                                        .clickable { navigationPopupOpen = true }
+                                        .clickable { navigationPopupOpen = true },
+                                    contentAlignment = Alignment.CenterStart
                                 ) {
                                     AstraBrand(listening = listening)
                                 }
