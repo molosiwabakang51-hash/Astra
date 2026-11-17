@@ -55,6 +55,26 @@ class AstraOfflinePolicyTest {
         assertFalse(bounded.contains("M".repeat(4_000)))
     }
 
+    @Test fun truncationDoesNotSplitUnicodeSurrogatePairs() {
+        val markerLength =
+            "\n[Middle of long input omitted to fit the offline model context.]\n".length
+        val headLength = 3_000 - markerLength - 1_800
+        val headBoundary = "a".repeat(headLength - 1) + "😀" + "b".repeat(5_000)
+        val tailBoundary = "a".repeat(5_000 - 1_800 - 1) + "😀" + "b".repeat(1_800)
+        for (input in listOf(headBoundary, tailBoundary)) {
+            val result = AstraOfflinePolicy.boundedInput(input)
+            assertTrue(result.length <= 3_000)
+            for (index in result.indices) {
+                if (result[index].isHighSurrogate()) {
+                    assertTrue(index + 1 < result.length && result[index + 1].isLowSurrogate())
+                }
+                if (result[index].isLowSurrogate()) {
+                    assertTrue(index > 0 && result[index - 1].isHighSurrogate())
+                }
+            }
+        }
+    }
+
     @Test fun interruptedThinkingMessageIsRecoveredAfterRestart() {
         assertEquals(
             "The response was interrupted when Astra closed.",
