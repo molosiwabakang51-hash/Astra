@@ -2551,6 +2551,8 @@ class MainActivity :
                 var tab by remember {
                     mutableIntStateOf(0)
                 }
+                // Re-open the subject catalog instead of retaining an old topic.
+                var studyOpenToken by remember { mutableIntStateOf(0) }
 
                 var showFindInChat by remember { mutableStateOf(false) }
                 var findInChatQuery by remember { mutableStateOf("") }
@@ -4777,7 +4779,7 @@ class MainActivity :
                                     onDismissRequest = { navigationPopupOpen = false }
                                 ) {
                                     listOf(
-                                        "Chat", "Tasks", "Notes", "Tools", "Settings"
+                                        "Chat", "Tasks", "Notes", "Tools", "Settings", "Study"
                                     ).forEachIndexed { index, title ->
                                         DropdownMenuItem(
                                             text = {
@@ -4786,7 +4788,7 @@ class MainActivity :
                                                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                                                 ) {
                                                     Text(
-                                                        listOf("◌", "✓", "▤", "⌘", "⚙")[index],
+                                                        listOf("◌", "✓", "▤", "⌘", "⚙", "✦")[index],
                                                         color = MaterialTheme.colorScheme.primary
                                                     )
                                                     Text(title, style = MaterialTheme.typography.bodyMedium)
@@ -4794,6 +4796,7 @@ class MainActivity :
                                                 }
                                             },
                                             onClick = {
+                                                if (index == 5) studyOpenToken++
                                                 tab = index
                                                 navigationPopupOpen = false
                                             }
@@ -4999,6 +5002,10 @@ class MainActivity :
                                             AstraWelcomePanel(
                                                 onOpenNavigation = {
                                                     navigationPopupOpen = true
+                                                },
+                                                onOpenStudy = {
+                                                    studyOpenToken++
+                                                    tab = 5
                                                 },
                                                 onCommand = { command -> submit(command) }
                                             )
@@ -5430,6 +5437,23 @@ class MainActivity :
                                 )
 
                                 Text(toolOutput)
+                            }
+
+                            // ========================================
+                            // STUDY HUB
+                            // ========================================
+
+                            5 -> {
+                                key(studyOpenToken) {
+                                    AstraStudyHub(
+                                        onBackToChat = { tab = 0 },
+                                        onLesson = { topic ->
+                                            // Show the resulting offline lesson in Chat.
+                                            tab = 0
+                                            submit(topic.command)
+                                        }
+                                    )
+                                }
                             }
 
                             // ========================================
