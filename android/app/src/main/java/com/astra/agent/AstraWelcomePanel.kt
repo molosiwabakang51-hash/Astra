@@ -35,7 +35,7 @@ import androidx.compose.ui.unit.sp
  */
 internal object AstraWelcomePolicy {
     val commands = listOf(
-        "Teach me finance",
+        "Study",
         "Memory overview",
         "Show tasks",
         "Show notes"
@@ -53,6 +53,7 @@ internal object AstraWelcomePolicy {
 @Composable
 internal fun AstraWelcomePanel(
     onOpenNavigation: () -> Unit,
+    onOpenStudy: () -> Unit,
     onCommand: (String) -> Unit
 ) {
     val card = RoundedCornerShape(28.dp)
@@ -119,8 +120,9 @@ internal fun AstraWelcomePanel(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(9.dp)
         ) {
-            AstraStarterAction("✦", "Study", "Finance & concepts",
-                AstraWelcomePolicy.commands[0], onCommand, Modifier.weight(1f), AstraAurora.cyan)
+            AstraStarterAction("✦", "Study", "Choose a subject",
+                AstraWelcomePolicy.commands[0], { _ -> onOpenStudy() },
+                Modifier.weight(1f), AstraAurora.cyan)
             AstraStarterAction("◎", "Recall", "Private memory",
                 AstraWelcomePolicy.commands[1], onCommand, Modifier.weight(1f), AstraAurora.violet)
         }
