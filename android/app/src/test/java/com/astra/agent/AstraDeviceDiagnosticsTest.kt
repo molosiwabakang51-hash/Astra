@@ -60,11 +60,17 @@ class AstraDeviceDiagnosticsTest {
             maxJavaHeapBytes = 256L * 1024 * 1024,
             bundledModelBytes = 484L * 1024 * 1024,
             extractedModelBytes = null,
-            selfTestResult = "NOT RUN"
+            selfTestResult = "NOT RUN",
+            installedBaseApkBytes = 65_090_210L
         )
         val report = AstraDeviceDiagnostics.render(snapshot)
         assertTrue(report.contains("Astra version: 0.10.3"))
         assertTrue(report.contains("Device: Example TestDevice"))
+        assertTrue(report.contains("Installed base APK: 65.09 MB"))
+        assertTrue(report.contains("LITE downloadable APK maximum: 300.00 MB"))
+        assertTrue(report.contains("The LITE cap excludes separately imported GGUF models"))
+        assertTrue(report.contains("Installed base APK size may exclude Android split APKs"))
+        assertFalse(report.contains("/data/user/0"))
         assertTrue(report.contains("Supported ABIs: arm64-v8a"))
         assertTrue(report.contains("Free app storage: 5.00 GiB"))
         assertTrue(report.contains("Private compact candidate: Unavailable"))
@@ -135,6 +141,15 @@ class AstraDeviceDiagnosticsTest {
         assertEquals("CANCELLED",
             AstraDeviceDiagnostics.summarizeLanguageBenchmark(
                 "Conversation checks cancelled. Partial results are not scored."))
+    }
+
+    @Test fun decimalApkSizesAndUnknownValuesAreClearlyReported() {
+        assertEquals("Unavailable", AstraDeviceDiagnostics.formatDecimalMb(null))
+        assertEquals("Unavailable", AstraDeviceDiagnostics.formatDecimalMb(-1L))
+        assertEquals("0.00 MB", AstraDeviceDiagnostics.formatDecimalMb(0L))
+        assertEquals("299.99 MB", AstraDeviceDiagnostics.formatDecimalMb(299_990_000L))
+        assertEquals("300.00 MB", AstraDeviceDiagnostics.formatDecimalMb(300_000_000L))
+        assertEquals("300.00 MB", AstraDeviceDiagnostics.formatDecimalMb(300_000_001L))
     }
 
     @Test fun bytesAreFormattedWithoutDeviceAccess() {
