@@ -2027,6 +2027,7 @@ class MainActivity :
     private var workspaceUnlocked by mutableStateOf(true)
     private var backgroundLockDelayMillis by mutableLongStateOf(0L)
     private var backgroundedAtElapsedMs: Long? = null
+    private var backgroundSessionWasUnlocked = false
     private var authenticationInProgress = false
 
     private fun requestWorkspaceAuthentication(onAccepted: () -> Unit = {
@@ -7049,14 +7050,15 @@ class MainActivity :
         // Enforce a missed background deadline before the private activity is shown.
         // Cold launches are independently locked in onCreate.
         val leftAt = backgroundedAtElapsedMs
-        if (secureLockEnabled && leftAt != null) {
+        if (secureLockEnabled && leftAt != null && backgroundSessionWasUnlocked) {
             val now = android.os.SystemClock.elapsedRealtime()
             val elapsed = if (now >= leftAt) now - leftAt else -1L
-            workspaceUnlocked = workspaceUnlocked &&
-                AstraAppLockPolicy.unlockedAfterBackground(
-                    true, backgroundLockDelayMillis, elapsed
-                )
+            // Only restore a previously authenticated session within the grace period.
+            workspaceUnlocked = AstraAppLockPolicy.unlockedAfterBackground(
+                true, backgroundLockDelayMillis, elapsed
+            )
         }
+        backgroundSessionWasUnlocked = false
         backgroundedAtElapsedMs = null
         super.onStart()
     }
@@ -7064,15 +7066,15 @@ class MainActivity :
     override fun onStop() {
         if (secureLockEnabled) {
             backgroundedAtElapsedMs = android.os.SystemClock.elapsedRealtime()
-            // A configured grace period never permits screenshots or app previews:
-            // FLAG_SECURE remains enabled for the entire secured session.
+            backgroundSessionWasUnlocked = workspaceUnlocked
+            // Remove the private composition *even if a return grace period exists*.
+            // A quick return restores only a previously authenticated session.
+            workspaceUnlocked = AstraAppLockPolicy.unlockedAfterBackground(true)
+            // FLAG_SECURE and blocked recents previews remain active throughout.
             // Never leave a voice session listening behind a backgrounded surface.
             recognizer?.cancel()
             listening = false
             tts?.stop()
-            if (backgroundLockDelayMillis == 0L) {
-                workspaceUnlocked = AstraAppLockPolicy.unlockedAfterBackground(true)
-            }
         }
         super.onStop()
     }
