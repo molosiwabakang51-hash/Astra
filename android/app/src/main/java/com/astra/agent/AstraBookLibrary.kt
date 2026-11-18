@@ -1,5 +1,6 @@
 package com.astra.agent
 
+import android.content.Context
 import org.json.JSONObject
 import java.io.ByteArrayOutputStream
 import java.io.File
@@ -25,7 +26,10 @@ import kotlin.math.min
  * - Files remain private until the owner deletes them; no original book is shared.
  * - This is retrieval for Qwen context, NOT language-model fine-tuning.
  */
-internal class AstraBookLibrary(private val directory: File) {
+internal class AstraBookLibrary(
+    private val directory: File,
+    private val pdfContext: Context? = null
+) {
     data class Book(
         val id: String, val title: String, val chunks: Int,
         val truncated: Boolean, val format: String
@@ -61,7 +65,7 @@ internal class AstraBookLibrary(private val directory: File) {
         val body = when (format) {
             "epub" -> epubText(input)
             "txt", "markdown" -> decode(readBounded(input, MAX_INPUT_BYTES))
-            else -> AstraDocumentText.extract(format, input)
+            else -> AstraDocumentText.extract(format, input, pdfContext)
         }.trim()
         require(body.length >= 60) { "This book contains too little readable text." }
         val all = chunks(body)
