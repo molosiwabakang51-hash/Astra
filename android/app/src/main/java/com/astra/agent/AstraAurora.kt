@@ -40,6 +40,14 @@ internal object AstraAurora {
     val ink = Color(0xFFEAF5FF)
     val muted = Color(0xFFB3C5DD)
 
+    // Status is truthful and derived from observed microphone/inference state.
+    // Listening wins if the user begins dictating during an unfinished reply.
+    fun statusLabel(listening: Boolean, thinking: Boolean): String = when {
+        listening -> "LISTENING"
+        thinking -> "GENERATING"
+        else -> "LOCAL ASSISTANT"
+    }
+
     // All orbital animation is optional; the core still makes sense when static.
     fun motionEnabled(scale: Float): Boolean = scale.isFinite() && scale > 0f
 
