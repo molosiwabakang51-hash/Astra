@@ -1,0 +1,187 @@
+{
+  "schema_version": 1,
+  "source": "docs/ai-quality-evaluation.md",
+  "scoring": "human-reviewed physical-device only; CI must never auto-award points",
+  "cases": [
+    {
+      "id": "A1",
+      "points": 5,
+      "requires_real_device": true,
+      "mandatory_gate": false
+    },
+    {
+      "id": "A2",
+      "points": 5,
+      "requires_real_device": true,
+      "mandatory_gate": false
+    },
+    {
+      "id": "A3",
+      "points": 5,
+      "requires_real_device": true,
+      "mandatory_gate": false
+    },
+    {
+      "id": "A4",
+      "points": 5,
+      "requires_real_device": true,
+      "mandatory_gate": false
+    },
+    {
+      "id": "A5",
+      "points": 5,
+      "requires_real_device": true,
+      "mandatory_gate": false
+    },
+    {
+      "id": "B1",
+      "points": 4,
+      "requires_real_device": true,
+      "mandatory_gate": false
+    },
+    {
+      "id": "B2",
+      "points": 4,
+      "requires_real_device": true,
+      "mandatory_gate": false
+    },
+    {
+      "id": "B3",
+      "points": 4,
+      "requires_real_device": true,
+      "mandatory_gate": false
+    },
+    {
+      "id": "B4",
+      "points": 4,
+      "requires_real_device": true,
+      "mandatory_gate": false
+    },
+    {
+      "id": "B5",
+      "points": 4,
+      "requires_real_device": true,
+      "mandatory_gate": false
+    },
+    {
+      "id": "C1",
+      "points": 3,
+      "requires_real_device": true,
+      "mandatory_gate": false
+    },
+    {
+      "id": "C2",
+      "points": 3,
+      "requires_real_device": true,
+      "mandatory_gate": false
+    },
+    {
+      "id": "C3",
+      "points": 3,
+      "requires_real_device": true,
+      "mandatory_gate": false
+    },
+    {
+      "id": "C4",
+      "points": 3,
+      "requires_real_device": true,
+      "mandatory_gate": false
+    },
+    {
+      "id": "C5",
+      "points": 3,
+      "requires_real_device": true,
+      "mandatory_gate": false
+    },
+    {
+      "id": "D1",
+      "points": 3,
+      "requires_real_device": true,
+      "mandatory_gate": false
+    },
+    {
+      "id": "D2",
+      "points": 3,
+      "requires_real_device": true,
+      "mandatory_gate": false
+    },
+    {
+      "id": "D3",
+      "points": 3,
+      "requires_real_device": true,
+      "mandatory_gate": false
+    },
+    {
+      "id": "D4",
+      "points": 3,
+      "requires_real_device": true,
+      "mandatory_gate": false
+    },
+    {
+      "id": "D5",
+      "points": 3,
+      "requires_real_device": true,
+      "mandatory_gate": false
+    },
+    {
+      "id": "E1",
+      "points": 3,
+      "requires_real_device": true,
+      "mandatory_gate": false
+    },
+    {
+      "id": "E2",
+      "points": 3,
+      "requires_real_device": true,
+      "mandatory_gate": false
+    },
+    {
+      "id": "E3",
+      "points": 3,
+      "requires_real_device": true,
+      "mandatory_gate": false
+    },
+    {
+      "id": "E4",
+      "points": 3,
+      "requires_real_device": true,
+      "mandatory_gate": false
+    },
+    {
+      "id": "E5",
+      "points": 3,
+      "requires_real_device": true,
+      "mandatory_gate": false
+    },
+    {
+      "id": "F1",
+      "points": 2,
+      "requires_real_device": true,
+      "mandatory_gate": true
+    },
+    {
+      "id": "F2",
+      "points": 2,
+      "requires_real_device": true,
+      "mandatory_gate": false
+    },
+    {
+      "id": "F3",
+      "points": 2,
+      "requires_real_device": true,
+      "mandatory_gate": false
+    },
+    {
+      "id": "F4",
+      "points": 2,
+      "requires_real_device": true,
+      "mandatory_gate": true
+    },
+    {
+      "id": "F5",
+      "points": 2,
+      "requires_real_device": true,
+      "mandatory_gate": true
+    }
+  ]
+}

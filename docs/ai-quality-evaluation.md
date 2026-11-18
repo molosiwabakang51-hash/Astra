@@ -162,3 +162,39 @@ arbitrary untrusted text.
 | User/private-data/signing acceptance | PASS / FAIL / UNVERIFIED |
 | Largest unresolved capability defect | One reproducible example |
 | Next code/test action | Specific issue, PR and acceptance test |
+
+## Coverage traceability and score boundaries
+
+The 30 scored cases are deliberately weighted toward **real generative behavior**.
+The following is a **coverage map**, not another 100 points and not a claim
+that every named capability has been adequately tested. Cases may appear in
+multiple rows, but each case earns its original points **only once**.
+
+| Required dimension | Scored cases | Additional release evidence required |
+| --- | --- | --- |
+| Natural conversation | A1–A5 | Human-rated clarity, concision and hallucination review |
+| Factual accuracy | A1–A3, B1–B5, D1–D5 | Check answers against independent answer keys; no live-data invention |
+| Reasoning | A2, A5, B3–B5 | Multi-step explanations on both model sizes |
+| Multi-turn context | C1–C5 | Restart and conversation isolation |
+| Language | D1–D5 | Free-form Russian, Setswana, French, German and Spanish follow-ups |
+| Tool correctness | E1–E5 | Persistence, atomicity, rejection and rollback |
+| Startup and latency | F1–F3 | Cold/warm first-token timing, 5-minute RAM/thermal/battery observations |
+| Safety and privacy | E1–E5, F4–F5 | Consent, network capture, credential hygiene, update preservation |
+| Handset usability | F2–F5 | TalkBack, font scaling, keyboard, navigation and crash/ANR review |
+
+**Blind spots:** D1–D5 are short translations and do not alone establish
+multilingual conversation. F3 records performance but sets no minimum
+latency threshold; reviewers must report actual values and judge usability
+rather than treating the existence of a measurement as proof of speed.
+The release acceptance checklist remains binding even if 85 points are
+recorded. Do not convert the 4.5/10 provisional development estimate into a
+measured score without a complete phone run.
+
+### Machine-readable case manifest
+
+The repository maintains `scripts/quality/scorecard_cases.json` with
+the 30 unique IDs, their exact assigned points, and whether they require
+physical-device evidence. Run
+`python3 -m unittest discover -s scripts/tests -p 'test_quality_scorecard.py'`
+to catch missing/duplicated cases, altered weights and unsupported
+automatic scoring. This is **schema validation**, not an AI benchmark.
