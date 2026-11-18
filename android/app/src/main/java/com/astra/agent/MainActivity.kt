@@ -3584,19 +3584,23 @@ class MainActivity :
                         ActivityResultContracts
                             .StartActivityForResult()
                     ) { result ->
-
-                        val words = result.data
-                            ?.getStringArrayListExtra(
-                                RecognizerIntent.EXTRA_RESULTS
+                        // External system speech can return after biometric
+                        // locking or a long background interval. Its words
+                        // must never auto-send into an inaccessible workspace.
+                        if (!AstraSpeechPrivacy.mayUseVoice(
+                                speechForeground, secureLockEnabled, workspaceUnlocked
                             )
-                            ?.firstOrNull()
-
-                        if (!words.isNullOrBlank()) {
-
-                            if (autoSendVoice) {
-                                submit(words)
-                            } else {
-                                input = words
+                        ) {
+                            voiceError = "System speech result discarded because Astra is locked."
+                        } else {
+                            val words = result.data
+                                ?.getStringArrayListExtra(
+                                    RecognizerIntent.EXTRA_RESULTS
+                                )
+                                ?.firstOrNull()
+                            if (!words.isNullOrBlank()) {
+                                if (autoSendVoice) submit(words)
+                                else input = words
                             }
                         }
                     }
