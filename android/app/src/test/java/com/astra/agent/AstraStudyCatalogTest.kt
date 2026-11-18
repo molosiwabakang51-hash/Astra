@@ -18,6 +18,7 @@ class AstraStudyCatalogTest {
         assertEquals(1, AstraStudyLayout.columnsFor(Float.NaN, 1f))
         assertEquals(1, AstraStudyLayout.columnsFor(Float.POSITIVE_INFINITY, 1f))
         assertEquals(1, AstraStudyLayout.columnsFor(600f, Float.NaN))
+        assertEquals(1, AstraStudyLayout.columnsFor(600f, 0f))
     }
 
     @Test fun studyOpensCatalogWithoutAutostartingFinance() {
