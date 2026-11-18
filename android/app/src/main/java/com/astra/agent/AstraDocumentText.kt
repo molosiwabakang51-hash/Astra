@@ -360,10 +360,11 @@ internal object AstraDocumentText {
         }
         return buildString {
             for ((number, value) in slides) {
-                if (length >= MAX_CHARS) break
-                append("Slide ").append(number).append(":\n")
+                val header = "Slide $number:\n"
+                if (length + header.length >= MAX_CHARS) break
+                append(header)
                 append(value.take(MAX_CHARS - length))
-                append("\n")
+                if (length < MAX_CHARS) append('\n')
             }
         }.trim().take(MAX_CHARS)
     }
