@@ -26,15 +26,17 @@ internal class AstraVerifiedModelCache {
                 fileIdentity(file) == identity
     }
 
-    // Android 13+ supports NIO file attributes. The inode-backed fileKey
-    // changes when an atomic import replaces a GGUF even if its size and
-    // timestamp are identical. Unknown identities fail closed (rehash).
-    private fun fileIdentity(file: File): Any? = runCatching {
-        Files.readAttributes(
-            file.toPath(), BasicFileAttributes::class.java,
-            LinkOption.NOFOLLOW_LINKS
-        ).fileKey()
-    }.getOrNull()
+    // Keep this stateless helper in a companion: nested Entry is not an
+    // inner class and cannot call an instance member of the enclosing cache.
+    // Unknown file keys still fail closed (require another full SHA-256).
+    private companion object {
+        fun fileIdentity(file: File): Any? = runCatching {
+            Files.readAttributes(
+                file.toPath(), BasicFileAttributes::class.java,
+                LinkOption.NOFOLLOW_LINKS
+            ).fileKey()
+        }.getOrNull()
+    }
 
     private var entry: Entry? = null
 
