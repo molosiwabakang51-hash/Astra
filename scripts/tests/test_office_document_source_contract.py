@@ -19,7 +19,7 @@ class OfficeDocumentSourceContract(unittest.TestCase):
             self.assertIn(f'"{extension}" to "{extension}"', EXTRACT)
             self.assertIn(f'"{extension}" -> officeArchive(input, "{extension}")', EXTRACT)
         self.assertIn("AstraDocumentText.format(title)", BOOKS)
-        self.assertIn("AstraDocumentText.extract(format, input)", BOOKS)
+        self.assertIn("AstraDocumentText.extract(format, input, pdfContext)", BOOKS)
         self.assertIn("AstraDocumentText.format(filename) != null", FOLDER)
 
     def test_archive_and_xml_are_bounded_and_do_not_execute_objects(self):
