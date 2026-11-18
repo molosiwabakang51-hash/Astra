@@ -60,11 +60,17 @@ class AstraDeviceDiagnosticsTest {
             maxJavaHeapBytes = 256L * 1024 * 1024,
             bundledModelBytes = 484L * 1024 * 1024,
             extractedModelBytes = null,
-            selfTestResult = "NOT RUN"
+            selfTestResult = "NOT RUN",
+            installedBaseApkBytes = 65_090_210L
         )
         val report = AstraDeviceDiagnostics.render(snapshot)
         assertTrue(report.contains("Astra version: 0.10.3"))
         assertTrue(report.contains("Device: Example TestDevice"))
+        assertTrue(report.contains("Installed base APK: 65.09 MB"))
+        assertTrue(report.contains("LITE downloadable APK maximum: 300.00 MB"))
+        assertTrue(report.contains("The LITE cap excludes separately imported GGUF models"))
+        assertTrue(report.contains("Installed base APK size may exclude Android split APKs"))
+        assertFalse(report.contains("/data/user/0"))
         assertTrue(report.contains("Supported ABIs: arm64-v8a"))
         assertTrue(report.contains("Free app storage: 5.00 GiB"))
         assertTrue(report.contains("Private compact candidate: Unavailable"))
@@ -72,6 +78,7 @@ class AstraDeviceDiagnosticsTest {
         assertTrue(report.contains("Model last loaded: Not verified in this session"))
         assertTrue(report.contains("Language spot checks: NOT RUN"))
         assertTrue(report.contains("Offline AI self-test: NOT RUN"))
+        assertTrue(report.contains("Native inference checkpoint: NONE RECORDED"))
         assertFalse(report.contains("history"))
         assertFalse(report.contains("Bearer "))
         assertFalse(report.contains("saved text:"))
@@ -97,6 +104,28 @@ class AstraDeviceDiagnosticsTest {
         assertTrue(report.contains("Private 1.7B candidate:"))
         assertTrue(report.contains("Language spot checks: RECORDED (5/7"))
         assertTrue(report.contains("sizes are not integrity or inference proof"))
+    }
+
+    @Test fun diagnosticReportShowsOnlyFixedCheckpointMetadata() {
+        val snapshot = AstraDeviceDiagnostics.Snapshot(
+            version = "0.12.2", manufacturer = "Example", model = "Device",
+            androidRelease = "16", sdk = 36,
+            supportedAbis = listOf("arm64-v8a"),
+            freeStorageBytes = null, availableRamBytes = null,
+            totalRamBytes = null, maxJavaHeapBytes = null,
+            bundledModelBytes = null, extractedModelBytes = null,
+            selfTestResult = "NOT RUN",
+            previousInferenceCheckpoint =
+                "CHECKPOINT PRESENT (token generation). " +
+                "Android recorded a native crash (JNI/C++); capture the crash log. " +
+                "This could reflect active inference, interruption or process death; " +
+                "not proof of a native crash."
+        )
+        val report = AstraDeviceDiagnostics.render(snapshot)
+        assertTrue(report.contains("CHECKPOINT PRESENT (token generation)"))
+        assertTrue(report.contains("not proof of a native crash"))
+        assertFalse(report.contains("private prompt"))
+        assertFalse(report.contains("/data/user/0"))
     }
 
     @Test fun onlyKnownModelLabelsMayBeShared() {
@@ -135,6 +164,15 @@ class AstraDeviceDiagnosticsTest {
         assertEquals("CANCELLED",
             AstraDeviceDiagnostics.summarizeLanguageBenchmark(
                 "Conversation checks cancelled. Partial results are not scored."))
+    }
+
+    @Test fun decimalApkSizesAndUnknownValuesAreClearlyReported() {
+        assertEquals("Unavailable", AstraDeviceDiagnostics.formatDecimalMb(null))
+        assertEquals("Unavailable", AstraDeviceDiagnostics.formatDecimalMb(-1L))
+        assertEquals("0.00 MB", AstraDeviceDiagnostics.formatDecimalMb(0L))
+        assertEquals("299.99 MB", AstraDeviceDiagnostics.formatDecimalMb(299_990_000L))
+        assertEquals("300.00 MB", AstraDeviceDiagnostics.formatDecimalMb(300_000_000L))
+        assertEquals("300.00 MB", AstraDeviceDiagnostics.formatDecimalMb(300_000_001L))
     }
 
     @Test fun bytesAreFormattedWithoutDeviceAccess() {
