@@ -1,27 +1,46 @@
 #!/usr/bin/env python3
-"""Check the Astra small-update APK has native local AI but no bundled GGUF.
+"""Enforce the owner's 300 MB cap on every Astra LITE installable APK.
 
-This is a structural build check. A real Android phone is still needed to
-verify GGUF import, model token generation and update installation.
+300 MB means 300,000,000 bytes (decimal), not 300 MiB. The APK must
+retain its local ARM64 inference runtime and never bundle GGUF weights.
+Size inspection is structural, not evidence of a working phone install.
 """
 from pathlib import Path
 from zipfile import ZipFile
 import sys
 
-MAX_APK_SIZE = 150 * 1024 * 1024
-MODEL_NAME = "assets/qwen3-0.6b-q4km.gguf"
+MAX_APK_SIZE_BYTES = 300_000_000
+# Legacy alias retained for any repository consumers importing the constant.
+MAX_APK_SIZE = MAX_APK_SIZE_BYTES
+
+
+def check_lite_size(size_bytes: int) -> None:
+    """The cap is inclusive; a one-byte overshoot is a build failure."""
+    if size_bytes <= 0:
+        raise RuntimeError("Lite APK is empty")
+    if size_bytes > MAX_APK_SIZE_BYTES:
+        raise RuntimeError(
+            "Lite APK exceeds the 300 MB maximum: "
+            f"{size_bytes:,} bytes ({size_bytes / 1_000_000:.2f} MB)"
+        )
 
 
 def main(path: Path) -> None:
     if not path.is_file():
         raise RuntimeError("Lite APK missing: " + str(path))
-    if path.stat().st_size >= MAX_APK_SIZE:
-        raise RuntimeError("Lite APK too large: %.1f MiB" %
-                           (path.stat().st_size / 1048576))
+    size_bytes = path.stat().st_size
+    check_lite_size(size_bytes)
     with ZipFile(path) as apk:
         entries = apk.namelist()
-        if MODEL_NAME in entries:
-            raise RuntimeError("The model was accidentally packaged in the lite APK")
+        bundled_models = [
+            name for name in entries
+            if name.lower().endswith(".gguf")
+        ]
+        if bundled_models:
+            raise RuntimeError(
+                "LITE must not bundle any GGUF model weights: "
+                + ", ".join(bundled_models[:3])
+            )
         lib = [p for p in entries if
                p.startswith("lib/arm64-v8a/") and p.endswith(".so")]
         if not any(p.endswith("libai-chat.so") for p in lib):
@@ -30,9 +49,10 @@ def main(path: Path) -> None:
                       "assets/open_source_licenses/llama.cpp-MIT.txt"):
             if asset not in entries:
                 raise RuntimeError("Lite APK is missing license notices")
-    print("PASS: model-free lite APK, with on-device inference engine")
+    print("PASS: model-free LITE APK with on-device ARM64 inference engine")
     print("PASS: %d ARM64 libraries, licensing notices present" % len(lib))
-    print("Lite APK size: %.1f MiB" % (path.stat().st_size / 1048576))
+    print(f"PASS: LITE size {size_bytes:,} / {MAX_APK_SIZE_BYTES:,} bytes "
+          f"({size_bytes / 1_000_000:.2f} MB / 300 MB maximum)")
 
 
 if __name__ == "__main__":

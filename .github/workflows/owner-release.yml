@@ -127,6 +127,8 @@ jobs:
           }
           mkdir -p dist
           cp "$apk" dist/Astra-v0.12.2-LITE-owner-signed.apk
+          # The signed, publishable APK itself must stay <=300 MB, with no GGUF.
+          python3 scripts/verify_lite_apk.py dist/Astra-v0.12.2-LITE-owner-signed.apk
           echo "Owner certificate and package identity verified."
 
       - name: Upload owner-signed small APK as workflow artifact
