@@ -266,11 +266,13 @@ internal class AstraMathCourse(
 
     private fun answer(command: String): String {
         val active = readInt(PENDING, 0)
-        if (active !in 1..lessons.size) return
-            "No Maths quiz is active. Say 'math quiz 1' or 'math quiz'."
+        if (active !in 1..lessons.size) {
+            return "No Maths quiz is active. Say 'math quiz 1' or 'math quiz'."
+        }
         val choice = command.removePrefix("answer math").trim().uppercase(Locale.ROOT)
-        if (choice !in listOf("A", "B", "C")) return
-            "Choose A, B or C using 'answer math A'."
+        if (choice !in listOf("A", "B", "C")) {
+            return "Choose A, B or C using 'answer math A'."
+        }
         val item = lessons[active - 1]
         val correct = choice[0] == item.answer
         writeInt(PENDING, 0)
