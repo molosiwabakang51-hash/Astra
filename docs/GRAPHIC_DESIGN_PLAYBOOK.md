@@ -152,3 +152,45 @@ No claim of "8.5/10 AI intelligence" is justified from design score alone. Note 
 - Reddit 2026 complaint about fractured app modes: https://www.reddit.com/r/ChatGPT/comments/1wsbj98/the_chatgpt_appweb_experience/
 
 This document is a **reasoned synthesis with project-specific design choices**, not a claim that these organizations endorse Astra's specific palette or typography sizes. Last reviewed 2026-11-18.
+
+
+## 11. Observatory implementation — research to executable design (18 November 2026)
+
+The owner reported that Astra's earlier Aurora screen still lacked imagination and felt like a conventional card-based app. This prompted a second-stage research and implementation exercise, *not* a claim that private AI model weights were retrained.
+
+### Evidence and limits
+
+- **Google Design, Material 3 Expressive research** — shape, scale, color, containment and purposeful motion contribute to preference and usability. The 2026 CHI paper *Usability Hasn't Peaked* reports faster attention to targets and task completion for its particular tested interfaces; those numbers are **not** Astra performance claims. Research: https://design.google/library/expressive-material-design-google-research and https://research.google/pubs/usability-hasnt-peaked-exploring-how-expressive-design-overcomes-the-usability-plateau/
+- **Nielsen Norman Group, good visual design and visual hierarchy** — typography, alignment, spacing, visual contrast and grouping guide the first read. Research: https://www.nngroup.com/articles/good-visual-design/ and https://www.nngroup.com/articles/principles-visual-design/
+- **Nielsen Norman Group, progressive disclosure** — keep less-used controls out of the primary interaction path until requested. Research: https://www.nngroup.com/articles/progressive-disclosure/
+- **W3C WCAG text contrast** — aim at least 4.5:1 for normal text; verify the real composited foreground/background, not merely nominal palette pairs. Standard: https://www.w3.org/WAI/WCAG21/Understanding/contrast-minimum.html
+- **Android Compose accessibility** — maintain 48dp interactive touch target and descriptive semantics. Guidance: https://developer.android.com/guide/topics/ui/accessibility/apps
+- **Community complaints in AI-app forums** (ChatGPT/Claude/other apps) often concern inconsistent navigation and buggy or crowded mobile experiences. These posts are **anecdotal** and cannot establish population-wide preference. Do not copy a third-party assistant's branding or visual assets.
+
+### Three competing concepts considered
+
+| Approach | Benefit | Rejection/selection criterion |
+| --- | --- | --- |
+| Quiet typography-first chat | Efficient, calm, familiar | Too little distinct Astra identity to satisfy owner's brief |
+| Neon HUD full-screen dashboard | Immediately futuristic | Overcrowded, expensive for battery, distracts from real chat |
+| **Observatory**: editorial headline + instrument orb + four clear tools | Distinctive silhouette and hierarchy; calm after first message | **Selected** with a strict empty-chat-only lifetime |
+
+### Design contract implemented on branch
+
+- `AstraWelcomePanel.kt`: a single orbital instrument under the message hierarchy; asymmetric Study/Recall and Tasks/Notes action geometry. There are *no* synthetic usage metrics or inert product cards.
+- `AstraAurora.kt`: faceted lens and 12/32 polar calibration marks, with mint representing actual microphone listening and violet representing an actual active inference job.
+- `AstraVisuals.kt`: compact header still occupies a small footprint and presents readable **LISTENING / GENERATING / LOCAL ASSISTANT** labels, avoiding false model/network readiness claims.
+- `MainActivity.kt`: passes the current on-device generation job's state into the header, without starting any background generation.
+- Action icon family: drawn directly in Compose Canvas with consistent 2dp rounded strokes instead of mixing Unicode glyph shapes and vendor-dependent emoji.
+- The animation remains static when the device's global animator duration scale is zero and in the inactive compact header. First-message behavior removes the hero to reclaim chat space.
+
+### Mandatory acceptance before saying the new design is finished
+
+1. Android unit tests, Compose compilation, fast Python regression suite, standard LITE workflow, then real-device navigation.
+2. Screenshots for a fresh chat and a long chat on 360dp, 320dp/split-screen and maximum comfortable Android font scaling; inspect truncation and the keyboard.
+3. Verify touch target size, TalkBack, alpha-blended text contrast, orientation, system bars and dark surfaces on a phone.
+4. Verify the listening state appears only during microphone capture and generating state only during an active job; no state should claim model installed solely from animation.
+5. On a device, verify that the first user message removes the graphic, saving chat height, and that animation scale 0 disables continuous motion.
+6. Measure startup, frame responsiveness, memory use and battery impact; do not infer performance or user delight from green GitHub CI.
+
+A source/design pass is not owner acceptance. The remaining visual requirements in issue #166 (especially R006, R014–R018) stay open until handset checks exist.
