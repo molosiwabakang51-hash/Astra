@@ -16,8 +16,9 @@ using Android's system folder picker. Astra retains a read-only
 Storage Access Framework (SAF) grant to that selected folder across restarts
 and correctly signed in-place updates; no permanent all-files permission is
 requested. On a later visit, tap **Import books from authorized folder** to
-index supported TXT, Markdown, EPUB, HTML, CSV/TSV, JSON, XML, DOCX, RTF
-and XLSX text or spreadsheet documents in the folder, without another file-selection prompt. Importing is explicit, never an automatic/background
+index supported TXT, Markdown, EPUB, HTML, CSV/TSV, JSON, XML, DOCX, RTF,
+XLSX, PPTX (presentation slide text) and ODT (OpenDocument body text) in the
+folder, without another file-selection prompt. Importing is explicit, never an automatic/background
 scan, and the original files remain untouched. Up to 30 books can be stored
 privately; input size and directory enumeration are bounded.
 
@@ -166,7 +167,8 @@ capability is not production-verified on an actual phone.
 ## Your private offline book library
 
 Astra can now index text from your **own downloaded UTF-8 TXT, Markdown,
-unencrypted EPUB, HTML, CSV/TSV, JSON, XML, DOCX, RTF and XLSX** documents on the phone. Open **Settings → Your private book library →
+unencrypted EPUB, HTML, CSV/TSV, JSON, XML, DOCX, RTF, XLSX, PPTX
+and ODT** documents on the phone. Open **Settings → Your private book library →
 Import book** and select a file through Android's system document picker.
 Book text stays under Astra's private no-backup storage; no book content,
 search terms or citations are sent to any cloud AI or external website.
@@ -187,6 +189,14 @@ operation; the original downloaded file is not moved or deleted. The
 Astra's private indexed copy. If a large book exceeds indexing limits,
 the app reports that the index is partial rather than falsely claiming
 comprehensive coverage.
+
+**PPTX and ODT limitations:** These new offline importers extract PowerPoint
+slide text and OpenDocument Text paragraphs/headings from bounded ZIP/XML
+packages. They do not read image-only slides, scan PDFs, decode photos, run
+macros, import speaker notes, or execute embedded scripts. Encrypted,
+unusually large or malformed archives are rejected; PPTX and ODT ZIP content
+is limited to a 20 MiB expanded scan budget, 8 MiB per entry and 350 entries.
+The original selected files stay unchanged.
 
 **Not a model fine-tuner:** Imported paragraphs are transient reference
 context for Qwen3 and are not used to modify the GGUF's pretrained weights.
