@@ -33,7 +33,8 @@ internal object AstraDocumentText {
         "epub" to "epub", "html" to "html", "htm" to "html",
         "csv" to "csv", "tsv" to "tsv",
         "json" to "json", "xml" to "xml", "docx" to "docx",
-        "rtf" to "rtf", "xlsx" to "xlsx"
+        "rtf" to "rtf", "xlsx" to "xlsx",
+        "pptx" to "pptx", "odt" to "odt"
     )
 
     fun format(filename: String): String? {
@@ -42,7 +43,7 @@ internal object AstraDocumentText {
         return supported[ext]?.takeIf { name.length > ext.length + 1 }
     }
 
-    const val FORMATS = "TXT, MD, EPUB, HTML, CSV, TSV, JSON, XML, DOCX, RTF or XLSX"
+    const val FORMATS = "TXT, MD, EPUB, HTML, CSV, TSV, JSON, XML, DOCX, RTF, XLSX, PPTX or ODT"
 
     fun extract(format: String, input: InputStream): String = when (format) {
         "html" -> html(decode(readBounded(input, MAX_TEXT_BYTES)))
@@ -53,6 +54,8 @@ internal object AstraDocumentText {
         "docx" -> docx(input)
         "rtf" -> AstraRtfText.extract(input)
         "xlsx" -> AstraSpreadsheetText.extract(input)
+        "pptx" -> officeArchive(input, "pptx")
+        "odt" -> officeArchive(input, "odt")
         else -> throw IllegalArgumentException("Unsupported document format: $format.")
     }
 
@@ -232,6 +235,7 @@ internal object AstraDocumentText {
                     if (office) {
                         if (name == "p") text.append('\n')
                         if (name == "tab") text.append('\t')
+                        if (name == "br") text.append('\n')
                         if (name == "t") inText = true
                     } else text.append('\n').append(name).append(": ")
                 }
@@ -281,5 +285,148 @@ internal object AstraDocumentText {
             ?: throw IllegalArgumentException(
                 "DOCX has no readable text. Encrypted, scanned and old DOC documents are unsupported."
             )
+    }
+
+    /**
+     * PPTX slides and ODT body text are plain owner-provided XML in ZIP
+     * containers. Scan/decompress within a shared budget, including ignored
+     * image/macro entries, to prevent a tiny archive from expanding without
+     * limit. Never execute objects, macros, scripts, or embedded documents.
+     */
+    private fun officeArchive(input: InputStream, kind: String): String {
+        require(kind == "pptx" || kind == "odt") { "Unsupported office archive." }
+        val slides = sortedMapOf<Int, String>()
+        var body: String? = null
+        var mime: String? = null
+        var types: String? = null
+        var foundPresentation = false
+        var scanned = 0
+        var entries = 0
+        val slidePath = Regex("""ppt/slides/slide([1-9][0-9]{0,3})\.xml""")
+        ZipInputStream(input.buffered()).use { archive ->
+            while (true) {
+                val entry = archive.nextEntry ?: break
+                require(++entries <= MAX_ARCHIVE_ENTRIES) {
+                    "Office archive has too many entries to inspect safely."
+                }
+                val path = entry.name.replace('\\', '/')
+                require(!path.startsWith('/') && path.split('/').none { it == ".." }) {
+                    "Unsafe office archive entry."
+                }
+                if (entry.isDirectory) continue
+                val remaining = MAX_ARCHIVE_SCAN - scanned
+                require(remaining > 0) {
+                    "Office archive exceeds the safe extraction budget."
+                }
+                // Reading every entry, even skipped pictures, bounds the total
+                // uncompressed workload and limits hostile ZIP expansion.
+                val data = readBounded(archive, minOf(MAX_OFFICE_ENTRY, remaining))
+                scanned += data.size
+                when {
+                    kind == "odt" && path == "mimetype" ->
+                        mime = decode(data).trim()
+                    kind == "odt" && path == "content.xml" ->
+                        body = odtBody(data)
+                    kind == "pptx" && path == "[Content_Types].xml" ->
+                        types = decode(data)
+                    kind == "pptx" && path == "ppt/presentation.xml" ->
+                        foundPresentation = true
+                    kind == "pptx" && slidePath.matches(path) -> {
+                        val number = slidePath.matchEntire(path)!!.groupValues[1].toInt()
+                        require(slides.size < 150 && number !in slides) {
+                            "Presentation exceeds the safe slide limit or duplicates a slide."
+                        }
+                        val content = xml(data, office = true)
+                        if (content.isNotBlank()) slides[number] = content.take(MAX_CHARS)
+                    }
+                }
+            }
+        }
+        if (kind == "odt") {
+            require(mime == "application/vnd.oasis.opendocument.text") {
+                "This is not a standard OpenDocument text file."
+            }
+            return body?.takeIf { it.isNotBlank() }?.take(MAX_CHARS)
+                ?: throw IllegalArgumentException(
+                    "ODT has no readable body text. Scanned or encrypted content is unsupported."
+                )
+        }
+        require(foundPresentation &&
+            types?.contains("presentationml.presentation.main+xml") == true) {
+            "This is not a standard PowerPoint presentation."
+        }
+        require(slides.isNotEmpty()) {
+            "PPTX has no readable slide text. Scanned slides and images need OCR."
+        }
+        return buildString {
+            for ((number, value) in slides) {
+                val header = "Slide $number:\n"
+                if (length + header.length >= MAX_CHARS) break
+                append(header)
+                append(value.take(MAX_CHARS - length))
+                if (length < MAX_CHARS) append('\n')
+            }
+        }.trim().take(MAX_CHARS)
+    }
+
+    /** ODT paragraphs/headings only; never surface scripts, metadata or XML tags. */
+    private fun odtBody(bytes: ByteArray): String {
+        val officeNamespace =
+            "urn:oasis:names:tc:opendocument:xmlns:office:1.0"
+        val textNamespace =
+            "urn:oasis:names:tc:opendocument:xmlns:text:1.0"
+        val output = StringBuilder()
+        var insideBody = false
+        var paragraphs = 0
+        val parser = SAXParserFactory.newInstance().apply {
+            isNamespaceAware = true
+            setFeature("http://apache.org/xml/features/disallow-doctype-decl", true)
+            setFeature("http://xml.org/sax/features/external-general-entities", false)
+            setFeature("http://xml.org/sax/features/external-parameter-entities", false)
+        }.newSAXParser()
+        parser.xmlReader.apply {
+            entityResolver = org.xml.sax.EntityResolver { _, _ -> InputSource(StringReader("")) }
+            contentHandler = object : DefaultHandler() {
+                override fun startElement(
+                    uri: String?, localName: String?, qName: String?, attributes: Attributes?
+                ) {
+                    if (uri == officeNamespace && localName == "text") {
+                        insideBody = true
+                    } else if (insideBody && uri == textNamespace) {
+                        when (localName) {
+                            "p", "h" -> {
+                                if (output.isNotEmpty() && output.length < MAX_CHARS)
+                                    output.append('\n')
+                                paragraphs++
+                            }
+                            "tab" -> if (paragraphs > 0 && output.length < MAX_CHARS)
+                                output.append('\t')
+                            "line-break" -> if (paragraphs > 0 && output.length < MAX_CHARS)
+                                output.append('\n')
+                            "s" -> if (paragraphs > 0 && output.length < MAX_CHARS) {
+                                val count = attributes?.getValue(textNamespace, "c")
+                                    ?.toIntOrNull()?.coerceIn(1, 16) ?: 1
+                                output.append(" ".repeat(minOf(count, MAX_CHARS - output.length)))
+                            }
+                        }
+                    }
+                }
+                override fun endElement(uri: String?, localName: String?, qName: String?) {
+                    if (insideBody && uri == textNamespace &&
+                        (localName == "p" || localName == "h")) {
+                        paragraphs = (paragraphs - 1).coerceAtLeast(0)
+                    } else if (uri == officeNamespace && localName == "text") {
+                        insideBody = false
+                    }
+                }
+                override fun characters(ch: CharArray, start: Int, length: Int) {
+                    if (insideBody && paragraphs > 0 && output.length < MAX_CHARS) {
+                        output.append(ch, start, minOf(length, MAX_CHARS - output.length))
+                    }
+                }
+            }
+            parse(InputSource(ByteArrayInputStream(bytes)))
+        }
+        return output.toString().trim()
     }
 }
