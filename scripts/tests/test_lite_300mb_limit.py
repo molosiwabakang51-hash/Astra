@@ -33,6 +33,7 @@ class LiteSizeCapTests(unittest.TestCase):
         with ZipFile(path, "w") as apk:
             apk.writestr("lib/arm64-v8a/libai-chat.so", "fake-test-only")
             apk.writestr("assets/open_source_licenses/Qwen3-Apache-2.0.txt", "notice")
+            apk.writestr("assets/open_source_licenses/PdfBox-Android-Apache-2.0.txt", "notice")
             if not license_missing:
                 apk.writestr("assets/open_source_licenses/llama.cpp-MIT.txt", "notice")
             if model:
