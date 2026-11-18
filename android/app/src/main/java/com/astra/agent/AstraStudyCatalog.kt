@@ -52,10 +52,17 @@ internal object AstraStudyCatalog {
             Topic("English quiz", "Test the most recently opened lesson.",
                 "english quiz")
         )),
-        Subject("day_trading", "Day Trading", "↗", "Markets, chart reading and risk", listOf(
-            Topic("Market mechanics", "Orders, spreads and liquidity.", "Teach me day trading basics: order types, spreads and liquidity", true),
-            Topic("Reading charts", "Candles, trend and volume.", "Teach me candlesticks, trends and volume using hypothetical examples", true),
-            Topic("Risk management", "Position sizing and loss controls.", "Teach me trading risk management and position sizing, with hypothetical numbers", true)
+        Subject("day_trading", "Day Trading", "↗", "Market structure, charting and risk", listOf(
+            Topic("Trading course", "Explore 16 model-free foundational lessons.", "trading course")
+        ) + AstraTradingCourse.lessons.mapIndexed { index, lesson ->
+            Topic(
+                "Lesson ${index + 1} — ${lesson.title}",
+                "Study a hypothetical example and a self-check question.",
+                "trading lesson ${index + 1}"
+            )
+        } + listOf(
+            Topic("Trading progress", "Review saved lessons and quiz mastery.", "trading progress"),
+            Topic("Trading quiz", "Test the most recently opened lesson.", "trading quiz")
         )),
         Subject("russian", "Russian", "Я", "Cyrillic, grammar and conversation", listOf(
             Topic("Start Russian", "Begin offline Russian lessons.", "learn russian"),
