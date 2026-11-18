@@ -1401,6 +1401,7 @@ private class AstraProcessor(
     private val russianTutor: RussianTutor,
     private val multilingualTutor: AstraMultilingualTutor,
     private val financeCourse: AstraFinanceCourse,
+    private val mathCourse: AstraMathCourse,
     private val everydayAssistant: EverydayAssistant,
     private val dialogue: AstraDialogue
 ) {
@@ -1511,6 +1512,10 @@ private class AstraProcessor(
         // An explicit lesson, quiz or study answer takes precedence over a
         // pending task/note prompt: never save a study answer as a task.
         financeCourse.respond(clean)?.let {
+            dialogue.dismissIncompletePrompt()
+            return AssistantResult(it)
+        }
+        mathCourse.respond(clean)?.let {
             dialogue.dismissIncompletePrompt()
             return AssistantResult(it)
         }
@@ -2468,6 +2473,7 @@ class MainActivity :
                 vocabularyStore
             ),
             AstraFinanceCourse(storage::getInt, storage::setInt),
+            AstraMathCourse(storage::getInt, storage::setInt),
             EverydayAssistant(storage::getString, storage::setString),
             dialogue
         )
