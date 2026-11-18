@@ -80,6 +80,8 @@ jobs:
           }
           mkdir -p dist
           cp "$apk" dist/Astra-v0.12.2-LITE-offline-arm64.apk
+          # Revalidate the exact artifact selected for upload, not just the Gradle output.
+          python3 scripts/verify_lite_apk.py dist/Astra-v0.12.2-LITE-offline-arm64.apk
           sha256sum dist/Astra-v0.12.2-LITE-offline-arm64.apk             > dist/Astra-v0.12.2-LITE-offline-arm64.apk.sha256
           "$signer" verify --print-certs "$apk"             > dist/Astra-v0.12.2-LITE-signer.txt
           {
