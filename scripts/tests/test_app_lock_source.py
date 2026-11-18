@@ -25,6 +25,20 @@ class AstraAppLockSourceTest(unittest.TestCase):
         self.assertIn("override fun onStop()", MAIN)
         self.assertIn("unlockedAfterBackground(true)", MAIN)
 
+    def test_selected_delay_cannot_skip_system_auth_or_private_preview_protection(self):
+        self.assertIn("setBackgroundDelayMillis(", LOCK)
+        self.assertIn("getLong(BACKGROUND_DELAY_KEY, 0L)", LOCK)
+        self.assertIn("saved in AstraAppLockPolicy.backgroundDelaysMillis", LOCK)
+        self.assertIn("requestWorkspaceAuthentication {", MAIN)
+        self.assertIn("backgroundLockDelayMillis = AstraAppLock.backgroundDelayMillis(this)", MAIN)
+        self.assertIn("override fun onStart()", MAIN)
+        self.assertIn("android.os.SystemClock.elapsedRealtime()", MAIN)
+        self.assertIn("backgroundSessionWasUnlocked = workspaceUnlocked", MAIN)
+        self.assertIn("workspaceUnlocked = AstraAppLockPolicy.unlockedAfterBackground(true)", MAIN)
+        self.assertIn("if (secureLockEnabled && leftAt != null && backgroundSessionWasUnlocked)", MAIN)
+        self.assertIn("backgroundSessionWasUnlocked = false", MAIN)
+        self.assertIn("Screen capture stays blocked at every delay setting.", MAIN)
+
     def test_strong_system_auth_only_and_default_off(self):
         self.assertIn("BiometricPrompt.Builder(activity)", LOCK)
         self.assertIn("BiometricManager.Authenticators.BIOMETRIC_STRONG", LOCK)

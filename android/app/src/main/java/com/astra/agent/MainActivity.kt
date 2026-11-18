@@ -2025,6 +2025,9 @@ class MainActivity :
 
     private var secureLockEnabled by mutableStateOf(false)
     private var workspaceUnlocked by mutableStateOf(true)
+    private var backgroundLockDelayMillis by mutableLongStateOf(0L)
+    private var backgroundedAtElapsedMs: Long? = null
+    private var backgroundSessionWasUnlocked = false
     private var authenticationInProgress = false
 
     private fun requestWorkspaceAuthentication(onAccepted: () -> Unit = {
@@ -2369,6 +2372,7 @@ class MainActivity :
         super.onCreate(savedInstanceState)
 
         secureLockEnabled = AstraAppLock.enabled(this)
+        backgroundLockDelayMillis = AstraAppLock.backgroundDelayMillis(this)
         workspaceUnlocked = AstraAppLockPolicy.unlockedOnColdLaunch(secureLockEnabled)
         AstraAppLock.protectRecentsAndScreenshots(this, secureLockEnabled)
 
@@ -5525,9 +5529,9 @@ class MainActivity :
                                         )
                                         Text(
                                             "Optional Android fingerprint or device PIN unlock. " +
-                                                "When enabled, Astra hides private screens when " +
-                                                "backgrounded and blocks screenshots and app previews. " +
-                                                "This does not encrypt existing files."
+                                                "When enabled, Astra hides private screens after the " +
+                                                "selected background delay and blocks screenshots and " +
+                                                "app previews throughout. This does not encrypt existing files."
                                         )
                                         Row(
                                             modifier = Modifier.fillMaxWidth(),
@@ -5572,6 +5576,67 @@ class MainActivity :
                                             )
                                         }
                                         if (secureLockEnabled) {
+                                            var backgroundDelayMenuOpen by remember {
+                                                mutableStateOf(false)
+                                            }
+                                            Spacer(Modifier.height(12.dp))
+                                            Text(
+                                                "Lock after leaving Astra",
+                                                style = MaterialTheme.typography.titleMedium
+                                            )
+                                            Text(
+                                                "Quick app switching can stay unlocked for a chosen " +
+                                                    "period. Cold launches always require authentication.",
+                                                style = MaterialTheme.typography.bodyMedium
+                                            )
+                                            Box {
+                                                OutlinedButton(
+                                                    onClick = { backgroundDelayMenuOpen = true }
+                                                ) {
+                                                    Text(AstraAppLockPolicy.labelForDelay(
+                                                        backgroundLockDelayMillis
+                                                    ))
+                                                }
+                                                DropdownMenu(
+                                                    expanded = backgroundDelayMenuOpen,
+                                                    onDismissRequest = {
+                                                        backgroundDelayMenuOpen = false
+                                                    }
+                                                ) {
+                                                    AstraAppLockPolicy.backgroundDelaysMillis.forEach { delayMs ->
+                                                        DropdownMenuItem(
+                                                            text = {
+                                                                Text(AstraAppLockPolicy.labelForDelay(delayMs))
+                                                            },
+                                                            onClick = {
+                                                                backgroundDelayMenuOpen = false
+                                                                if (delayMs != backgroundLockDelayMillis) {
+                                                                    requestWorkspaceAuthentication {
+                                                                        try {
+                                                                            AstraAppLock.setBackgroundDelayMillis(
+                                                                                applicationContext, delayMs
+                                                                            )
+                                                                            backgroundLockDelayMillis = delayMs
+                                                                        } catch (_: Exception) {
+                                                                            Toast.makeText(
+                                                                                this@MainActivity,
+                                                                                "Could not save lock delay.",
+                                                                                Toast.LENGTH_LONG
+                                                                            ).show()
+                                                                        }
+                                                                    }
+                                                                }
+                                                            }
+                                                        )
+                                                    }
+                                                }
+                                            }
+                                            Text(
+                                                "Screen capture stays blocked at every delay setting. " +
+                                                    "Choose Immediately on a shared device.",
+                                                style = MaterialTheme.typography.bodySmall
+                                            )
+                                            Spacer(Modifier.height(8.dp))
                                             OutlinedButton(onClick = {
                                                 workspaceUnlocked = false
                                             }) { Text("Lock Astra now") }
@@ -6981,15 +7046,35 @@ class MainActivity :
         }.trim()
     }
 
+    override fun onStart() {
+        // Enforce a missed background deadline before the private activity is shown.
+        // Cold launches are independently locked in onCreate.
+        val leftAt = backgroundedAtElapsedMs
+        if (secureLockEnabled && leftAt != null && backgroundSessionWasUnlocked) {
+            val now = android.os.SystemClock.elapsedRealtime()
+            val elapsed = if (now >= leftAt) now - leftAt else -1L
+            // Only restore a previously authenticated session within the grace period.
+            workspaceUnlocked = AstraAppLockPolicy.unlockedAfterBackground(
+                true, backgroundLockDelayMillis, elapsed
+            )
+        }
+        backgroundSessionWasUnlocked = false
+        backgroundedAtElapsedMs = null
+        super.onStart()
+    }
+
     override fun onStop() {
-        // Lock when backgrounded; next foreground composition sees only
-        // the public lock surface until the Android system authenticates.
         if (secureLockEnabled) {
-            // Never leave a voice session listening behind a locked surface.
+            backgroundedAtElapsedMs = android.os.SystemClock.elapsedRealtime()
+            backgroundSessionWasUnlocked = workspaceUnlocked
+            // Remove the private composition *even if a return grace period exists*.
+            // A quick return restores only a previously authenticated session.
+            workspaceUnlocked = AstraAppLockPolicy.unlockedAfterBackground(true)
+            // FLAG_SECURE and blocked recents previews remain active throughout.
+            // Never leave a voice session listening behind a backgrounded surface.
             recognizer?.cancel()
             listening = false
             tts?.stop()
-            workspaceUnlocked = AstraAppLockPolicy.unlockedAfterBackground(true)
         }
         super.onStop()
     }
