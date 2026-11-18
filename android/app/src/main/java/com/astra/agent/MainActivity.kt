@@ -4885,9 +4885,9 @@ class MainActivity :
                                                     verticalAlignment = Alignment.CenterVertically,
                                                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                                                 ) {
-                                                    Text(
-                                                        listOf("◌", "✓", "▤", "⌘", "⚙", "✦")[index],
-                                                        color = MaterialTheme.colorScheme.primary
+                                                    AstraNavigationGlyph(
+                                                        section = AstraNavSection.entries[index],
+                                                        tint = MaterialTheme.colorScheme.primary
                                                     )
                                                     Text(title, style = MaterialTheme.typography.bodyMedium)
                                                     if (tab == index) Text("✓")
