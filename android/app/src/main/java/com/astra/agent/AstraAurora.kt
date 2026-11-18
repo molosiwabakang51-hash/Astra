@@ -139,7 +139,7 @@ internal fun AstraOrb(
             repeat(ticks) { tick ->
                 val angle = AstraAurora.pointAngle(tick, ticks) +
                     Math.toRadians(rotation.toDouble() * 0.16)
-                val inner = unit * if (tick % 4 == 0) 0.457f else 0.467f
+                val inner = unit * (if (tick % 4 == 0) 0.457f else 0.467f)
                 val outer = unit * 0.484f
                 drawLine(
                     glow.copy(alpha = if (tick % 4 == 0) 0.47f else 0.20f),
