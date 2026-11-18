@@ -44,6 +44,26 @@ internal object AstraInferenceCheckpoint {
             .commit()
     }
 
+    /**
+     * Low-information diagnostics for the owner's support report. The same
+     * checkpoint can also be present while an inference is actively running,
+     * so it is never labeled as definite evidence of a crash.
+     *
+     * The saved state contains only a fixed stage, flag and start timestamp:
+     * no prompt, file path, answer, chat or user-supplied text.
+     */
+    fun diagnosticStatus(context: Context): String {
+        val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        if (!prefs.getBoolean(ACTIVE, false)) return "NONE RECORDED"
+        val phase = phaseLabel(prefs.getString(PHASE, null))
+        val exitReason = AstraProcessExitReason.latest(
+            context, prefs.getLong(STARTED_AT, 0L)
+        )
+        return "CHECKPOINT PRESENT ($phase). $exitReason " +
+            "This could reflect active inference, interruption or process death; " +
+            "not proof of a native crash."
+    }
+
     /** Available after app restart. No prompt, generated answer or file path. */
     fun interruptedSummary(context: Context): String? {
         val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
