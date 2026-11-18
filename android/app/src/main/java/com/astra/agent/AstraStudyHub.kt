@@ -21,6 +21,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -49,6 +50,22 @@ internal object AstraStudyLayout {
 }
 
 /**
+ * Pure, ordered topic search. No online service, model loading or persistent
+ * query history. The bounded search avoids a large input monopolizing UI.
+ */
+internal object AstraStudyTopicFilter {
+    fun apply(topics: List<AstraStudyCatalog.Topic>, rawQuery: String): List<AstraStudyCatalog.Topic> {
+        val query = rawQuery.trim().take(80).lowercase(java.util.Locale.ROOT)
+        if (query.isEmpty()) return topics
+        return topics.filter { topic ->
+            topic.title.lowercase(java.util.Locale.ROOT).contains(query) ||
+                topic.description.lowercase(java.util.Locale.ROOT).contains(query) ||
+                topic.command.lowercase(java.util.Locale.ROOT).contains(query)
+        }
+    }
+}
+
+/**
  * Study button navigates to this catalog only. A separate explicit topic tap
  * begins a lesson. AI-only lessons clearly identify their GGUF dependency.
  */
@@ -59,6 +76,7 @@ internal fun AstraStudyHub(
 ) {
     var selectedId by remember { mutableStateOf<String?>(null) }
     val selected = AstraStudyCatalog.find(selectedId)
+    var topicQuery by remember(selectedId) { mutableStateOf("") }
     Column(Modifier.fillMaxSize()) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(top = 9.dp, bottom = 6.dp),
@@ -121,16 +139,56 @@ internal fun AstraStudyHub(
             Text(selected.description, color = AstraAurora.muted,
                 style = MaterialTheme.typography.bodyMedium)
             Spacer(Modifier.height(12.dp))
-            Text("CHOOSE A TOPIC", color = AstraAurora.mint,
-                style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
-            Spacer(Modifier.height(8.dp))
+            val visibleTopics = AstraStudyTopicFilter.apply(selected.topics, topicQuery)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text("CURRICULUM", color = AstraAurora.mint,
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Bold)
+                Text("${visibleTopics.size} / ${selected.topics.size} topics",
+                    color = AstraAurora.muted,
+                    style = MaterialTheme.typography.labelMedium)
+            }
+            Spacer(Modifier.height(9.dp))
+            OutlinedTextField(
+                value = topicQuery,
+                onValueChange = { topicQuery = it.take(80) },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                shape = RoundedCornerShape(16.dp),
+                placeholder = {
+                    Text("Find a lesson or skill", color = AstraAurora.muted)
+                },
+                label = {
+                    Text("Search this subject", color = AstraAurora.ink)
+                }
+            )
+            Spacer(Modifier.height(11.dp))
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(bottom = 24.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                items(selected.topics) { topic ->
+                items(visibleTopics, key = { it.title }) { topic ->
                     AstraStudyTopicCard(topic) { onLesson(topic) }
+                }
+                if (visibleTopics.isEmpty()) {
+                    item {
+                        Column(Modifier.fillMaxWidth().padding(vertical = 21.dp)) {
+                            Text("No matching lessons", color = AstraAurora.ink,
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold)
+                            Text("Try a different word or clear the search.",
+                                color = AstraAurora.muted,
+                                style = MaterialTheme.typography.bodyMedium)
+                            TextButton(onClick = { topicQuery = "" }) {
+                                Text("Show all ${selected.topics.size} topics")
+                            }
+                        }
+                    }
                 }
                 item {
                     Text(
