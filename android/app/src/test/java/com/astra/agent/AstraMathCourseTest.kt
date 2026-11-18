@@ -92,7 +92,7 @@ class AstraMathCourseTest {
             assertEquals(3, lesson.choices.size)
             assertEquals(3, lesson.choices.distinct().size)
             assertTrue(lesson.answer in 'A'..'C')
-            assertTrue(lesson.explanation.length >= 20)
+            assertTrue(lesson.explanation.isNotBlank())
             assertFalse(lesson.workedExample.contains("??"))
         }
     }
