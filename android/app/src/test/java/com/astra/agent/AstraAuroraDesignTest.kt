@@ -27,6 +27,13 @@ class AstraAuroraDesignTest {
         assertTrue(AstraAurora.motionEnabled(1f))
     }
 
+    @Test fun headerStatusUsesObservedVoiceAndGenerationState() {
+        org.junit.Assert.assertEquals("LOCAL ASSISTANT", AstraAurora.statusLabel(false, false))
+        org.junit.Assert.assertEquals("GENERATING", AstraAurora.statusLabel(false, true))
+        org.junit.Assert.assertEquals("LISTENING", AstraAurora.statusLabel(true, false))
+        org.junit.Assert.assertEquals("LISTENING", AstraAurora.statusLabel(true, true))
+    }
+
     @Test fun readableTypographyIsNotThin() {
         assertTrue(AstraReadableTypography.bodyLarge.fontWeight!!.weight >= FontWeight.Medium.weight)
         assertTrue(AstraReadableTypography.bodySmall.fontWeight!!.weight >= FontWeight.Medium.weight)
