@@ -214,6 +214,10 @@ internal class AstraOnDeviceBrain(
                 ) {
                     onPartial("Loading the language model on this phone...")
                     suspend fun loadPreparedModel(path: File) {
+                        // Android's own low-memory signal takes precedence over
+                        // starting a large new JNI model allocation. This does
+                        // not interfere with an already-running model session.
+                        AstraNativeLoadGuard.requireCapacity(context)
                         AstraInferenceCheckpoint.mark(
                             context, AstraInferenceCheckpoint.MODEL_LOADING
                         )
@@ -233,6 +237,12 @@ internal class AstraOnDeviceBrain(
                     } catch (cancel: kotlinx.coroutines.CancellationException) {
                         throw cancel
                     } catch (loadError: Exception) {
+                        // Low system RAM is a temporary condition, not
+                        // evidence that the advanced GGUF is corrupt. Stop
+                        // before JNI and allow a later retry after RAM clears.
+                        if (loadError is AstraNativeLowMemoryException) {
+                            throw loadError
+                        }
                         // Native model load may fail without crashing Android.
                         // A valid compact GGUF can then recover conversation.
                         session.invalidate()
