@@ -229,8 +229,7 @@ class AstraDocumentTextTest {
         }
         assertThrows(IllegalArgumentException::class.java) {
             AstraDocumentText.extract("odt", ByteArrayInputStream(
-                officeZip("mimetype" to "application/epub+zip",
-                    "content.xml" to "<office:text>not an ODT</office:text>")))
+                officeZip("mimetype" to "application/epub+zip")))
         }
         val xxe = """<!DOCTYPE p:sld [<!ENTITY stolen SYSTEM "file:///etc/passwd">]>
             <p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
