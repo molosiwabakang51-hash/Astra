@@ -1402,6 +1402,7 @@ private class AstraProcessor(
     private val multilingualTutor: AstraMultilingualTutor,
     private val financeCourse: AstraFinanceCourse,
     private val mathCourse: AstraMathCourse,
+    private val englishCourse: AstraEnglishCourse,
     private val everydayAssistant: EverydayAssistant,
     private val dialogue: AstraDialogue
 ) {
@@ -1516,6 +1517,10 @@ private class AstraProcessor(
             return AssistantResult(it)
         }
         mathCourse.respond(clean)?.let {
+            dialogue.dismissIncompletePrompt()
+            return AssistantResult(it)
+        }
+        englishCourse.respond(clean)?.let {
             dialogue.dismissIncompletePrompt()
             return AssistantResult(it)
         }
@@ -2474,6 +2479,7 @@ class MainActivity :
             ),
             AstraFinanceCourse(storage::getInt, storage::setInt),
             AstraMathCourse(storage::getInt, storage::setInt),
+            AstraEnglishCourse(storage::getInt, storage::setInt),
             EverydayAssistant(storage::getString, storage::setString),
             dialogue
         )
