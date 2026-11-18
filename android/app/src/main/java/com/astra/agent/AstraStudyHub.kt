@@ -172,7 +172,7 @@ internal fun AstraStudyHub(
                 contentPadding = PaddingValues(bottom = 24.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                items(visibleTopics, key = { it.command }) { topic ->
+                items(visibleTopics, key = { it.title }) { topic ->
                     AstraStudyTopicCard(topic) { onLesson(topic) }
                 }
                 if (visibleTopics.isEmpty()) {
