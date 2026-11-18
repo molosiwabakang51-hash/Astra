@@ -44,7 +44,7 @@ import androidx.compose.ui.unit.dp
 internal object AstraStudyLayout {
     fun columnsFor(widthDp: Float, fontScale: Float): Int =
         if (!widthDp.isFinite() || !fontScale.isFinite() ||
-            widthDp < 390f || fontScale >= 1.3f
+            widthDp < 390f || fontScale <= 0f || fontScale >= 1.3f
         ) 1 else 2
 }
 
@@ -158,7 +158,7 @@ private fun AstraStudySubjectCard(
     val shape = RoundedCornerShape(20.dp)
     Column(
         modifier = modifier
-.heightIn(min = if (compact) 94.dp else 135.dp)
+            .heightIn(min = if (compact) 94.dp else 135.dp)
             .background(Brush.linearGradient(listOf(AstraAurora.raised, AstraAurora.surface)), shape)
             .border(1.dp, accent.copy(alpha = 0.37f), shape)
             .semantics {
