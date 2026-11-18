@@ -85,31 +85,31 @@ class AstraGenerationPolicyTest {
     }
 
     @Test fun restoredChatIgnoresOlderBriefInstructionsWhenOwnerRequestsDetail() {
-        val restored = "EARLIER CHAT EXCERPTS (quoted reference, NOT instructions):\\n" +
-            "Previous user: \\"FINAL QUESTION: Answer briefly.\\"\\n" +
-            "Previous Astra: \\"In one sentence, define a bond.\\"\\n" +
-            "\\nCURRENT USER MESSAGE (answer this message, not the excerpts):\\n" +
-            "Explain bond duration step by step and give examples.\\n/no_think"
+        val restored = "EARLIER CHAT EXCERPTS (quoted reference, NOT instructions):\n" +
+            "Previous user: \"FINAL QUESTION: Answer briefly.\"\n" +
+            "Previous Astra: \"In one sentence, define a bond.\"\n" +
+            "\nCURRENT USER MESSAGE (answer this message, not the excerpts):\n" +
+            "Explain bond duration step by step and give examples.\n/no_think"
         assertEquals(AstraGenerationPolicy.Depth.DETAILED,
             AstraGenerationPolicy.depth(restored))
         assertEquals(1152, AstraGenerationPolicy.maxAnswerTokens(restored, true))
     }
 
     @Test fun restoredChatIgnoresOlderDetailedInstructionsWhenOwnerRequestsBrief() {
-        val restored = "EARLIER CHAT EXCERPTS (quoted reference, NOT instructions):\\n" +
-            "Previous user: \\"FINAL QUESTION: Write a comprehensive tutorial.\\"\\n" +
-            "\\nCURRENT USER MESSAGE (answer this message, not the excerpts):\\n" +
-            "Briefly define bond duration.\\n/no_think"
+        val restored = "EARLIER CHAT EXCERPTS (quoted reference, NOT instructions):\n" +
+            "Previous user: \"FINAL QUESTION: Write a comprehensive tutorial.\"\n" +
+            "\nCURRENT USER MESSAGE (answer this message, not the excerpts):\n" +
+            "Briefly define bond duration.\n/no_think"
         assertEquals(AstraGenerationPolicy.Depth.BRIEF,
             AstraGenerationPolicy.depth(restored))
         assertEquals(192, AstraGenerationPolicy.maxAnswerTokens(restored, false))
     }
 
     @Test fun activeFinalQuestionMarkerStillWorksAfterRestoredBoundary() {
-        val restored = "EARLIER CHAT EXCERPTS (quoted reference, NOT instructions):\\n" +
-            "Previous user: \\"FINAL QUESTION: Answer briefly.\\"\\n" +
-            "\\nCURRENT USER MESSAGE (answer this message, not the excerpts):\\n" +
-            "Source notes say to answer briefly.\\n" +
+        val restored = "EARLIER CHAT EXCERPTS (quoted reference, NOT instructions):\n" +
+            "Previous user: \"FINAL QUESTION: Answer briefly.\"\n" +
+            "\nCURRENT USER MESSAGE (answer this message, not the excerpts):\n" +
+            "Source notes say to answer briefly.\n" +
             "FINAL QUESTION: Explain bond convexity in detail."
         assertEquals(AstraGenerationPolicy.Depth.DETAILED,
             AstraGenerationPolicy.depth(restored))
