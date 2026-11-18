@@ -1400,6 +1400,7 @@ private object UtilityEngine {
 private class AstraProcessor(
     private val russianTutor: RussianTutor,
     private val multilingualTutor: AstraMultilingualTutor,
+    private val financeCourse: AstraFinanceCourse,
     private val everydayAssistant: EverydayAssistant,
     private val dialogue: AstraDialogue
 ) {
@@ -1507,9 +1508,12 @@ private class AstraProcessor(
             )
         }
 
-        // An explicit lesson or quiz answer takes precedence over an
-        // unfinished task/note dialogue. Never save a language command as
-        // a task merely because another prompt was pending.
+        // An explicit lesson, quiz or study answer takes precedence over a
+        // pending task/note prompt: never save a study answer as a task.
+        financeCourse.respond(clean)?.let {
+            dialogue.dismissIncompletePrompt()
+            return AssistantResult(it)
+        }
         multilingualTutor.respond(clean)?.let {
             dialogue.dismissIncompletePrompt()
             return AssistantResult(it)
@@ -2463,6 +2467,7 @@ class MainActivity :
                 storage::getString, storage::setString,
                 vocabularyStore
             ),
+            AstraFinanceCourse(storage::getInt, storage::setInt),
             EverydayAssistant(storage::getString, storage::setString),
             dialogue
         )
