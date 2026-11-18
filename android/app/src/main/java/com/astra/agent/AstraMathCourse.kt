@@ -181,7 +181,7 @@ internal class AstraMathCourse(
                 "1,000 × 1.10 × 1.10 = P1,210."
             )
         )
-        private const val VALID_MASK = (1 shl 16) - 1
+        private const val VALID_MASK = 0x0000FFFF
     }
 
     fun respond(raw: String): String? {
