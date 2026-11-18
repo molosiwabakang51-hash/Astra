@@ -39,8 +39,10 @@ internal object AstraAppLock {
      * Only four bounded, recognized values are accepted; corrupt preferences fail closed.
      */
     fun backgroundDelayMillis(context: Context): Long {
-        val saved = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            .getLong(BACKGROUND_DELAY_KEY, 0L)
+        val saved = runCatching {
+            context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                .getLong(BACKGROUND_DELAY_KEY, 0L)
+        }.getOrDefault(0L)
         return if (saved in AstraAppLockPolicy.backgroundDelaysMillis) saved else 0L
     }
 
