@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -29,11 +30,23 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+
+/**
+ * Fit one subject card per row on narrow devices or when Android fonts grow.
+ * Maintain two columns only when the screen can genuinely fit them.
+ */
+internal object AstraStudyLayout {
+    fun columnsFor(widthDp: Float, fontScale: Float): Int =
+        if (!widthDp.isFinite() || !fontScale.isFinite() ||
+            widthDp < 390f || fontScale <= 0f || fontScale >= 1.3f
+        ) 1 else 2
+}
 
 /**
  * Study button navigates to this catalog only. A separate explicit topic tap
@@ -68,26 +81,36 @@ internal fun AstraStudyHub(
             Text("Choose a subject. Lessons only begin when you select a topic.",
                 color = AstraAurora.muted, style = MaterialTheme.typography.bodyMedium)
             Spacer(Modifier.height(15.dp))
-            LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(bottom = 24.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                items(AstraStudyCatalog.subjects.chunked(2)) { pair ->
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        pair.forEach { subject ->
-                            AstraStudySubjectCard(
-                                subject = subject,
-                                accent = when (AstraStudyCatalog.subjects.indexOf(subject) % 3) {
-                                    0 -> AstraAurora.cyan
-                                    1 -> AstraAurora.violet
-                                    else -> AstraAurora.mint
-                                },
-                                modifier = Modifier.weight(1f),
-                                onClick = { selectedId = subject.id }
-                            )
+            val fontScale = LocalDensity.current.fontScale
+            BoxWithConstraints(Modifier.fillMaxSize()) {
+                val columns = AstraStudyLayout.columnsFor(maxWidth.value, fontScale)
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(bottom = 24.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    items(AstraStudyCatalog.subjects.chunked(columns)) { pair ->
+                        Row(
+                            Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            pair.forEach { subject ->
+                                AstraStudySubjectCard(
+                                    subject = subject,
+                                    accent = when (AstraStudyCatalog.subjects.indexOf(subject) % 3) {
+                                        0 -> AstraAurora.cyan
+                                        1 -> AstraAurora.violet
+                                        else -> AstraAurora.mint
+                                    },
+                                    compact = columns == 1,
+                                    modifier = Modifier.weight(1f),
+                                    onClick = { selectedId = subject.id }
+                                )
+                            }
+                            if (pair.size == 1 && columns == 2) {
+                                Spacer(Modifier.weight(1f))
+                            }
                         }
-                        if (pair.size == 1) Spacer(Modifier.weight(1f))
                     }
                 }
             }
@@ -129,12 +152,13 @@ private fun AstraStudySubjectCard(
     subject: AstraStudyCatalog.Subject,
     accent: Color,
     modifier: Modifier,
+    compact: Boolean,
     onClick: () -> Unit
 ) {
     val shape = RoundedCornerShape(20.dp)
     Column(
         modifier = modifier
-            .heightIn(min = 135.dp)
+            .heightIn(min = if (compact) 94.dp else 135.dp)
             .background(Brush.linearGradient(listOf(AstraAurora.raised, AstraAurora.surface)), shape)
             .border(1.dp, accent.copy(alpha = 0.37f), shape)
             .semantics {
@@ -144,15 +168,53 @@ private fun AstraStudySubjectCard(
             .padding(13.dp),
         verticalArrangement = Arrangement.SpaceBetween
     ) {
-        Text(subject.symbol, style = MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.Bold, color = accent)
-        Spacer(Modifier.height(9.dp))
-        Text(subject.title, style = MaterialTheme.typography.titleMedium,
-            color = AstraAurora.ink, fontWeight = FontWeight.Bold,
-            maxLines = 1, overflow = TextOverflow.Ellipsis)
-        Spacer(Modifier.height(3.dp))
-        Text(subject.description, style = MaterialTheme.typography.bodySmall,
-            color = AstraAurora.muted, maxLines = 2, overflow = TextOverflow.Ellipsis)
+        if (compact) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    subject.symbol,
+                    style = MaterialTheme.typography.headlineMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = accent
+                )
+                Spacer(Modifier.width(15.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        subject.title,
+                        style = MaterialTheme.typography.titleMedium,
+                        color = AstraAurora.ink,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 2
+                    )
+                    Spacer(Modifier.height(3.dp))
+                    Text(
+                        subject.description,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = AstraAurora.muted,
+                        maxLines = 3,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+                Spacer(Modifier.width(8.dp))
+                Text("›", color = accent, style = MaterialTheme.typography.titleLarge)
+            }
+        } else {
+            Text(
+                subject.symbol, style = MaterialTheme.typography.headlineMedium,
+                fontWeight = FontWeight.Bold, color = accent
+            )
+            Spacer(Modifier.height(9.dp))
+            Text(
+                subject.title, style = MaterialTheme.typography.titleMedium,
+                color = AstraAurora.ink, fontWeight = FontWeight.Bold,
+                maxLines = 1, overflow = TextOverflow.Ellipsis
+            )
+            Spacer(Modifier.height(3.dp))
+            Text(
+                subject.description, style = MaterialTheme.typography.bodySmall,
+                color = AstraAurora.muted, maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
     }
 }
 

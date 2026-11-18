@@ -1,17 +1,17 @@
 package com.astra.agent
 
+import android.provider.Settings
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -29,7 +29,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
-import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.geometry.Offset
@@ -90,6 +93,15 @@ internal fun AstraCommandDeck(
     onCommand: (String) -> Unit
 ) {
     val status = AstraDeck.status(listening, researching, awaitingReply)
+    val context = LocalContext.current
+    val motion = remember(context) {
+        AstraAurora.motionEnabled(runCatching {
+            Settings.Global.getFloat(
+                context.contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f
+            )
+        }.getOrDefault(1f))
+    }
+    val shape = RoundedCornerShape(18.dp)
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -99,6 +111,7 @@ internal fun AstraCommandDeck(
                 ),
                 shape = RoundedCornerShape(18.dp)
             )
+            .border(1.dp, AstraAurora.cyan.copy(alpha = 0.22f), shape)
             .padding(horizontal = 12.dp, vertical = 4.dp)
     ) {
         // The collapsed surface remains a single accessible touch target.
@@ -106,14 +119,15 @@ internal fun AstraCommandDeck(
             modifier = Modifier
                 .fillMaxWidth()
                 .heightIn(min = 48.dp)
+                .semantics { contentDescription = "Mission Control, $status" }
                 .clickable { onExpandedChange(!expanded) },
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    "Overview",
-                    color = Color(0xFFBBDFFF),
+                    "MISSION CONTROL",
+                    color = AstraAurora.ink,
                     fontWeight = FontWeight.SemiBold,
                     style = MaterialTheme.typography.labelMedium,
                     maxLines = 1,
@@ -122,7 +136,7 @@ internal fun AstraCommandDeck(
                 Spacer(Modifier.height(4.dp))
                 Text(
                     status,
-                    color = Color(0xFF6ED2FF),
+                    color = AstraAurora.mint,
                     style = MaterialTheme.typography.labelSmall,
                     maxLines = 1
                 )
@@ -147,33 +161,39 @@ internal fun AstraCommandDeck(
 
         AnimatedVisibility(
             visible = expanded,
-            enter = expandVertically(animationSpec = tween(240)) +
-                fadeIn(animationSpec = tween(180)),
-            exit = shrinkVertically(animationSpec = tween(220)) +
-                fadeOut(animationSpec = tween(150))
+            enter = if (motion) expandVertically(animationSpec = tween(240)) +
+                fadeIn(animationSpec = tween(180)) else EnterTransition.None,
+            exit = if (motion) shrinkVertically(animationSpec = tween(220)) +
+                fadeOut(animationSpec = tween(150)) else ExitTransition.None
         ) {
             Column {
                 Spacer(Modifier.height(9.dp))
-                Text(
-                    "MISSION HUD",
-                    color = Color(0xFF7199BC),
-                    style = MaterialTheme.typography.labelSmall
-                )
+                Row(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    AstraDeckMetric("OPEN", openTasks, Modifier.weight(1f))
+                    AstraDeckMetric("DONE", completedTasks, Modifier.weight(1f))
+                    AstraDeckMetric("NOTES", storedNotes, Modifier.weight(1f))
+                }
+                Spacer(Modifier.height(10.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        "TASK COMPLETION",
+                        color = AstraAurora.muted,
+                        fontWeight = FontWeight.SemiBold,
+                        style = MaterialTheme.typography.labelSmall
+                    )
+                    Spacer(Modifier.weight(1f))
+                    Text(
+                        "${AstraDeck.completionPercent(openTasks, completedTasks)}%",
+                        color = AstraAurora.ink,
+                        fontWeight = FontWeight.Bold,
+                        style = MaterialTheme.typography.labelMedium
+                    )
+                }
                 Spacer(Modifier.height(7.dp))
-                Text(
-                    "OPEN $openTasks    DONE $completedTasks    NOTES $storedNotes" +
-                        "    COMPLETION ${AstraDeck.completionPercent(openTasks, completedTasks)}%",
-                    color = Color(0xFFB2C9DE),
-                    style = MaterialTheme.typography.labelSmall
-                )
-                Spacer(Modifier.height(7.dp))
-                val animation = rememberInfiniteTransition(label = "astra-deck")
-                val sweep by animation.animateFloat(
-                    initialValue = 0f,
-                    targetValue = 1f,
-                    animationSpec = infiniteRepeatable(tween(4200), RepeatMode.Restart),
-                    label = "scanline"
-                )
+                // Static progress indicator: no infinite scanline, no idle battery draw.
                 Canvas(modifier = Modifier.fillMaxWidth().height(8.dp)) {
                     val y = size.height / 2f
                     drawLine(
@@ -191,18 +211,11 @@ internal fun AstraCommandDeck(
                         3.dp.toPx(),
                         cap = StrokeCap.Round
                     )
-                    drawLine(
-                        Color(0xFF70D7FF),
-                        Offset((size.width * sweep).coerceAtMost(size.width), y),
-                        Offset((size.width * (sweep + 0.12f)).coerceAtMost(size.width), y),
-                        2.dp.toPx(),
-                        cap = StrokeCap.Round
-                    )
                 }
                 Spacer(Modifier.height(9.dp))
                 Text(
                     "QUICK COMMANDS  ·  SWIPE FOR MORE",
-                    color = Color(0xFF8FB3D1),
+                    color = AstraAurora.muted,
                     style = MaterialTheme.typography.labelSmall
                 )
                 Spacer(Modifier.height(7.dp))
@@ -216,8 +229,10 @@ internal fun AstraCommandDeck(
                             text = command,
                             modifier = Modifier
                                 .background(Color(0xFF20364F), RoundedCornerShape(50))
+                                .heightIn(min = 48.dp)
+                                .semantics { contentDescription = "Run $command" }
                                 .clickable { onCommand(command) }
-                                .padding(horizontal = 12.dp, vertical = 8.dp),
+                                .padding(horizontal = 14.dp, vertical = 12.dp),
                             color = Color(0xFFE4F5FF),
                             style = MaterialTheme.typography.labelMedium
                         )
@@ -226,5 +241,29 @@ internal fun AstraCommandDeck(
                 Spacer(Modifier.height(5.dp))
             }
         }
+    }
+}
+
+@Composable
+private fun AstraDeckMetric(label: String, value: Int, modifier: Modifier) {
+    Column(
+        modifier = modifier
+            .background(AstraAurora.raised, RoundedCornerShape(14.dp))
+            .padding(horizontal = 10.dp, vertical = 10.dp)
+    ) {
+        Text(
+            label,
+            color = AstraAurora.muted,
+            fontWeight = FontWeight.SemiBold,
+            style = MaterialTheme.typography.labelSmall
+        )
+        Text(
+            value.coerceAtLeast(0).toString(),
+            color = AstraAurora.ink,
+            fontWeight = FontWeight.Bold,
+            style = MaterialTheme.typography.titleLarge,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
     }
 }
