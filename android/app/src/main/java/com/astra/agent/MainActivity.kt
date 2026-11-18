@@ -2269,6 +2269,9 @@ class MainActivity :
         }
 
         val requestId = speechSession.begin()
+        // Keep the callback name distinct from RecognitionListener.onError(Int).
+        val reportError = onError
+        try {
         engine.setRecognitionListener(
             object : RecognitionListener {
 
@@ -2311,7 +2314,7 @@ class MainActivity :
                         return
                     }
 
-                    onError(
+                    reportError(
                         when (error) {
 
                             SpeechRecognizer.ERROR_NO_MATCH ->
@@ -2367,7 +2370,7 @@ class MainActivity :
 
                     } else {
 
-                        onError("No speech recognized.")
+                        reportError("No speech recognized.")
                     }
                 }
 
@@ -2381,6 +2384,12 @@ class MainActivity :
                 ) {}
             }
         )
+        } catch (_: Exception) {
+            speechSession.complete(requestId)
+            listening = false
+            reportError("Unable to initialize the device speech service.")
+            return
+        }
 
         val intent = Intent(
             RecognizerIntent.ACTION_RECOGNIZE_SPEECH
