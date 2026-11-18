@@ -19,6 +19,7 @@ def main(apk_path: Path) -> None:
         for notice in (
             "assets/open_source_licenses/Qwen3-Apache-2.0.txt",
             "assets/open_source_licenses/llama.cpp-MIT.txt",
+            "assets/open_source_licenses/PdfBox-Android-Apache-2.0.txt",
             "assets/open_source_licenses/SOURCES.txt",
         ):
             if notice not in names:
