@@ -32,6 +32,7 @@ class AstraPdfTextTest {
         writer.write("0123456789".toCharArray(), 2, 5)
         writer.write("DO_NOT_APPEND", 0, 13)
         assertEquals("abcde23456", writer.text())
+        assertTrue(writer.truncated)
         writer.flush()
         writer.close()
         assertEquals("abcde23456", writer.text())
@@ -41,5 +42,6 @@ class AstraPdfTextTest {
         val writer = AstraPdfText.BoundedTextWriter(0)
         writer.write("private", 0, 7)
         assertTrue(writer.text().isEmpty())
+        assertTrue(writer.truncated)
     }
 }
