@@ -7,6 +7,19 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class AstraStudyCatalogTest {
+    @Test fun studyLayoutProtectsNarrowScreensAndLargeFontScaling() {
+        assertEquals(1, AstraStudyLayout.columnsFor(320f, 1f))
+        assertEquals(1, AstraStudyLayout.columnsFor(360f, 1f))
+        assertEquals(1, AstraStudyLayout.columnsFor(389f, 1f))
+        assertEquals(2, AstraStudyLayout.columnsFor(390f, 1f))
+        assertEquals(2, AstraStudyLayout.columnsFor(440f, 1.29f))
+        assertEquals(1, AstraStudyLayout.columnsFor(440f, 1.3f))
+        assertEquals(1, AstraStudyLayout.columnsFor(600f, 2f))
+        assertEquals(1, AstraStudyLayout.columnsFor(Float.NaN, 1f))
+        assertEquals(1, AstraStudyLayout.columnsFor(Float.POSITIVE_INFINITY, 1f))
+        assertEquals(1, AstraStudyLayout.columnsFor(600f, Float.NaN))
+    }
+
     @Test fun studyOpensCatalogWithoutAutostartingFinance() {
         assertEquals("Study", AstraWelcomePolicy.commands.first())
         assertFalse(AstraWelcomePolicy.commands.first().contains("finance", ignoreCase = true))
