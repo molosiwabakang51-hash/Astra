@@ -82,13 +82,17 @@ class AstraStudyCatalogTest {
         assertEquals(null, AstraStudyCatalog.topic("finance", "Not a topic"))
     }
 
-    @Test fun nonBuiltInEnglishTradingAndAlgebraAreLabelledLocalAi() {
+    @Test fun nonBuiltInEnglishAndTradingRemainAiOnlyWhileMathIsNowOffline() {
         for (id in listOf("english", "day_trading")) {
             val subject = AstraStudyCatalog.find(id)
             assertNotNull(subject)
             assertTrue(subject!!.topics.all { it.requiresModel })
         }
-        assertTrue(AstraStudyCatalog.topic("mathematics", "Algebra")!!.requiresModel)
+        val mathematics = AstraStudyCatalog.find("mathematics")!!
+        assertEquals(16, mathematics.topics.count {
+            it.command.startsWith("math lesson ")
+        })
+        assertTrue(mathematics.topics.all { !it.requiresModel })
         assertFalse(AstraStudyCatalog.topic("russian", "Start Russian")!!.requiresModel)
         assertFalse(AstraStudyCatalog.topic("french", "Start French")!!.requiresModel)
     }
