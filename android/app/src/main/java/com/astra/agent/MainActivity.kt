@@ -2014,6 +2014,8 @@ class MainActivity :
     private var tts: TextToSpeech? = null
 
     private var recognizer: SpeechRecognizer? = null
+    private val speechSession = AstraSpeechSession()
+    private var speechForeground = false
 
     private var ttsReady by mutableStateOf(false)
 
@@ -2046,6 +2048,7 @@ class MainActivity :
     private fun lockPrivateWorkspace() {
         idleLockHandler.removeCallbacks(idleLockRunnable)
         // Never leave speech or a microphone session active behind the lock.
+        speechSession.cancel()
         recognizer?.cancel()
         listening = false
         tts?.stop()
@@ -2100,12 +2103,6 @@ class MainActivity :
 
     private var recognitionAvailable by mutableStateOf(false)
 
-    private var speechResultCallback:
-        ((String) -> Unit)? = null
-
-    private var speechErrorCallback:
-        ((String) -> Unit)? = null
-
     private var pendingVoiceStart:
         (() -> Unit)? = null
 
@@ -2156,7 +2153,12 @@ class MainActivity :
     }
 
     private fun speak(text: String, offlineOnly: Boolean) {
-        if (!ttsReady) return
+        // A native reply may finish after a background/biometric lock.
+        // Never start reading private chat text outside the unlocked activity.
+        if (!ttsReady || !AstraSpeechPrivacy.mayUseVoice(
+                speechForeground, secureLockEnabled, workspaceUnlocked
+            )
+        ) return
         val selected = selectedSpeechLanguage()
         selectOfflineVoice()
         if (offlineOnly && !offlineVoiceAvailable) {
@@ -2188,6 +2190,8 @@ class MainActivity :
 
     private fun initializeRecognizer() {
 
+        speechSession.cancel()
+        recognizer?.cancel()
         recognizer?.destroy()
 
         recognizer = null
@@ -2236,8 +2240,13 @@ class MainActivity :
         onLanguageUnsupported: (() -> Unit)? = null
     ) {
 
-        speechResultCallback = onResult
-        speechErrorCallback = onError
+        if (!AstraSpeechPrivacy.mayUseVoice(
+                speechForeground, secureLockEnabled, workspaceUnlocked
+            )
+        ) {
+            onError("Unlock and open Astra before using the microphone.")
+            return
+        }
 
         val engine =
             recognizer ?: run {
@@ -2249,15 +2258,20 @@ class MainActivity :
                 return
             }
 
-        if (listening) {
-
-            engine.stopListening()
-
+        // A second microphone tap is a cancellation, not a request to
+        // transcribe and auto-send what the owner just cancelled.
+        // Android may still deliver callbacks from the cancelled request.
+        if (speechSession.isPending() || listening) {
+            speechSession.cancel()
+            engine.cancel()
             listening = false
-
             return
         }
 
+        val requestId = speechSession.begin()
+        // Keep the callback name distinct from RecognitionListener.onError(Int).
+        val reportError = onError
+        try {
         engine.setRecognitionListener(
             object : RecognitionListener {
 
@@ -2265,7 +2279,7 @@ class MainActivity :
                     params: Bundle?
                 ) {
 
-                    listening = true
+                    if (speechSession.accepts(requestId)) listening = true
                 }
 
                 override fun onBeginningOfSpeech() {}
@@ -2280,13 +2294,15 @@ class MainActivity :
 
                 override fun onEndOfSpeech() {
 
-                    listening = false
+                    if (speechSession.accepts(requestId)) listening = false
                 }
 
                 override fun onError(
                     error: Int
                 ) {
-
+                    // Ignore a service callback from a cancelled, replaced,
+                    // or background-locked recognition request.
+                    if (!speechSession.complete(requestId)) return
                     listening = false
 
                     if (
@@ -2298,7 +2314,7 @@ class MainActivity :
                         return
                     }
 
-                    speechErrorCallback?.invoke(
+                    reportError(
                         when (error) {
 
                             SpeechRecognizer.ERROR_NO_MATCH ->
@@ -2337,7 +2353,9 @@ class MainActivity :
                 override fun onResults(
                     results: Bundle?
                 ) {
-
+                    // A late final result must never restart a cancelled
+                    // dictation, submit text, or reveal it after a lock.
+                    if (!speechSession.complete(requestId)) return
                     listening = false
 
                     val text = results
@@ -2348,15 +2366,11 @@ class MainActivity :
 
                     if (!text.isNullOrBlank()) {
 
-                        speechResultCallback?.invoke(
-                            text
-                        )
+                        onResult(text)
 
                     } else {
 
-                        speechErrorCallback?.invoke(
-                            "No speech recognized."
-                        )
+                        reportError("No speech recognized.")
                     }
                 }
 
@@ -2370,6 +2384,12 @@ class MainActivity :
                 ) {}
             }
         )
+        } catch (_: Exception) {
+            speechSession.complete(requestId)
+            listening = false
+            reportError("Unable to initialize the device speech service.")
+            return
+        }
 
         val intent = Intent(
             RecognizerIntent.ACTION_RECOGNIZE_SPEECH
@@ -2399,6 +2419,7 @@ class MainActivity :
 
         } catch (_: Exception) {
 
+            speechSession.complete(requestId)
             listening = false
 
             onError(
@@ -3563,19 +3584,23 @@ class MainActivity :
                         ActivityResultContracts
                             .StartActivityForResult()
                     ) { result ->
-
-                        val words = result.data
-                            ?.getStringArrayListExtra(
-                                RecognizerIntent.EXTRA_RESULTS
+                        // External system speech can return after biometric
+                        // locking or a long background interval. Its words
+                        // must never auto-send into an inaccessible workspace.
+                        if (!AstraSpeechPrivacy.mayUseVoice(
+                                speechForeground, secureLockEnabled, workspaceUnlocked
                             )
-                            ?.firstOrNull()
-
-                        if (!words.isNullOrBlank()) {
-
-                            if (autoSendVoice) {
-                                submit(words)
-                            } else {
-                                input = words
+                        ) {
+                            voiceError = "System speech result discarded because Astra is locked."
+                        } else {
+                            val words = result.data
+                                ?.getStringArrayListExtra(
+                                    RecognizerIntent.EXTRA_RESULTS
+                                )
+                                ?.firstOrNull()
+                            if (!words.isNullOrBlank()) {
+                                if (autoSendVoice) submit(words)
+                                else input = words
                             }
                         }
                     }
@@ -7150,6 +7175,9 @@ class MainActivity :
     }
 
     override fun onStart() {
+        // Speech and spoken model output are allowed only while the activity
+        // is visible. This does not imply an app-locked workspace is unlocked.
+        speechForeground = true
         // Enforce a missed background deadline before the private activity is shown.
         // Cold launches are independently locked in onCreate.
         val leftAt = backgroundedAtElapsedMs
@@ -7177,6 +7205,13 @@ class MainActivity :
     }
 
     override fun onStop() {
+        // Stop local mic capture and spoken private answers even if app lock
+        // is disabled. Cancelling invalidates any queued recognition result.
+        speechForeground = false
+        speechSession.cancel()
+        recognizer?.cancel()
+        listening = false
+        tts?.stop()
         if (secureLockEnabled) {
             backgroundedAtElapsedMs = android.os.SystemClock.elapsedRealtime()
             backgroundSessionWasUnlocked = workspaceUnlocked
@@ -7190,6 +7225,8 @@ class MainActivity :
 
     override fun onDestroy() {
         idleLockHandler.removeCallbacks(idleLockRunnable)
+        speechForeground = false
+        speechSession.cancel()
         recognizer?.cancel()
         recognizer?.destroy()
 
