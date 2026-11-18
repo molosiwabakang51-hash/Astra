@@ -33,8 +33,10 @@ class AstraAppLockSourceTest(unittest.TestCase):
         self.assertIn("backgroundLockDelayMillis = AstraAppLock.backgroundDelayMillis(this)", MAIN)
         self.assertIn("override fun onStart()", MAIN)
         self.assertIn("android.os.SystemClock.elapsedRealtime()", MAIN)
-        self.assertIn("workspaceUnlocked = workspaceUnlocked &&", MAIN)
-        self.assertIn("backgroundLockDelayMillis == 0L", MAIN)
+        self.assertIn("backgroundSessionWasUnlocked = workspaceUnlocked", MAIN)
+        self.assertIn("workspaceUnlocked = AstraAppLockPolicy.unlockedAfterBackground(true)", MAIN)
+        self.assertIn("if (secureLockEnabled && leftAt != null && backgroundSessionWasUnlocked)", MAIN)
+        self.assertIn("backgroundSessionWasUnlocked = false", MAIN)
         self.assertIn("Screen capture stays blocked at every delay setting.", MAIN)
 
     def test_strong_system_auth_only_and_default_off(self):
