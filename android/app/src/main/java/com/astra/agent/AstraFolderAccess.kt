@@ -211,6 +211,12 @@ internal object AstraFolderRules {
         if (filename.isBlank() || filename.length > 180 ||
             filename.any { it.isISOControl() || it == '/' || it == '\\' }) return false
         if (size != null && size !in 1..MAX_BYTES) return false
-        return AstraDocumentText.format(filename) != null
+        val format = AstraDocumentText.format(filename) ?: return false
+        // PDF input is deliberately more conservative than other documents.
+        // Reject a known oversized file before opening a SAF content stream.
+        if (format == "pdf" && size != null &&
+            !AstraPdfText.sizeAllowed(size)
+        ) return false
+        return true
     }
 }
