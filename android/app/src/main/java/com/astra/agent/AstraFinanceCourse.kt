@@ -56,7 +56,7 @@ internal class AstraFinanceCourse(
             Lesson(
                 "Simple interest",
                 "Simple interest is charged on the original principal only. The formula is I = principal × annual rate × years.",
-                "P1,000 × 10% × 3 years = P300 interest. Ending balance = P1,300.",
+                "P1,000 × 10% × 3 years = P300 interest. Ending balance = P1,300 before fees and taxes.",
                 "The rate and time units must agree; fees and taxes are excluded.",
                 "What is the simple interest on P1,000 at 10% for 3 years?",
                 listOf("P331", "P300", "P1,300"), 'B',
