@@ -2,6 +2,7 @@ package com.astra.agent
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.width
@@ -16,17 +17,37 @@ import androidx.compose.ui.text.font.FontWeight
 
 /** Compact identity reused by navigation without wasting the chat header. */
 @Composable
-internal fun AstraBrand(modifier: Modifier = Modifier, listening: Boolean = false) {
+internal fun AstraBrand(
+    modifier: Modifier = Modifier,
+    listening: Boolean = false,
+    thinking: Boolean = false
+) {
     Row(modifier = modifier, verticalAlignment = Alignment.CenterVertically) {
-        AstraOrb(diameter = 38.dp, compact = true, listening = listening)
-        Spacer(Modifier.width(6.dp))
-        Text(
-            "Astra",
-            fontSize = 20.sp,
-            fontWeight = FontWeight.SemiBold,
-            letterSpacing = (-0.5).sp,
-            color = AstraAurora.ink
+        AstraOrb(
+            diameter = 38.dp, compact = true,
+            listening = listening, thinking = thinking
         )
+        Spacer(Modifier.width(6.dp))
+        Column {
+            Text(
+                "Astra",
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = (-0.3).sp,
+                color = AstraAurora.ink
+            )
+            Text(
+                AstraAurora.statusLabel(listening, thinking),
+                fontSize = 10.sp,
+                fontWeight = FontWeight.SemiBold,
+                letterSpacing = 0.5.sp,
+                color = when {
+                    listening -> AstraAurora.mint
+                    thinking -> AstraAurora.violet
+                    else -> AstraAurora.muted
+                }
+            )
+        }
     }
 }
 
