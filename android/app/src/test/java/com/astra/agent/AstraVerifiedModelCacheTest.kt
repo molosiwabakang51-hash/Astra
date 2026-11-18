@@ -57,6 +57,25 @@ class AstraVerifiedModelCacheTest {
         assertEquals(file, cache.matching(name, digest))
     }
 
+    @Test fun sameSizeSameTimestampReplacementCannotReuseOldDigest() = withModel { file ->
+        val cache = AstraVerifiedModelCache()
+        cache.rememberVerified(file, digest)
+        val previousModifiedAt = file.lastModified()
+        val previousLength = file.length()
+        val replacement = File(file.parentFile, "replacement.gguf")
+        replacement.writeText("DIFF fixture")
+        assertEquals(previousLength, replacement.length())
+        assertTrue(replacement.setLastModified(previousModifiedAt))
+        // Rename over the old path as a verified importer would. Neither
+        // filename, byte length nor last-modified time can detect this swap.
+        assertTrue(replacement.renameTo(file))
+        assertEquals(previousLength, file.length())
+        assertEquals(previousModifiedAt, file.lastModified())
+        assertTrue(cache.changed(name))
+        assertFalse(cache.hasVerifiedFile())
+        assertNull(cache.matching(name, digest))
+    }
+
     @Test fun partialOrDeletedModelCannotRetainVerifiedStatus() = withModel { file ->
         val cache = AstraVerifiedModelCache()
         cache.rememberVerified(file, digest)
