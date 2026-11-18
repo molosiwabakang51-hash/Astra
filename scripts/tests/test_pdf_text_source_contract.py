@@ -45,6 +45,11 @@ class OfflinePdfSourceContractTest(unittest.TestCase):
         self.assertIn(marker, PREPARE)
         self.assertIn(marker, VERIFY_LITE)
         self.assertIn(marker, VERIFY_FULL)
+        self.assertIn("PdfBox-Android-NOTICE.txt", VERIFY_LITE)
+        self.assertIn("PdfBox-Android-NOTICE.txt", VERIFY_FULL)
+        notice = (ROOT / "android/app/src/main/assets/open_source_licenses/PdfBox-Android-NOTICE.txt").read_text(encoding="utf-8")
+        self.assertIn("Apache PDFBox", notice)
+        self.assertIn("Adobe Glyph List", notice)
         self.assertIn("PDFBox-Android 2.0.27.0", PREPARE)
         self.assertIn("LITE APK", (ROOT / "README.md").read_text(encoding="utf-8"))
 
