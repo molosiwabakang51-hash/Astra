@@ -4863,7 +4863,10 @@ class MainActivity :
                                         .clickable { navigationPopupOpen = true },
                                     contentAlignment = Alignment.CenterStart
                                 ) {
-                                    AstraBrand(listening = listening)
+                                    AstraBrand(
+                                        listening = listening,
+                                        thinking = offlineJob?.isActive == true
+                                    )
                                 }
                                 DropdownMenu(
                                     expanded = navigationPopupOpen,
