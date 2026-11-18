@@ -91,7 +91,36 @@ internal object AstraStudyCatalog {
         // The existing multilingual tutor already supports 21 offline lessons
         // per included course. Surface those *real* chapters instead of
         // disguising a three-button preview as the whole curriculum.
-        if (subject.id in setOf("setswana", "french", "spanish", "portuguese",
+        if (subject.id == "russian") {
+            // The existing RussianTutor includes six structured introductions
+            // and enough bundled vocabulary for 21+ offline lessons. Surface
+            // real topics in Study without inventing content or calling an LLM.
+            // Keep the quiz as the last action for stable navigation contracts.
+            subject.copy(
+                topics = listOf(subject.topics.first()) +
+                    (2..21).map { number ->
+                        val title = when (number) {
+                            2 -> "Lesson 2 — Everyday phrases"
+                            3 -> "Lesson 3 — Cyrillic"
+                            4 -> "Lesson 4 — Numbers"
+                            5 -> "Lesson 5 — Russian cases"
+                            6 -> "Lesson 6 — Verb aspect"
+                            else -> "Lesson $number — Vocabulary"
+                        }
+                        Topic(
+                            title,
+                            if (number <= 6) "Open the built-in Russian lesson."
+                            else "Practice a new group of offline Russian vocabulary.",
+                            "russian lesson $number"
+                        )
+                    } +
+                    listOf(
+                        Topic("Course progress", "Review Russian lessons and quiz progress.",
+                            "russian progress"),
+                        subject.topics.last()
+                    )
+            )
+        } else if (subject.id in setOf("setswana", "french", "spanish", "portuguese",
                 "german", "swahili", "japanese", "mandarin")) {
             subject.copy(
                 topics = listOf(subject.topics.first()) +
