@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -14,6 +15,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -66,6 +68,37 @@ internal object AstraStudyTopicFilter {
 }
 
 /**
+ * Search the complete Study library before a subject is opened. Search
+ * includes individual lesson titles but never executes a lesson implicitly.
+ */
+internal object AstraStudySubjectFilter {
+    fun apply(
+        subjects: List<AstraStudyCatalog.Subject>,
+        rawQuery: String
+    ): List<AstraStudyCatalog.Subject> {
+        val query = rawQuery.trim().take(80).lowercase(java.util.Locale.ROOT)
+        if (query.isEmpty()) return subjects
+        return subjects.filter { subject ->
+            subject.title.lowercase(java.util.Locale.ROOT).contains(query) ||
+                subject.description.lowercase(java.util.Locale.ROOT).contains(query) ||
+                subject.topics.any { topic ->
+                    topic.title.lowercase(java.util.Locale.ROOT).contains(query) ||
+                        topic.description.lowercase(java.util.Locale.ROOT).contains(query)
+                }
+        }
+    }
+}
+
+/** Indicate when a lesson can actually start without an imported GGUF model. */
+internal object AstraStudyAccess {
+    fun label(subject: AstraStudyCatalog.Subject): String = when {
+        subject.topics.all { it.requiresModel } -> "MODEL NEEDED"
+        subject.topics.any { it.requiresModel } -> "OFFLINE + AI"
+        else -> "OFFLINE"
+    }
+}
+
+/**
  * Study button navigates to this catalog only. A separate explicit topic tap
  * begins a lesson. AI-only lessons clearly identify their GGUF dependency.
  */
@@ -76,6 +109,7 @@ internal fun AstraStudyHub(
 ) {
     var selectedId by remember { mutableStateOf<String?>(null) }
     val selected = AstraStudyCatalog.find(selectedId)
+    var subjectQuery by remember { mutableStateOf("") }
     var topicQuery by remember(selectedId) { mutableStateOf("") }
     Column(Modifier.fillMaxSize()) {
         Row(
@@ -98,7 +132,34 @@ internal fun AstraStudyHub(
             Spacer(Modifier.height(5.dp))
             Text("Choose a subject. Lessons only begin when you select a topic.",
                 color = AstraAurora.muted, style = MaterialTheme.typography.bodyMedium)
-            Spacer(Modifier.height(15.dp))
+            Spacer(Modifier.height(13.dp))
+            OutlinedTextField(
+                value = subjectQuery,
+                onValueChange = { subjectQuery = it.take(80) },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                shape = RoundedCornerShape(16.dp),
+                label = { Text("Search all subjects", color = AstraAurora.ink) },
+                placeholder = {
+                    Text("Try bonds, algebra or French", color = AstraAurora.muted)
+                }
+            )
+            Spacer(Modifier.height(12.dp))
+            val visibleSubjects = AstraStudySubjectFilter.apply(
+                AstraStudyCatalog.subjects, subjectQuery
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(bottom = 11.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("SUBJECT LIBRARY", color = AstraAurora.mint,
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Bold)
+                Text("${visibleSubjects.size} / ${AstraStudyCatalog.subjects.size} subjects",
+                    color = AstraAurora.muted,
+                    style = MaterialTheme.typography.labelMedium)
+            }
             val fontScale = LocalDensity.current.fontScale
             BoxWithConstraints(Modifier.fillMaxSize()) {
                 val columns = AstraStudyLayout.columnsFor(maxWidth.value, fontScale)
@@ -107,7 +168,7 @@ internal fun AstraStudyHub(
                     contentPadding = PaddingValues(bottom = 24.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    items(AstraStudyCatalog.subjects.chunked(columns)) { pair ->
+                    items(visibleSubjects.chunked(columns), key = { pair -> pair.first().id }) { pair ->
                         Row(
                             Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(10.dp)
@@ -127,6 +188,21 @@ internal fun AstraStudyHub(
                             }
                             if (pair.size == 1 && columns == 2) {
                                 Spacer(Modifier.weight(1f))
+                            }
+                        }
+                    }
+                    if (visibleSubjects.isEmpty()) {
+                        item {
+                            Column(Modifier.fillMaxWidth().padding(vertical = 20.dp)) {
+                                Text("No subjects found", color = AstraAurora.ink,
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold)
+                                Text("Search by subject name, skill or lesson topic.",
+                                    color = AstraAurora.muted,
+                                    style = MaterialTheme.typography.bodyMedium)
+                                TextButton(onClick = { subjectQuery = "" }) {
+                                    Text("Show all subjects")
+                                }
                             }
                         }
                     }
@@ -216,11 +292,12 @@ private fun AstraStudySubjectCard(
     val shape = RoundedCornerShape(20.dp)
     Column(
         modifier = modifier
-            .heightIn(min = if (compact) 94.dp else 135.dp)
+            .heightIn(min = if (compact) 116.dp else 152.dp)
             .background(Brush.linearGradient(listOf(AstraAurora.raised, AstraAurora.surface)), shape)
             .border(1.dp, accent.copy(alpha = 0.37f), shape)
             .semantics {
-                contentDescription = "Study " + subject.title + ". " + subject.description
+                contentDescription = "Study " + subject.title + ". " +
+                    subject.description + ". " + AstraStudyAccess.label(subject)
             }
             .clickable(onClick = onClick)
             .padding(13.dp),
@@ -228,12 +305,7 @@ private fun AstraStudySubjectCard(
     ) {
         if (compact) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    subject.symbol,
-                    style = MaterialTheme.typography.headlineMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = accent
-                )
+                AstraStudyEmblem(subject.symbol, accent)
                 Spacer(Modifier.width(15.dp))
                 Column(Modifier.weight(1f)) {
                     Text(
@@ -256,10 +328,7 @@ private fun AstraStudySubjectCard(
                 Text("›", color = accent, style = MaterialTheme.typography.titleLarge)
             }
         } else {
-            Text(
-                subject.symbol, style = MaterialTheme.typography.headlineMedium,
-                fontWeight = FontWeight.Bold, color = accent
-            )
+            AstraStudyEmblem(subject.symbol, accent)
             Spacer(Modifier.height(9.dp))
             Text(
                 subject.title, style = MaterialTheme.typography.titleMedium,
@@ -273,6 +342,42 @@ private fun AstraStudySubjectCard(
                 overflow = TextOverflow.Ellipsis
             )
         }
+        Spacer(Modifier.height(9.dp))
+        Row(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text("${subject.topics.size} topics",
+                color = AstraAurora.muted,
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = FontWeight.SemiBold)
+            Text(AstraStudyAccess.label(subject),
+                color = accent,
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = FontWeight.Bold)
+        }
+    }
+}
+
+@Composable
+private fun AstraStudyEmblem(symbol: String, accent: Color) {
+    val frame = RoundedCornerShape(13.dp)
+    Box(
+        modifier = Modifier.size(45.dp)
+            .background(
+                Brush.linearGradient(
+                    listOf(accent.copy(alpha = 0.22f), AstraAurora.raised)
+                ),
+                frame
+            )
+            .border(1.dp, accent.copy(alpha = 0.52f), frame),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(symbol,
+            color = accent,
+            style = MaterialTheme.typography.titleLarge,
+            fontWeight = FontWeight.Bold)
     }
 }
 

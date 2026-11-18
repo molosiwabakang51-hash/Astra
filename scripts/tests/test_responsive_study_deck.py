@@ -17,9 +17,10 @@ class ResponsiveAstraUiTest(unittest.TestCase):
         self.assertIn("BoxWithConstraints(Modifier.fillMaxSize())", STUDY)
         self.assertIn("LocalDensity.current.fontScale", STUDY)
         self.assertIn("AstraStudyLayout.columnsFor(maxWidth.value, fontScale)", STUDY)
-        self.assertIn("AstraStudyCatalog.subjects.chunked(columns)", STUDY)
+        self.assertIn("visibleSubjects.chunked(columns)", STUDY)
+        self.assertIn("AstraStudySubjectFilter.apply(", STUDY)
         self.assertIn("compact = columns == 1", STUDY)
-        self.assertIn("min = if (compact) 94.dp else 135.dp", STUDY)
+        self.assertIn("min = if (compact) 116.dp else 152.dp", STUDY)
         self.assertNotIn("AstraStudyCatalog.subjects.chunked(2)", STUDY)
 
     def test_mission_control_static_progress_respects_animation_setting(self):
