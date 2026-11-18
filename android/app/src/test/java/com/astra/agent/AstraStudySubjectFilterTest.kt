@@ -39,7 +39,7 @@ class AstraStudySubjectFilterTest {
         assertEquals("OFFLINE", AstraStudyAccess.label(
             AstraStudyCatalog.find("english")!!
         ))
-        assertEquals("MODEL NEEDED", AstraStudyAccess.label(
+        assertEquals("OFFLINE", AstraStudyAccess.label(
             AstraStudyCatalog.find("day_trading")!!
         ))
         assertEquals("OFFLINE", AstraStudyAccess.label(
