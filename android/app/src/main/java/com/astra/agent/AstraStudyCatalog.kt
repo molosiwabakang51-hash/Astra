@@ -91,7 +91,27 @@ internal object AstraStudyCatalog {
         // The existing multilingual tutor already supports 21 offline lessons
         // per included course. Surface those *real* chapters instead of
         // disguising a three-button preview as the whole curriculum.
-        if (subject.id == "russian") {
+        if (subject.id == "finance") {
+            // These are real self-contained lessons, not model prompts. Keep
+            // the original quick-reference finance topics as shortcuts.
+            subject.copy(
+                topics = listOf(
+                    Topic("Course roadmap", "Browse 20 complete offline foundation lessons.",
+                        "finance course")
+                ) + AstraFinanceCourse.lessons.mapIndexed { index, lesson ->
+                    Topic(
+                        "Lesson ${index + 1} — ${lesson.title}",
+                        "Read a worked example, assumptions and an optional quiz.",
+                        "finance lesson ${index + 1}"
+                    )
+                } + listOf(
+                    Topic("Quiz current lesson", "Test the lesson you last opened.",
+                        "finance quiz"),
+                    Topic("Course progress", "Track opened lessons and quiz mastery.",
+                        "finance progress")
+                ) + subject.topics
+            )
+        } else if (subject.id == "russian") {
             // The existing RussianTutor includes six structured introductions
             // and enough bundled vocabulary for 21+ offline lessons. Surface
             // real topics in Study without inventing content or calling an LLM.
