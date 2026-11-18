@@ -216,11 +216,11 @@ internal class AstraEnglishCourse(
         val number = raw.toIntOrNull()
         return if (number != null && number in 1..lessons.size)
             handler(number) else
-            "Choose a English lesson from 1 to ${lessons.size}; say 'english course' for the syllabus."
+            "Choose an English lesson from 1 to ${lessons.size}; say 'english course' for the syllabus."
     }
 
     private fun syllabus(): String = buildString {
-        appendLine("MATHEMATICS FOUNDATION · ${lessons.size} OFFLINE LESSONS")
+        appendLine("ENGLISH FOUNDATION · ${lessons.size} OFFLINE LESSONS")
         appendLine("No model or internet required.")
         lessons.forEachIndexed { index, item ->
             appendLine("${index + 1}. ${item.title}")
@@ -292,7 +292,7 @@ internal class AstraEnglishCourse(
         val last = readInt(LAST, 0).coerceIn(0, lessons.size)
         val attempts = readInt(ATTEMPTS, 0).coerceAtLeast(0)
         val correct = readInt(CORRECT, 0).coerceIn(0, attempts)
-        return "MATHEMATICS COURSE PROGRESS · OFFLINE\n" +
+        return "ENGLISH COURSE PROGRESS · OFFLINE\n" +
             "Lessons opened: $visited/${lessons.size}. " +
             "Lesson quizzes mastered: $mastered/${lessons.size}.\n" +
             "Quiz answers: $correct/$attempts correct. " +
