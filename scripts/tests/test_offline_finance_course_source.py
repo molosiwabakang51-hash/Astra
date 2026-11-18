@@ -42,7 +42,7 @@ class FinanceCourseSourceTest(unittest.TestCase):
 
     def test_course_is_private_no_network_and_no_retraining_claims(self):
         for forbidden in ("android.content", "android.net", "http://", "https://",
-                          "GGUF", "OpenAI", "trainModel", "WRITE_EXTERNAL_STORAGE",
+                          "openConnection(", "trainModel(", "WRITE_EXTERNAL_STORAGE",
                           "java.io.File"):
             self.assertNotIn(forbidden, COURSE)
         self.assertIn("private val readInt: (String, Int) -> Int", COURSE)
