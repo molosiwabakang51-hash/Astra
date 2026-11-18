@@ -2555,7 +2555,8 @@ class MainActivity :
                 }
                 val localBooks = remember {
                     AstraBookLibrary(
-                        java.io.File(applicationContext.noBackupFilesDir, "knowledge/books")
+                        java.io.File(applicationContext.noBackupFilesDir, "knowledge/books"),
+                        pdfContext = applicationContext
                     )
                 }
                 var importedBookCount by remember {

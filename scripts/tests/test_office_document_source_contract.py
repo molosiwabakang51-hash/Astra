@@ -19,8 +19,10 @@ class OfficeDocumentSourceContract(unittest.TestCase):
             self.assertIn(f'"{extension}" to "{extension}"', EXTRACT)
             self.assertIn(f'"{extension}" -> officeArchive(input, "{extension}")', EXTRACT)
         self.assertIn("AstraDocumentText.format(title)", BOOKS)
-        self.assertIn("AstraDocumentText.extract(format, input)", BOOKS)
-        self.assertIn("AstraDocumentText.format(filename) != null", FOLDER)
+        self.assertIn("AstraDocumentText.extract(format, input, pdfContext)", BOOKS)
+        self.assertIn("val format = AstraDocumentText.format(filename) ?: return false", FOLDER)
+        self.assertIn('if (format == "pdf" && size != null &&', FOLDER)
+        self.assertIn("AstraPdfText.sizeAllowed(size)", FOLDER)
 
     def test_archive_and_xml_are_bounded_and_do_not_execute_objects(self):
         for gate in (

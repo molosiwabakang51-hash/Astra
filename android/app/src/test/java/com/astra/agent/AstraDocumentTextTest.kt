@@ -30,12 +30,22 @@ class AstraDocumentTextTest {
     @Test fun supportedFormatsUseRealDocumentExtensions() {
         for (name in listOf("lecture.HTML", "table.csv", "book.tsv", "study.json",
             "manual.xml", "notes.DOCX", "course.epub", "study.md", "handout.RTF",
-            "course.pptx", "finance.ODT")) {
+            "course.pptx", "finance.ODT", "lecture.PDF")) {
             assertTrue(name, AstraDocumentText.format(name) != null)
         }
-        for (name in listOf("bad.pdf", "photo.jpg", "audio.mp3",
+        for (name in listOf("photo.jpg", "audio.mp3",
             "document.doc", "script.exe", ".docx", "file.docx.exe")) {
             assertEquals(name, null, AstraDocumentText.format(name))
+        }
+    }
+
+    @Test fun pdfRequiresAndroidContextAndCannotPretendToReadScansInJvm() {
+        assertEquals("pdf", AstraDocumentText.format("finance.PDF"))
+        assertThrows(IllegalArgumentException::class.java) {
+            AstraDocumentText.extract("pdf", bytes("%PDF-1.4"))
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            library().importBook("lecture.pdf", bytes("%PDF-1.4"))
         }
     }
 

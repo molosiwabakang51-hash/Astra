@@ -22,12 +22,13 @@ class AstraFolderRulesTest {
             "finance.txt", "bond duration.MD", "course.markdown",
             "Russki.epub", "setswana reading.EPUB",
             "finance.csv", "notes.json", "manual.DOCX", "webpage.html",
-            "financial_data.xml", "curriculum.tsv", "vocabulary.tsv", "lecture.rtf", "finance.xlsx"
+            "financial_data.xml", "curriculum.tsv", "vocabulary.tsv", "lecture.rtf", "finance.xlsx",
+            "lecture.PDF"
         )) {
             assertTrue(name, AstraFolderRules.bookNameAllowed(name, 1024L))
         }
         for (name in listOf(
-            "model.gguf", "private.pdf", "backup.zip", "app.apk",
+            "model.gguf", "private.pdf.exe", "backup.zip", "app.apk",
             "fakes.txt.exe", "no extension", ".txt",
             "../secret.md", "folder\\escape.txt", "bad\u0000title.md", ""
         )) {
@@ -44,6 +45,9 @@ class AstraFolderRulesTest {
         // Some SAF document providers omit sizes. The book importer also
         // enforces its own bounded input limits for such sources.
         assertTrue(AstraFolderRules.bookNameAllowed("book.md", null))
+        assertTrue(AstraFolderRules.bookNameAllowed("book.pdf", null))
+        assertTrue(AstraFolderRules.bookNameAllowed("book.pdf", 4L * 1024 * 1024))
+        assertFalse(AstraFolderRules.bookNameAllowed("book.pdf", 4L * 1024 * 1024 + 1))
     }
 
     @Test fun malformedFilenameFuzzNeverBypassesExtensionAndLengthChecks() {
