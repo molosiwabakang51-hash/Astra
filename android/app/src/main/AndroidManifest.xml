@@ -12,9 +12,6 @@
          Astra never receives the fingerprint template or screen-lock PIN. -->
     <uses-permission android:name="android.permission.USE_BIOMETRIC" />
 
-    <!-- Android system fingerprint / device credential prompt; no fingerprint data stored. -->
-    <uses-permission android:name="android.permission.USE_BIOMETRIC" />
-
     <!-- Microphone permission for voice recognition -->
     <uses-permission
         android:name="android.permission.RECORD_AUDIO" />
