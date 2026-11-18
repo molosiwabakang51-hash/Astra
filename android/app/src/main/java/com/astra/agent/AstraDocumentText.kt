@@ -1,5 +1,7 @@
 package com.astra.agent
 
+import android.content.Context
+
 import org.json.JSONArray
 import org.json.JSONObject
 import org.json.JSONTokener
@@ -34,7 +36,7 @@ internal object AstraDocumentText {
         "csv" to "csv", "tsv" to "tsv",
         "json" to "json", "xml" to "xml", "docx" to "docx",
         "rtf" to "rtf", "xlsx" to "xlsx",
-        "pptx" to "pptx", "odt" to "odt"
+        "pptx" to "pptx", "odt" to "odt", "pdf" to "pdf"
     )
 
     fun format(filename: String): String? {
@@ -43,9 +45,9 @@ internal object AstraDocumentText {
         return supported[ext]?.takeIf { name.length > ext.length + 1 }
     }
 
-    const val FORMATS = "TXT, MD, EPUB, HTML, CSV, TSV, JSON, XML, DOCX, RTF, XLSX, PPTX or ODT"
+    const val FORMATS = "TXT, MD, EPUB, HTML, CSV, TSV, JSON, XML, DOCX, RTF, XLSX, PPTX, ODT or text PDF"
 
-    fun extract(format: String, input: InputStream): String = when (format) {
+    fun extract(format: String, input: InputStream, pdfContext: Context? = null): String = when (format) {
         "html" -> html(decode(readBounded(input, MAX_TEXT_BYTES)))
         "csv" -> table(decode(readBounded(input, MAX_TEXT_BYTES)), ',')
         "tsv" -> table(decode(readBounded(input, MAX_TEXT_BYTES)), '\t')
@@ -56,6 +58,9 @@ internal object AstraDocumentText {
         "xlsx" -> AstraSpreadsheetText.extract(input)
         "pptx" -> officeArchive(input, "pptx")
         "odt" -> officeArchive(input, "odt")
+        "pdf" -> AstraPdfText.extract(
+            requireNotNull(pdfContext) { "PDF import requires an Android device context." }, input
+        )
         else -> throw IllegalArgumentException("Unsupported document format: $format.")
     }
 
