@@ -28,7 +28,8 @@ class SpeechSessionSourceTests(unittest.TestCase):
 
     def test_speech_output_does_not_escape_foreground_or_secure_lock(self):
         self.assertIn("private var speechForeground = false", MAIN)
-        self.assertIn("AstraSpeechPrivacy.mayUseVoice(", MAIN)
+        self.assertGreaterEqual(MAIN.count("AstraSpeechPrivacy.mayUseVoice("), 3)
+        self.assertIn("System speech result discarded because Astra is locked.", MAIN)
         self.assertIn("speechForeground = true", MAIN)
         self.assertGreaterEqual(MAIN.count("speechForeground = false"), 2)
         self.assertIn("override fun onStop()", MAIN)
