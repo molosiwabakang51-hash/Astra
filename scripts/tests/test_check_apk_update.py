@@ -15,11 +15,15 @@ CERT_B = "bb" * 32
 
 
 def fake_run_for(cert_installed=CERT_A, cert_new=CERT_A,
-                 installed_code=28, new_code=29, package="com.astra.agent"):
+                 installed_code=28, new_code=29, package="com.astra.agent",
+                 installed_package="com.astra.agent"):
     def execute(command, **kwargs):
         if command[-2:] == ["devices", "-l"]:
             return "List of devices attached\nSERIAL123\tdevice product:phone\n"
         if command[1:3] == ["dump", "badging"]:
+            if "installed-base.apk" in command[-1]:
+                return (f"package: name='{installed_package}' "
+                        f"versionCode='{installed_code}' versionName='old'\n")
             return f"package: name='{package}' versionCode='{new_code}' versionName='test'\n"
         if "verify" in command:
             is_installed = "installed-base.apk" in command[-1]
@@ -28,9 +32,10 @@ def fake_run_for(cert_installed=CERT_A, cert_new=CERT_A,
         if command[-3:] == ["pm", "path", "com.astra.agent"]:
             return "package:/data/app/~~abc/com.astra.agent-xyz/base.apk\n"
         if "pull" in command:
+            Path(command[-1]).write_bytes(b"synthetic base APK for tests")
             return "1 file pulled\n"
-        if command[-3:] == ["dumpsys", "package", "com.astra.agent"]:
-            return f"Packages:\n Package [com.astra.agent]\n versionCode={installed_code} minSdk=33\n"
+        if "dumpsys" in command:
+            raise AssertionError("Installed version must come from copied APK, not dumpsys.")
         raise AssertionError(f"Unexpected command: {command}")
     return execute
 
@@ -98,6 +103,44 @@ class UpdatePreflightTest(unittest.TestCase):
                 allowed, message = module.check(apk, "adb", "apksigner", "aapt")
         self.assertFalse(allowed)
         self.assertIn("certificates differ", message)
+
+    def test_same_version_cannot_be_approved_as_forward_upgrade(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            apk = Path(tmp) / "same-version.apk"
+            apk.write_bytes(b"test")
+            with patch.object(module, "run",
+                              side_effect=fake_run_for(installed_code=29,
+                                                       new_code=29)):
+                allowed, message = module.check(apk, "adb", "apksigner", "aapt")
+        self.assertFalse(allowed)
+        self.assertIn("not newer", message)
+        self.assertIn("same version", message)
+
+    def test_installed_apk_package_must_match_astra_identity(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            apk = Path(tmp) / "candidate.apk"
+            apk.write_bytes(b"test")
+            with patch.object(module, "run",
+                              side_effect=fake_run_for(
+                                  installed_package="com.other.app")):
+                allowed, message = module.check(apk, "adb", "apksigner", "aapt")
+        self.assertFalse(allowed)
+        self.assertIn("installed base APK", message)
+
+    def test_missing_local_copy_never_approves_an_upgrade(self):
+        original = fake_run_for()
+
+        def missing_copy(command, **kwargs):
+            if "pull" in command:
+                return "ADB lied about transferring a file"
+            return original(command, **kwargs)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            apk = Path(tmp) / "candidate.apk"
+            apk.write_bytes(b"test")
+            with patch.object(module, "run", side_effect=missing_copy):
+                with self.assertRaisesRegex(RuntimeError, "temporary installed APK"):
+                    module.check(apk, "adb", "apksigner", "aapt")
 
     def test_downgrade_blocks_update(self):
         with tempfile.TemporaryDirectory() as tmp:

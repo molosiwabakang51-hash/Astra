@@ -118,14 +118,23 @@ and should not be installed as though they were stable release updates.
 
 ## 4. Upgrade without losing Astra data
 
-**Before a first owner-signed install:** Run the read-only `python scripts/check_apk_update.py PATH_TO_APK` compatibility check with an attached authorized device and Android SDK Build Tools. If it says `BLOCKED`, do not try to bypass Android's signature enforcement by uninstalling before you have exported a verified chat backup and retained the original GGUF/FULL APK externally. The JSON backup does **not** contain model weights. Keep the original full APK or GGUF on a phone folder or computer that is not erased with Astra's application data.
+**Before every update:** Run the read-only `python scripts/check_apk_update.py PATH_TO_APK` compatibility check with an attached authorized device and Android SDK Build Tools. It compares the installed base APK's signer, package name **and installed version code from the APK itself** with the candidate. It only labels an upgrade compatible when certificates match and the candidate versionCode is **strictly greater**. The script temporarily copies the installed base APK to the **computer over USB** for comparison; a FULL installation may require significant computer disk space and USB transfer time. That temporary copy is deleted when checking finishes, and the command **never installs, uninstalls, clears data or reads private chats**.
 
-**If you have a debug build installed:** Its signing certificate is different.
-Android cannot install the first owner-signed release over that debug build.
-Before doing anything destructive, open **Astra → Settings → Data backup &
-recovery** and export a JSON backup. Verify the file exists and keep it private.
-Only then uninstall the debug build, install your first owner-signed APK and
-import that backup. The exported file is **not encrypted**.
+If it says `BLOCKED` or cannot prove compatibility, keep Astra installed. Do not try to bypass Android signature enforcement by uninstalling. Before any deliberate, owner-authorized migration, verify **both** an accessible, separate chat JSON backup **and** a usable original GGUF/FULL APK outside Astra's app-private directories. A JSON backup does **not** contain model weights; having the JSON file alone is insufficient to preserve offline inference. Keep original data and app untouched until all backups and future installation requirements are confirmed.
+
+**If you have a debug build installed:** Its signing certificate can differ
+from the permanent owner release key. Confirm this with the preflight above;
+never assume the fingerprint from the package name. If the signer differs,
+Android will not accept a first owner-signed release over that debug build.
+
+**Do not uninstall just because the JSON export succeeded.** Open **Astra →
+Settings → Data backup & recovery**, export the JSON backup and verify that it
+exists in storage outside Astra's app-private area. It is **not encrypted**.
+Separately verify that the Qwen GGUF is backed up outside the app, or that an
+original FULL APK/artifact remains accessible for offline reimport. If the
+model exists only inside Astra's private storage, keep the current app
+installed. Migration is a separate deliberate owner decision after verifying
+both the chats and model source; the verifier does not perform that migration.
 
 **Import the model without paying for another large download:** After your
 first LITE install, open Astra's **logo → Settings → Import offline model once**.

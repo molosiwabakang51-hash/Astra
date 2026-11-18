@@ -19,7 +19,6 @@ import tempfile
 PACKAGE = "com.astra.agent"
 VERSION_RE = re.compile(r"\bversionCode='(\d+)'")
 PACKAGE_RE = re.compile(r"\bname='([^']+)'")
-INSTALLED_VERSION_RE = re.compile(r"\bversionCode=(\d+)")
 
 
 def cert_fingerprint(output: str) -> str:
@@ -52,13 +51,6 @@ def apk_identity(aapt_output: str) -> tuple[str, int]:
     if not package or not version:
         raise ValueError("Could not verify APK package name and version code.")
     return package.group(1), int(version.group(1))
-
-
-def installed_version(dumpsys: str) -> int:
-    match = INSTALLED_VERSION_RE.search(dumpsys)
-    if not match:
-        raise ValueError("Could not determine installed version code.")
-    return int(match.group(1))
 
 
 def package_apk_path(pm_output: str) -> str:
@@ -162,20 +154,28 @@ def check(apk: Path, adb: str, apksigner: str, aapt: str,
     with tempfile.TemporaryDirectory(prefix="astra-apk-check-") as tmp:
         local_copy = Path(tmp) / "installed-base.apk"
         # Pulls only the public installed base APK; does not access app data.
-        run(adb_cmd + ["pull", path, str(local_copy)], timeout=90)
+        run(adb_cmd + ["pull", path, str(local_copy)], timeout=600)
+        if not local_copy.is_file() or local_copy.stat().st_size <= 0:
+            raise RuntimeError("ADB did not create a valid temporary installed APK copy.")
         old_cert = cert_fingerprint(
             run([apksigner, "verify", "--print-certs", str(local_copy)]))
+        installed_package, existing_version = apk_identity(
+            run([aapt, "dump", "badging", str(local_copy)]))
+    if installed_package != PACKAGE:
+        return False, ("BLOCKED: the installed base APK has a different " +
+                       "package identity; cannot prove this is a safe Astra upgrade.")
     if old_cert != new_cert:
         return False, ("BLOCKED: installed and replacement APK certificates differ. "
                        "Do not uninstall or clear storage: the imported GGUF and "
                        "local chats could be lost. Use a matching signing key.")
-    existing_version = installed_version(
-        run(adb_cmd + ["shell", "dumpsys", "package", PACKAGE]))
-    if new_version < existing_version:
-        return False, (f"BLOCKED: APK versionCode {new_version} is older than "
-                       f"installed versionCode {existing_version}.")
+    # Every owner-signed release must advance versionCode; same-version
+    # debug reinstalls are not treated as verified forward upgrades.
+    if new_version <= existing_version:
+        return False, (f"BLOCKED: APK versionCode {new_version} is not newer than "
+                       f"installed versionCode {existing_version} "
+                       "(same version or older).")
     return True, (f"COMPATIBLE: signing certificate matches and APK versionCode "
-                  f"{new_version} >= installed {existing_version}. "
+                  f"{new_version} > installed {existing_version}. "
                   f"An in-place update may be attempted with adb install -r; "
                   f"this checker has not installed anything.")
 
