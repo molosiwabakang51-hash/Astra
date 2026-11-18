@@ -41,7 +41,7 @@ internal class AstraFinanceCourse(
         private const val ATTEMPTS = "astra_finance_quiz_attempts"
 
         // 20 lesson flags fit in a signed Int without the sign bit.
-        private const val VALID_MASK = (1 shl 20) - 1
+        private const val VALID_MASK = 0x000FFFFF
 
         val lessons: List<Lesson> = listOf(
             Lesson(
