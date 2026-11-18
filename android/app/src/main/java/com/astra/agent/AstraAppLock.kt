@@ -17,6 +17,7 @@ import android.view.WindowManager
 internal object AstraAppLock {
     private const val PREFS = "astra"
     private const val ENABLED_KEY = "astra_app_lock_enabled"
+    private const val BACKGROUND_DELAY_KEY = "astra_app_lock_background_delay_ms"
 
     private val AUTHENTICATORS =
         BiometricManager.Authenticators.BIOMETRIC_STRONG or
@@ -30,6 +31,24 @@ internal object AstraAppLock {
         check(context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
             .edit().putBoolean(ENABLED_KEY, enabled).commit()) {
             "Could not save Astra's app lock preference."
+        }
+    }
+
+    /**
+     * Lock-delay preference defaults to immediate for existing installs.
+     * Only four bounded, recognized values are accepted; corrupt preferences fail closed.
+     */
+    fun backgroundDelayMillis(context: Context): Long {
+        val saved = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .getLong(BACKGROUND_DELAY_KEY, 0L)
+        return if (saved in AstraAppLockPolicy.backgroundDelaysMillis) saved else 0L
+    }
+
+    fun setBackgroundDelayMillis(context: Context, delayMillis: Long) {
+        require(delayMillis in AstraAppLockPolicy.backgroundDelaysMillis)
+        check(context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .edit().putLong(BACKGROUND_DELAY_KEY, delayMillis).commit()) {
+            "Could not save Astra's background lock delay."
         }
     }
 
@@ -88,7 +107,31 @@ internal object AstraAppLock {
 
 /** Independent, JVM-testable access rules for the opt-in secure workspace. */
 internal object AstraAppLockPolicy {
+    val backgroundDelaysMillis: List<Long> = listOf(0L, 30_000L, 120_000L, 300_000L)
+
+    fun labelForDelay(delayMillis: Long): String = when (delayMillis) {
+        0L -> "Immediately"
+        30_000L -> "After 30 seconds"
+        120_000L -> "After 2 minutes"
+        300_000L -> "After 5 minutes"
+        else -> "Immediately"
+    }
+
     fun requiresUnlock(enabled: Boolean, unlocked: Boolean): Boolean = enabled && !unlocked
     fun unlockedOnColdLaunch(enabled: Boolean): Boolean = !enabled
+
+    // Retain the original immediate-lock policy for existing callers and tests.
     fun unlockedAfterBackground(enabled: Boolean): Boolean = !enabled
+
+    /**
+     * Monotonic elapsed-time check. If time moves backwards, configuration is invalid,
+     * or the configured delay has elapsed, the secured workspace must lock.
+     */
+    fun unlockedAfterBackground(
+        enabled: Boolean, delayMillis: Long, elapsedMillis: Long
+    ): Boolean {
+        if (!enabled) return true
+        return delayMillis in backgroundDelaysMillis &&
+            delayMillis > 0L && elapsedMillis >= 0L && elapsedMillis < delayMillis
+    }
 }
