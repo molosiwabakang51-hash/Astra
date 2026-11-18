@@ -53,6 +53,31 @@ class AstraAppLockPolicyTest {
         )
     }
 
+    @Test fun inactivityLockEnforcesExactLimit() {
+        assertFalse(AstraAppLockPolicy.shouldLockForInactivity(true, 120_000L, 0L))
+        assertFalse(AstraAppLockPolicy.shouldLockForInactivity(true, 120_000L, 119_999L))
+        assertTrue(AstraAppLockPolicy.shouldLockForInactivity(true, 120_000L, 120_000L))
+        assertTrue(AstraAppLockPolicy.shouldLockForInactivity(true, 300_000L, 300_001L))
+        assertTrue(AstraAppLockPolicy.shouldLockForInactivity(true, 900_000L, -1L))
+    }
+
+    @Test fun idleProtectionIsOptInAndStrictlyValidated() {
+        assertFalse(AstraAppLockPolicy.shouldLockForInactivity(false, 120_000L, 900_000L))
+        assertFalse(AstraAppLockPolicy.shouldLockForInactivity(true, 0L, 900_000L))
+        assertFalse(AstraAppLockPolicy.shouldLockForInactivity(true, -1L, 900_000L))
+        assertFalse(AstraAppLockPolicy.shouldLockForInactivity(true, 30_000L, 900_000L))
+        org.junit.Assert.assertEquals(
+            listOf(0L, 120_000L, 300_000L, 900_000L),
+            AstraAppLockPolicy.idleTimeoutsMillis
+        )
+        org.junit.Assert.assertEquals(
+            "After 15 minutes", AstraAppLockPolicy.idleTimeoutLabel(900_000L)
+        )
+        org.junit.Assert.assertEquals(
+            "Off", AstraAppLockPolicy.idleTimeoutLabel(-1L)
+        )
+    }
+
     @Test fun disablingOptInRestoresUnrestrictedDefault() {
         assertFalse(AstraAppLockPolicy.requiresUnlock(false, true))
         assertFalse(AstraAppLockPolicy.requiresUnlock(false, false))
