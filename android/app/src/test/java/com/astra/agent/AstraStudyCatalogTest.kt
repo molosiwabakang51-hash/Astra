@@ -27,6 +27,31 @@ class AstraStudyCatalogTest {
         assertEquals(13, AstraStudyCatalog.subjects.size)
     }
 
+    @Test fun russianStudyHubExposesRealOfflineLessonsAndProgress() {
+        val russian = AstraStudyCatalog.find("russian")!!
+        assertEquals("learn russian", russian.topics.first().command)
+        assertEquals("russian quiz", russian.topics.last().command)
+        assertTrue(russian.topics.size >= 23)
+        for (number in 2..21) {
+            assertEquals(1, russian.topics.count { it.command == "russian lesson $number" })
+            assertTrue(russian.topics.first { it.command == "russian lesson $number" }
+                .requiresModel.not())
+        }
+        assertEquals(1, russian.topics.count { it.command == "russian progress" })
+
+        val values = mutableMapOf<String, Int>()
+        val tutor = RussianTutor(
+            readInt = { key, default -> values[key] ?: default },
+            writeInt = { key, value -> values[key] = value }
+        )
+        for (number in listOf(2, 3, 6, 20, 21)) {
+            val response = tutor.respond("russian lesson $number") ?: ""
+            assertTrue("Existing offline tutor must serve lesson $number: $response",
+                response.contains("Russian lesson $number"))
+        }
+        assertTrue(tutor.respond("russian progress").orEmpty().contains("Last lesson:"))
+    }
+
     @Test fun userRequestedCoreSubjectsExist() {
         val available = AstraStudyCatalog.subjects.map { it.title }.toSet()
         assertTrue(available.containsAll(
