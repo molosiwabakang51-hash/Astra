@@ -31,7 +31,8 @@ internal object AstraDeviceDiagnostics {
         val selfTestResult: String,
         val loadedModelName: String? = null,
         val advancedCandidateBytes: Long? = null,
-        val languageBenchmarkResult: String = "NOT RUN"
+        val languageBenchmarkResult: String = "NOT RUN",
+        val installedBaseApkBytes: Long? = null
     )
 
     fun capture(
@@ -51,6 +52,11 @@ internal object AstraDeviceDiagnostics {
         val freeStorage = runCatching {
             StatFs(appContext.noBackupFilesDir.absolutePath).availableBytes
         }.getOrNull()
+        // Android may install split APKs; this is the on-device base APK only.
+        // Never log or export its private filesystem path.
+        val baseApkBytes = runCatching {
+            File(appContext.applicationInfo.sourceDir).takeIf { it.isFile }?.length()
+        }.getOrNull()?.takeIf { it > 0L }
 
         // The model is stored uncompressed inside the APK. openFd() reads its
         // metadata without allocating hundreds of megabytes in RAM.
@@ -88,7 +94,8 @@ internal object AstraDeviceDiagnostics {
             selfTestResult = summarizeSelfTest(selfTestStatus),
             loadedModelName = verifiedLoadedName(loadedModelName),
             advancedCandidateBytes = advancedCandidate,
-            languageBenchmarkResult = summarizeLanguageBenchmark(languageBenchmarkStatus)
+            languageBenchmarkResult = summarizeLanguageBenchmark(languageBenchmarkStatus),
+            installedBaseApkBytes = baseApkBytes
         )
     }
 
@@ -152,6 +159,11 @@ internal object AstraDeviceDiagnostics {
         appendLine("Generated on the phone; never sent automatically.")
         appendLine()
         appendLine("Astra version: ${snapshot.version}")
+        appendLine("Installed base APK: ${formatDecimalMb(snapshot.installedBaseApkBytes)}")
+        appendLine("LITE downloadable APK maximum: 300.00 MB (300,000,000 bytes).")
+        appendLine("The LITE cap excludes separately imported GGUF models,")
+        appendLine("user data and other installed storage; a FULL APK is not LITE.")
+        appendLine("Installed base APK size may exclude Android split APKs.")
         appendLine("Device: ${snapshot.manufacturer} ${snapshot.model}".trim())
         appendLine("Android: ${snapshot.androidRelease} (API ${snapshot.sdk})")
         appendLine("Supported ABIs: ${snapshot.supportedAbis.joinToString().ifBlank { "Unknown" }}")
@@ -171,6 +183,15 @@ internal object AstraDeviceDiagnostics {
         appendLine("passwords or access tokens are included.")
         appendLine("Review this report before sharing it.")
     }.trimEnd()
+
+    /**
+     * APK distribution uses decimal MB (1 MB = 1,000,000 bytes).
+     * This value is not the package ZIP size and excludes separately imported
+     * model weights and user files.
+     */
+    fun formatDecimalMb(bytes: Long?): String =
+        if (bytes == null || bytes < 0L) "Unavailable"
+        else String.format(Locale.US, "%.2f MB", bytes / 1_000_000.0)
 
     fun formatBytes(bytes: Long?): String {
         if (bytes == null || bytes < 0) return "Unavailable"
