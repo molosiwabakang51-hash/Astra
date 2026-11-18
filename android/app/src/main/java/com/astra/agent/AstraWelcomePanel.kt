@@ -23,8 +23,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -205,14 +209,14 @@ internal fun AstraWelcomePanel(
             horizontalArrangement = Arrangement.spacedBy(9.dp)
         ) {
             AstraObservatoryAction(
-                glyph = "✦", title = "Study", subtitle = "Choose a subject",
+                glyph = AstraStarterGlyph.STUDY, title = "Study", subtitle = "Choose a subject",
                 command = AstraWelcomePolicy.commands[0],
                 onCommand = { onOpenStudy() },
                 modifier = Modifier.weight(1.16f),
                 accent = AstraAurora.cyan, featured = true
             )
             AstraObservatoryAction(
-                glyph = "◎", title = "Recall", subtitle = "Local memory",
+                glyph = AstraStarterGlyph.RECALL, title = "Recall", subtitle = "Local memory",
                 command = AstraWelcomePolicy.commands[1],
                 onCommand = { onCommand(AstraWelcomePolicy.commands[1]) },
                 modifier = Modifier.weight(0.84f),
@@ -225,14 +229,14 @@ internal fun AstraWelcomePanel(
             horizontalArrangement = Arrangement.spacedBy(9.dp)
         ) {
             AstraObservatoryAction(
-                glyph = "⌁", title = "Tasks", subtitle = "Track progress",
+                glyph = AstraStarterGlyph.TASKS, title = "Tasks", subtitle = "Track progress",
                 command = AstraWelcomePolicy.commands[2],
                 onCommand = { onCommand(AstraWelcomePolicy.commands[2]) },
                 modifier = Modifier.weight(1f),
                 accent = AstraAurora.mint
             )
             AstraObservatoryAction(
-                glyph = "▥", title = "Notes", subtitle = "Capture an idea",
+                glyph = AstraStarterGlyph.NOTES, title = "Notes", subtitle = "Capture an idea",
                 command = AstraWelcomePolicy.commands[3],
                 onCommand = { onCommand(AstraWelcomePolicy.commands[3]) },
                 modifier = Modifier.weight(1f),
@@ -252,7 +256,7 @@ internal fun AstraWelcomePanel(
 
 @Composable
 private fun AstraObservatoryAction(
-    glyph: String,
+    glyph: AstraStarterGlyph,
     title: String,
     subtitle: String,
     command: String,
@@ -280,9 +284,9 @@ private fun AstraObservatoryAction(
         verticalArrangement = Arrangement.SpaceBetween
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(glyph, color = accent, style = MaterialTheme.typography.titleLarge)
+            AstraStarterIcon(glyph, accent)
             Spacer(Modifier.weight(1f))
-            Text("↗", color = accent, style = MaterialTheme.typography.labelLarge)
+            AstraCornerArrow(accent)
         }
         Spacer(Modifier.height(10.dp))
         Text(
@@ -300,5 +304,85 @@ private fun AstraObservatoryAction(
             maxLines = 2,
             overflow = TextOverflow.Ellipsis
         )
+    }
+}
+
+/** One coherent 2dp/rounded-stroke icon family, independent of emoji fonts. */
+private enum class AstraStarterGlyph { STUDY, RECALL, TASKS, NOTES }
+
+@Composable
+private fun AstraStarterIcon(kind: AstraStarterGlyph, tint: Color) {
+    Canvas(Modifier.size(24.dp)) {
+        val w = size.width
+        val h = size.height
+        val line = 2.dp.toPx()
+        when (kind) {
+            AstraStarterGlyph.STUDY -> {
+                // Two open book pages; central fold always remains visible.
+                drawLine(tint, Offset(w * 0.5f, h * 0.24f), Offset(w * 0.5f, h * 0.83f),
+                    strokeWidth = line, cap = StrokeCap.Round)
+                drawLine(tint, Offset(w * 0.5f, h * 0.29f), Offset(w * 0.13f, h * 0.18f),
+                    strokeWidth = line, cap = StrokeCap.Round)
+                drawLine(tint, Offset(w * 0.5f, h * 0.29f), Offset(w * 0.87f, h * 0.18f),
+                    strokeWidth = line, cap = StrokeCap.Round)
+                drawLine(tint, Offset(w * 0.13f, h * 0.18f), Offset(w * 0.13f, h * 0.71f),
+                    strokeWidth = line, cap = StrokeCap.Round)
+                drawLine(tint, Offset(w * 0.87f, h * 0.18f), Offset(w * 0.87f, h * 0.71f),
+                    strokeWidth = line, cap = StrokeCap.Round)
+                drawLine(tint, Offset(w * 0.13f, h * 0.71f), Offset(w * 0.5f, h * 0.83f),
+                    strokeWidth = line, cap = StrokeCap.Round)
+                drawLine(tint, Offset(w * 0.87f, h * 0.71f), Offset(w * 0.5f, h * 0.83f),
+                    strokeWidth = line, cap = StrokeCap.Round)
+            }
+            AstraStarterGlyph.RECALL -> {
+                drawCircle(tint, radius = w * 0.36f,
+                    style = Stroke(width = line))
+                drawCircle(tint, radius = w * 0.09f)
+                drawLine(tint, Offset(w * 0.5f, h * 0.14f),
+                    Offset(w * 0.5f, h * 0.3f), strokeWidth = line,
+                    cap = StrokeCap.Round)
+            }
+            AstraStarterGlyph.TASKS -> {
+                drawRoundRect(tint, topLeft = Offset(w * 0.11f, h * 0.13f),
+                    size = Size(w * 0.78f, h * 0.74f),
+                    cornerRadius = CornerRadius(4.dp.toPx()),
+                    style = Stroke(width = line))
+                drawLine(tint, Offset(w * 0.25f, h * 0.48f),
+                    Offset(w * 0.41f, h * 0.62f), strokeWidth = line,
+                    cap = StrokeCap.Round)
+                drawLine(tint, Offset(w * 0.41f, h * 0.62f),
+                    Offset(w * 0.75f, h * 0.34f), strokeWidth = line,
+                    cap = StrokeCap.Round)
+            }
+            AstraStarterGlyph.NOTES -> {
+                drawRoundRect(tint, topLeft = Offset(w * 0.2f, h * 0.10f),
+                    size = Size(w * 0.6f, h * 0.80f),
+                    cornerRadius = CornerRadius(3.dp.toPx()),
+                    style = Stroke(width = line))
+                repeat(3) { index ->
+                    val y = h * (0.32f + index * 0.16f)
+                    drawLine(tint, Offset(w * 0.32f, y), Offset(w * 0.68f, y),
+                        strokeWidth = line, cap = StrokeCap.Round)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AstraCornerArrow(tint: Color) {
+    Canvas(Modifier.size(18.dp)) {
+        val w = size.width
+        val h = size.height
+        val line = 1.7.dp.toPx()
+        drawLine(tint, Offset(w * 0.22f, h * 0.78f),
+            Offset(w * 0.78f, h * 0.22f),
+            strokeWidth = line, cap = StrokeCap.Round)
+        drawLine(tint, Offset(w * 0.42f, h * 0.22f),
+            Offset(w * 0.78f, h * 0.22f),
+            strokeWidth = line, cap = StrokeCap.Round)
+        drawLine(tint, Offset(w * 0.78f, h * 0.22f),
+            Offset(w * 0.78f, h * 0.58f),
+            strokeWidth = line, cap = StrokeCap.Round)
     }
 }
