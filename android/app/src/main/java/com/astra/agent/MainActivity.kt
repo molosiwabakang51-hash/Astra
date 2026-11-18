@@ -2026,9 +2026,50 @@ class MainActivity :
     private var secureLockEnabled by mutableStateOf(false)
     private var workspaceUnlocked by mutableStateOf(true)
     private var backgroundLockDelayMillis by mutableLongStateOf(0L)
+    private var idleTimeoutMillis by mutableLongStateOf(0L)
+    private var lastUserInteractionElapsedMs: Long = 0L
+    private val idleLockHandler = android.os.Handler(android.os.Looper.getMainLooper())
+    private val idleLockRunnable = Runnable { checkForegroundIdleTimeout() }
     private var backgroundedAtElapsedMs: Long? = null
     private var backgroundSessionWasUnlocked = false
     private var authenticationInProgress = false
+
+    /** Only activity foreground interactions renew the idle timeout. */
+    private fun resetForegroundIdleTimer() {
+        idleLockHandler.removeCallbacks(idleLockRunnable)
+        lastUserInteractionElapsedMs = android.os.SystemClock.elapsedRealtime()
+        if (secureLockEnabled && workspaceUnlocked && idleTimeoutMillis > 0L) {
+            idleLockHandler.postDelayed(idleLockRunnable, idleTimeoutMillis)
+        }
+    }
+
+    private fun lockPrivateWorkspace() {
+        idleLockHandler.removeCallbacks(idleLockRunnable)
+        // Never leave speech or a microphone session active behind the lock.
+        recognizer?.cancel()
+        listening = false
+        tts?.stop()
+        workspaceUnlocked = false
+    }
+
+    private fun checkForegroundIdleTimeout() {
+        if (!secureLockEnabled || !workspaceUnlocked || idleTimeoutMillis == 0L) return
+        val elapsed = android.os.SystemClock.elapsedRealtime() - lastUserInteractionElapsedMs
+        if (AstraAppLockPolicy.shouldLockForInactivity(true, idleTimeoutMillis, elapsed)) {
+            lockPrivateWorkspace()
+        } else {
+            // If a monotonic clock check was early, re-arm only for the remainder.
+            idleLockHandler.postDelayed(
+                idleLockRunnable,
+                (idleTimeoutMillis - elapsed).coerceAtLeast(1L)
+            )
+        }
+    }
+
+    override fun onUserInteraction() {
+        super.onUserInteraction()
+        if (secureLockEnabled && workspaceUnlocked) resetForegroundIdleTimer()
+    }
 
     private fun requestWorkspaceAuthentication(onAccepted: () -> Unit = {
         workspaceUnlocked = true
@@ -2040,6 +2081,7 @@ class MainActivity :
             onSuccess = {
                 authenticationInProgress = false
                 onAccepted()
+                resetForegroundIdleTimer()
             },
             onUnavailable = {
                 authenticationInProgress = false
@@ -2373,6 +2415,7 @@ class MainActivity :
 
         secureLockEnabled = AstraAppLock.enabled(this)
         backgroundLockDelayMillis = AstraAppLock.backgroundDelayMillis(this)
+        idleTimeoutMillis = AstraAppLock.idleTimeoutMillis(this)
         workspaceUnlocked = AstraAppLockPolicy.unlockedOnColdLaunch(secureLockEnabled)
         AstraAppLock.protectRecentsAndScreenshots(this, secureLockEnabled)
 
@@ -5636,9 +5679,61 @@ class MainActivity :
                                                     "Choose Immediately on a shared device.",
                                                 style = MaterialTheme.typography.bodySmall
                                             )
+                                            Spacer(Modifier.height(16.dp))
+                                            Text(
+                                                "Lock while Astra is open and idle",
+                                                style = MaterialTheme.typography.titleMedium
+                                            )
+                                            Text(
+                                                "Optional inactivity protection. The timer resets " +
+                                                    "when you interact with the app.",
+                                                style = MaterialTheme.typography.bodyMedium
+                                            )
+                                            var idleTimeoutMenuOpen by remember {
+                                                mutableStateOf(false)
+                                            }
+                                            Box {
+                                                OutlinedButton(
+                                                    onClick = { idleTimeoutMenuOpen = true }
+                                                ) {
+                                                    Text(AstraAppLockPolicy.idleTimeoutLabel(idleTimeoutMillis))
+                                                }
+                                                DropdownMenu(
+                                                    expanded = idleTimeoutMenuOpen,
+                                                    onDismissRequest = { idleTimeoutMenuOpen = false }
+                                                ) {
+                                                    AstraAppLockPolicy.idleTimeoutsMillis.forEach { timeoutMs ->
+                                                        DropdownMenuItem(
+                                                            text = {
+                                                                Text(AstraAppLockPolicy.idleTimeoutLabel(timeoutMs))
+                                                            },
+                                                            onClick = {
+                                                                idleTimeoutMenuOpen = false
+                                                                if (timeoutMs != idleTimeoutMillis) {
+                                                                    requestWorkspaceAuthentication {
+                                                                        try {
+                                                                            AstraAppLock.setIdleTimeoutMillis(
+                                                                                applicationContext, timeoutMs
+                                                                            )
+                                                                            idleTimeoutMillis = timeoutMs
+                                                                            resetForegroundIdleTimer()
+                                                                        } catch (_: Exception) {
+                                                                            Toast.makeText(
+                                                                                this@MainActivity,
+                                                                                "Could not save inactivity lock timeout.",
+                                                                                Toast.LENGTH_LONG
+                                                                            ).show()
+                                                                        }
+                                                                    }
+                                                                }
+                                                            }
+                                                        )
+                                                    }
+                                                }
+                                            }
                                             Spacer(Modifier.height(8.dp))
                                             OutlinedButton(onClick = {
-                                                workspaceUnlocked = false
+                                                lockPrivateWorkspace()
                                             }) { Text("Lock Astra now") }
                                         }
                                     }
@@ -7063,24 +7158,30 @@ class MainActivity :
         super.onStart()
     }
 
+    override fun onResume() {
+        super.onResume()
+        resetForegroundIdleTimer()
+    }
+
+    override fun onPause() {
+        idleLockHandler.removeCallbacks(idleLockRunnable)
+        super.onPause()
+    }
+
     override fun onStop() {
         if (secureLockEnabled) {
             backgroundedAtElapsedMs = android.os.SystemClock.elapsedRealtime()
             backgroundSessionWasUnlocked = workspaceUnlocked
-            // Remove the private composition *even if a return grace period exists*.
+            // Remove private composition even if a return grace period exists.
             // A quick return restores only a previously authenticated session.
-            workspaceUnlocked = AstraAppLockPolicy.unlockedAfterBackground(true)
+            lockPrivateWorkspace()
             // FLAG_SECURE and blocked recents previews remain active throughout.
-            // Never leave a voice session listening behind a backgrounded surface.
-            recognizer?.cancel()
-            listening = false
-            tts?.stop()
         }
         super.onStop()
     }
 
     override fun onDestroy() {
-
+        idleLockHandler.removeCallbacks(idleLockRunnable)
         recognizer?.cancel()
         recognizer?.destroy()
 
