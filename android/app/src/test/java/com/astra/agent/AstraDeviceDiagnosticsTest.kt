@@ -78,6 +78,7 @@ class AstraDeviceDiagnosticsTest {
         assertTrue(report.contains("Model last loaded: Not verified in this session"))
         assertTrue(report.contains("Language spot checks: NOT RUN"))
         assertTrue(report.contains("Offline AI self-test: NOT RUN"))
+        assertTrue(report.contains("Native inference checkpoint: NONE RECORDED"))
         assertFalse(report.contains("history"))
         assertFalse(report.contains("Bearer "))
         assertFalse(report.contains("saved text:"))
@@ -103,6 +104,28 @@ class AstraDeviceDiagnosticsTest {
         assertTrue(report.contains("Private 1.7B candidate:"))
         assertTrue(report.contains("Language spot checks: RECORDED (5/7"))
         assertTrue(report.contains("sizes are not integrity or inference proof"))
+    }
+
+    @Test fun diagnosticReportShowsOnlyFixedCheckpointMetadata() {
+        val snapshot = AstraDeviceDiagnostics.Snapshot(
+            version = "0.12.2", manufacturer = "Example", model = "Device",
+            androidRelease = "16", sdk = 36,
+            supportedAbis = listOf("arm64-v8a"),
+            freeStorageBytes = null, availableRamBytes = null,
+            totalRamBytes = null, maxJavaHeapBytes = null,
+            bundledModelBytes = null, extractedModelBytes = null,
+            selfTestResult = "NOT RUN",
+            previousInferenceCheckpoint =
+                "CHECKPOINT PRESENT (token generation). " +
+                "Android recorded a native crash (JNI/C++); capture the crash log. " +
+                "This could reflect active inference, interruption or process death; " +
+                "not proof of a native crash."
+        )
+        val report = AstraDeviceDiagnostics.render(snapshot)
+        assertTrue(report.contains("CHECKPOINT PRESENT (token generation)"))
+        assertTrue(report.contains("not proof of a native crash"))
+        assertFalse(report.contains("private prompt"))
+        assertFalse(report.contains("/data/user/0"))
     }
 
     @Test fun onlyKnownModelLabelsMayBeShared() {
