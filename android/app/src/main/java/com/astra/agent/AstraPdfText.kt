@@ -42,9 +42,13 @@ internal object AstraPdfText {
                 require(totalPages > 0) { "PDF contains no pages." }
                 val result = StringBuilder()
                 val count = pagesToRead(totalPages)
+                var partial = count < totalPages
 
                 for (page in 1..count) {
-                    if (result.length >= MAX_CHARS - 80) break
+                    if (result.length >= MAX_CHARS - 80) {
+                        partial = true
+                        break
+                    }
                     val remaining = MAX_CHARS - result.length - 80
                     val writer = BoundedTextWriter(remaining)
                     PDFTextStripper().apply {
@@ -55,14 +59,21 @@ internal object AstraPdfText {
                     val text = writer.text().trim()
                     if (text.isNotBlank()) {
                         val header = "Page $page:\n"
-                        if (result.length + header.length + text.length > MAX_CHARS) break
+                        if (result.length + header.length + text.length > MAX_CHARS) {
+                            partial = true
+                            break
+                        }
                         result.append(header).append(text).append('\n')
+                    }
+                    if (writer.truncated) {
+                        partial = true
+                        break
                     }
                 }
                 require(result.isNotBlank()) {
                     "No selectable text found in this PDF. Scanned/image-only PDFs need OCR."
                 }
-                if (count < totalPages || result.length >= MAX_CHARS - 80) {
+                if (partial) {
                     result.append("[PDF index is partial; later pages or text were not scanned.]")
                 }
                 result.toString().take(MAX_CHARS).trim()
@@ -97,13 +108,27 @@ internal object AstraPdfText {
     /** Avoid unbounded StringWriter allocation on pages with huge text streams. */
     internal class BoundedTextWriter(private val capacity: Int) : Writer() {
         private val buffer = StringBuilder()
+        var truncated: Boolean = false
+            private set
         override fun write(chars: CharArray, off: Int, len: Int) {
-            if (capacity <= buffer.length || len <= 0) return
-            buffer.append(chars, off, minOf(len, capacity - buffer.length))
+            if (len <= 0) return
+            if (capacity <= buffer.length) {
+                truncated = true
+                return
+            }
+            val count = minOf(len, capacity - buffer.length)
+            buffer.append(chars, off, count)
+            if (count < len) truncated = true
         }
         override fun write(str: String, off: Int, len: Int) {
-            if (capacity <= buffer.length || len <= 0) return
-            buffer.append(str, off, off + minOf(len, capacity - buffer.length))
+            if (len <= 0) return
+            if (capacity <= buffer.length) {
+                truncated = true
+                return
+            }
+            val count = minOf(len, capacity - buffer.length)
+            buffer.append(str, off, off + count)
+            if (count < len) truncated = true
         }
         override fun flush() {}
         override fun close() {}
