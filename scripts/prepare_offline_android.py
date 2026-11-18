@@ -120,6 +120,9 @@ def prepare_licenses() -> None:
                 b"END OF TERMS AND CONDITIONS" not in license_data):
             raise RuntimeError("Model license download is invalid.")
         qwen_license.write_bytes(license_data)
+    # PDFBox-Android is Apache-2.0 licensed. Reuse the fully verified
+    # Apache license text already packaged for Qwen; no extra fetch needed.
+    shutil.copyfile(qwen_license, notices / "PdfBox-Android-Apache-2.0.txt")
 
     (notices / "SOURCES.txt").write_text(
         "Qwen3 0.6B original model: https://huggingface.co/Qwen/Qwen3-0.6B\\n"
@@ -127,7 +130,9 @@ def prepare_licenses() -> None:
         "https://huggingface.co/QuantFactory/Qwen3-0.6B-GGUF\\n"
         "Qwen3 model weights: Apache License 2.0.\\n"
         "llama.cpp native runtime: https://github.com/ggml-org/llama.cpp\\n"
-        "llama.cpp: MIT license; dependency notices are included in this folder.\\n",
+        "llama.cpp: MIT license; dependency notices are included in this folder.\\n"
+        "PDFBox-Android 2.0.27.0: https://github.com/TomRoush/PdfBox-Android\\n"
+        "PDFBox-Android: Apache 2.0; full license included in this folder.\\n",
         encoding="utf-8"
     )
     print("Packaged model and inference open-source licenses.", flush=True)
