@@ -227,6 +227,9 @@ internal class AstraFinanceCourse(
         )
     }
 
+    /** Most recently opened lesson, or the first lesson for a new owner. */
+    fun lastOpenedLesson(): Int = readInt(LAST, 1).coerceIn(1, lessons.size)
+
     fun respond(raw: String): String? {
         val command = raw.trim().lowercase(Locale.ROOT)
             .trimEnd('?', '!', '.').trim()
