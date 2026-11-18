@@ -260,4 +260,25 @@ class AstraDocumentTextTest {
         }
     }
 
+
+    @Test fun veryLongSlideAndLaterSlideNeverExceedOutputBudget() {
+        val types = "<Types ContentType=" +
+            "\"application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml\"/>"
+        val open = """<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+                   xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+                   <a:p><a:t>"""
+        val close = "</a:t></a:p></p:sld>"
+        val file = officeZip(
+            "[Content_Types].xml" to types,
+            "ppt/presentation.xml" to "<presentation/>",
+            "ppt/slides/slide1.xml" to (open + "A".repeat(900_000) + close),
+            "ppt/slides/slide2.xml" to (open + "B".repeat(1_000) + close)
+        )
+        val text = AstraDocumentText.extract("pptx", ByteArrayInputStream(file))
+        assertTrue(text.length <= 900_000)
+        assertTrue(text.startsWith("Slide 1:"))
+        assertFalse(text.contains("Slide 2:"))
+    }
+
+
 }
