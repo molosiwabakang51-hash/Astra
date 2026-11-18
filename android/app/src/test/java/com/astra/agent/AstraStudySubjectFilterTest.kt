@@ -36,7 +36,7 @@ class AstraStudySubjectFilterTest {
     }
 
     @Test fun accessLabelsAreTruthfulAboutLocalModelRequirements() {
-        assertEquals("MODEL NEEDED", AstraStudyAccess.label(
+        assertEquals("OFFLINE", AstraStudyAccess.label(
             AstraStudyCatalog.find("english")!!
         ))
         assertEquals("MODEL NEEDED", AstraStudyAccess.label(

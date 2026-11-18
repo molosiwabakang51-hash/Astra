@@ -39,9 +39,18 @@ internal object AstraStudyCatalog {
             Topic("Maths quiz", "Test your most recently opened lesson.", "math quiz")
         )),
         Subject("english", "English", "Aa", "Grammar, vocabulary and writing", listOf(
-            Topic("Grammar essentials", "Parts of speech and sentence structure.", "Teach me English grammar, starting with parts of speech", true),
-            Topic("Vocabulary", "Definitions, context and practice.", "Teach me five English vocabulary words with examples and a quiz", true),
-            Topic("Writing", "Build clear paragraphs.", "Teach me to write a clear English paragraph and give me an exercise", true)
+            Topic("English course", "Browse the complete 16-lesson offline course.", "english course")
+        ) + AstraEnglishCourse.lessons.mapIndexed { index, lesson ->
+            Topic(
+                "Lesson ${index + 1} — ${lesson.title}",
+                "Read a clear explanation, worked example and practice quiz.",
+                "english lesson ${index + 1}"
+            )
+        } + listOf(
+            Topic("English progress", "Review lesson and quiz mastery stored on this phone.",
+                "english progress"),
+            Topic("English quiz", "Test the most recently opened lesson.",
+                "english quiz")
         )),
         Subject("day_trading", "Day Trading", "↗", "Markets, chart reading and risk", listOf(
             Topic("Market mechanics", "Orders, spreads and liquidity.", "Teach me day trading basics: order types, spreads and liquidity", true),
