@@ -154,7 +154,9 @@ def check(apk: Path, adb: str, apksigner: str, aapt: str,
     with tempfile.TemporaryDirectory(prefix="astra-apk-check-") as tmp:
         local_copy = Path(tmp) / "installed-base.apk"
         # Pulls only the public installed base APK; does not access app data.
-        run(adb_cmd + ["pull", path, str(local_copy)], timeout=90)
+        run(adb_cmd + ["pull", path, str(local_copy)], timeout=600)
+        if not local_copy.is_file() or local_copy.stat().st_size <= 0:
+            raise RuntimeError("ADB did not create a valid temporary installed APK copy.")
         old_cert = cert_fingerprint(
             run([apksigner, "verify", "--print-certs", str(local_copy)]))
         installed_package, existing_version = apk_identity(
