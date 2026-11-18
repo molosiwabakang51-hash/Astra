@@ -32,7 +32,8 @@ internal object AstraDeviceDiagnostics {
         val loadedModelName: String? = null,
         val advancedCandidateBytes: Long? = null,
         val languageBenchmarkResult: String = "NOT RUN",
-        val installedBaseApkBytes: Long? = null
+        val installedBaseApkBytes: Long? = null,
+        val previousInferenceCheckpoint: String = "NONE RECORDED"
     )
 
     fun capture(
@@ -95,7 +96,8 @@ internal object AstraDeviceDiagnostics {
             loadedModelName = verifiedLoadedName(loadedModelName),
             advancedCandidateBytes = advancedCandidate,
             languageBenchmarkResult = summarizeLanguageBenchmark(languageBenchmarkStatus),
-            installedBaseApkBytes = baseApkBytes
+            installedBaseApkBytes = baseApkBytes,
+            previousInferenceCheckpoint = AstraInferenceCheckpoint.diagnosticStatus(appContext)
         )
     }
 
@@ -177,6 +179,7 @@ internal object AstraDeviceDiagnostics {
         appendLine("Total device RAM: ${formatBytes(snapshot.totalRamBytes)}")
         appendLine("Max Java heap (not native model RAM): ${formatBytes(snapshot.maxJavaHeapBytes)}")
         appendLine("Offline AI self-test: ${snapshot.selfTestResult}")
+        appendLine("Native inference checkpoint: ${snapshot.previousInferenceCheckpoint}")
         appendLine("Language spot checks: ${snapshot.languageBenchmarkResult}")
         appendLine()
         appendLine("No messages, notes, tasks, location, account identifiers,")
