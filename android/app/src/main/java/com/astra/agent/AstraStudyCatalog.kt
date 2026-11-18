@@ -27,10 +27,16 @@ internal object AstraStudyCatalog {
             Topic("Dividend yield", "Learn an income-investing metric.", "explain dividend yield")
         )),
         Subject("mathematics", "Mathematics", "∑", "Numbers, algebra and finance math", listOf(
-            Topic("Arithmetic", "Work through a multiplication example.", "calculate 12 * 5"),
-            Topic("Percentages", "Calculate 20% of 500.", "20 percent of 500"),
-            Topic("Compound growth", "Learn an application of exponents.", "explain compound interest"),
-            Topic("Algebra", "Open a guided algebra explanation.", "Teach me algebra with a simple worked example", true)
+            Topic("Maths course", "View the 16-lesson offline curriculum.", "math course")
+        ) + AstraMathCourse.lessons.mapIndexed { index, lesson ->
+            Topic(
+                "Lesson ${index + 1} — ${lesson.title}",
+                "Worked example and independent self-check quiz.",
+                "math lesson ${index + 1}"
+            )
+        } + listOf(
+            Topic("Maths progress", "Review your mastered quizzes and next lesson.", "math progress"),
+            Topic("Maths quiz", "Test your most recently opened lesson.", "math quiz")
         )),
         Subject("english", "English", "Aa", "Grammar, vocabulary and writing", listOf(
             Topic("Grammar essentials", "Parts of speech and sentence structure.", "Teach me English grammar, starting with parts of speech", true),
