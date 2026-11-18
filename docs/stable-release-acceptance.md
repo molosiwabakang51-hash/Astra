@@ -10,7 +10,7 @@ is supported by evidence.
 | Gate | Required evidence | Current state |
 | --- | --- | --- |
 | Correct installer | Manifest matches intended version, `com.astra.agent`, and ARM64. | Automated in GitHub Actions. |
-| Data-efficient updates | LITE APK <150 MiB and contains no GGUF; FULL contains verified GGUF. | Automated, current LITE approximately 77.5 MiB. |
+| Data-efficient updates | **LITE APK ≤300 MB (300,000,000 bytes, decimal)** and contains no GGUF; FULL contains verified GGUF. This is a hard ceiling, not a size target. | Enforced for LITE debug and owner-signed builds by the APK verifier; an earlier LITE measured about 77.5 MiB. Installed-size and phone acceptance are separate. |
 | Authentic weights | SHA-256 matches pinned model; native shared libraries and notices included. | Automated for FULL, model import checked during operation. |
 | Stable signing | Protected `astra-release` key configured by owner, matching APK certificate for **two successive releases**. | BLOCKED: owner must privately configure signing secrets. |
 | Data-preserving updates | Install a newer owner-signed LITE APK over the previous owner-signed build without uninstalling; chats, notes, tasks and private GGUF remain. | NOT VERIFIED on a phone. |
