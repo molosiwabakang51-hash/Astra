@@ -77,7 +77,8 @@ internal fun AstraOrb(
     diameter: Dp,
     modifier: Modifier = Modifier,
     compact: Boolean = false,
-    listening: Boolean = false
+    listening: Boolean = false,
+    thinking: Boolean = false
 ) {
     val context = LocalContext.current
     val motion = remember(context) {
@@ -89,13 +90,13 @@ internal fun AstraOrb(
     }
     // Keep the persistent header mark static until voice input is active.
     // The large new-chat hero animates only while that panel is visible.
-    val rotation = if (motion && (!compact || listening)) {
+    val rotation = if (motion && (!compact || listening || thinking)) {
         val transition = rememberInfiniteTransition(label = "astra-aurora")
         val value by transition.animateFloat(
             initialValue = 0f,
             targetValue = 360f,
             animationSpec = infiniteRepeatable(
-                animation = tween(if (compact) 14000 else 18000, easing = LinearEasing),
+                animation = tween(if (thinking) 6500 else if (listening) 9000 else 18000, easing = LinearEasing),
                 repeatMode = RepeatMode.Restart
             ),
             label = "orbital-drift"
@@ -108,7 +109,11 @@ internal fun AstraOrb(
             val unit = size.minDimension
             val cx = center.x
             val cy = center.y
-            val glow = if (listening) AstraAurora.mint else AstraAurora.cyan
+            val glow = when {
+                listening -> AstraAurora.mint
+                thinking -> AstraAurora.violet
+                else -> AstraAurora.cyan
+            }
             drawCircle(
                 brush = Brush.radialGradient(
                     listOf(
@@ -119,6 +124,29 @@ internal fun AstraOrb(
                 ),
                 radius = unit * 0.49f
             )
+
+            // Calibration ticks add a recognisable instrument silhouette.
+            // They share the existing orbital rotation, so no new animator runs.
+            val ticks = if (compact) 12 else 32
+            repeat(ticks) { tick ->
+                val angle = AstraAurora.pointAngle(tick, ticks) +
+                    Math.toRadians(rotation.toDouble() * 0.16)
+                val inner = unit * if (tick % 4 == 0) 0.457f else 0.467f
+                val outer = unit * 0.484f
+                drawLine(
+                    glow.copy(alpha = if (tick % 4 == 0) 0.47f else 0.20f),
+                    Offset(
+                        cx + inner * cos(angle).toFloat(),
+                        cy + inner * sin(angle).toFloat()
+                    ),
+                    Offset(
+                        cx + outer * cos(angle).toFloat(),
+                        cy + outer * sin(angle).toFloat()
+                    ),
+                    strokeWidth = unit * 0.006f,
+                    cap = StrokeCap.Round
+                )
+            }
 
             val rings = if (compact) 2 else 3
             repeat(rings) { index ->
@@ -158,14 +186,42 @@ internal fun AstraOrb(
                 )
             }
 
+            // The luminous center is a layered lens, not a generic emoji.
             drawCircle(
                 brush = Brush.radialGradient(
-                    listOf(Color(0xFF368CC4), Color(0xFF1E3D71), Color(0xFF101B35)),
-                    center = Offset(cx - unit * 0.045f, cy - unit * 0.06f),
-                    radius = unit * 0.25f
-                ), radius = unit * 0.205f
+                    listOf(
+                        glow.copy(alpha = 0.46f),
+                        Color(0xFF1C4668).copy(alpha = 0.98f),
+                        Color(0xFF101B35)
+                    ),
+                    center = Offset(cx - unit * 0.045f, cy - unit * 0.055f),
+                    radius = unit * 0.29f
+                ), radius = unit * 0.213f
             )
-            // Original stylized "A" is retained as the brand's recognisable mark.
+            drawCircle(
+                glow.copy(alpha = 0.41f), radius = unit * 0.18f,
+                style = Stroke(width = unit * 0.007f)
+            )
+            val facet = androidx.compose.ui.graphics.Path().apply {
+                moveTo(cx, cy - unit * 0.171f)
+                lineTo(cx + unit * 0.142f, cy - unit * 0.035f)
+                lineTo(cx + unit * 0.112f, cy + unit * 0.130f)
+                lineTo(cx, cy + unit * 0.178f)
+                lineTo(cx - unit * 0.112f, cy + unit * 0.130f)
+                lineTo(cx - unit * 0.142f, cy - unit * 0.035f)
+                close()
+            }
+            drawPath(
+                facet,
+                brush = Brush.linearGradient(
+                    listOf(
+                        glow.copy(alpha = 0.19f),
+                        AstraAurora.violet.copy(alpha = 0.10f),
+                        Color(0xFF081223).copy(alpha = 0.30f)
+                    )
+                )
+            )
+            // Original stylized "A" remains legible at small header size.
             val stroke = unit * 0.025f
             drawLine(
                 AstraAurora.ink,
