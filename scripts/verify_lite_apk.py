@@ -46,7 +46,8 @@ def main(path: Path) -> None:
         if not any(p.endswith("libai-chat.so") for p in lib):
             raise RuntimeError("Lite APK is missing the Android llama.cpp engine")
         for asset in ("assets/open_source_licenses/Qwen3-Apache-2.0.txt",
-                      "assets/open_source_licenses/llama.cpp-MIT.txt"):
+                      "assets/open_source_licenses/llama.cpp-MIT.txt",
+                      "assets/open_source_licenses/PdfBox-Android-Apache-2.0.txt"):
             if asset not in entries:
                 raise RuntimeError("Lite APK is missing license notices")
     print("PASS: model-free LITE APK with on-device ARM64 inference engine")
