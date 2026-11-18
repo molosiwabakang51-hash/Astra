@@ -23,7 +23,7 @@ class AstraAppLockSourceTest(unittest.TestCase):
         )
         self.assertIn("return@MaterialTheme", MAIN)
         self.assertIn("override fun onStop()", MAIN)
-        self.assertIn("unlockedAfterBackground(true)", MAIN)
+        self.assertIn("lockPrivateWorkspace()", MAIN)
 
     def test_selected_delay_cannot_skip_system_auth_or_private_preview_protection(self):
         self.assertIn("setBackgroundDelayMillis(", LOCK)
@@ -34,10 +34,21 @@ class AstraAppLockSourceTest(unittest.TestCase):
         self.assertIn("override fun onStart()", MAIN)
         self.assertIn("android.os.SystemClock.elapsedRealtime()", MAIN)
         self.assertIn("backgroundSessionWasUnlocked = workspaceUnlocked", MAIN)
-        self.assertIn("workspaceUnlocked = AstraAppLockPolicy.unlockedAfterBackground(true)", MAIN)
+        self.assertIn("lockPrivateWorkspace()", MAIN)
         self.assertIn("if (secureLockEnabled && leftAt != null && backgroundSessionWasUnlocked)", MAIN)
         self.assertIn("backgroundSessionWasUnlocked = false", MAIN)
         self.assertIn("Screen capture stays blocked at every delay setting.", MAIN)
+
+    def test_inactivity_lock_is_foreground_only_and_auth_protected(self):
+        self.assertIn("setIdleTimeoutMillis(", LOCK)
+        self.assertIn("getLong(IDLE_TIMEOUT_KEY, 0L)", LOCK)
+        self.assertIn("override fun onUserInteraction()", MAIN)
+        self.assertIn("override fun onPause()", MAIN)
+        self.assertIn("idleLockHandler.removeCallbacks(idleLockRunnable)", MAIN)
+        self.assertIn("AstraAppLockPolicy.shouldLockForInactivity(", MAIN)
+        self.assertIn("lockPrivateWorkspace()", MAIN)
+        self.assertIn("idleTimeoutMillis = AstraAppLock.idleTimeoutMillis(this)", MAIN)
+        self.assertIn("requestWorkspaceAuthentication {", MAIN)
 
     def test_strong_system_auth_only_and_default_off(self):
         self.assertIn("BiometricPrompt.Builder(activity)", LOCK)

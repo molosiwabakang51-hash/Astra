@@ -18,6 +18,7 @@ internal object AstraAppLock {
     private const val PREFS = "astra"
     private const val ENABLED_KEY = "astra_app_lock_enabled"
     private const val BACKGROUND_DELAY_KEY = "astra_app_lock_background_delay_ms"
+    private const val IDLE_TIMEOUT_KEY = "astra_app_lock_idle_timeout_ms"
 
     private val AUTHENTICATORS =
         BiometricManager.Authenticators.BIOMETRIC_STRONG or
@@ -51,6 +52,27 @@ internal object AstraAppLock {
         check(context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
             .edit().putLong(BACKGROUND_DELAY_KEY, delayMillis).commit()) {
             "Could not save Astra's background lock delay."
+        }
+    }
+
+    /**
+     * Foreground inactivity lock is opt-in, including for previously secured installs.
+     * An invalid or unreadable stored preference is treated as the disabled default;
+     * it cannot bypass the independently enforced cold-launch/background lock.
+     */
+    fun idleTimeoutMillis(context: Context): Long {
+        val saved = runCatching {
+            context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                .getLong(IDLE_TIMEOUT_KEY, 0L)
+        }.getOrDefault(0L)
+        return if (saved in AstraAppLockPolicy.idleTimeoutsMillis) saved else 0L
+    }
+
+    fun setIdleTimeoutMillis(context: Context, timeoutMillis: Long) {
+        require(timeoutMillis in AstraAppLockPolicy.idleTimeoutsMillis)
+        check(context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .edit().putLong(IDLE_TIMEOUT_KEY, timeoutMillis).commit()) {
+            "Could not save Astra's inactivity lock timeout."
         }
     }
 
@@ -110,6 +132,25 @@ internal object AstraAppLock {
 /** Independent, JVM-testable access rules for the opt-in secure workspace. */
 internal object AstraAppLockPolicy {
     val backgroundDelaysMillis: List<Long> = listOf(0L, 30_000L, 120_000L, 300_000L)
+    // Off is the migration-safe default; selected limits apply only while active.
+    val idleTimeoutsMillis: List<Long> = listOf(0L, 120_000L, 300_000L, 900_000L)
+
+    fun idleTimeoutLabel(timeoutMillis: Long): String = when (timeoutMillis) {
+        0L -> "Off"
+        120_000L -> "After 2 minutes"
+        300_000L -> "After 5 minutes"
+        900_000L -> "After 15 minutes"
+        else -> "Off"
+    }
+
+    fun shouldLockForInactivity(
+        enabled: Boolean, timeoutMillis: Long, idleElapsedMillis: Long
+    ): Boolean {
+        if (!enabled || timeoutMillis == 0L) return false
+        if (timeoutMillis !in idleTimeoutsMillis) return false
+        // Time should be monotonic; an impossible clock regression locks closed.
+        return idleElapsedMillis < 0L || idleElapsedMillis >= timeoutMillis
+    }
 
     fun labelForDelay(delayMillis: Long): String = when (delayMillis) {
         0L -> "Immediately"

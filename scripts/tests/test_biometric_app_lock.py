@@ -51,11 +51,17 @@ class AstraBiometricLockContractTests(unittest.TestCase):
         start = self.main.index('override fun onStop()')
         end = self.main.index('override fun onDestroy()', start)
         on_stop = self.main[start:end]
-        for required in (
-            'if (secureLockEnabled)', 'recognizer?.cancel()', 'listening = false',
-            'tts?.stop()', 'workspaceUnlocked = AstraAppLockPolicy.unlockedAfterBackground(true)'
-        ):
-            self.assertIn(required, on_stop)
+        self.assertIn('if (secureLockEnabled)', on_stop)
+        self.assertIn('lockPrivateWorkspace()', on_stop)
+        lock_start = self.main.index('private fun lockPrivateWorkspace()')
+        lock_end = self.main.index('private fun checkForegroundIdleTimeout()', lock_start)
+        lock_body = self.main[lock_start:lock_end]
+        for required in ('recognizer?.cancel()', 'listening = false',
+                         'tts?.stop()', 'workspaceUnlocked = false'):
+            self.assertIn(required, lock_body)
+
+    def test_only_one_biometric_permission_declared(self):
+        self.assertEqual(self.manifest.count('android:name="android.permission.USE_BIOMETRIC"'), 1)
 
     def test_opted_in_app_disables_screenshots_and_recent_task_preview(self):
         self.assertIn('WindowManager.LayoutParams.FLAG_SECURE', self.lock)
