@@ -82,12 +82,15 @@ class AstraStudyCatalogTest {
         assertEquals(null, AstraStudyCatalog.topic("finance", "Not a topic"))
     }
 
-    @Test fun nonBuiltInEnglishAndTradingRemainAiOnlyWhileMathIsNowOffline() {
-        for (id in listOf("english", "day_trading")) {
-            val subject = AstraStudyCatalog.find(id)
-            assertNotNull(subject)
-            assertTrue(subject!!.topics.all { it.requiresModel })
-        }
+    @Test fun englishAndMathHaveRealOfflineCurriculaWhileTradingNeedsAI() {
+        val english = AstraStudyCatalog.find("english")!!
+        assertEquals(16, english.topics.count {
+            it.command.startsWith("english lesson ")
+        })
+        assertTrue(english.topics.all { !it.requiresModel })
+        val dayTrading = AstraStudyCatalog.find("day_trading")
+        assertNotNull(dayTrading)
+        assertTrue(dayTrading!!.topics.all { it.requiresModel })
         val mathematics = AstraStudyCatalog.find("mathematics")!!
         assertEquals(16, mathematics.topics.count {
             it.command.startsWith("math lesson ")
