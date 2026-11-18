@@ -3113,6 +3113,10 @@ class MainActivity :
                         return
                     }
 
+                    // A real user action takes priority over Mission Control.
+                    // Do not reopen the dashboard after the reply completes.
+                    commandDeckExpanded = false
+
                     // A deliberate Send always returns focus to the newest reply.
                     followNewest = true
 
