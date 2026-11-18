@@ -190,7 +190,7 @@ internal class AstraEnglishCourse(
         if (command.length > 90) return null
         return when (command) {
             "english course", "english syllabus", "learn english", "start english course", "study english" -> syllabus()
-            "english progress", "english progress" -> progress()
+            "english progress", "my english progress" -> progress()
             "next english lesson" -> lesson((readInt(LAST, 0) + 1).coerceIn(1, lessons.size))
             "english quiz", "quiz me on english" -> quiz(readInt(LAST, 1).coerceIn(1, lessons.size))
             "skip english quiz" -> {
