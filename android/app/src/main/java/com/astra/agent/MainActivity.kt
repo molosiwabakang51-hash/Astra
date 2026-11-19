@@ -1425,6 +1425,19 @@ private class AstraProcessor(
         val lower =
             clean.lowercase(Locale.ENGLISH)
 
+        // Explicit distress never falls through to a small local LLM or a
+        // pending task/note confirmation. Keep responses grounded and private.
+        AstraDistressSupport.respond(clean)?.let {
+            dialogue.dismissIncompletePrompt()
+            return AssistantResult(it)
+        }
+        // A short, independently checked offline fact card fixes the reported
+        // Shiller identity hallucination without claiming live browsing.
+        AstraVerifiedEconomics.respond(clean)?.let {
+            dialogue.dismissIncompletePrompt()
+            return AssistantResult(it)
+        }
+
         AstraConversationCommands.classify(lower)?.let { command ->
             return AssistantResult(
                 "",
@@ -3010,6 +3023,13 @@ class MainActivity :
                     // Search the retained chat, not just the latest 160 messages.
                     // AstraConversationContext still sends only eight short,
                     // bounded, same-chat excerpts to the reloaded native model.
+                    val focusedPrompt = if (grounding == null) {
+                        AstraFollowUpAnchor.enrich(
+                            prompt, history.map {
+                                AstraChatArchive.Message(it.role, it.text)
+                            }
+                        )
+                    } else prompt
                     val turns = AstraConversationHistory.forRecovery(history).mapNotNull { entry ->
                         val role = when (entry.role) {
                             "You" -> "user"
@@ -3017,7 +3037,7 @@ class MainActivity :
                             else -> null
                         }
                         role?.let { AstraOnDeviceBrain.Turn(it, entry.text) }
-                    } + AstraOnDeviceBrain.Turn("user", prompt)
+                    } + AstraOnDeviceBrain.Turn("user", focusedPrompt)
                     val generation = chatGeneration
                     val placeholder = "ASTRA // THINKING OFFLINE..."
                     var displayed = placeholder
@@ -3329,6 +3349,26 @@ class MainActivity :
                                     }
                             }
                         }
+                    }
+
+                    // Reviewing Astra's own earlier claims is different from
+                    // remembering user-authored facts. Explicit chat-review
+                    // requests see both roles with labels, never a model guess.
+                    val chatReview = AstraChatReview.respond(
+                        message, history.map {
+                            AstraChatArchive.Message(it.role, it.text)
+                        }
+                    )
+                    if (chatReview != null) {
+                        dialogue.dismissIncompletePrompt()
+                        dialogueAwaiting = false
+                        history.add(ChatMessage("You", message))
+                        history.add(ChatMessage("Astra", chatReview))
+                        while (history.size > MAX_HISTORY) history.removeAt(0)
+                        persist()
+                        input = ""
+                        keyboard?.hide()
+                        return
                     }
 
                     // Evidence-grounded analysis is opt-in and runs on the phone.

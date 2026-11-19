@@ -189,7 +189,8 @@ internal class AstraMathCourse(
         if (command.length > 90) return null
         return when (command) {
             "math course", "mathematics course", "math syllabus",
-            "learn math", "learn mathematics", "start math course" -> syllabus()
+            "learn math", "learn mathematics", "teach me math",
+            "teach me mathematics", "start math course" -> syllabus()
             "math progress", "mathematics progress" -> progress()
             "next math lesson" -> lesson((readInt(LAST, 0) + 1).coerceIn(1, lessons.size))
             "math quiz", "quiz me on math" -> quiz(readInt(LAST, 1).coerceIn(1, lessons.size))

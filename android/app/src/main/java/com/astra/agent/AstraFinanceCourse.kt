@@ -233,7 +233,7 @@ internal class AstraFinanceCourse(
         if (command.length > 90) return null
         return when (command) {
             "finance course", "finance syllabus", "learn finance",
-            "start finance course" -> syllabus()
+            "teach me finance", "start finance course" -> syllabus()
             "finance progress", "my finance progress" -> progress()
             "next finance lesson" -> lesson(
                 (readInt(LAST, 0) + 1).coerceIn(1, lessons.size)
