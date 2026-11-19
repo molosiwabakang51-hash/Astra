@@ -1426,6 +1426,14 @@ private class AstraProcessor(
         val lower =
             clean.lowercase(Locale.ENGLISH)
 
+        // Direct distress disclosures receive bounded on-device support
+        // ahead of generic dialogue, pending task prompts and the local LLM.
+        // Do not assert that an extraordinary environmental claim is true.
+        AstraDistressSupport.respond(clean)?.let { support ->
+            dialogue.dismissIncompletePrompt()
+            return AssistantResult(support)
+        }
+
         AstraConversationCommands.classify(lower)?.let { command ->
             return AssistantResult(
                 "",
@@ -3066,6 +3074,15 @@ class MainActivity :
                     // Search the retained chat, not just the latest 160 messages.
                     // AstraConversationContext still sends only eight short,
                     // bounded, same-chat excerpts to the reloaded native model.
+                    // For short, ambiguous continuations, anchor the current
+                    // prompt to the immediately preceding same-chat exchange.
+                    // Quoted model text is untrusted and never private memory.
+                    val focusedPrompt = if (grounding == null) {
+                        AstraFollowUpAnchor.enrich(
+                            prompt,
+                            history.map { AstraChatArchive.Message(it.role, it.text) }
+                        )
+                    } else prompt
                     val turns = AstraConversationHistory.forRecovery(history).mapNotNull { entry ->
                         val role = when (entry.role) {
                             "You" -> "user"
@@ -3073,7 +3090,7 @@ class MainActivity :
                             else -> null
                         }
                         role?.let { AstraOnDeviceBrain.Turn(it, entry.text) }
-                    } + AstraOnDeviceBrain.Turn("user", prompt)
+                    } + AstraOnDeviceBrain.Turn("user", focusedPrompt)
                     val generation = chatGeneration
                     val placeholder = "ASTRA // THINKING OFFLINE..."
                     var displayed = placeholder
