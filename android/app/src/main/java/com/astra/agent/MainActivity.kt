@@ -6423,13 +6423,13 @@ class MainActivity :
                                                                     listOf(
                                                                         AstraOnDeviceBrain.Turn(
                                                                             "user",
-                                                                            AstraReasoningBenchmark.prompt(
-                                                                                probe, mode
-                                                                            )
+                                                                            AstraReasoningBenchmark.prompt(probe)
                                                                         )
                                                                     ),
                                                                     Int.MIN_VALUE + 400 + index * 2 +
-                                                                        modeIndex
+                                                                        modeIndex,
+                                                                    reasoningModeOverride =
+                                                                        mode == AstraReasoningBenchmark.Mode.CAREFUL
                                                                 )
                                                                 val elapsed =
                                                                     (System.nanoTime() - start) / 1_000_000
