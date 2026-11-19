@@ -106,7 +106,7 @@ class AstraFinanceCourseTest {
         assertTrue(tutor.respond("finance lesson 0")!!.contains("from 1 to 20"))
         assertTrue(tutor.respond("finance lesson 21")!!.contains("from 1 to 20"))
         assertTrue(tutor.respond("finance quiz 9999")!!.contains("from 1 to 20"))
-        assertNull(tutor.respond("teach me finance"))
+        assertTrue(tutor.respond("teach me finance")!!.contains("20 OFFLINE LESSONS"))
         assertNull(tutor.respond("what did I say about my portfolio?"))
         assertNull(tutor.respond("done 1"))
         assertNull(tutor.respond("add task study finance"))
