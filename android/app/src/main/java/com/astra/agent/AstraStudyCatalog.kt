@@ -212,6 +212,8 @@ internal object AstraStudyCatalog {
             "day_trading" -> "trading"
             "french" -> "french"
             "physics" -> "physics"
+            "russian" -> "russian"
+            "computer_science" -> "computing"
             else -> null
         }
         if (course == null) subject else {
