@@ -80,4 +80,58 @@ class AstraFollowUpAnchorTest {
         assertFalse(prompt.contains("Shiller"))
         assertFalse(prompt.contains("Niall"))
     }
+
+    @Test fun arbitraryNumberedFollowUpsUseOnlySelectedItem() {
+        val history = listOf(
+            msg("You", "Show me several Python learning paths."),
+            msg("Astra", """
+                1. Variables: storing values and simple expressions.
+                2. Functions: reusable pieces of logic with inputs.
+                Learn how parameters and return values work.
+                3. Modules: organize reusable code across files.
+                4. Testing: check assumptions with repeatable assertions.
+                5. Data: lists, dictionaries, and tabular examples.
+            """.trimIndent())
+        )
+        val second = AstraFollowUpAnchor.enrich("Explain point 2", history)
+        assertTrue(second.contains("USER-SELECTED ITEM 2"))
+        assertTrue(second.contains("Functions: reusable pieces"))
+        assertTrue(second.contains("parameters and return values"))
+        assertFalse(second.contains("Testing: check assumptions"))
+        val fifth = AstraFollowUpAnchor.enrich("What about item 5?", history)
+        assertTrue(fifth.contains("USER-SELECTED ITEM 5"))
+        assertTrue(fifth.contains("Data: lists"))
+        assertFalse(fifth.contains("Functions: reusable pieces"))
+        val third = AstraFollowUpAnchor.enrich("expand on step 3", history)
+        assertTrue(third.contains("USER-SELECTED ITEM 3"))
+        assertTrue(third.contains("Modules: organize"))
+    }
+
+    @Test fun numberedFollowUpsHandleBulletsAndNeverInventMissingItems() {
+        val history = listOf(
+            msg("You", "Give me a study plan."),
+            msg("Astra", "- **1.** Read the chapter.\n- **2.** Solve practice problems.\n- **3.** Review mistakes.")
+        )
+        val item = AstraFollowUpAnchor.enrich("go into more detail for 2", history)
+        assertTrue(item.contains("USER-SELECTED ITEM 2"))
+        assertTrue(item.contains("Solve practice problems"))
+        assertFalse(item.contains("Review mistakes"))
+        val missing = AstraFollowUpAnchor.enrich("explain option 9", history)
+        assertTrue(missing.contains("Item 9 was not located"))
+        assertTrue(missing.contains("instead of guessing"))
+    }
+
+    @Test fun ordinaryQuestionsWithNumbersRemainUnmodified() {
+        val history = listOf(
+            msg("You", "Bond duration"),
+            msg("Astra", "1. Interest rate risk.\n2. Convexity.")
+        )
+        for (prompt in listOf("What is 2 + 3?", "Find point 4 on the map",
+            "Explain 2-factor authentication", "Expand 200 euros into pula",
+            "what about 2026?")) {
+            assertEquals(prompt, AstraFollowUpAnchor.enrich(prompt, history))
+        }
+        assertEquals("explain point 2",
+            AstraFollowUpAnchor.enrich("explain point 2", emptyList()))
+    }
 }
