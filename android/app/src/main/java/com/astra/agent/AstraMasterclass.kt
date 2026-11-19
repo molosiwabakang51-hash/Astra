@@ -13,7 +13,7 @@ import java.util.Locale
  */
 internal class AstraMasterclass(
     private val readInt: (String, Int) -> Int,
-    private val writeInt: (String, Int) -> Unit
+    private val writeInt: (String, Int) -> kotlin.Unit
 ) {
     internal data class Unit(
         val title: String,
