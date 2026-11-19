@@ -233,7 +233,7 @@ internal class AstraFinanceCourse(
         if (command.length > 90) return null
         return when (command) {
             "finance course", "finance syllabus", "learn finance",
-            "start finance course" -> syllabus()
+            "start finance course", "teach me finance", "study finance" -> syllabus()
             "finance progress", "my finance progress" -> progress()
             "next finance lesson" -> lesson(
                 (readInt(LAST, 0) + 1).coerceIn(1, lessons.size)
@@ -276,6 +276,8 @@ internal class AstraFinanceCourse(
         appendLine()
         append("Choose 'finance lesson 1', 'next finance lesson', " +
             "'finance quiz 1', or 'finance progress'.")
+        appendLine()
+        append("For detailed cases and exercises: 'finance workshop'.")
     }.trim()
 
     private fun lesson(index: Int): String {
