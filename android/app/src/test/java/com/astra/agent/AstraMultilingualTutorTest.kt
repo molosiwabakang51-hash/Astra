@@ -39,6 +39,25 @@ class AstraMultilingualTutorTest {
         assertTrue(coach.respond("language progress")!!.contains("8 correct"))
     }
 
+    @Test fun courteousBilingualFollowUpsAdvanceTheActiveFrenchCourse() {
+        val coach = tutor()
+        assertTrue(coach.respond("Teach me French")!!.contains("lesson 1/21"))
+        assertTrue(coach.respond("Next language lesson")!!.contains("lesson 2/21"))
+        assertTrue(coach.respond("oui")!!.contains("Oui — yes"))
+        assertTrue(coach.respond("Oui next lesson s'il vous plaît")!!
+            .contains("French lesson 3/21"))
+        assertTrue(coach.respond("next lesson please")!!.contains("lesson 4/21"))
+        assertTrue(coach.respond("Next french lesson")!!.contains("lesson 5/21"))
+    }
+
+    @Test fun tutorDoesNotHijackUnrelatedMixedLanguageConversation() {
+        val coach = tutor()
+        coach.respond("learn french")
+        assertNull(coach.respond("Oui, what do you think about bond duration?"))
+        assertNull(coach.respond("Please explain what a lesson means"))
+        assertNull(coach.respond("I have a next lesson in mathematics tomorrow"))
+    }
+
     @Test fun everyPackHasSeventyTwoWellFormedDistinctExtraTerms() {
         for (lang in AstraMultilingualTutor.Language.entries) {
             val additions = AstraExtendedVocabulary.additional(lang.id)
