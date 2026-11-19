@@ -57,6 +57,30 @@ class AstraSubjectAtlasTest {
         assertTrue(physics.contains("no"))
     }
 
+    @Test fun subjectSearchFindsNamesAndModulesWithoutModel() {
+        val chemistry = AstraSubjectAtlas.respond("atlas search chemical bonding")!!
+        assertTrue(chemistry.contains("General Chemistry"))
+        assertTrue(chemistry.contains("atlas syllabus general_chemistry"))
+        val biology = AstraSubjectAtlas.respond("study search biology")!!
+        assertTrue(biology.contains("ATLAS RESULTS"))
+        val noMatch = AstraSubjectAtlas.respond("atlas search zzzzz")!!
+        assertTrue(noMatch.contains("No subject matched"))
+        assertNull(AstraSubjectAtlas.respond("atlas search a"))
+        assertNull(AstraSubjectAtlas.respond("atlas search " + "x".repeat(200)))
+    }
+
+    @Test fun browseSubjectCategoriesAndGetExactRoadmapReferences() {
+        val all = AstraSubjectAtlas.respond("atlas categories")!!
+        assertTrue(all.contains("285 FIELDS"))
+        assertTrue(all.contains("Physical Sciences"))
+        assertTrue(all.contains("15 academic and practical categories"))
+        val physics = AstraSubjectAtlas.respond("atlas category Physical Sciences")!!
+        assertTrue(physics.contains("Physics: atlas syllabus physics"))
+        assertTrue(physics.contains("Astronomy"))
+        assertTrue(AstraSubjectAtlas.respond("atlas category notarealcategory")!!
+            .contains("Unknown category"))
+    }
+
     @Test fun advancedWorkshopCardsExposeRealChaptersAndProgressNotModelPrompts() {
         val expected = mapOf(
             "finance" to Pair("finance", 14),
