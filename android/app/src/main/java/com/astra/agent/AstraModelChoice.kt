@@ -8,6 +8,13 @@ package com.astra.agent
 internal object AstraModelChoice {
     enum class Variant { ADVANCED, NONE }
 
+    /** Only report a successfully loaded 1.7B model; never expose its path. */
+    fun loadedName(modelPath: String?): String? =
+        when (modelPath?.substringAfterLast('/')) {
+            AstraModelImport.ADVANCED_NAME -> "Qwen3 1.7B · Q4_K_M"
+            else -> null
+        }
+
     /** Only the advanced 1.7B model can serve general conversation. */
     fun candidates(advancedAvailable: Boolean): List<Variant> =
         if (advancedAvailable) listOf(Variant.ADVANCED) else emptyList()
