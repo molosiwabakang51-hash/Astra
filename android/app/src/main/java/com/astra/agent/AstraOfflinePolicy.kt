@@ -114,6 +114,14 @@ internal object AstraOfflinePolicy {
                 }
             }
         }
-        return value.dropLast(trim).trim().take(16_000)
+        val cleaned = value.dropLast(trim).trim()
+        if (cleaned.length <= 16_000) return cleaned
+        // Kotlin take() counts UTF-16 code units, not Unicode code points.
+        // A long streamed answer can end exactly between an emoji's
+        // surrogate halves. Never persist or speak a malformed character.
+        val safeEnd = if (cleaned[15_999].isHighSurrogate() &&
+            cleaned[16_000].isLowSurrogate()
+        ) 15_999 else 16_000
+        return cleaned.substring(0, safeEnd)
     }
 }

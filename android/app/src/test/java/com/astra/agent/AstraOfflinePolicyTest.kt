@@ -146,4 +146,27 @@ class AstraOfflinePolicyTest {
             "<think>private</think>Answer."
         ))
     }
+    @Test fun publicReplyLimitNeverSplitsAnEmojiOrSupplementaryScriptCharacter() {
+        // The 16,000th UTF-16 unit is the high surrogate of an emoji.
+        val boundary = "a".repeat(15_999) + "🧠" + " after"
+        val result = AstraOfflinePolicy.publicReply(boundary)
+        assertEquals(15_999, result.length)
+        assertEquals("a".repeat(15_999), result)
+        val within = "a".repeat(15_998) + "🧠" + " after"
+        val kept = AstraOfflinePolicy.publicReply(within)
+        assertEquals(16_000, kept.length)
+        assertTrue(kept.endsWith("🧠"))
+        for (answer in listOf(result, kept)) {
+            for (index in answer.indices) {
+                if (answer[index].isHighSurrogate()) {
+                    assertTrue(index + 1 < answer.length &&
+                        answer[index + 1].isLowSurrogate())
+                }
+                if (answer[index].isLowSurrogate()) {
+                    assertTrue(index > 0 && answer[index - 1].isHighSurrogate())
+                }
+            }
+        }
+    }
+
 }
