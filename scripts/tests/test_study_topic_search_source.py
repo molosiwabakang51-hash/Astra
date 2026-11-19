@@ -5,11 +5,14 @@ import unittest
 ROOT = Path(__file__).resolve().parents[2]
 JAVA = ROOT / "android/app/src/main/java/com/astra/agent"
 HUB = (JAVA / "AstraStudyHub.kt").read_text(encoding="utf-8")
+SEARCH = (JAVA / "AstraStudySearch.kt").read_text(encoding="utf-8")
 
 class StudyTopicSearchSourceTest(unittest.TestCase):
     def test_catalog_uses_bounded_local_filter_only(self):
         self.assertIn("internal object AstraStudyTopicFilter", HUB)
-        self.assertIn("val query = rawQuery.trim().take(80)", HUB)
+        self.assertIn("val query = AstraStudySearch.query(rawQuery)", HUB)
+        self.assertIn("raw.trim().take(80)", SEARCH)
+        self.assertNotIn("https://", SEARCH)
         self.assertIn("items(visibleTopics, key = { it.title })", HUB)
         self.assertIn("AstraStudyTopicFilter.apply(selected.topics, topicQuery)", HUB)
         self.assertIn("onLesson(topic)", HUB)
