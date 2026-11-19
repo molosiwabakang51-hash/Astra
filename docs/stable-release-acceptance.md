@@ -46,8 +46,8 @@ APK. GitHub Actions debug builds may use different signing certificates.
    confirm the saved conversation is usable without a permanent `THINKING`
    placeholder.
 7. **Signed upgrade:** Install two successive owner-signed versions using the
-   **same** private key. Confirm chats, tasks, notes and imported model survive
-   without another 462 MiB download.
+   **same** private key. Confirm chats, tasks, notes and imported Qwen3 1.7B survive
+   without downloading another roughly 1.28 GB model.
 8. **Resource usage:** Record time-to-first-token, tokens/second, RAM usage,
    5-minute battery drain and thermal behavior on the owner's phone. No
    unexpected native crash, lockup or storage exhaustion.
@@ -62,6 +62,8 @@ APK. GitHub Actions debug builds may use different signing certificates.
 12. **Speech privacy under interruption:** Start a long spoken response, then separately lock the phone, turn the screen off, switch to another app, and activate Astra's own app lock. In each case verify queued and currently speaking audio stops immediately and does not restart after unlocking/returning without an explicit user action. Repeat during speech chunk transitions and after rapid background/foreground changes. Verify no private answer is audible from the lock screen.
 13. **Study depth and memory:** Open the Study Hub and choose different subjects rather than accepting a default Finance launch. Test one detailed workshop, quiz, spaced-review due/next controls and independent progress in two courses. Reopen Astra and verify progress persists. Record whether full lessons are substantively useful; the presence of a course button alone is not a pass.
 14. **Device-library privacy and retrieval:** Authorize a folder once using the Android system picker, import a supported text-bearing document, then verify a relevant citation in airplane mode. Restart the app and confirm the retained permission works without repeated prompting. Revoke permission and verify further access fails safely; originals must remain unchanged. Separately verify that shared-storage filename searches do not silently read file contents. Record incomplete indexes and unsupported media types rather than reporting full-device learning.
+15. **1.7B picker return regression (mandatory for LITE):** With a valid, fully downloaded `Qwen3-1.7B-Q4_K_M.gguf` in Downloads, use Settings → Import offline model once. Choose the file using Android Files. Verify Astra returns to **Settings → Model setup**, not a blank new chat, shows copied MiB during the import and a SHA-256-verified READY result. Repeat with app lock enabled and its delay set to immediately: unlocking must reveal the same progress/result, and an interrupted import must display a recoverable message without deleting the source file. Attempt with insufficient free storage and with a wrong GGUF variant; neither may silently return to Chat or claim success. Verify no new network usage and no 0.6B fallback. If a build is signed with a different key, use a separate test installation after backing up data—never uninstall a working copy just to test.
+16. **Astra-core navigation tray:** Tap the Astra icon on Chat, Study and Settings. Verify the edge-aligned tray opens from the left, can be dismissed by tapping outside or using Close, and presents six fully labelled destinations with a single clear active indicator. In Chat verify New conversation, Conversations, Search, Copy, Share, Rename, Mission Control, Speak last response and Clear; Clear must still ask for confirmation. Test large Android font scaling, TalkBack, a narrow screen, landscape and system gesture navigation: controls must not overlap the status/navigation bars or require horizontal scrolling.
 
 ## Honest release labels
 

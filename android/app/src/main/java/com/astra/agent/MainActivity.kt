@@ -27,6 +27,8 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.lifecycle.lifecycleScope
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -2088,6 +2090,119 @@ class MainActivity :
     private var backgroundSessionWasUnlocked = false
     private var authenticationInProgress = false
 
+    // The model-picker callback MUST survive chat UI disposal, activity
+    // backgrounding and the opt-in biometric lock while Files is open.
+    // Compose-scoped launchers/coroutines can disappear during this flow.
+    private var modelImportRunning by mutableStateOf(false)
+    private var modelImportStatus by mutableStateOf("")
+    private var modelSetupRequested by mutableStateOf(false)
+
+    private fun updateModelImportStatus(message: String, stage: String) {
+        modelImportStatus = message
+        // Persist only sanitized, non-file-specific diagnostics: no URIs,
+        // paths, private filenames, model prompts or read permissions.
+        getSharedPreferences("astra", Context.MODE_PRIVATE).edit()
+            .putString("astra_model_import_status", message.take(350))
+            .putString("astra_model_import_stage", stage)
+            .apply()
+    }
+
+    private val importModelLauncher = registerForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { selected ->
+        modelSetupRequested = true
+        if (selected == null) {
+            updateModelImportStatus(
+                "No model selected. Choose your downloaded Qwen3 1.7B Q4_K_M GGUF again.",
+                "cancelled"
+            )
+        } else if (modelImportRunning) {
+            updateModelImportStatus(
+                "Another model operation is running. Finish it before importing again.",
+                "busy"
+            )
+        } else {
+            modelImportRunning = true
+            updateModelImportStatus("Reading selected file; checking local storage...", "copying")
+            // A one-time persistable read grant protects slow SAF providers
+            // and background screen-lock transitions. Never store the URI.
+            val retainedPermission = runCatching {
+                contentResolver.takePersistableUriPermission(
+                    selected, Intent.FLAG_GRANT_READ_URI_PERMISSION
+                )
+                true
+            }.getOrDefault(false)
+            lifecycleScope.launch {
+                try {
+                    val bytes = AstraModelImport.importDocument(
+                        applicationContext, selected
+                    ) { copied ->
+                        withContext(Dispatchers.Main.immediate) {
+                            updateModelImportStatus(
+                                "Importing Qwen3 1.7B: " +
+                                    (copied / 1048576L) +
+                                    " MiB copied. Keep Astra open until SHA-256 verification finishes.",
+                                "copying"
+                            )
+                        }
+                    }
+                    updateModelImportStatus(
+                        "QWEN3 1.7B READY · " + (bytes / 1048576L) +
+                            " MiB verified. You can now use offline conversation.",
+                        "ready"
+                    )
+                    Toast.makeText(
+                        this@MainActivity,
+                        "Qwen3 1.7B imported and verified.", Toast.LENGTH_LONG
+                    ).show()
+                } catch (cancel: CancellationException) {
+                    updateModelImportStatus(
+                        "Model import interrupted. Select the downloaded GGUF again; " +
+                            "the original file was not changed.", "interrupted"
+                    )
+                    throw cancel
+                } catch (error: Exception) {
+                    updateModelImportStatus(
+                        "MODEL IMPORT FAILED: " +
+                            (error.message ?: "Could not read the selected GGUF.") +
+                            " Check free storage and confirm that this is the official " +
+                            "Qwen3-1.7B-Q4_K_M.gguf, not a 0.6B model.", "failed"
+                    )
+                    Toast.makeText(
+                        this@MainActivity,
+                        "Model import failed. Open Settings for the exact reason.",
+                        Toast.LENGTH_LONG
+                    ).show()
+                } finally {
+                    if (retainedPermission) {
+                        runCatching {
+                            contentResolver.releasePersistableUriPermission(
+                                selected, Intent.FLAG_GRANT_READ_URI_PERMISSION
+                            )
+                        }
+                    }
+                    modelImportRunning = false
+                }
+            }
+        }
+    }
+
+    private fun selectOfflineModelFromFiles() {
+        modelSetupRequested = true
+        updateModelImportStatus(
+            "Choose the downloaded Qwen3-1.7B-Q4_K_M.gguf from Files.",
+            "selecting"
+        )
+        try {
+            importModelLauncher.launch(arrayOf("*/*"))
+        } catch (failure: Exception) {
+            updateModelImportStatus(
+                "MODEL IMPORT FAILED: Android could not open Files. " +
+                    (failure.message ?: "Try again from Settings."), "failed"
+            )
+        }
+    }
+
     /** Only activity foreground interactions renew the idle timeout. */
     private fun resetForegroundIdleTimer() {
         idleLockHandler.removeCallbacks(idleLockRunnable)
@@ -2590,6 +2705,21 @@ class MainActivity :
     ) {
 
         super.onCreate(savedInstanceState)
+        val modelPrefs = getSharedPreferences("astra", Context.MODE_PRIVATE)
+        val previousStage = modelPrefs.getString("astra_model_import_stage", "idle")
+        modelImportStatus = if (previousStage == "copying" ||
+            previousStage == "selecting"
+        ) {
+            "Previous model import was interrupted by an Android restart or " +
+                "file-picker transition. Choose the Qwen3 1.7B GGUF again; " +
+                "your original downloaded file remains unchanged."
+        } else {
+            modelPrefs.getString("astra_model_import_status", "").orEmpty()
+        }
+        modelSetupRequested = previousStage in setOf("copying", "selecting")
+        if (modelSetupRequested) {
+            updateModelImportStatus(modelImportStatus, "interrupted")
+        }
         // A dynamically registered system screen-off receiver needs no
         // extra permission. onPause/onStop remain fallback stop paths if
         // registration fails on a particular Android implementation.
@@ -2823,15 +2953,24 @@ class MainActivity :
                 var languageBenchmarkJob by remember {
                     mutableStateOf<kotlinx.coroutines.Job?>(null)
                 }
-                var modelImportRunning by remember { mutableStateOf(false) }
-                var modelImportStatus by remember { mutableStateOf("") }
                 var confirmOneTimeModelDownload by remember { mutableStateOf(false) }
                 var modelDownloadJob by remember {
                     mutableStateOf<kotlinx.coroutines.Job?>(null)
                 }
 
-                var tab by remember {
+                var tab by rememberSaveable {
                     mutableIntStateOf(0)
+                }
+                // A Files selection may return after lock-screen recomposition.
+                // Bring the verified progress/error back to Settings once the
+                // owner has unlocked their private workspace.
+                LaunchedEffect(modelSetupRequested, workspaceUnlocked) {
+                    if (modelSetupRequested &&
+                        (!secureLockEnabled || workspaceUnlocked)
+                    ) {
+                        tab = 4
+                        modelSetupRequested = false
+                    }
                 }
                 // Re-open the subject catalog instead of retaining an old topic.
                 var studyOpenToken by remember { mutableIntStateOf(0) }
@@ -4131,42 +4270,6 @@ class MainActivity :
                     )
                 }
 
-                val importModelLauncher =
-                    rememberLauncherForActivityResult(
-                        ActivityResultContracts.OpenDocument()
-                    ) { selected ->
-                        if (selected != null && !modelImportRunning &&
-                            offlineJob?.isActive != true && !offlineModelTestRunning) {
-                            modelImportRunning = true
-                            modelImportStatus = "Importing a locally saved model..."
-                            researchScope.launch {
-                                try {
-                                    val bytes = AstraModelImport.importDocument(
-                                        applicationContext, selected
-                                    ) { copied ->
-                                        withContext(Dispatchers.Main) {
-                                            modelImportStatus = "Importing offline model: " +
-                                                (copied / (1024 * 1024)) + " MiB..."
-                                        }
-                                    }
-                                    modelImportStatus =
-                                        "MODEL READY ON THIS PHONE · " +
-                                            (bytes / (1024 * 1024)) + " MiB verified. " +
-                                            "No network was used."
-                                } catch (cancel: kotlinx.coroutines.CancellationException) {
-                                    modelImportStatus = "Model import cancelled."
-                                    throw cancel
-                                } catch (error: Exception) {
-                                    modelImportStatus =
-                                        "MODEL IMPORT FAILED: " +
-                                            (error.message ?: "Cannot read the model document.")
-                                } finally {
-                                    modelImportRunning = false
-                                }
-                            }
-                        }
-                    }
-
                 val microphonePermission =
                     rememberLauncherForActivityResult(
                         ActivityResultContracts.RequestPermission()
@@ -5117,119 +5220,42 @@ class MainActivity :
                                         thinking = offlineJob?.isActive == true
                                     )
                                 }
-                                DropdownMenu(
+                                AstraNavigationTray(
                                     expanded = navigationPopupOpen,
-                                    onDismissRequest = { navigationPopupOpen = false }
-                                ) {
-                                    listOf(
-                                        "Chat", "Tasks", "Notes", "Tools", "Settings", "Study"
-                                    ).forEachIndexed { index, title ->
-                                        DropdownMenuItem(
-                                            text = {
-                                                Row(
-                                                    verticalAlignment = Alignment.CenterVertically,
-                                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                                                ) {
-                                                    AstraNavigationGlyph(
-                                                        section = AstraNavSection.entries[index],
-                                                        tint = MaterialTheme.colorScheme.primary
-                                                    )
-                                                    Text(title, style = MaterialTheme.typography.bodyMedium)
-                                                    if (tab == index) Text("✓")
-                                                }
-                                            },
-                                            onClick = {
-                                                if (index == 5) studyOpenToken++
-                                                tab = index
-                                                navigationPopupOpen = false
-                                            }
-                                        )
-                                    }
-                                    if (tab == 0) {
-                                        HorizontalDivider()
-                                        Text(
-                                            "CHAT OPTIONS",
-                                            modifier = Modifier.padding(
-                                                start = 16.dp, top = 8.dp, bottom = 4.dp
-                                            ),
-                                            style = MaterialTheme.typography.labelSmall,
-                                            color = MaterialTheme.colorScheme.primary
-                                        )
-
-
-                                        DropdownMenuItem(
-                                            text = { Text("Find in chat") },
-                                            onClick = {
-                                                navigationPopupOpen = false
+                                    selectedTab = tab,
+                                    canReadLastReply = history.any { it.role == "Astra" },
+                                    missionControlExpanded = commandDeckExpanded,
+                                    onDismiss = { navigationPopupOpen = false },
+                                    onNavigate = { index ->
+                                        if (index == 5) studyOpenToken++
+                                        tab = index
+                                        navigationPopupOpen = false
+                                    },
+                                    onAction = { action ->
+                                        navigationPopupOpen = false
+                                        when (action) {
+                                            AstraTrayAction.FIND_IN_CHAT -> {
                                                 findInChatQuery = ""
                                                 showFindInChat = true
                                             }
-                                        )
-
-                                        DropdownMenuItem(
-                                            text = { Text("Search all local memory") },
-                                            onClick = {
-                                                navigationPopupOpen = false
+                                            AstraTrayAction.MEMORY_SEARCH -> {
                                                 memorySearchQuery = ""
                                                 showMemorySearch = true
                                             }
-                                        )
-
-                                        DropdownMenuItem(
-                                            text = {
-                                                Text("Copy chat")
-                                            },
-                                            onClick = {
-
-                                                navigationPopupOpen = false
-
-                                                copyText(
-                                                    exportConversation(
-                                                        history
-                                                    )
-                                                )
+                                            AstraTrayAction.COPY_CHAT -> {
+                                                copyText(exportConversation(history))
                                             }
-                                        )
-
-                                        DropdownMenuItem(
-                                            text = {
-                                                Text("Share chat")
-                                            },
-                                            onClick = {
-
-                                                navigationPopupOpen = false
-
-                                                shareText(
-                                                    exportConversation(
-                                                        history
-                                                    )
-                                                )
+                                            AstraTrayAction.SHARE_CHAT -> {
+                                                shareText(exportConversation(history))
                                             }
-                                        )
-
-                                        DropdownMenuItem(
-                                            text = {
-                                                Text("New conversation")
-                                            },
-                                            onClick = {
-
-                                                navigationPopupOpen = false
-
+                                            AstraTrayAction.NEW_CONVERSATION -> {
                                                 startNewConversation()
                                             }
-                                        )
-                                        DropdownMenuItem(
-                                            text = { Text("Conversations") },
-                                            onClick = {
-                                                navigationPopupOpen = false
+                                            AstraTrayAction.CONVERSATIONS -> {
                                                 chatSearchQuery = ""
                                                 showChatSwitcher = true
                                             }
-                                        )
-                                        DropdownMenuItem(
-                                            text = { Text("Rename current chat") },
-                                            onClick = {
-                                                navigationPopupOpen = false
+                                            AstraTrayAction.RENAME_CHAT -> {
                                                 renameActiveChat = true
                                                 renameChatDraft = activeChatTitle.ifBlank {
                                                     history.firstOrNull {
@@ -5238,33 +5264,21 @@ class MainActivity :
                                                 }
                                                 returnToChatLibrary = false
                                             }
-                                        )
-                                        DropdownMenuItem(
-                                            text = { Text(if (commandDeckExpanded) "Hide mission control" else "Show mission control") },
-                                            onClick = {
+                                            AstraTrayAction.MISSION_CONTROL -> {
                                                 commandDeckExpanded = !commandDeckExpanded
-                                                navigationPopupOpen = false
                                             }
-                                        )
-                                        DropdownMenuItem(
-                                            text = { Text("Read last response aloud") },
-                                            enabled = history.any { it.role == "Astra" },
-                                            onClick = {
-                                                navigationPopupOpen = false
-                                                val reply = history.lastOrNull { it.role == "Astra" }?.text.orEmpty()
-                                                if (reply.isNotBlank()) speak(reply, localOnlyTts)
+                                            AstraTrayAction.READ_LAST_REPLY -> {
+                                                val last = history.lastOrNull {
+                                                    it.role == "Astra"
+                                                }?.text.orEmpty()
+                                                if (last.isNotBlank()) speak(last, localOnlyTts)
                                             }
-                                        )
-                                        DropdownMenuItem(
-                                            text = { Text("Clear current chat") },
-                                            onClick = {
-                                                navigationPopupOpen = false
+                                            AstraTrayAction.CLEAR_CHAT -> {
                                                 showClearDialog = true
                                             }
-                                        )
+                                        }
                                     }
-
-                                }
+                                )
                             }
 
                             // Visible build identification makes old APKs unmistakable.
@@ -5302,6 +5316,45 @@ class MainActivity :
                             // ========================================
 
                             0 -> {
+
+                                // File picker may have triggered app-lock/recomposition:
+                                // the import outcome is always visible from chat too.
+                                // The Status view in Settings retains full details.
+                                if (modelImportStatus.isNotBlank()) {
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(top = 9.dp)
+                                            .background(
+                                                AstraAurora.raised,
+                                                RoundedCornerShape(18.dp)
+                                            )
+                                            .padding(start = 12.dp, end = 5.dp, top = 7.dp, bottom = 7.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            modelImportStatus,
+                                            modifier = Modifier.weight(1f),
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = if (modelImportStatus.contains("FAILED") ||
+                                                modelImportStatus.contains("interrupted", true))
+                                                MaterialTheme.colorScheme.error
+                                            else AstraAurora.ink,
+                                            maxLines = 3,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                        TextButton(onClick = { tab = 4 }) {
+                                            Text("Model setup")
+                                        }
+                                        if (!modelImportRunning) {
+                                            TextButton(onClick = {
+                                                updateModelImportStatus("", "idle")
+                                            }) {
+                                                Text("×")
+                                            }
+                                        }
+                                    }
+                                }
 
                                 // Dashboard is on demand to maximize chat space.
                                 AnimatedVisibility(
@@ -6049,7 +6102,7 @@ class MainActivity :
                                                 offlineJob?.isActive != true &&
                                                 !offlineModelTestRunning,
                                             onClick = {
-                                                importModelLauncher.launch(arrayOf("*/*"))
+                                                selectOfflineModelFromFiles()
                                             }
                                         ) {
                                             Text(
@@ -6060,16 +6113,20 @@ class MainActivity :
                                         if (modelImportStatus.isNotBlank()) {
                                             Text(
                                                 modelImportStatus,
-                                                style = MaterialTheme.typography.bodySmall,
-                                                color = MaterialTheme.colorScheme.primary
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                color = if (modelImportStatus.contains("FAILED") ||
+                                                    modelImportStatus.contains("interrupted", true))
+                                                    MaterialTheme.colorScheme.error
+                                                else AstraAurora.mint
                                             )
                                         }
                                         Text(
                                             "The full APK includes model weights. With the smaller APK, " +
                                             "you can import a GGUF or previous large APK/ZIP " +
                                             "without downloading the model again. " +
-                                            "Keep at least 1 GB of free storage for installation " +
-                                            "and extraction. Responses may be slow on older phones. " +
+                                            "Keep at least 1.3 GB of additional free phone storage for " +
+                                            "copying and verifying the 1.7B model. " +
+                                            "Responses may be slow on older phones. " +
                                             "Astra does not transmit these messages to a server.",
                                             style = MaterialTheme.typography.bodySmall
                                         )

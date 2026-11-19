@@ -12,6 +12,7 @@ GRADLE = ROOT / "android/app/build.gradle.kts"
 BRAIN = ROOT / "android/app/src/main/java/com/astra/agent/AstraOnDeviceBrain.kt"
 IMPORT = ROOT / "android/app/src/main/java/com/astra/agent/AstraModelImport.kt"
 CONTEXT = ROOT / "android/app/src/main/java/com/astra/agent/AstraConversationContext.kt"
+TRAY = ROOT / "android/app/src/main/java/com/astra/agent/AstraNavigationTray.kt"
 
 
 def main():
@@ -20,10 +21,11 @@ def main():
     brain = BRAIN.read_text(encoding="utf-8")
     importer = IMPORT.read_text(encoding="utf-8")
     conversation_context = CONTEXT.read_text(encoding="utf-8")
+    tray = TRAY.read_text(encoding="utf-8")
 
     required = {
         "Astra icon opens navigation": 'clickable { navigationPopupOpen = true }',
-        "Astra logo contains chat/settings options": 'listOf(\n                                        "Chat", "Tasks", "Notes", "Tools", "Settings", "Study"',
+        "Astra logo opens the new navigation sheet": 'AstraNavigationTray(',
         "Chat deck starts collapsed": 'var commandDeckExpanded by remember { mutableStateOf(false) }',
         "Chat takes remaining space": 'Modifier.weight(1f)',
         "Qwen is installed on device": 'AstraOnDeviceBrain(applicationContext',
@@ -35,7 +37,7 @@ def main():
         "On-phone source extraction is integrated": 'AstraGroundedMemory.retrieve(',
         "Memory analysis UI remains in icon menu": 'Text("Ask with evidence")',
         "Memory recall stays off-device model prompt": 'AstraMemoryRecall.find(',
-        "Compact logo offers memory search": 'Text("Search all local memory")',
+        "Compact logo offers memory search": 'AstraTrayAction.MEMORY_SEARCH',
         "Strict on-device AI challenge is wired in": 'AstraOfflineSelfTest.evaluate(',
         "Build identity is in the chat header": '"●  LOCAL  ·  v" + ASTRA_VERSION',
     }
@@ -48,6 +50,15 @@ def main():
     for description, value in required.items():
         if value not in app:
             raise RuntimeError(f"Missing {description}: {value!r}")
+
+    for title in ('"Chat"', '"Tasks"', '"Notes"', '"Tools"', '"Settings"', '"Study"'):
+        if title not in tray:
+            raise RuntimeError(f"Navigation tray lost destination: {title}")
+    for action in ("NEW_CONVERSATION", "CONVERSATIONS", "MEMORY_SEARCH",
+                   "FIND_IN_CHAT", "COPY_CHAT", "SHARE_CHAT", "RENAME_CHAT",
+                   "MISSION_CONTROL", "READ_LAST_REPLY", "CLEAR_CHAT"):
+        if "AstraTrayAction." + action not in app:
+            raise RuntimeError(f"Navigation tray lost action routing: {action}")
 
     for description, pattern in forbidden.items():
         if re.search(pattern, app):
@@ -75,7 +86,7 @@ def main():
 
     if '?: "0.12.1"' not in config or "?: 28" not in config:
         raise RuntimeError("Release identity is not Astra 0.12.1 (versionCode 28)")
-    print("PASS: Astra icon menu, compact chat, offline model, version stamp")
+    print("PASS: Astra core side tray, compact chat, offline model, version stamp")
     print("PASS: no legacy bottom tabs, top-right overflow, or obsolete fallback")
 
 
