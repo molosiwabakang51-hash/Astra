@@ -598,7 +598,58 @@ internal object AstraSubjectAtlas {
     private val byId: Map<String, Entry> = entries.associateBy { it.id }
 
     fun respond(raw: String): String? {
-        val command = raw.trim().lowercase(Locale.ROOT).trimEnd('?', '!')
+        val command = raw.trim().lowercase(Locale.ROOT)
+            .replace(Regex("""\s+"""), " ")
+            .trimEnd('?', '!', '.', ' ')
+        if (command.length > 100) return null
+        if (command in setOf("atlas", "atlas subjects", "study subjects", "atlas categories")) {
+            val counts = entries.groupingBy { it.category }.eachCount()
+            return buildString {
+                appendLine("ASTRA SUBJECT ATLAS · " + entries.size + " FIELDS")
+                appendLine("15 academic and practical categories. These are offline study roadmaps, not verified complete courses.")
+                appendLine()
+                counts.forEach { (category, count) ->
+                    appendLine("• " + category + ": " + count)
+                }
+                appendLine()
+                append("Type 'atlas search biology', 'atlas category Physical Sciences', " +
+                    "or choose a subject in Study.")
+            }.trim()
+        }
+        val query = Regex("""^(?:atlas|study) search ([\p{L}\p{N} _-]{2,65})$""")
+            .matchEntire(command)?.groupValues?.get(1)
+        if (query != null) {
+            val terms = query.split(Regex("""\s+""")).filter { it.length >= 2 }
+            val matches = entries.filter { entry ->
+                val haystack = (entry.title + " " + entry.category + " " +
+                    entry.modules.joinToString(" ")).lowercase(Locale.ROOT)
+                terms.all { it in haystack }
+            }
+            return if (matches.isEmpty()) {
+                "No subject matched '" + query + "'. Try a broader term or 'atlas categories'."
+            } else buildString {
+                appendLine("ATLAS RESULTS · " + matches.size + " subjects for '" + query + "'")
+                matches.take(25).forEach { entry ->
+                    appendLine("• " + entry.title + " [" + entry.category + "]")
+                    appendLine("  " + "atlas syllabus " + entry.id)
+                }
+                if (matches.size > 25) appendLine(
+                    "Showing the first 25; refine your search for the remaining subjects.")
+            }.trim()
+        }
+        val categoryQuery = Regex("""^atlas category ([\p{L}\p{N}& ,'-]{3,65})$""")
+            .matchEntire(command)?.groupValues?.get(1)
+        if (categoryQuery != null) {
+            val category = entries.map { it.category }.distinct().firstOrNull {
+                it.equals(categoryQuery, ignoreCase = true)
+            } ?: return "Unknown category. Say 'atlas categories' to see available categories."
+            val matches = entries.filter { it.category == category }
+            return buildString {
+                appendLine("ATLAS CATEGORY · " + category)
+                appendLine(matches.size.toString() + " available offline roadmaps")
+                matches.forEach { appendLine("• " + it.title + ": atlas syllabus " + it.id) }
+            }.trim()
+        }
         val id = Regex("^atlas syllabus ([a-z0-9_]+)$")
             .matchEntire(command)?.groupValues?.get(1) ?: return null
         val entry = byId[id] ?: return null
