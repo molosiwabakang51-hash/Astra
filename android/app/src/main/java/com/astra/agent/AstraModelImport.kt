@@ -11,6 +11,7 @@ import kotlinx.coroutines.withContext
 import java.io.BufferedInputStream
 import java.io.File
 import java.io.FileOutputStream
+import java.io.FilterInputStream
 import java.io.InputStream
 import java.io.OutputStream
 import java.security.MessageDigest
@@ -98,11 +99,12 @@ internal object AstraModelImport {
                 ?: error("Cannot open selected model document.")
             val digest = MessageDigest.getInstance("SHA-256")
             val total = input.use { source ->
-                BufferedInputStream(source, 64 * 1024).use { buffered ->
-                    val signature = ByteArray(4)
-                    buffered.mark(4)
-                    val signatureSize = buffered.read(signature)
-                    buffered.reset()
+                // BufferedInputStream may misinterpret a zero-byte provider
+                // read as EOF. Guard the raw provider before buffering.
+                BufferedInputStream(guardTransientEmptyReads(source), 64 * 1024)
+                    .use { buffered ->
+                    val signature = readPrefix4(buffered)
+                    val signatureSize = signature.size
                     val isArchive = signatureSize == 4 &&
                         signature[0] == 'P'.code.toByte() &&
                         signature[1] == 'K'.code.toByte()
@@ -122,6 +124,14 @@ internal object AstraModelImport {
                             }
                         }.getOrNull()
                         if (declaredBytes != null) {
+                            require(declaredBytes in
+                                ADVANCED_MIN_BYTES..ADVANCED_MAX_BYTES
+                            ) {
+                                "Selected GGUF is ${declaredBytes / 1048576L} MiB; " +
+                                    "the verified Qwen3 1.7B Q4_K_M model is " +
+                                    "approximately 1.2 GiB. Your file may be " +
+                                    "incomplete, a different quantization, or 0.6B."
+                            }
                             val available = StatFs(dir.absolutePath).availableBytes
                             require(hasSpaceForKnownGguf(available, declaredBytes)) {
                                 val required = maxOf(MIN_BYTES, declaredBytes) + FREE_HEADROOM
@@ -165,6 +175,55 @@ internal object AstraModelImport {
         } finally {
             if (partial.exists()) partial.delete()
         }
+    }
+
+    /**
+     * A broken Android DocumentsProvider can return 0 for a positive-sized
+     * bulk read, even without reaching EOF. BufferedInputStream may treat
+     * that result as -1, creating a false "unsupported GGUF" outcome.
+     * Retry transient empties at the original provider boundary and give up
+     * after 17 consecutive empty reads, never looping forever.
+     */
+    internal fun guardTransientEmptyReads(source: InputStream): InputStream =
+        object : FilterInputStream(source) {
+            override fun read(b: ByteArray, off: Int, len: Int): Int {
+                if (len == 0) return 0
+                var stalled = 0
+                while (true) {
+                    val bytes = super.read(b, off, len)
+                    if (bytes != 0) return bytes
+                    require(++stalled <= 16) {
+                        "Selected model file provider stopped responding."
+                    }
+                }
+            }
+        }
+
+    /**
+     * Peek at the first four bytes without consuming them. Android Files and
+     * cloud-backed document providers are allowed to perform short reads.
+     * The model importer must still detect GGUF/ZIP reliably and must never
+     * spin on repeated empty reads.
+     */
+    internal fun readPrefix4(input: BufferedInputStream): ByteArray {
+        val signature = ByteArray(4)
+        input.mark(4)
+        var size = 0
+        var stalled = 0
+        while (size < signature.size) {
+            val count = input.read(signature, size, signature.size - size)
+            if (count < 0) break
+            if (count == 0) {
+                require(++stalled <= 16) {
+                    "Selected model file provider stopped responding."
+                }
+            } else {
+                size += count
+                stalled = 0
+            }
+        }
+        input.reset()
+        return signature.copyOf(size)
     }
 
     // Exposed within the module so JVM tests can validate nested APK ZIP
