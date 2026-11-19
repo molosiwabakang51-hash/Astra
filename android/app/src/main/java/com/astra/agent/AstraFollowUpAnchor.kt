@@ -69,7 +69,7 @@ internal object AstraFollowUpAnchor {
     }
 
     private fun specificNumberedItem(reply: String, index: Int): String? {
-        val marker = Regex("""^\\s*(?:#{1,6}\\s*)?(?:\\*\\*)?(\\d+)[.)]""")
+        val marker = Regex("""^\s*(?:#{1,6}\s*)?(?:\*\*)?(\d+)[.)]""")
         val lines = reply.lines()
         val start = lines.indexOfFirst { line ->
             marker.find(line)?.groupValues?.getOrNull(1)?.toIntOrNull() == index
