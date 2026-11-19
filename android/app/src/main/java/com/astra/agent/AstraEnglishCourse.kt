@@ -189,7 +189,9 @@ internal class AstraEnglishCourse(
         val command = raw.trim().lowercase(Locale.ROOT).trimEnd('?', '!', '.').trim()
         if (command.length > 90) return null
         return when (command) {
-            "english course", "english syllabus", "learn english", "start english course", "study english" -> syllabus()
+            "english course", "english syllabus", "learn english",
+            "start english course", "study english", "teach me english",
+            "english lessons" -> syllabus()
             "english progress", "my english progress" -> progress()
             "next english lesson" -> lesson((readInt(LAST, 0) + 1).coerceIn(1, lessons.size))
             "english quiz", "quiz me on english" -> quiz(readInt(LAST, 1).coerceIn(1, lessons.size))
@@ -227,6 +229,8 @@ internal class AstraEnglishCourse(
         }
         appendLine()
         append("Choose 'english lesson 1', 'next english lesson', 'english quiz 1', or 'english progress'.")
+        appendLine()
+        append("For detailed cases and exercises: 'english workshop'.")
     }.trim()
 
     private fun lesson(index: Int): String {
