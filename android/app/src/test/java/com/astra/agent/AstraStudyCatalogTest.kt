@@ -24,7 +24,7 @@ class AstraStudyCatalogTest {
     @Test fun studyOpensCatalogWithoutAutostartingFinance() {
         assertEquals("Study", AstraWelcomePolicy.commands.first())
         assertFalse(AstraWelcomePolicy.commands.first().contains("finance", ignoreCase = true))
-        assertEquals(13, AstraStudyCatalog.subjects.size)
+        assertEquals(13 + AstraSubjectAtlas.entries.size, AstraStudyCatalog.subjects.size)
     }
 
     @Test fun russianStudyHubExposesRealOfflineLessonsAndProgress() {
