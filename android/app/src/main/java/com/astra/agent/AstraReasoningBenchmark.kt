@@ -66,14 +66,43 @@ internal object AstraReasoningBenchmark {
                 .trim().take(120)
         )
 
+    /**
+     * No partial scores: interruptions, duplicate cases and wrong model
+     * labels cannot be mistaken for an A/B improvement. Count each exact
+     * problem/mode pair once. A caller cannot fabricate a complete run by
+     * repeating an easy passing probe.
+     */
+    fun isComplete(samples: List<Sample>): Boolean =
+        samples.size == Probe.entries.size * Mode.entries.size &&
+            samples.map { it.probe to it.mode }.toSet().size == samples.size &&
+            Probe.entries.all { probe ->
+                Mode.entries.all { mode ->
+                    samples.any { it.probe == probe && it.mode == mode }
+                }
+            }
+
     fun render(samples: List<Sample>, loadedModel: String?): String {
+        val expectedModel = "Qwen3 1.7B · Q4_K_M"
+        if (!isComplete(samples) || loadedModel != expectedModel) {
+            return buildString {
+                appendLine("ON-DEVICE 1.7B REASONING A/B")
+                appendLine("Model loaded: " + (loadedModel ?: "unverified"))
+                appendLine("INCOMPLETE OR UNVERIFIED RUN — NO SCORE.")
+                append("All distinct questions must finish in both modes " +
+                    "on the verified 1.7B model.")
+            }
+        }
         val fast = samples.filter { it.mode == Mode.FAST }
         val careful = samples.filter { it.mode == Mode.CAREFUL }
         return buildString {
             appendLine("ON-DEVICE 1.7B REASONING A/B")
-            appendLine("Loaded model: " + (loadedModel ?: "unverified"))
+            appendLine("Model loaded: " + expectedModel)
             appendLine("Fast: " + fast.count { it.passed } + "/" + fast.size)
             appendLine("Careful: " + careful.count { it.passed } + "/" + careful.size)
+            appendLine("Fast average elapsed: " +
+                fast.map { it.milliseconds }.average().toLong() + " ms")
+            appendLine("Careful average elapsed: " +
+                careful.map { it.milliseconds }.average().toLong() + " ms")
             for (result in samples) {
                 appendLine(
                     (if (result.passed) "PASS" else "UNVERIFIED") + " " +
