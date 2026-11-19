@@ -9,6 +9,8 @@ import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
+import java.io.InputStream
+import java.io.OutputStream
 import java.net.URL
 import java.security.MessageDigest
 import javax.net.ssl.HttpsURLConnection
@@ -87,23 +89,12 @@ internal object AstraModelDownload {
             currentCoroutineContext().ensureActive()
             connection.inputStream.use { input ->
                 FileOutputStream(partial, transfer.append).use { output ->
-                    val data = ByteArray(1024 * 1024)
-                    var total = usedBytes
-                    var lastUpdate = 0L
-                    while (true) {
-                        currentCoroutineContext().ensureActive()
-                        val n = input.read(data)
-                        if (n < 0) break
-                        total += n
-                        require(total <= transfer.totalBytes && total <= MAX_BYTES) {
-                            "The model download exceeded its declared size."
-                        }
-                        output.write(data, 0, n)
-                        if (total - lastUpdate >= 16L * 1024 * 1024) {
-                            onProgress(total, transfer.totalBytes)
-                            lastUpdate = total
-                        }
-                    }
+                    // A provider or TLS input stream returning 0 must not
+                    // create an unbounded CPU loop. A recoverable failure
+                    // retains the partial file for the next ranged request.
+                    copyResponse(
+                        input, output, usedBytes, transfer.totalBytes, onProgress
+                    )
                     currentCoroutineContext().ensureActive()
                     output.fd.sync()
                 }
@@ -125,6 +116,52 @@ internal object AstraModelDownload {
         } finally {
             connection.disconnect()
         }
+    }
+
+    /**
+     * Copy a response body with bounded progress and cancellation. A 0-byte
+     * bulk read is neither EOF nor useful progress; retry up to 16 times
+     * before surfacing a resumable error. Tested without an Android network.
+     */
+    internal suspend fun copyResponse(
+        input: InputStream,
+        output: OutputStream,
+        initialBytes: Long,
+        expectedBytes: Long,
+        onProgress: suspend (Long, Long) -> Unit
+    ): Long {
+        require(initialBytes >= 0L && expectedBytes >= initialBytes &&
+            expectedBytes <= MAX_BYTES) {
+            "Invalid expected offline model transfer size."
+        }
+        val data = ByteArray(1024 * 1024)
+        var total = initialBytes
+        var lastUpdate = initialBytes
+        var consecutiveEmptyReads = 0
+        while (true) {
+            currentCoroutineContext().ensureActive()
+            val count = input.read(data)
+            if (count < 0) break
+            if (count == 0) {
+                require(++consecutiveEmptyReads <= 16) {
+                    "Model server stopped sending data. Tap Download once " +
+                        "again to resume without starting over."
+                }
+                continue
+            }
+            consecutiveEmptyReads = 0
+            total += count
+            require(total <= expectedBytes && total <= MAX_BYTES) {
+                "The model download exceeded its declared size."
+            }
+            output.write(data, 0, count)
+            if (total - lastUpdate >= 16L * 1024 * 1024) {
+                onProgress(total, expectedBytes)
+                lastUpdate = total
+            }
+        }
+        currentCoroutineContext().ensureActive()
+        return total
     }
 
     private suspend fun sha256(file: File): String {
