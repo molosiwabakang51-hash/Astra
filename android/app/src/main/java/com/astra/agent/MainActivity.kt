@@ -27,6 +27,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.lifecycle.lifecycleScope
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -2088,6 +2089,66 @@ class MainActivity :
     private var backgroundSessionWasUnlocked = false
     private var authenticationInProgress = false
 
+    // File selection launches a separate Android Activity. If Astra's
+    // biometric lock covers the private Compose tree while Files is open,
+    // Compose-scoped launchers and model-import state disappear. Register
+    // once on the Activity, retain the Settings destination, and complete
+    // import in a lifecycle-aware Activity scope instead.
+    private var modelImportRunning by mutableStateOf(false)
+    private var modelImportStatus by mutableStateOf("")
+    private var tab by mutableIntStateOf(0)
+    private val importModelDocument =
+        registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+            tab = 4 // Always return to model Settings, not an empty new chat.
+            when {
+                uri == null -> {
+                    modelImportStatus =
+                        "No model selected. Choose the verified Qwen3 1.7B Q4_K_M GGUF."
+                }
+                modelImportRunning -> {
+                    modelImportStatus =
+                        "A model transfer is already running; finish or cancel it first."
+                }
+                else -> {
+                    modelImportRunning = true
+                    modelImportStatus =
+                        "Opening selected Qwen3 1.7B document for local import..."
+                    lifecycleScope.launch {
+                        try {
+                            val bytes = AstraModelImport.importDocument(
+                                applicationContext, uri
+                            ) { copied ->
+                                withContext(Dispatchers.Main.immediate) {
+                                    modelImportStatus =
+                                        "Importing Qwen3 1.7B: " +
+                                            (copied / 1048576L) + " MiB copied..."
+                                }
+                            }
+                            modelImportStatus =
+                                "QWEN3 1.7B READY · " + (bytes / 1048576L) +
+                                    " MiB SHA-256 verified on this phone. " +
+                                    "Original download is unchanged."
+                        } catch (cancel: CancellationException) {
+                            modelImportStatus =
+                                "Model import stopped before verification. " +
+                                    "Select the local file again to retry."
+                            throw cancel
+                        } catch (error: Exception) {
+                            modelImportStatus = "MODEL IMPORT FAILED: " +
+                                (error.message ?: "Cannot read the selected document.")
+                            Toast.makeText(
+                                this@MainActivity,
+                                "Model import failed. Open Settings for the exact reason.",
+                                Toast.LENGTH_LONG
+                            ).show()
+                        } finally {
+                            modelImportRunning = false
+                        }
+                    }
+                }
+            }
+        }
+
     /** Only activity foreground interactions renew the idle timeout. */
     private fun resetForegroundIdleTimer() {
         idleLockHandler.removeCallbacks(idleLockRunnable)
@@ -2590,6 +2651,8 @@ class MainActivity :
     ) {
 
         super.onCreate(savedInstanceState)
+        tab = savedInstanceState?.getInt("astra_selected_tab", 0)
+            ?.coerceIn(0, 5) ?: 0
         // A dynamically registered system screen-off receiver needs no
         // extra permission. onPause/onStop remain fallback stop paths if
         // registration fails on a particular Android implementation.
@@ -2823,16 +2886,13 @@ class MainActivity :
                 var languageBenchmarkJob by remember {
                     mutableStateOf<kotlinx.coroutines.Job?>(null)
                 }
-                var modelImportRunning by remember { mutableStateOf(false) }
-                var modelImportStatus by remember { mutableStateOf("") }
                 var confirmOneTimeModelDownload by remember { mutableStateOf(false) }
                 var modelDownloadJob by remember {
                     mutableStateOf<kotlinx.coroutines.Job?>(null)
                 }
 
-                var tab by remember {
-                    mutableIntStateOf(0)
-                }
+                // Keep the current destination on the Activity: opening Files
+                // or authenticating can temporarily dispose this private UI.
                 // Re-open the subject catalog instead of retaining an old topic.
                 var studyOpenToken by remember { mutableIntStateOf(0) }
 
@@ -4131,41 +4191,10 @@ class MainActivity :
                     )
                 }
 
-                val importModelLauncher =
-                    rememberLauncherForActivityResult(
-                        ActivityResultContracts.OpenDocument()
-                    ) { selected ->
-                        if (selected != null && !modelImportRunning &&
-                            offlineJob?.isActive != true && !offlineModelTestRunning) {
-                            modelImportRunning = true
-                            modelImportStatus = "Importing a locally saved model..."
-                            researchScope.launch {
-                                try {
-                                    val bytes = AstraModelImport.importDocument(
-                                        applicationContext, selected
-                                    ) { copied ->
-                                        withContext(Dispatchers.Main) {
-                                            modelImportStatus = "Importing offline model: " +
-                                                (copied / (1024 * 1024)) + " MiB..."
-                                        }
-                                    }
-                                    modelImportStatus =
-                                        "MODEL READY ON THIS PHONE · " +
-                                            (bytes / (1024 * 1024)) + " MiB verified. " +
-                                            "No network was used."
-                                } catch (cancel: kotlinx.coroutines.CancellationException) {
-                                    modelImportStatus = "Model import cancelled."
-                                    throw cancel
-                                } catch (error: Exception) {
-                                    modelImportStatus =
-                                        "MODEL IMPORT FAILED: " +
-                                            (error.message ?: "Cannot read the model document.")
-                                } finally {
-                                    modelImportRunning = false
-                                }
-                            }
-                        }
-                    }
+                // Model selection is owned by MainActivity, not by this
+                // private Compose subtree. The latter can be removed by
+                // biometric lock while Android's Files picker is foregrounded.
+                // The Activity callback keeps importing and returns to Settings.
 
                 val microphonePermission =
                     rememberLauncherForActivityResult(
@@ -6049,7 +6078,8 @@ class MainActivity :
                                                 offlineJob?.isActive != true &&
                                                 !offlineModelTestRunning,
                                             onClick = {
-                                                importModelLauncher.launch(arrayOf("*/*"))
+                                                tab = 4
+                                                importModelDocument.launch(arrayOf("*/*"))
                                             }
                                         ) {
                                             Text(
@@ -6068,8 +6098,9 @@ class MainActivity :
                                             "The full APK includes model weights. With the smaller APK, " +
                                             "you can import a GGUF or previous large APK/ZIP " +
                                             "without downloading the model again. " +
-                                            "Keep at least 1 GB of free storage for installation " +
-                                            "and extraction. Responses may be slow on older phones. " +
+                                            "Allow at least 1.3 GB of additional free phone storage " +
+                                            "for the verified 1.7B import. A different GGUF version " +
+                                            "or a partial download will be rejected with a reason. " +
                                             "Astra does not transmit these messages to a server.",
                                             style = MaterialTheme.typography.bodySmall
                                         )
@@ -7387,6 +7418,11 @@ class MainActivity :
             }
 
         }.trim()
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        outState.putInt("astra_selected_tab", tab)
+        super.onSaveInstanceState(outState)
     }
 
     override fun onStart() {
