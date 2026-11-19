@@ -203,11 +203,28 @@ internal class AstraMultilingualTutor(
                 }
             }
         }
-        if (lower == "next language lesson") {
-            val language = current() ?: return "Select a course first: 'learn setswana'."
+        // People naturally mix a brief acknowledgement with the lesson action:
+        // "Oui next lesson s'il vous plaît". Do not pass that back to a model
+        // which may follow an unrelated older topic. A next-lesson action
+        // requires an active local language course and changes no other state.
+        val naturalNext = lower.replace('’', '\'')
+            .replace(Regex("""[!,]+"""), " ")
+            .replace(spacing, " ").trim()
+        val nextLesson = Regex(
+            """^(?:(?:oui|yes|ok|okay) )?(?:next|continue) """ +
+                """(?:(?:language|french|spanish|setswana|portuguese|german|swahili|japanese|mandarin) )?""" +
+                """lesson(?: (?:please|s'il vous plaît|s'il te plaît|svp))?$"""
+        ).matches(naturalNext)
+        if (nextLesson) {
+            val language = current() ?: return "Select a course first: 'learn french'."
             val next = (readInt(key(language, "lesson"), 1) + 1)
                 .coerceAtMost(lessonCount(language))
             return lesson(language, next)
+        }
+        // A simple course-language acknowledgement is not a random model
+        // response, a quiz answer, or an instruction to switch subjects.
+        if (lower == "oui" && current() == Language.FRENCH) {
+            return "Oui means 'yes' in French. To continue, say 'next language lesson'."
         }
         if (lower in setOf("skip language question", "skip language quiz")) {
             val language = current() ?: return "No active language quiz."
