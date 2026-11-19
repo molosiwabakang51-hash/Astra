@@ -20,7 +20,9 @@ class AstraMasterclassTest {
         assertEquals(14, AstraMasterclass.units("trading").size)
         assertEquals(16, AstraMasterclass.units("french").size)
         assertEquals(19, AstraMasterclass.units("physics").size)
-        assertEquals(92, AstraMasterclass.tracks.values.sumOf { it.size })
+        assertEquals(18, AstraMasterclass.units("russian").size)
+        assertEquals(18, AstraMasterclass.units("computing").size)
+        assertEquals(128, AstraMasterclass.tracks.values.sumOf { it.size })
         for ((id, chapters) in AstraMasterclass.tracks) {
             assertTrue(id.isNotBlank())
             assertEquals(chapters.size, chapters.map { it.title }.toSet().size)
@@ -100,6 +102,46 @@ class AstraMasterclassTest {
             .contains("No english workshop quiz"))
         assertTrue(restored.respond("english workshop next").orEmpty()
             .contains("WORKSHOP 3/15"))
+    }
+
+    @Test fun russianAndComputingSupportAllLessonsQuizzesAndIsolatedPersistence() {
+        val engine = course()
+        assertTrue(engine.respond("russian workshop")!!.contains("18 CHAPTERS"))
+        assertTrue(engine.respond("computer science workshop")!!.contains("18 CHAPTERS"))
+        assertTrue(engine.respond("computer_science workshop 1")!!
+            .contains("WORKSHOP 1/18"))
+        assertTrue(engine.respond("russian workshop 1")!!.contains("WORKSHOP 1/18"))
+        val russianCorrect = AstraMasterclass.units("russian")[0].answer
+        engine.respond("russian workshop quiz 1")
+        assertTrue(engine.respond("russian workshop answer " + russianCorrect)!!
+            .contains("Correct."))
+        assertTrue(course().respond("russian workshop progress")!!
+            .contains("Mastery quizzes passed: 1/18"))
+        assertTrue(course().respond("computing workshop progress")!!
+            .contains("Mastery quizzes passed: 0/18"))
+        assertTrue(engine.respond("computer science workshop quiz 19")!!
+            .contains("1 to 18"))
+        assertNull(engine.respond("computer science says hello"))
+    }
+
+    @Test fun addedLessonsContainActualGrammarAndComputerScienceExamples() {
+        val cases = mapOf(
+            "russian" to listOf("Cyrillic", "Genitive", "Imperfective", "motion"),
+            "computing" to listOf("Binary", "Algorithms", "Relational", "Machine learning")
+        )
+        for ((subject, titles) in cases) {
+            val chapters = AstraMasterclass.units(subject)
+            for (title in titles) {
+                assertTrue("Missing $subject chapter: $title",
+                    chapters.any { it.title.contains(title, ignoreCase = true) })
+            }
+            for (unit in chapters) {
+                assertTrue(unit.explanation.length >= 180)
+                assertTrue(unit.workedCase.length >= 95)
+                assertTrue(unit.independentExercise.length >= 80)
+                assertEquals(3, unit.choices.toSet().size)
+            }
+        }
     }
 
     @Test fun unrelatedRequestsAreNotIntercepted() {
