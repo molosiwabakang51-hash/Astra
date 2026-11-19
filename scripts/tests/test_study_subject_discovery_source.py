@@ -6,12 +6,18 @@ ROOT = Path(__file__).resolve().parents[2]
 SOURCE = (ROOT / "android/app/src/main/java/com/astra/agent/AstraStudyHub.kt").read_text(
     encoding="utf-8"
 )
+SEARCH = (ROOT / "android/app/src/main/java/com/astra/agent/AstraStudySearch.kt").read_text(
+    encoding="utf-8"
+)
 
 class StudySubjectDiscoverySourceTest(unittest.TestCase):
     def test_subject_search_is_pure_local_and_does_not_start_lessons(self):
         self.assertIn("internal object AstraStudySubjectFilter", SOURCE)
         self.assertIn("subject.topics.any { topic ->", SOURCE)
-        self.assertIn("rawQuery.trim().take(80)", SOURCE)
+        self.assertIn("AstraStudySearch.query(rawQuery)", SOURCE)
+        self.assertIn("raw.trim().take(80)", SEARCH)
+        self.assertIn("java.text.Normalizer", SEARCH)
+        self.assertNotIn("https://", SEARCH)
         self.assertIn("AstraStudySubjectFilter.apply(", SOURCE)
         self.assertIn("items(visibleSubjects.chunked(columns), key = { pair -> pair.first().id })", SOURCE)
         self.assertIn("onValueChange = { subjectQuery = it.take(80) }", SOURCE)
