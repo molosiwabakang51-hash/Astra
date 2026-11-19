@@ -9,6 +9,7 @@ ROOT = Path(__file__).resolve().parents[2]
 JAVA = ROOT / "android/app/src/main/java/com/astra/agent"
 GLYPHS = (JAVA / "AstraNavigationGlyph.kt").read_text(encoding="utf-8")
 MAIN = (JAVA / "MainActivity.kt").read_text(encoding="utf-8")
+TRAY = (JAVA / "AstraNavigationTray.kt").read_text(encoding="utf-8")
 
 
 class NavigationGlyphSourceTest(unittest.TestCase):
@@ -20,13 +21,18 @@ class NavigationGlyphSourceTest(unittest.TestCase):
         self.assertNotIn("http://", GLYPHS)
         self.assertNotIn("https://", GLYPHS)
 
-    def test_real_dropdown_uses_vectors_and_retains_text_labels(self):
-        self.assertIn("AstraNavigationGlyph(", MAIN)
-        self.assertIn("section = AstraNavSection.entries[index]", MAIN)
-        self.assertIn('"Chat", "Tasks", "Notes", "Tools", "Settings", "Study"', MAIN)
+    def test_new_left_tray_uses_vectors_and_retains_labelled_destinations(self):
+        self.assertIn("AstraNavigationTray(", MAIN)
+        self.assertIn("AstraNavigationGlyph(", TRAY)
+        self.assertIn("AstraNavSection.entries[index]", TRAY)
+        for title in ('"Chat"', '"Tasks"', '"Notes"', '"Tools"',
+                      '"Settings"', '"Study"'):
+            self.assertIn(title, TRAY)
         self.assertNotIn('listOf("◌", "✓", "▤", "⌘", "⚙", "✦")[index]', MAIN)
         self.assertIn("navigationPopupOpen = true", MAIN)
         self.assertIn("tab = index", MAIN)
+        self.assertIn("RoundedCornerShape(topEnd = 32.dp, bottomEnd = 32.dp)", TRAY)
+        self.assertIn("Alignment.CenterStart", TRAY)
 
 
 if __name__ == "__main__":
