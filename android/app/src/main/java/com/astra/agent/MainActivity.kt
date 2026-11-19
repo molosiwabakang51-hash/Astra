@@ -1,10 +1,14 @@
 package com.astra.agent
 
 import android.Manifest
+import android.app.KeyguardManager
+import android.content.BroadcastReceiver
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
+import android.os.PowerManager
 import android.os.Environment
 import android.provider.Settings
 import android.net.Uri
@@ -2052,6 +2056,18 @@ class MainActivity :
     private var recognizer: SpeechRecognizer? = null
     private val speechSession = AstraSpeechSession()
     private var speechForeground = false
+    private var screenOffReceiverRegistered = false
+
+    // Hardware screen-off can arrive before an Activity lifecycle callback,
+    // so stop Android TTS immediately even when the app-lock toggle is off.
+    private val screenOffReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            if (intent?.action == Intent.ACTION_SCREEN_OFF) {
+                speechForeground = false
+                tts?.stop()
+            }
+        }
+    }
 
     private var ttsReady by mutableStateOf(false)
 
@@ -2223,13 +2239,24 @@ class MainActivity :
         }
     }
 
+    private fun canPlaySpeechNow(): Boolean {
+        val displayInteractive = (getSystemService(Context.POWER_SERVICE)
+            as? PowerManager)?.isInteractive == true
+        val deviceUnlocked = (getSystemService(Context.KEYGUARD_SERVICE)
+            as? KeyguardManager)?.isKeyguardLocked == false
+        return AstraSpeechPrivacy.mayUseVoice(
+            speechForeground, secureLockEnabled, workspaceUnlocked,
+            displayInteractive = displayInteractive,
+            deviceUnlocked = deviceUnlocked,
+            windowFocused = hasWindowFocus()
+        )
+    }
+
     private fun speak(text: String, offlineOnly: Boolean) {
-        // A native reply may finish after a background/biometric lock.
-        // Never start reading private chat text outside the unlocked activity.
-        if (!ttsReady || !AstraSpeechPrivacy.mayUseVoice(
-                speechForeground, secureLockEnabled, workspaceUnlocked
-            )
-        ) return
+        // Background/biometric/system-lock transitions may happen while the
+        // local model is producing a reply. Never start playback while a
+        // device keyguard, dark display or unfocused window is present.
+        if (!ttsReady || !canPlaySpeechNow()) return
         val savedLanguage = getSharedPreferences("astra", Context.MODE_PRIVATE)
             .getString("astra_ai_reply_language", "auto")
         val preferred = AstraReplyLanguage.fromId(savedLanguage)
@@ -2273,6 +2300,12 @@ class MainActivity :
                     selected.displayName + " accent. Speech was not played.",
                 Toast.LENGTH_LONG
             ).show()
+            return
+        }
+        // Screen/keyguard state may change during TTS voice initialization.
+        // Fail closed before even the first queued private utterance.
+        if (!canPlaySpeechNow()) {
+            tts?.stop()
             return
         }
         // A long detailed lesson may exceed Android's maximum per-utterance
@@ -2557,6 +2590,13 @@ class MainActivity :
     ) {
 
         super.onCreate(savedInstanceState)
+        // A dynamically registered system screen-off receiver needs no
+        // extra permission. onPause/onStop remain fallback stop paths if
+        // registration fails on a particular Android implementation.
+        runCatching {
+            registerReceiver(screenOffReceiver, IntentFilter(Intent.ACTION_SCREEN_OFF))
+            screenOffReceiverRegistered = true
+        }
 
         secureLockEnabled = AstraAppLock.enabled(this)
         backgroundLockDelayMillis = AstraAppLock.backgroundDelayMillis(this)
@@ -7359,9 +7399,9 @@ class MainActivity :
     }
 
     override fun onStart() {
-        // Speech and spoken model output are allowed only while the activity
-        // is visible. This does not imply an app-locked workspace is unlocked.
-        speechForeground = true
+        // onStart is too early to authorize speech: a visible activity can
+        // still be paused, behind the device keyguard, or without focus.
+        speechForeground = false
         // Enforce a missed background deadline before the private activity is shown.
         // Cold launches are independently locked in onCreate.
         val leftAt = backgroundedAtElapsedMs
@@ -7380,10 +7420,30 @@ class MainActivity :
 
     override fun onResume() {
         super.onResume()
+        // A window can be resumed before receiving focus; audio starts only
+        // after focus returns and canPlaySpeechNow rechecks hardware state.
+        speechForeground = hasWindowFocus()
         resetForegroundIdleTimer()
     }
 
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (!hasFocus) {
+            speechForeground = false
+            tts?.stop()
+        } else if (lifecycle.currentState.isAtLeast(
+                androidx.lifecycle.Lifecycle.State.RESUMED
+            )
+        ) {
+            speechForeground = true
+        }
+    }
+
     override fun onPause() {
+        // onStop may be delayed when Home, screen-off, recent apps or an
+        // authentication overlay obscures Astra. Stop queued TTS now.
+        speechForeground = false
+        tts?.stop()
         idleLockHandler.removeCallbacks(idleLockRunnable)
         super.onPause()
     }
@@ -7408,6 +7468,10 @@ class MainActivity :
     }
 
     override fun onDestroy() {
+        if (screenOffReceiverRegistered) {
+            runCatching { unregisterReceiver(screenOffReceiver) }
+            screenOffReceiverRegistered = false
+        }
         idleLockHandler.removeCallbacks(idleLockRunnable)
         speechForeground = false
         speechSession.cancel()
