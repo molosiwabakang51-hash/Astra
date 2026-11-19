@@ -238,7 +238,13 @@ internal object AstraStudyCatalog {
                 Topic("Workshop quiz", "Assess the last opened advanced workshop.",
                     course + " workshop quiz"),
                 Topic("Workshop progress", "Review advanced chapter mastery stored privately.",
-                    course + " workshop progress")
+                    course + " workshop progress"),
+                Topic("Due reviews", "Practise questions scheduled for recall today.",
+                    course + " workshop review"),
+                Topic("Next due review", "Open the next quiz due for spaced practice.",
+                    course + " workshop review next"),
+                Topic("Review plan", "See upcoming review intervals without internet.",
+                    course + " workshop review plan")
             ) + if (subject.id == "russian") {
                 listOf(subject.topics.last())
             } else emptyList())
