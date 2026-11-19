@@ -224,7 +224,7 @@ internal object AstraModelImport {
         return 0L
     }
 
-    private suspend fun copyBounded(
+    internal suspend fun copyBounded(
         input: InputStream,
         out: OutputStream,
         digest: MessageDigest,
@@ -233,10 +233,20 @@ internal object AstraModelImport {
         val buffer = ByteArray(1024 * 1024)
         var total = 0L
         var nextUpdate = 32L * 1024 * 1024
+        var consecutiveEmptyReads = 0
         while (true) {
             currentCoroutineContext().ensureActive()
             val count = input.read(buffer)
             if (count < 0) break
+            if (count == 0) {
+                // A faulty SAF provider can return zero indefinitely instead
+                // of EOF. Fail safely rather than spin on the IO dispatcher.
+                require(++consecutiveEmptyReads <= 16) {
+                    "Selected model document stopped making read progress. Retry with a local file."
+                }
+                continue
+            }
+            consecutiveEmptyReads = 0
             total += count
             require(total <= MAX_BYTES) { "Selected model exceeds safe size limit." }
             digest.update(buffer, 0, count)
