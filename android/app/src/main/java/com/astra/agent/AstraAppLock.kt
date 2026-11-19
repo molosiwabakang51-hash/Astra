@@ -69,16 +69,22 @@ internal object AstraAppLock {
     }
 
     /**
-     * Foreground inactivity lock is opt-in, including for previously secured installs.
-     * An invalid or unreadable stored preference is treated as the disabled default;
-     * it cannot bypass the independently enforced cold-launch/background lock.
+     * Foreground inactivity lock is opt-in. Missing saved preference remains
+     * Off on existing/new installs. However, a present malformed setting
+     * must not silently disable a previously opted-in inactivity deadline:
+     * use the shortest offered 2-minute timeout when app lock is enabled.
      */
-    fun idleTimeoutMillis(context: Context): Long {
-        val saved = runCatching {
-            context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-                .getLong(IDLE_TIMEOUT_KEY, 0L)
-        }.getOrDefault(0L)
-        return if (saved in AstraAppLockPolicy.idleTimeoutsMillis) saved else 0L
+    fun idleTimeoutMillis(context: Context): Long = runCatching {
+        val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        AstraAppLockPolicy.idleTimeoutFromStoredPreference(
+            present = prefs.contains(IDLE_TIMEOUT_KEY),
+            value = prefs.all[IDLE_TIMEOUT_KEY]
+        )
+    }.getOrElse {
+        // If preferences are unreadable we cannot prove that a previously
+        // configured timeout was Off. The global biometric access gate still
+        // decides whether an inactivity timeout should be enforced at all.
+        120_000L
     }
 
     fun setIdleTimeoutMillis(context: Context, timeoutMillis: Long) {
@@ -157,6 +163,13 @@ internal object AstraAppLockPolicy {
     val backgroundDelaysMillis: List<Long> = listOf(0L, 30_000L, 120_000L, 300_000L)
     // Off is the migration-safe default; selected limits apply only while active.
     val idleTimeoutsMillis: List<Long> = listOf(0L, 120_000L, 300_000L, 900_000L)
+
+    /** Preserve explicit Off; fail closed on a damaged *present* setting. */
+    fun idleTimeoutFromStoredPreference(present: Boolean, value: Any?): Long {
+        if (!present) return 0L
+        val saved = value as? Long
+        return if (saved != null && saved in idleTimeoutsMillis) saved else 120_000L
+    }
 
     fun idleTimeoutLabel(timeoutMillis: Long): String = when (timeoutMillis) {
         0L -> "Off"
