@@ -76,6 +76,9 @@ internal class AstraOnDeviceBrain(
         turns: List<Turn>,
         conversationGeneration: Int,
         diagnosticMaxTokens: Int? = null,
+        // Internal diagnostic A/B only. User chat normally derives this from
+        // the current owner's explicit text, not quoted model material.
+        reasoningModeOverride: Boolean? = null,
         onPartial: suspend (String) -> Unit = {}
     ): String = mutex.withLock {
             // Durable but content-free checkpoint survives a fatal JNI signal.
@@ -86,6 +89,8 @@ internal class AstraOnDeviceBrain(
                     turns.lastOrNull { it.role == "user" }?.content
                 )
                 require(finalMessage.isNotEmpty()) { "Message cannot be empty." }
+                val carefulReasoning = reasoningModeOverride ?:
+                    AstraReasoningMode.enabled(finalMessage)
                 val selectedReplyLanguageId = context.getSharedPreferences(
                     "astra", Context.MODE_PRIVATE
                 ).getString("astra_ai_reply_language", "auto") ?: "auto"
@@ -237,7 +242,7 @@ internal class AstraOnDeviceBrain(
                             AstraConversationContext.Turn(it.role, it.content)
                         },
                         restoringConversation,
-                        thinkingRequested = AstraReasoningMode.enabled(finalMessage)
+                        thinkingRequested = carefulReasoning
                     ),
                     AstraReplyLanguage.fromId(selectedReplyLanguageId)
                 )
@@ -257,7 +262,8 @@ internal class AstraOnDeviceBrain(
                     AstraGenerationPolicy.maxAnswerTokens(
                         finalMessage,
                         advancedModel = modelPath.name == AstraModelImport.ADVANCED_NAME,
-                        hasReferences = citedBooks.isNotEmpty() || citedOpenCourse.isNotEmpty()
+                        hasReferences = citedBooks.isNotEmpty() || citedOpenCourse.isNotEmpty(),
+                        thinkingRequested = carefulReasoning
                     ),
                     diagnosticMaxTokens
                 )
