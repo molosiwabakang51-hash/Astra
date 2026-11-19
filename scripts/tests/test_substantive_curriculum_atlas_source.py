@@ -58,7 +58,7 @@ class SubstantiveCurriculumTest(unittest.TestCase):
         self.assertLess(MAIN.index('AstraSubjectAtlas.respond(clean)?.let'),
                         MAIN.index('multilingualTutor.respond(clean)?.let'))
         self.assertIn("offline syllabus roadmap", CATALOG)
-        self.assertIn("optional local AI", CATALOG.lower())
+        self.assertIn("optional local ai", CATALOG.lower())
 
 
 if __name__ == "__main__":
