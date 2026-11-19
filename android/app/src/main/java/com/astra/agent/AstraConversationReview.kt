@@ -20,6 +20,11 @@ internal object AstraConversationReview {
         RegexOption.IGNORE_CASE
     )
 
+    private val compoundReviewPattern = Regex(
+        """^recall earlier mentions of\s+(.+?)\.{1,}\s*do you see your mistake\??$""",
+        RegexOption.IGNORE_CASE
+    )
+
     fun respond(raw: String, history: List<AstraChatArchive.Message>): String? {
         val command = raw.trim().replace(Regex("""\s+"""), " ")
         if (command.length !in 2..180) return null
@@ -45,10 +50,7 @@ internal object AstraConversationReview {
                 "valuations can imply poor long-term returns. This does not " +
                 "predict when a bubble will burst."
         }
-        val compoundReview = Regex(
-            """^recall earlier mentions of\s+(.+?)\.{1,}\s*do you see your mistake\??$""",
-            RegexOption.IGNORE_CASE
-        ).matchEntire(command)
+        val compoundReview = compoundReviewPattern.matchEntire(command)
         if (compoundReview != null) {
             return earlierMentions(compoundReview.groupValues[1], history) +
                 "\n\n" + reviewMistake(history)
@@ -59,10 +61,8 @@ internal object AstraConversationReview {
                 .take(8)
                 .mapNotNull { previous ->
                     mentions.matchEntire(previous.text.trim())?.groupValues?.get(1)
-                        ?: compoundReview.pattern.let {
-                            Regex(it, RegexOption.IGNORE_CASE)
-                                .matchEntire(previous.text.trim())?.groupValues?.get(1)
-                        }
+                        ?: compoundReviewPattern.matchEntire(previous.text.trim())
+                            ?.groupValues?.get(1)
                 }
                 .firstOrNull()
             if (priorQuery != null) {
