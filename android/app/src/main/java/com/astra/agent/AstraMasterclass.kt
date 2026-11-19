@@ -53,6 +53,22 @@ internal class AstraMasterclass(
         fun units(subject: String): List<Unit> = tracks[subject].orEmpty()
     }
 
+    private fun mark(subject: String, suffix: String, index: Int) {
+        require(index >= 1)
+        val segment = (index - 1) / 30
+        val bit = 1 shl ((index - 1) % 30)
+        val part = suffix + "_" + segment
+        write(subject, part, read(subject, part) or bit)
+    }
+
+    private fun countMarked(subject: String, suffix: String, total: Int): Int =
+        (0 until ((total + 29) / 30)).sumOf { segment ->
+            val remaining = total - segment * 30
+            val width = minOf(remaining, 30)
+            val mask = (1 shl width) - 1
+            Integer.bitCount(read(subject, suffix + "_" + segment) and mask)
+        }
+
     private fun key(subject: String, suffix: String) =
         "astra_masterclass_" + subject + "_" + suffix
     private fun read(subject: String, suffix: String, default: Int = 0): Int =
@@ -115,13 +131,12 @@ internal class AstraMasterclass(
         appendLine()
         append("Open '" + subject + " workshop 1'; complete '" +
             subject + " workshop quiz 1'; check '" + subject + " workshop progress'.")
-    }.trim().take(3_600)
+    }.trim()
 
     private fun show(subject: String, number: Int, list: List<Unit>): String {
         val unit = list[number - 1]
         write(subject, "last", number)
-        val bit = 1 shl (number - 1)
-        write(subject, "visited", read(subject, "visited") or bit)
+        mark(subject, "visited", number)
         return buildString {
             appendLine(subjectNames.getValue(subject).uppercase(Locale.ROOT) +
                 " · WORKSHOP " + number + "/" + list.size)
@@ -174,8 +189,7 @@ internal class AstraMasterclass(
         write(subject, "attempts", read(subject, "attempts").coerceAtMost(999_999) + 1)
         if (correct) {
             write(subject, "correct", read(subject, "correct").coerceAtMost(999_999) + 1)
-            write(subject, "mastered",
-                read(subject, "mastered") or (1 shl (pending - 1)))
+            mark(subject, "mastered", pending)
         }
         return (if (correct) "Correct." else "Not quite. Answer: " + unit.answer + ".") +
             " " + unit.rationale + "\nNext: '" +
@@ -184,11 +198,9 @@ internal class AstraMasterclass(
     }
 
     private fun progress(subject: String, list: List<Unit>): String {
-        // The bit mask deliberately accepts at most 30 content chapters per
-        // subject. A later expansion to >30 must migrate to segmented flags.
-        val safeMask = (1 shl list.size) - 1
-        val visited = Integer.bitCount(read(subject, "visited") and safeMask)
-        val mastered = Integer.bitCount(read(subject, "mastered") and safeMask)
+        // Segment local bitsets so expanded tracks can grow beyond 30 chapters.
+        val visited = countMarked(subject, "visited", list.size)
+        val mastered = countMarked(subject, "mastered", list.size)
         val last = read(subject, "last").coerceIn(0, list.size)
         val attempts = read(subject, "attempts").coerceAtLeast(0)
         val correct = read(subject, "correct").coerceIn(0, attempts)
