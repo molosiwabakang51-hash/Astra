@@ -41,7 +41,11 @@ class AstraAppLockSourceTest(unittest.TestCase):
 
     def test_inactivity_lock_is_foreground_only_and_auth_protected(self):
         self.assertIn("setIdleTimeoutMillis(", LOCK)
-        self.assertIn("getLong(IDLE_TIMEOUT_KEY, 0L)", LOCK)
+        self.assertIn("prefs.contains(IDLE_TIMEOUT_KEY)", LOCK)
+        self.assertIn("prefs.all[IDLE_TIMEOUT_KEY]", LOCK)
+        self.assertIn("idleTimeoutFromStoredPreference(", LOCK)
+        self.assertIn("120_000L", LOCK)
+        self.assertNotIn(".getLong(IDLE_TIMEOUT_KEY, 0L)", LOCK)
         self.assertIn("override fun onUserInteraction()", MAIN)
         self.assertIn("override fun onPause()", MAIN)
         self.assertIn("idleLockHandler.removeCallbacks(idleLockRunnable)", MAIN)
