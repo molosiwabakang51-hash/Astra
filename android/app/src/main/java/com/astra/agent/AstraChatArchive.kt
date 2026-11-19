@@ -10,7 +10,7 @@ import org.json.JSONObject
  */
 internal object AstraChatArchive {
     internal const val MAX_CHATS = 40
-    private const val MAX_MESSAGES = 2_000
+    internal const val MAX_MESSAGES = 2_000
 
     data class Message(val role: String, val text: String)
     data class Chat(val id: String, val title: String, val messages: List<Message>)
