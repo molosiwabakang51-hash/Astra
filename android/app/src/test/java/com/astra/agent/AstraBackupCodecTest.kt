@@ -244,4 +244,46 @@ class AstraBackupCodecTest {
             AstraBackupCodec.readLimited(ByteArrayInputStream(truncated))
         }
     }
+
+    @Test fun archivedConversationsRoundTripWithoutSilentLoss() {
+        val conversations = listOf(
+            AstraChatArchive.Chat("one", "Research",
+                listOf(AstraChatArchive.Message("You", "Review bonds 🧠"),
+                    AstraChatArchive.Message("Astra", "Duration formula"))),
+            AstraChatArchive.Chat("two", "French",
+                listOf(AstraChatArchive.Message("You", "C'est une leçon")))
+        )
+        val archived = AstraChatArchive.encode(conversations)
+        val exported = AstraBackupCodec.encode(example +
+            ("astra_chat_archive" to archived))
+        val parsed = AstraBackupCodec.parse(exported)
+        assertEquals(conversations, AstraChatArchive.decode(
+            parsed.values["astra_chat_archive"] as String))
+        val empty = AstraBackupCodec.parse(AstraBackupCodec.encode(example))
+        assertEquals("[]", empty.values["astra_chat_archive"])
+    }
+
+    @Test fun invalidArchivedChatsAreRejectedInsteadOfSilentlyDropped() {
+        val base = JSONObject(AstraBackupCodec.encode(example))
+        val data = base.getJSONObject("data")
+        fun corrupted(value: String) {
+            data.put("astra_chat_archive", value)
+            assertRejects { AstraBackupCodec.parse(base.toString()) }
+        }
+        corrupted("{invalid")
+        corrupted("""[{"id":"1","title":"ok","messages":[{"role":"root","text":"hidden"}]}]""")
+        corrupted("""[{"id":"1","title":"ok","messages":[]},{"id":"1","title":"duplicate","messages":[]}]""")
+        corrupted("""[{"id":"1","title":"ok","messages":[{"role":"You","text":123}]}]""")
+        corrupted("""[{"id":"1","title":"ok","messages":null}]""")
+        val overflow = org.json.JSONArray()
+        repeat(AstraChatArchive.MAX_CHATS + 1) { i ->
+            overflow.put(JSONObject().put("id", "id-$i")
+                .put("title", "Chat $i")
+                .put("messages", org.json.JSONArray()))
+        }
+        corrupted(overflow.toString())
+        assertEquals("[]", AstraBackupCodec.parse(
+            JSONObject(AstraBackupCodec.encode(example)).toString()
+        ).values["astra_chat_archive"])
+    }
 }
