@@ -40,6 +40,17 @@ class AdvancedOnlyReasoningContract(unittest.TestCase):
         self.assertNotIn("QuantFactory/Qwen3-0.6B-GGUF", prep)
         self.assertIn("Obsolete Qwen3 0.6B GGUF must not be bundled", gradle)
         self.assertIn('MODEL = "assets/Qwen3-1.7B-Q4_K_M.gguf"', verifier)
+        workflow = read(".github/workflows/android.yml")
+        # CI builds FULL first, then LITE in the same workspace. Both
+        # GGUF names must be removed before the LITE Gradle invocation.
+        lite_section = workflow.split(
+            "- name: Build lightweight APK without repackaging Qwen3 weights", 1
+        )[1].split("- name: Record LITE APK checksum", 1)[0]
+        for asset in ("Qwen3-1.7B-Q4_K_M.gguf", "qwen3-0.6b-q4km.gguf"):
+            self.assertIn("rm -f app/src/main/assets/" + asset, lite_section)
+        self.assertLess(lite_section.index("rm -f app/src/main/assets/Qwen3-1.7B"),
+                        lite_section.index("ASTRA_BUNDLE_MODEL=false"))
+
 
     def test_settings_do_not_claim_a_weak_fallback(self):
         main = (APP / "MainActivity.kt").read_text(encoding="utf-8")
