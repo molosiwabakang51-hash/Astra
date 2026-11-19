@@ -19,7 +19,7 @@ internal object AstraStudyCatalog {
         val description: String,
         val topics: List<Topic>
     )
-    val subjects: List<Subject> = listOf(
+    val subjects: List<Subject> = (listOf(
         Subject("finance", "Finance", "◈", "Investing, markets and money", listOf(
             Topic("Compound interest", "Understand how returns accumulate.", "explain compound interest"),
             Topic("Bond duration", "Explore interest-rate sensitivity.", "explain bond duration"),
@@ -180,6 +180,58 @@ internal object AstraStudyCatalog {
                     )
             )
         } else subject
+    } + AstraSubjectAtlas.entries.map { entry ->
+        Subject(
+            id = entry.id,
+            title = entry.title,
+            symbol = "◇",
+            description = entry.category + " · offline syllabus roadmap, optional local AI",
+            topics = listOf(
+                Topic(
+                    "Offline syllabus",
+                    "A structured four-module roadmap, not a complete taught course.",
+                    "atlas syllabus " + entry.id
+                )
+            ) + entry.modules.mapIndexed { index, module ->
+                Topic(
+                    "Explore " + (index + 1) + " — " + module,
+                    "Optional on-device AI discussion. Verify facts against reliable materials.",
+                    "Teach me " + module + " within " + entry.title +
+                        ". Explain important ideas, equations or evidence, " +
+                        "then give worked examples and a self-check. " +
+                        "Distinguish facts from uncertainties.",
+                    requiresModel = true
+                )
+            }
+        )
+    }).map { subject ->
+        val course = when (subject.id) {
+            "finance" -> "finance"
+            "mathematics" -> "math"
+            "english" -> "english"
+            "day_trading" -> "trading"
+            else -> null
+        }
+        if (course == null) subject else {
+            subject.copy(topics = subject.topics + listOf(
+                Topic(
+                    "Advanced workshop roadmap",
+                    "Deep practical modules beyond the original foundation chapters.",
+                    course + " workshop"
+                )
+            ) + AstraMasterclass.units(course).mapIndexed { index, unit ->
+                Topic(
+                    "Workshop " + (index + 1) + " — " + unit.title,
+                    "Detailed theory, a worked case, an independent exercise and mastery quiz.",
+                    course + " workshop " + (index + 1)
+                )
+            } + listOf(
+                Topic("Workshop quiz", "Assess the last opened advanced workshop.",
+                    course + " workshop quiz"),
+                Topic("Workshop progress", "Review advanced chapter mastery stored privately.",
+                    course + " workshop progress")
+            ))
+        }
     }
     fun find(id: String?): Subject? = subjects.firstOrNull { it.id == id }
     fun topic(subjectId: String, title: String): Topic? =

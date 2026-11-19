@@ -5,7 +5,7 @@ import java.util.Locale
 /**
  * A fully offline, educational day-trading foundations curriculum. Lessons and quiz answers are
  * original authored examples, not price predictions, trading advice or live market data.
- * Only small integer counters/bitsets persist in existing Astra preferences.
+ * Only small, subject-isolated integer counters/bitsets persist in Astra preferences.
  * No internet, third-party service, bundled model or file access is required.
  */
 internal class AstraTradingCourse(
@@ -29,12 +29,12 @@ internal class AstraTradingCourse(
     }
 
     companion object {
-        private const val LAST = "astra_math_last_lesson"
-        private const val VISITED = "astra_math_lessons_visited"
-        private const val MASTERED = "astra_math_quizzes_mastered"
-        private const val PENDING = "astra_math_pending_quiz"
-        private const val ATTEMPTS = "astra_math_quiz_attempts"
-        private const val CORRECT = "astra_math_quiz_correct"
+        private const val LAST = "astra_trading_last_lesson"
+        private const val VISITED = "astra_trading_lessons_visited"
+        private const val MASTERED = "astra_trading_quizzes_mastered"
+        private const val PENDING = "astra_trading_pending_quiz"
+        private const val ATTEMPTS = "astra_trading_quiz_attempts"
+        private const val CORRECT = "astra_trading_quiz_correct"
 
         val lessons: List<Lesson> = listOf(
             Lesson(
@@ -190,7 +190,9 @@ internal class AstraTradingCourse(
         if (command.length > 90) return null
         return when (command) {
             "trading course", "day trading course", "trading syllabus", "learn trading",
-            "learn day trading", "teach me day trading", "start trading course" -> syllabus()
+            "learn day trading", "teach me day trading", "start trading course",
+            "teach me forex", "learn forex", "study forex",
+            "teach me index derivatives", "learn index derivatives" -> syllabus()
             "trading progress", "my trading progress" -> progress()
             "next trading lesson" -> lesson((readInt(LAST, 0) + 1).coerceIn(1, lessons.size))
             "trading quiz", "quiz me on trading" -> quiz(readInt(LAST, 1).coerceIn(1, lessons.size))
@@ -228,6 +230,8 @@ internal class AstraTradingCourse(
         }
         appendLine()
         append("Choose 'trading lesson 1', 'next trading lesson', 'trading quiz 1', or 'trading progress'.")
+        appendLine()
+        append("For in-depth Forex and index-derivative cases: 'trading workshop'.")
     }.trim()
 
     private fun lesson(index: Int): String {

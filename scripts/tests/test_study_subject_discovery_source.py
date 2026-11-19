@@ -21,7 +21,10 @@ class StudySubjectDiscoverySourceTest(unittest.TestCase):
 
     def test_empty_state_and_model_gate_are_visible(self):
         self.assertIn("No subjects found", SOURCE)
-        self.assertIn('onClick = { subjectQuery = "" }', SOURCE)
+        self.assertIn('subjectQuery = ""', SOURCE)
+        self.assertIn("selectedField = null", SOURCE)
+        self.assertIn("AstraStudyFieldFilter.apply(", SOURCE)
+        self.assertIn("FilterChip(", SOURCE)
         self.assertIn("internal object AstraStudyAccess", SOURCE)
         self.assertIn('-> "MODEL NEEDED"', SOURCE)
         self.assertIn('-> "OFFLINE"', SOURCE)

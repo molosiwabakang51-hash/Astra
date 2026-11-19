@@ -3,6 +3,8 @@ package com.astra.agent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -24,6 +26,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.FilterChip
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -89,6 +92,36 @@ internal object AstraStudySubjectFilter {
     }
 }
 
+/**
+ * Browse a broad library by discipline without implying the indexed
+ * syllabus-only subjects are authored full courses.
+ */
+internal object AstraStudyFieldFilter {
+    const val CORE = "Core courses"
+    val fields: List<String> by lazy {
+        listOf(CORE) + AstraSubjectAtlas.entries.map { it.category }.distinct()
+    }
+    private val atlasIds: Set<String> by lazy {
+        AstraSubjectAtlas.entries.map { it.id }.toSet()
+    }
+    private val byField: Map<String, Set<String>> by lazy {
+        AstraSubjectAtlas.entries.groupBy { it.category }
+            .mapValues { (_, members) -> members.map { it.id }.toSet() }
+    }
+
+    fun apply(
+        subjects: List<AstraStudyCatalog.Subject>,
+        field: String?
+    ): List<AstraStudyCatalog.Subject> = when (field) {
+        null -> subjects
+        CORE -> subjects.filter { it.id !in atlasIds }
+        else -> {
+            val ids = byField[field].orEmpty()
+            subjects.filter { it.id in ids }
+        }
+    }
+}
+
 /** Indicate when a lesson can actually start without an imported GGUF model. */
 internal object AstraStudyAccess {
     fun label(subject: AstraStudyCatalog.Subject): String = when {
@@ -110,6 +143,7 @@ internal fun AstraStudyHub(
     var selectedId by remember { mutableStateOf<String?>(null) }
     val selected = AstraStudyCatalog.find(selectedId)
     var subjectQuery by remember { mutableStateOf("") }
+    var selectedField by remember { mutableStateOf<String?>(null) }
     var topicQuery by remember(selectedId) { mutableStateOf("") }
     Column(Modifier.fillMaxSize()) {
         Row(
@@ -130,7 +164,8 @@ internal fun AstraStudyHub(
                 style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(5.dp))
-            Text("Choose a subject. Lessons only begin when you select a topic.",
+            Text("Choose a course or browse a syllabus. Roadmap-only fields " +
+                "are identified separately from completed offline lessons.",
                 color = AstraAurora.muted, style = MaterialTheme.typography.bodyMedium)
             Spacer(Modifier.height(13.dp))
             OutlinedTextField(
@@ -144,9 +179,34 @@ internal fun AstraStudyHub(
                     Text("Try bonds, algebra or French", color = AstraAurora.muted)
                 }
             )
-            Spacer(Modifier.height(12.dp))
-            val visibleSubjects = AstraStudySubjectFilter.apply(
-                AstraStudyCatalog.subjects, subjectQuery
+            Spacer(Modifier.height(6.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth()
+                    .horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                FilterChip(
+                    selected = selectedField == null,
+                    onClick = { selectedField = null },
+                    label = { Text("All subjects", maxLines = 1) }
+                )
+                AstraStudyFieldFilter.fields.forEach { field ->
+                    FilterChip(
+                        selected = selectedField == field,
+                        onClick = {
+                            selectedField = if (selectedField == field) null else field
+                        },
+                        label = { Text(field, maxLines = 1) }
+                    )
+                }
+            }
+            Spacer(Modifier.height(9.dp))
+            val visibleSubjects = AstraStudyFieldFilter.apply(
+                AstraStudySubjectFilter.apply(
+                    AstraStudyCatalog.subjects, subjectQuery
+                ),
+                selectedField
             )
             Row(
                 modifier = Modifier.fillMaxWidth().padding(bottom = 11.dp),
@@ -200,7 +260,10 @@ internal fun AstraStudyHub(
                                 Text("Search by subject name, skill or lesson topic.",
                                     color = AstraAurora.muted,
                                     style = MaterialTheme.typography.bodyMedium)
-                                TextButton(onClick = { subjectQuery = "" }) {
+                                TextButton(onClick = {
+                                    subjectQuery = ""
+                                    selectedField = null
+                                }) {
                                     Text("Show all subjects")
                                 }
                             }
