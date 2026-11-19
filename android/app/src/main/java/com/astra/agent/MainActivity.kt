@@ -3017,6 +3017,13 @@ class MainActivity :
                     // Search the retained chat, not just the latest 160 messages.
                     // AstraConversationContext still sends only eight short,
                     // bounded, same-chat excerpts to the reloaded native model.
+                    val focusedPrompt = if (grounding == null) {
+                        AstraFollowUpAnchor.enrich(
+                            prompt, history.map {
+                                AstraChatArchive.Message(it.role, it.text)
+                            }
+                        )
+                    } else prompt
                     val turns = AstraConversationHistory.forRecovery(history).mapNotNull { entry ->
                         val role = when (entry.role) {
                             "You" -> "user"
@@ -3024,7 +3031,7 @@ class MainActivity :
                             else -> null
                         }
                         role?.let { AstraOnDeviceBrain.Turn(it, entry.text) }
-                    } + AstraOnDeviceBrain.Turn("user", prompt)
+                    } + AstraOnDeviceBrain.Turn("user", focusedPrompt)
                     val generation = chatGeneration
                     val placeholder = "ASTRA // THINKING OFFLINE..."
                     var displayed = placeholder
