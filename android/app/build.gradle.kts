@@ -64,21 +64,27 @@ dependencies {
 // The full build includes GGUF weights. The lite build contains only Android
 // code and native inference; the owner imports a model already on the phone.
 // Use a clean source asset directory for lite builds to prevent accidental
-// 500 MB uploads disguised as low-data updates.
+// 1.28 GB uploads disguised as low-data updates.
 val bundleModel = System.getenv("ASTRA_BUNDLE_MODEL") != "false"
 
 // Refuse to ship a mislabeled full or lite APK.
 val verifyBundledModel by tasks.registering {
     group = "verification"
     doLast {
-        val model = file("src/main/assets/qwen3-0.6b-q4km.gguf")
+        val assets = file("src/main/assets")
+        val model = file("src/main/assets/Qwen3-1.7B-Q4_K_M.gguf")
+        val legacy = file("src/main/assets/qwen3-0.6b-q4km.gguf")
+        require(!legacy.exists()) {
+            "Obsolete Qwen3 0.6B GGUF must not be bundled."
+        }
         if (bundleModel) {
-            require(model.isFile && model.length() > 450_000_000L) {
-                "Full APK requires bundled model. Run python3 scripts/prepare_offline_android.py."
+            require(model.isFile && model.length() >= 1_150_000_000L) {
+                "FULL APK requires verified Qwen3 1.7B. Run python3 scripts/prepare_offline_android.py."
             }
         } else {
-            require(!model.exists()) {
-                "Lite APK must not contain model weights; remove model asset before building."
+            val anyGguf = assets.listFiles()?.any { it.isFile && it.extension.equals("gguf", ignoreCase = true) } ?: false
+            require(!anyGguf) {
+                "LITE APK must not contain any GGUF model weights."
             }
         }
     }
