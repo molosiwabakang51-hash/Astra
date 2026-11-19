@@ -90,11 +90,12 @@ internal object AstraGenerationPolicy {
     fun maxAnswerTokens(
         question: String,
         advancedModel: Boolean,
-        hasReferences: Boolean = false
+        hasReferences: Boolean = false,
+        thinkingRequested: Boolean = AstraReasoningMode.enabled(question)
     ): Int {
         // Only an explicit request enables larger private deliberation.
         // Native generation is still bounded, with no remote computation.
-        if (advancedModel && AstraReasoningMode.enabled(question)) return 1792
+        if (advancedModel && thinkingRequested) return 1792
         val tier = depth(question)
         val effective = if (hasReferences && tier == Depth.STANDARD)
             Depth.DETAILED else tier
