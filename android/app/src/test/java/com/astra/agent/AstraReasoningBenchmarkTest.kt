@@ -59,4 +59,16 @@ class AstraReasoningBenchmarkTest {
         assertFalse(report.contains("private"))
         assertEquals(1500L, b.milliseconds)
     }
+
+    @Test fun citedSourcesCannotSupplyAnOtherwiseWrongAnswer() {
+        val probe = AstraReasoningBenchmark.Probe.ENTAILMENT
+        assertTrue(AstraReasoningBenchmark.score(
+            probe, "NO.\n\nOpen-course references:\n[K1] unrelated note"))
+        assertFalse(AstraReasoningBenchmark.score(
+            probe, "YES.\n\nOpen-course references:\n[K1] NO"))
+        assertFalse(AstraReasoningBenchmark.score(
+            probe, "<think>NO</think>YES"))
+        assertTrue(AstraReasoningBenchmark.score(
+            probe, "NO\nRetrieved local book passages (verify originals):\n[K1] YES"))
+    }
 }
