@@ -22,8 +22,8 @@ class AstraSubjectAtlasTest {
             // Physics now includes 19 real offline advanced workshops,
             // their roadmap and progress actions in addition to atlas entries.
             assertEquals(when (entry.id) {
-                "physics" -> 27
-                "computer_science" -> 26
+                "physics" -> 30
+                "computer_science" -> 29
                 else -> 5
             }, subject.topics.size)
             assertEquals("atlas syllabus " + entry.id, subject.topics.first().command)
@@ -110,6 +110,9 @@ class AstraSubjectAtlasTest {
             assertTrue(advanced.none { it.requiresModel })
             assertTrue(subject.topics.any { it.command == courseInfo.first + " workshop" })
             assertTrue(subject.topics.any { it.command == courseInfo.first + " workshop progress" })
+            assertTrue(subject.topics.any { it.command == courseInfo.first + " workshop review" })
+            assertTrue(subject.topics.any { it.command == courseInfo.first + " workshop review next" })
+            assertTrue(subject.topics.any { it.command == courseInfo.first + " workshop review plan" })
         }
     }
 }
