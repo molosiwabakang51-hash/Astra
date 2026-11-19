@@ -6374,6 +6374,95 @@ class MainActivity :
                                                 ) { Text("Stop checks") }
                                             }
                                         }
+                                        Text(
+                                            "AI reasoning A/B (Qwen3 1.7B): run the same " +
+                                                "two synthetic logic and multistep problems in " +
+                                                "fast and careful modes, with isolated model " +
+                                                "sessions. Four local generations may be slow " +
+                                                "and consume battery. Use airplane mode. " +
+                                                "These results do not establish a 10/10 rating.",
+                                            style = MaterialTheme.typography.bodySmall
+                                        )
+                                        OutlinedButton(
+                                            enabled = !languageBenchmarkRunning &&
+                                                !offlineModelTestRunning &&
+                                                !modelImportRunning &&
+                                                offlineJob?.isActive != true &&
+                                                onDeviceBrain.hasLocalModel(),
+                                            onClick = {
+                                                languageBenchmarkRunning = true
+                                                languageBenchmarkStatus =
+                                                    "Preparing 1.7B reasoning A/B checks..."
+                                                languageBenchmarkJob = researchScope.launch {
+                                                    val results = mutableListOf<
+                                                        AstraReasoningBenchmark.Sample
+                                                    >()
+                                                    try {
+                                                        var count = 0
+                                                        for ((index, probe) in
+                                                            AstraReasoningBenchmark.Probe.entries.withIndex()
+                                                        ) {
+                                                            // Alternate A/B order to reduce warmup bias.
+                                                            val modes = if (index % 2 == 0)
+                                                                listOf(
+                                                                    AstraReasoningBenchmark.Mode.FAST,
+                                                                    AstraReasoningBenchmark.Mode.CAREFUL
+                                                                ) else listOf(
+                                                                    AstraReasoningBenchmark.Mode.CAREFUL,
+                                                                    AstraReasoningBenchmark.Mode.FAST
+                                                                )
+                                                            for ((modeIndex, mode) in modes.withIndex()) {
+                                                                count++
+                                                                languageBenchmarkStatus =
+                                                                    "Reasoning A/B $count/4: " +
+                                                                        probe.title + " (" + mode.name + ")"
+                                                                val start = System.nanoTime()
+                                                                // New generation for each case and mode:
+                                                                // do not let earlier answers contaminate A/B.
+                                                                val reply = onDeviceBrain.reply(
+                                                                    listOf(
+                                                                        AstraOnDeviceBrain.Turn(
+                                                                            "user",
+                                                                            AstraReasoningBenchmark.prompt(
+                                                                                probe, mode
+                                                                            )
+                                                                        )
+                                                                    ),
+                                                                    Int.MIN_VALUE + 400 + index * 2 +
+                                                                        modeIndex
+                                                                )
+                                                                val elapsed =
+                                                                    (System.nanoTime() - start) / 1_000_000
+                                                                results.add(
+                                                                    AstraReasoningBenchmark.sample(
+                                                                        probe, mode, reply, elapsed
+                                                                    )
+                                                                )
+                                                            }
+                                                        }
+                                                        languageBenchmarkStatus =
+                                                            AstraReasoningBenchmark.render(
+                                                                results,
+                                                                onDeviceBrain.loadedModelLabel()
+                                                            )
+                                                    } catch (cancel: CancellationException) {
+                                                        languageBenchmarkStatus =
+                                                            "Reasoning A/B cancelled; partial " +
+                                                                "results were not scored."
+                                                        throw cancel
+                                                    } catch (error: Exception) {
+                                                        languageBenchmarkStatus =
+                                                            "Reasoning A/B interrupted: " +
+                                                                (error.message ?:
+                                                                    "Local inference error") +
+                                                                ". Incomplete runs are not scored."
+                                                    } finally {
+                                                        languageBenchmarkRunning = false
+                                                        languageBenchmarkJob = null
+                                                    }
+                                                }
+                                            }
+                                        ) { Text("Compare fast vs careful reasoning") }
                                         if (languageBenchmarkStatus.isNotBlank()) {
                                             Text(
                                                 languageBenchmarkStatus,
