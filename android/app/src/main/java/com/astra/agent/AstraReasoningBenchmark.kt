@@ -10,6 +10,10 @@ import java.util.Locale
  * latency; they are not an earned general-intelligence rating.
  */
 internal object AstraReasoningBenchmark {
+    // Both A/B modes receive the same maximum generated tokens. Otherwise,
+    // "careful" mode's larger default answer budget confounds the comparison.
+    const val COMPARISON_TOKEN_CAP = 768
+
     enum class Probe(val title: String, val question: String) {
         ENTAILMENT(
             "Logical entailment",
