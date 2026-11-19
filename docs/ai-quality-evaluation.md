@@ -10,7 +10,8 @@ number of commands, passing compiler checks, or the theoretical ability of a GGU
 1. Use the same ARM64 Android handset and a recorded Astra commit/version, model
    label and checksum across repeated runs. Record Android version, available
    memory, airplane-mode status, model used, battery, wall-clock times, crashes,
-   and outputs. Test both 0.6B and imported 1.7B when each is genuinely installed.
+   and outputs. Test only verified Qwen3 1.7B Q4_K_M. A legacy 0.6B
+   file is NOT acceptable test evidence or a supported conversation fallback.
 2. Start with the owner-approved test dataset below, not personal diary entries,
    credentials or proprietary course materials. Do not upload chat archives.
 3. Enable airplane mode and disable Wi-Fi before the offline test. Disable any
@@ -137,7 +138,7 @@ arbitrary untrusted text.
 
 - **Reported score:** points obtained / 10, but only when all 30 cases have
   been evaluated on the real phone with recorded evidence.
-- **Target:** at least **85/100 = 8.5/10** on **two complete runs** using the
+- **Campaign baseline:** at least **85/100 = 8.5/10** on **two complete runs** using the
   same disclosed configuration, with mandatory F1/F4/F5 passing both times.
 - **No automatic score inflation:** unit-test counts, merged PR counts,
   bundle size, synthetic JVM outputs and static code inspection cannot be

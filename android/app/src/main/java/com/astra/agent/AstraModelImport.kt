@@ -19,14 +19,14 @@ import java.util.zip.ZipInputStream
 /**
  * Import a GGUF model from local storage once.
  *
- * Accepts the original Qwen3 GGUF, an old Astra APK containing the model,
- * or a GitHub artifact ZIP containing that APK. Nothing is downloaded.
+ * Accepts only the pinned Qwen3 1.7B GGUF, or an APK/artifact ZIP containing
+ * that model. Obsolete 0.6B imports are rejected without deleting old data.
  * The imported weights stay in the app's no-backup storage across upgrades
  * signed with the same key. The selected file in Downloads is not modified.
  */
 internal object AstraModelImport {
-    private const val MIN_BYTES = 450_000_000L
-    private const val MAX_BYTES = 1_400_000_000L
+    private const val MIN_BYTES = 1_150_000_000L
+    private const val MAX_BYTES = 1_350_000_000L
     private const val ADVANCED_MIN_BYTES = 1_150_000_000L
     private const val ADVANCED_MAX_BYTES = 1_350_000_000L
     const val ADVANCED_NAME = "Qwen3-1.7B-Q4_K_M.gguf"
@@ -36,9 +36,9 @@ internal object AstraModelImport {
     // Prevent untrusted ZIPs with enormous entry tables from keeping the
     // importer busy indefinitely before reaching a real model asset.
     private const val MAX_ARCHIVE_ENTRIES = 4_096
-    private const val ASSET_PATH = "assets/" + AstraOnDeviceBrain.ASSET_NAME
+    private const val ASSET_PATH = "assets/" + ADVANCED_NAME
 
-    /** A compact model may be imported without reserving 1.4 GB upfront. */
+    /** The required 1.7B model must fit before a large import begins. */
     internal fun hasImportStartingSpace(availableBytes: Long): Boolean =
         availableBytes >= MIN_BYTES + FREE_HEADROOM
 
@@ -50,7 +50,7 @@ internal object AstraModelImport {
      * a reliable estimate of the extracted model's space requirement.
      */
     internal fun hasSpaceForKnownGguf(availableBytes: Long, sizeBytes: Long): Boolean =
-        sizeBytes > 0L && sizeBytes <= MAX_BYTES &&
+        sizeBytes in ADVANCED_MIN_BYTES..ADVANCED_MAX_BYTES &&
             availableBytes >= maxOf(MIN_BYTES, sizeBytes) + FREE_HEADROOM
 
     fun modelFile(context: Context): File =
@@ -69,24 +69,20 @@ internal object AstraModelImport {
             it.isFile && it.length() in ADVANCED_MIN_BYTES..ADVANCED_MAX_BYTES
         }
 
-    fun appearsInstalled(context: Context): Boolean =
-        modelFile(context).let { it.isFile && it.length() in MIN_BYTES..600_000_000L } ||
-            advancedInstalled(context)
+    fun appearsInstalled(context: Context): Boolean = advancedInstalled(context)
 
     suspend fun importDocument(
         context: Context,
         uri: Uri,
         onProgress: suspend (Long) -> Unit = {}
     ): Long = withContext(Dispatchers.IO) {
-        val dir = modelFile(context).parentFile ?: throw IllegalStateException("Model storage unavailable.")
+        val dir = advancedFile(context).parentFile ?: throw IllegalStateException("Model storage unavailable.")
         require(dir.isDirectory || dir.mkdirs()) { "Cannot create model storage." }
-        // The previous 1.5 GB blanket check prevented importing a compact
-        // 0.6B GGUF on phones with sufficient room for that model. Accept a
-        // compact-sized starting budget, then enforce the remaining headroom
-        // throughout the copy (including ZIP/APK extraction).
+        // A smaller GGUF is no longer accepted. Reserve enough room for the
+        // pinned 1.7B model, then enforce headroom during streamed copying.
         require(hasImportStartingSpace(StatFs(dir.absolutePath).availableBytes)) {
             "Not enough free phone space to start a model import. " +
-                "Free at least 520 MB; larger models need more room."
+                "Free at least 1.22 GB for Qwen3 1.7B."
         }
         val safeProgress: suspend (Long) -> Unit = { copied ->
             require(StatFs(dir.absolutePath).availableBytes >= FREE_HEADROOM) {
@@ -145,7 +141,7 @@ internal object AstraModelImport {
                             )
                         } else {
                             require(isGguf) {
-                                "Select Qwen3 GGUF, a previous Astra APK or its GitHub ZIP."
+                                "Select Qwen3 1.7B GGUF, or an Astra APK/ZIP that bundles 1.7B."
                             }
                             copyBounded(buffered, output, digest, safeProgress)
                         }
@@ -155,14 +151,12 @@ internal object AstraModelImport {
                 }
             }
             val hash = digest.digest().joinToString("") { "%02x".format(it) }
-            val advanced = when {
-                total in ADVANCED_MIN_BYTES..ADVANCED_MAX_BYTES &&
-                    hash.equals(ADVANCED_SHA256, ignoreCase = true) -> true
-                total in MIN_BYTES..600_000_000L &&
-                    hash.equals(AstraOnDeviceBrain.MODEL_SHA256, ignoreCase = true) -> false
-                else -> error("Unsupported model or checksum mismatch. Import an exact verified Qwen3 GGUF.")
+            require(total in ADVANCED_MIN_BYTES..ADVANCED_MAX_BYTES &&
+                hash.equals(ADVANCED_SHA256, ignoreCase = true)) {
+                "Only the official verified Qwen3 1.7B Q4_K_M GGUF is supported. " +
+                    "The older 0.6B model cannot be used for conversation."
             }
-            val target = if (advanced) advancedFile(context) else modelFile(context)
+            val target = advancedFile(context)
             // Preserve the previously working GGUF until the fully verified
             // replacement is installed. A process death during the final
             // renames is recoverable at the next model-file lookup.
@@ -204,7 +198,6 @@ internal object AstraModelImport {
             }
             val name = entry.name.replace('\\', '/').trimStart('/')
             if (!entry.isDirectory && (name == ASSET_PATH ||
-                    name == AstraOnDeviceBrain.ASSET_NAME ||
                     name.endsWith("/" + ASSET_PATH) ||
                     name == ADVANCED_NAME || name.endsWith("/" + ADVANCED_NAME))) {
                 return copyBounded(zip, out, digest, onProgress)

@@ -24,18 +24,18 @@ ROOT = Path(__file__).resolve().parent.parent
 UPSTREAM = ROOT / "third_party" / "llama.cpp"
 LIB_DIR = UPSTREAM / "examples" / "llama.android" / "lib"
 GRADLE_SRC = ROOT / "android" / "llama-library.gradle.kts"
-MODEL_NAME = "qwen3-0.6b-q4km.gguf"
+MODEL_NAME = "Qwen3-1.7B-Q4_K_M.gguf"
 MODEL_PATH = ROOT / "android" / "app" / "src" / "main" / "assets" / MODEL_NAME
 
 # Release b12248; prevents source code from drifting between builds.
 LLAMA_TAG = "b12248"
 LLAMA_COMMIT_PREFIX = "3837bf0"
 MODEL_URL = (
-    "https://huggingface.co/QuantFactory/Qwen3-0.6B-GGUF/resolve/main/"
-    "Qwen3-0.6B.Q4_K_M.gguf"
+    "https://huggingface.co/ggml-org/Qwen3-1.7B-GGUF/resolve/main/"
+    "Qwen3-1.7B-Q4_K_M.gguf"
 )
-MODEL_SHA256 = "7af3fdf842f87b24672f8a7f1dd50404043f0bfb71093ff91c31d2b49df4631d"
-MIN_MODEL_BYTES = 450_000_000
+MODEL_SHA256 = "d2387ca2dbfee2ffabce7120d3770dadca0b293052bc2f0e138fdc940d9bc7b5"
+MIN_MODEL_BYTES = 1_150_000_000
 
 
 def check_model(path: Path) -> bool:
@@ -125,9 +125,9 @@ def prepare_licenses() -> None:
     shutil.copyfile(qwen_license, notices / "PdfBox-Android-Apache-2.0.txt")
 
     (notices / "SOURCES.txt").write_text(
-        "Qwen3 0.6B original model: https://huggingface.co/Qwen/Qwen3-0.6B\\n"
-        "QuantFactory Q4_K_M GGUF: "
-        "https://huggingface.co/QuantFactory/Qwen3-0.6B-GGUF\\n"
+        "Qwen3 1.7B original model: https://huggingface.co/Qwen/Qwen3-1.7B\\n"
+        "ggml-org Q4_K_M GGUF: "
+        "https://huggingface.co/ggml-org/Qwen3-1.7B-GGUF\\n"
         "Qwen3 model weights: Apache License 2.0.\\n"
         "llama.cpp native runtime: https://github.com/ggml-org/llama.cpp\\n"
         "llama.cpp: MIT license; dependency notices are included in this folder.\\n"
@@ -146,6 +146,8 @@ def main() -> None:
     )
     opts = parser.parse_args()
     prepare_binding()
+    # Old compact assets are never shipped in either FULL or LITE builds.
+    (MODEL_PATH.parent / "qwen3-0.6b-q4km.gguf").unlink(missing_ok=True)
     if opts.lite:
         MODEL_PATH.unlink(missing_ok=True)
         print("Lite build: GGUF omitted from APK.", flush=True)

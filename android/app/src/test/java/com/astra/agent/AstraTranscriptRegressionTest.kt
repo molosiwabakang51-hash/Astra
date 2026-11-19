@@ -41,9 +41,10 @@ class AstraTranscriptRegressionTest {
     }
 
     @Test fun noModelsAreClaimedInstalledWhenNoneExist() {
+        // A legacy 0.6B file alone can never satisfy 1.7B-only chat.
         assertEquals(AstraModelChoice.Variant.NONE,
-            AstraModelChoice.choose(advancedAvailable = false, compactAvailable = false))
+            AstraModelChoice.choose(advancedAvailable = false))
         assertEquals(AstraModelChoice.Variant.ADVANCED,
-            AstraModelChoice.choose(advancedAvailable = true, compactAvailable = true))
+            AstraModelChoice.choose(advancedAvailable = true))
     }
 }

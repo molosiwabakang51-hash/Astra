@@ -1,30 +1,24 @@
 package com.astra.agent
 
 /**
- * Local-first model routing. Use the largest verified model available, with
- * no subscription, remote inference endpoint or hardware-based restriction.
+ * The only supported conversation engine is locally verified Qwen3 1.7B.
+ * Do not silently select the historical 0.6B weights when the larger model
+ * is absent, corrupted or cannot be loaded. No remote inference is used.
  */
 internal object AstraModelChoice {
-    enum class Variant { ADVANCED, COMPACT, NONE }
+    enum class Variant { ADVANCED, NONE }
 
-    /** Return a public label, never exposing the private filesystem path. */
+    /** Only report a successfully loaded 1.7B model; never expose its path. */
     fun loadedName(modelPath: String?): String? =
         when (modelPath?.substringAfterLast('/')) {
             AstraModelImport.ADVANCED_NAME -> "Qwen3 1.7B · Q4_K_M"
-            AstraOnDeviceBrain.ASSET_NAME -> "Qwen3 0.6B · Q4_K_M"
             else -> null
         }
 
-    /**
-     * Preference order, not a guarantee that a file is valid. A candidate
-     * can fail the checksum or JNI load check and a later candidate can work.
-     */
-    fun candidates(advancedAvailable: Boolean, compactAvailable: Boolean): List<Variant> =
-        buildList {
-            if (advancedAvailable) add(Variant.ADVANCED)
-            if (compactAvailable) add(Variant.COMPACT)
-        }
+    /** Only the advanced 1.7B model can serve general conversation. */
+    fun candidates(advancedAvailable: Boolean): List<Variant> =
+        if (advancedAvailable) listOf(Variant.ADVANCED) else emptyList()
 
-    fun choose(advancedAvailable: Boolean, compactAvailable: Boolean): Variant =
-        candidates(advancedAvailable, compactAvailable).firstOrNull() ?: Variant.NONE
+    fun choose(advancedAvailable: Boolean): Variant =
+        candidates(advancedAvailable).firstOrNull() ?: Variant.NONE
 }

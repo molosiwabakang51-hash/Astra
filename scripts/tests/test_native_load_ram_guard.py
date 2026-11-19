@@ -27,9 +27,11 @@ class NativeLoadRamGuardSourceTest(unittest.TestCase):
             "suspend fun loadPreparedModel(path: File) {\n"
             "                        // Android's own low-memory signal", BRAIN
         )
-        self.assertIn(
-            "if (loadError is AstraNativeLowMemoryException)", BRAIN
-        )
+        # Low-memory errors now propagate; there is no weaker model to
+        # try. The preflight still runs before every fresh JNI model load.
+        self.assertIn("loadPreparedModel(modelPath)", BRAIN)
+        self.assertNotIn("Trying compact offline fallback", BRAIN)
+        self.assertNotIn("if (loadError is AstraNativeLowMemoryException)", BRAIN)
         self.assertIn("AstraInferenceCheckpoint.clear(context)", BRAIN)
 
 

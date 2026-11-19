@@ -35,19 +35,18 @@ class AstraModelImportTest {
         return extracted.toByteArray() to copied
     }
 
-    @Test fun compactImportStartsWithoutRequiringFullAdvancedModelSpace() {
+    @Test fun advancedImportRequiresEnoughStorageBeforeCopying() {
         val mib = 1024L * 1024L
-        assertTrue(AstraModelImport.hasImportStartingSpace(550L * mib))
-        assertTrue(!AstraModelImport.hasImportStartingSpace(450L * mib))
-        // The old blanket 1.5 GB requirement would incorrectly block 550 MiB.
-        assertTrue(550L * mib < 1_400_000_000L + 64L * mib)
+        assertTrue(!AstraModelImport.hasImportStartingSpace(550L * mib))
+        assertTrue(AstraModelImport.hasImportStartingSpace(1_300_000_000L))
+        assertTrue(!AstraModelImport.hasImportStartingSpace(1_100_000_000L))
     }
 
     @Test fun advancedGgufFailsEarlyWhenOnlyCompactFreeSpaceIsAvailable() {
         val mib = 1024L * 1024L
         val advancedFileSize = 1223L * mib
         val available = 700L * mib
-        assertTrue(AstraModelImport.hasImportStartingSpace(available))
+        assertTrue(!AstraModelImport.hasImportStartingSpace(available))
         assertTrue(!AstraModelImport.hasSpaceForKnownGguf(available, advancedFileSize))
         assertTrue(AstraModelImport.hasSpaceForKnownGguf(
             availableBytes = advancedFileSize + 64L * mib,
@@ -55,11 +54,10 @@ class AstraModelImportTest {
         ))
     }
 
-    @Test fun knownCompactGgufStillRequiresRealFileSizePlusHeadroom() {
+    @Test fun knownCompactGgufIsRejectedEvenWhenStorageIsPlentiful() {
         val mib = 1024L * 1024L
         val compactSize = 523L * mib
-        assertTrue(!AstraModelImport.hasSpaceForKnownGguf(550L * mib, compactSize))
-        assertTrue(AstraModelImport.hasSpaceForKnownGguf(600L * mib, compactSize))
+        assertTrue(!AstraModelImport.hasSpaceForKnownGguf(2_000_000_000L, compactSize))
     }
 
     @Test fun invalidOrMissingGgufSizeCannotBypassSafeImportChecks() {
@@ -73,7 +71,7 @@ class AstraModelImportTest {
         val gguf = byteArrayOf(0x47, 0x47, 0x55, 0x46, 1, 2, 3, 4)
         val apk = zip(
             "assets/open_source_licenses/SOURCES.txt" to "licenses".toByteArray(),
-            "assets/qwen3-0.6b-q4km.gguf" to gguf
+            "assets/Qwen3-1.7B-Q4_K_M.gguf" to gguf
         )
         val (output, count) = extract(apk)
         assertArrayEquals(gguf, output)
@@ -84,7 +82,7 @@ class AstraModelImportTest {
         val gguf = "GGUF test bytes".toByteArray()
         val apk = zip(
             "classes.dex" to byteArrayOf(0, 1),
-            "assets/qwen3-0.6b-q4km.gguf" to gguf
+            "assets/Qwen3-1.7B-Q4_K_M.gguf" to gguf
         )
         val artifact = zip("Astra-v0.10.4-offline-arm64-debug.apk" to apk)
         val (output, count) = extract(artifact)
@@ -113,7 +111,7 @@ class AstraModelImportTest {
                 output.putNextEntry(ZipEntry("unrelated/entry-$index.txt"))
                 output.closeEntry()
             }
-            output.putNextEntry(ZipEntry("assets/qwen3-0.6b-q4km.gguf"))
+            output.putNextEntry(ZipEntry("assets/Qwen3-1.7B-Q4_K_M.gguf"))
             output.write("GGUF ignored".toByteArray())
             output.closeEntry()
         }
@@ -131,7 +129,7 @@ class AstraModelImportTest {
                     output.closeEntry()
                 }
                 if (withModel) {
-                    output.putNextEntry(ZipEntry("assets/qwen3-0.6b-q4km.gguf"))
+                    output.putNextEntry(ZipEntry("assets/Qwen3-1.7B-Q4_K_M.gguf"))
                     output.write("GGUF should not be reached".toByteArray())
                     output.closeEntry()
                 }
@@ -153,7 +151,7 @@ class AstraModelImportTest {
         val model = "GGUF shared budget".toByteArray()
         val apk = zip(
             "META-INF/manifest" to byteArrayOf(1),
-            "assets/qwen3-0.6b-q4km.gguf" to model
+            "assets/Qwen3-1.7B-Q4_K_M.gguf" to model
         )
         val outer = zip("notes.txt" to byteArrayOf(2), "model.apk" to apk)
         val (extracted, count) = extract(outer)
@@ -166,7 +164,7 @@ class AstraModelImportTest {
         val archive = zip(
             "META-INF/MANIFEST.MF" to "manifest".toByteArray(),
             "assets/unrelated.txt" to "other".toByteArray(),
-            "assets/qwen3-0.6b-q4km.gguf" to model
+            "assets/Qwen3-1.7B-Q4_K_M.gguf" to model
         )
         val (extracted, count) = extract(archive)
         assertArrayEquals(model, extracted)

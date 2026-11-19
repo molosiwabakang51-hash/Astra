@@ -20,9 +20,9 @@ import java.security.MessageDigest
 /**
  * Qwen3 inference runs entirely on the Android device.
  *
- * CI bundles the verified GGUF inside the APK. At first use it is copied to
- * app-private no-backup storage for llama.cpp's file-path API; no network
- * request, separate computer, account or model server is involved.
+ * FULL builds bundle Qwen3 1.7B; LITE installs import the same verified model
+ * once into app-private storage. Neither build uses the older 0.6B model for
+ * conversation, and no cloud inference endpoint is required.
  */
 internal class AstraOnDeviceBrain(
     private val context: Context,
@@ -49,9 +49,6 @@ internal class AstraOnDeviceBrain(
     // A change of consent must not leave old book snippets in native KV-cache.
     private var previousBookContextAllowed: Boolean? = null
     private var previousReplyLanguageId: String? = null
-    // A failed native 1.7B load should not re-run on every subsequent turn.
-    // A newly imported file can be retried without restarting Astra.
-    private val failedAdvancedModels = AstraModelHealth()
 
     /**
      * Only reports the last model successfully loaded into the native engine.
@@ -59,11 +56,10 @@ internal class AstraOnDeviceBrain(
      */
     fun loadedModelLabel(): String? = AstraModelChoice.loadedName(loadedModelPath)
 
-    fun hasLocalModel(): Boolean = isModelBundled() ||
-        AstraModelImport.appearsInstalled(context)
+    fun hasLocalModel(): Boolean = hasAdvancedModel()
 
     fun isModelBundled(): Boolean =
-        isBundled(AstraModelImport.ADVANCED_NAME) || isBundled(ASSET_NAME)
+        isBundled(AstraModelImport.ADVANCED_NAME)
 
     fun hasAdvancedModel(): Boolean =
         AstraModelImport.advancedInstalled(context) ||
@@ -132,59 +128,29 @@ internal class AstraOnDeviceBrain(
                 if (!verifiedModels.hasVerifiedFile()) {
                     onPartial("Verifying the local offline model...")
                 }
-                val advancedFile = AstraModelImport.advancedFile(context)
-                val compactAvailable = AstraModelImport.modelFile(context).isFile ||
-                    isBundled(ASSET_NAME)
-                val candidates = AstraModelChoice.candidates(
-                    advancedAvailable = (AstraModelImport.advancedInstalled(context) ||
-                        isBundled(AstraModelImport.ADVANCED_NAME)) &&
-                        (!compactAvailable || failedAdvancedModels.shouldAttempt(advancedFile)),
-                    compactAvailable = compactAvailable
-                )
-                if (candidates.isEmpty()) {
+                // A smaller GGUF may remain on disk after an older Astra
+                // install, but it is never a valid conversation fallback.
+                if (!hasAdvancedModel()) {
                     error(
-                        "No local language model installed. Open Settings to import " +
-                            "the free Qwen3 1.7B model once."
+                        "Qwen3 1.7B is required for AI conversation. " +
+                            "Open Settings to download or import the verified 1.7B GGUF."
                     )
                 }
-                // A model file's size alone cannot prove integrity. If the
-                // preferred local file is truncated or corrupted, try the
-                // compact GGUF instead of disabling chat.
-                var selected: File? = null
-                var lastPreparationError: Exception? = null
-                for (candidate in candidates) {
-                    try {
-                        selected = when (candidate) {
-                            AstraModelChoice.Variant.ADVANCED -> ensureModel(
-                                AstraModelImport.ADVANCED_NAME,
-                                AstraModelImport.ADVANCED_SHA256,
-                                1_150_000_000L
-                            )
-                            AstraModelChoice.Variant.COMPACT -> ensureModel(
-                                ASSET_NAME, MODEL_SHA256, MIN_SIZE_BYTES
-                            )
-                            AstraModelChoice.Variant.NONE -> null
-                        }
-                        if (selected != null) break
-                    } catch (cancel: kotlinx.coroutines.CancellationException) {
-                        throw cancel
-                    } catch (failure: Exception) {
-                        lastPreparationError = failure
-                        if (candidate == AstraModelChoice.Variant.ADVANCED) {
-                            failedAdvancedModels.recordFailure(advancedFile)
-                        }
-                        if (candidate == AstraModelChoice.Variant.ADVANCED &&
-                            AstraModelChoice.Variant.COMPACT in candidates
-                        ) {
-                            onPartial("Advanced model unavailable. Checking compact offline fallback...")
-                        }
-                    }
+                val modelPath = try {
+                    ensureModel(
+                        AstraModelImport.ADVANCED_NAME,
+                        AstraModelImport.ADVANCED_SHA256,
+                        1_150_000_000L
+                    )
+                } catch (cancel: kotlinx.coroutines.CancellationException) {
+                    throw cancel
+                } catch (failure: Exception) {
+                    throw IllegalStateException(
+                        "Qwen3 1.7B could not be verified. Re-import the official model " +
+                            "in Settings; Astra will not use a smaller replacement.",
+                        failure
+                    )
                 }
-                var modelPath = selected ?: throw IllegalStateException(
-                    "No verified local language model could be prepared. " +
-                        "Re-import a model from Settings.",
-                    lastPreparationError
-                )
                 AstraInferenceCheckpoint.mark(
                     context, AstraInferenceCheckpoint.ENGINE_SETUP
                 )
@@ -232,32 +198,10 @@ internal class AstraOnDeviceBrain(
                         restoringConversation = true
                         session.markLoaded(conversationGeneration)
                     }
-                    try {
-                        loadPreparedModel(modelPath)
-                    } catch (cancel: kotlinx.coroutines.CancellationException) {
-                        throw cancel
-                    } catch (loadError: Exception) {
-                        // Low system RAM is a temporary condition, not
-                        // evidence that the advanced GGUF is corrupt. Stop
-                        // before JNI and allow a later retry after RAM clears.
-                        if (loadError is AstraNativeLowMemoryException) {
-                            throw loadError
-                        }
-                        // Native model load may fail without crashing Android.
-                        // A valid compact GGUF can then recover conversation.
-                        session.invalidate()
-                        loadedModelPath = null
-                        if (modelPath.name != AstraModelImport.ADVANCED_NAME ||
-                            AstraModelChoice.Variant.COMPACT !in candidates
-                        ) throw loadError
-                        failedAdvancedModels.recordFailure(modelPath)
-                        onPartial("Advanced model failed to load. Trying compact offline fallback...")
-                        // JNI's Error state is resettable, but a process-level
-                        // native crash cannot be recovered from Kotlin.
-                        current.cleanUp()
-                        modelPath = ensureModel(ASSET_NAME, MODEL_SHA256, MIN_SIZE_BYTES)
-                        loadPreparedModel(modelPath)
-                    }
+                    // A 1.7B JNI load failure is reported explicitly.
+                    // Downgrading to 0.6B would silently reduce reasoning
+                    // quality against the user's selected model policy.
+                    loadPreparedModel(modelPath)
                 }
 
                 val answer = StringBuilder()
@@ -363,11 +307,7 @@ internal class AstraOnDeviceBrain(
             }
         }
 
-    /**
-     * The strongest installed model is always selected. The 0.6B weights
-     * remain a compatibility fallback; switching models never uses a server.
-     * An app-private imported GGUF survives correctly signed app upgrades.
-     */
+    /** Verify the requested 1.7B GGUF locally and retain it across signed upgrades. */
     private suspend fun ensureModel(
         name: String,
         expectedSha256: String,

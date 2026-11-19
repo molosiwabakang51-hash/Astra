@@ -33,19 +33,20 @@ permission and provider behavior still need physical-device verification.
 ## Zero-fee offline model strategy
 
 **No mandatory paid AI API, subscription, remote model server, cloud GPU or paid hosting.**
-On supported Android phones, Astra uses the strongest verified locally available model.
-Qwen3 1.7B Q4_K_M is the preferred conversation model; the existing Qwen3 0.6B
-continues to work as an offline fallback. The 1.7B GGUF can be obtained from
+On supported Android phones, Astra requires the verified Qwen3 1.7B Q4_K_M
+model for general AI conversation. The previous Qwen3 0.6B is not a fallback:
+a missing, corrupt or unloadable 1.7B model produces an explicit error.
+The 1.7B GGUF can be obtained from
 [ggml-org on Hugging Face](https://huggingface.co/ggml-org/Qwen3-1.7B-GGUF/blob/main/Qwen3-1.7B-Q4_K_M.gguf)
 under Apache 2.0 and imported once through Settings. The application never
 sends chat prompts to Hugging Face for inference.
 
 Astra's low-data APK updates reuse verified model weights already stored in
 app-private no-backup storage (with the same signing key). Neither every build
-nor every update needs to host another 1.28 GB copy. The GitHub-hosted build
-may still bundle compact GGUF weights in the FULL artifact; **installing that
-artifact alone does not mean the 1.7B model is installed**. The 1.7B model
-becomes the default automatically once imported.
+nor every update needs to host another 1.28 GB copy. The GitHub-hosted FULL build now bundles the pinned 1.7B weights; LITE
+remains at or below 300 MB and bundles no GGUF. One-time LITE import is still
+necessary if the phone does not already hold the verified 1.7B weights.
+Same-signing-key updates preserve the privately imported model.
 
 **Zero-fee refers to software subscriptions and metered inference/hosting fees.**
 Initial downloads, mobile data charges, power consumption and hardware are
