@@ -24,9 +24,22 @@ internal object AstraAppLock {
         BiometricManager.Authenticators.BIOMETRIC_STRONG or
             BiometricManager.Authenticators.DEVICE_CREDENTIAL
 
-    fun enabled(context: Context): Boolean =
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            .getBoolean(ENABLED_KEY, false)
+    /**
+     * A malformed preference must not silently remove protection. A plain
+     * SharedPreferences.getBoolean can throw ClassCastException if a corrupt
+     * or old backup supplies a different type, crashing the cold launch.
+     *
+     * Missing key is the original opt-in default (unlocked). Existing key
+     * with an unexpected value or unreadable preferences requires Android
+     * authentication instead of failing open.
+     */
+    fun enabled(context: Context): Boolean = runCatching {
+        val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        AstraAppLockPolicy.enabledFromStoredPreference(
+            present = prefs.contains(ENABLED_KEY),
+            value = prefs.all[ENABLED_KEY]
+        )
+    }.getOrElse { true }
 
     fun setEnabled(context: Context, enabled: Boolean) {
         check(context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
@@ -131,6 +144,16 @@ internal object AstraAppLock {
 
 /** Independent, JVM-testable access rules for the opt-in secure workspace. */
 internal object AstraAppLockPolicy {
+    /**
+     * An absent key is a new, unlocked installation. If a saved lock
+     * setting is present but invalid, require unlock rather than reset it.
+     * Only a successful, system-authenticated user action can then disable
+     * the feature. This method is intentionally independent of Android APIs
+     * for deterministic JVM regression testing.
+     */
+    fun enabledFromStoredPreference(present: Boolean, value: Any?): Boolean =
+        if (!present) false else value as? Boolean ?: true
+
     val backgroundDelaysMillis: List<Long> = listOf(0L, 30_000L, 120_000L, 300_000L)
     // Off is the migration-safe default; selected limits apply only while active.
     val idleTimeoutsMillis: List<Long> = listOf(0L, 120_000L, 300_000L, 900_000L)
