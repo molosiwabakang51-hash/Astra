@@ -179,7 +179,10 @@ internal fun AstraNavigationTray(
                             )
                         }
                         Box(
-                            Modifier.size(36.dp)
+                            // The visible button and touch area are both 48dp.
+                            // Do not force users to accurately hit a tiny
+                            // decorative close glyph in the modal tray.
+                            Modifier.size(48.dp)
                                 .background(AstraAurora.raised, CircleShape)
                                 .semantics { contentDescription = "Close navigation" }
                                 .clickable(onClick = onDismiss),
