@@ -33,7 +33,7 @@ class AstraSubjectAtlasTest {
 
     @Test fun widerStudyLibraryCoversMajorAcademicAndPracticalFields() {
         for (name in listOf(
-            "Physics", "Chemistry", "Biology", "Neuroscience",
+            "Physics", "General Chemistry", "Biology", "Neuroscience",
             "World History", "Political Science", "Law", "Human Rights",
             "Computer Science", "Artificial Intelligence", "Machine Learning",
             "Cybersecurity", "Electrical Engineering", "Graphic Design",
