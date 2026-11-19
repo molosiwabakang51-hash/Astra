@@ -59,6 +59,7 @@ class ModelPickerRecoveryTests(unittest.TestCase):
         self.assertIn("Alignment.CenterStart", TRAY)
         self.assertIn("RoundedCornerShape(topEnd = 32.dp, bottomEnd = 32.dp)", TRAY)
         self.assertIn("AstraNavigationGlyph(", TRAY)
+        self.assertIn("Modifier.size(48.dp)", TRAY)  # close affordance
         self.assertIn("onNavigate(index)", TRAY)
         self.assertIn("AstraTrayAction.CLEAR_CHAT", MAIN)
         self.assertIn("showClearDialog = true", MAIN)

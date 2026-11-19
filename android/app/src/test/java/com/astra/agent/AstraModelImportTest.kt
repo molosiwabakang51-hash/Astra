@@ -209,4 +209,69 @@ class AstraModelImportTest {
         assertArrayEquals(byteArrayOf(71, 72), output.toByteArray())
     }
 
+
+    @Test fun modelSignatureProbeHandlesShortAndroidFilesReadsWithoutConsumingBytes() {
+        val expected = "GGUF model bytes".toByteArray(Charsets.US_ASCII)
+        val source = object : java.io.InputStream() {
+            var position = 0
+            override fun read(): Int =
+                if (position == expected.size) -1
+                else expected[position++].toInt() and 0xff
+            override fun read(buffer: ByteArray, offset: Int, length: Int): Int {
+                if (position >= expected.size) return -1
+                buffer[offset] = expected[position++]
+                return 1
+            }
+        }
+        val buffered = java.io.BufferedInputStream(source, 8)
+        assertArrayEquals("GGUF".toByteArray(Charsets.US_ASCII),
+            AstraModelImport.readPrefix4(buffered))
+        val copied = ByteArrayOutputStream()
+        buffered.copyTo(copied)
+        assertArrayEquals(expected, copied.toByteArray())
+    }
+
+    @Test fun modelSignatureProbeRejectsStalledProviderAndShortPartialHeaders() {
+        val stalled = object : java.io.InputStream() {
+            override fun read(): Int = 0
+            override fun read(buffer: ByteArray, off: Int, len: Int): Int = 0
+        }
+        val failure = runCatching {
+            AstraModelImport.readPrefix4(java.io.BufferedInputStream(
+                AstraModelImport.guardTransientEmptyReads(stalled), 8
+            ))
+        }.exceptionOrNull()
+        assertTrue(failure is IllegalArgumentException)
+        assertTrue(failure?.message.orEmpty().contains("stopped responding"))
+        assertArrayEquals(byteArrayOf(0x47, 0x47),
+            AstraModelImport.readPrefix4(
+                java.io.BufferedInputStream(ByteArrayInputStream(byteArrayOf(0x47, 0x47)))
+            ))
+    }
+
+    @Test fun transientZeroByteDocumentProviderReadsStillRevealFullGgufHeader() {
+        val bytes = "GGUF remaining".toByteArray(Charsets.US_ASCII)
+        val provider = object : java.io.InputStream() {
+            var index = 0
+            var emptyCount = 0
+            override fun read(): Int =
+                if (index == bytes.size) -1 else bytes[index++].toInt() and 0xff
+            override fun read(b: ByteArray, off: Int, len: Int): Int {
+                if (emptyCount < 8) {
+                    emptyCount++
+                    return 0
+                }
+                if (index == bytes.size) return -1
+                b[off] = bytes[index++]
+                return 1
+            }
+        }
+        val buffer = java.io.BufferedInputStream(
+            AstraModelImport.guardTransientEmptyReads(provider), 8
+        )
+        assertArrayEquals("GGUF".toByteArray(Charsets.US_ASCII),
+            AstraModelImport.readPrefix4(buffer))
+        assertEquals('G'.code, buffer.read())
+        assertEquals('G'.code, buffer.read())
+    }
 }
