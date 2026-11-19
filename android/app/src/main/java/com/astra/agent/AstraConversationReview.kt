@@ -36,6 +36,33 @@ internal object AstraConversationReview {
             return "Correct. Irrational Exuberance was written by Robert J. " +
                 "Shiller, a Yale economist, not 'Niall Shiller'."
         }
+        if (lower.startsWith("what does shiller say about irrational exuberance") ||
+            lower.startsWith("what did shiller say about irrational exuberance")) {
+            return "Robert J. Shiller argues in Irrational Exuberance that " +
+                "investor psychology, social narratives and feedback loops can " +
+                "drive asset valuations far beyond fundamentals. Rising prices " +
+                "can attract more buyers, reinforcing speculation, but high " +
+                "valuations can imply poor long-term returns. This does not " +
+                "predict when a bubble will burst."
+        }
+        val compoundReview = Regex(
+            """^recall earlier mentions of\s+(.+?)\.{1,}\s*do you see your mistake\??$""",
+            RegexOption.IGNORE_CASE
+        ).matchEntire(command)
+        if (compoundReview != null) {
+            return earlierMentions(compoundReview.groupValues[1], history) +
+                "\n\n" + reviewMistake(history)
+        }
+        if (lower == "in this chat" || lower == "earlier than this") {
+            val priorQuery = history.asReversed().asSequence()
+                .filter { it.role == "You" }
+                .take(8)
+                .mapNotNull { mentions.matchEntire(it.text.trim()) }
+                .firstOrNull()
+            if (priorQuery != null) {
+                return earlierMentions(priorQuery.groupValues[1], history)
+            }
+        }
         val match = mentions.matchEntire(command)
         if (match != null) {
             val term = match.groupValues[1].trim().trimEnd('.', '?', '!')
