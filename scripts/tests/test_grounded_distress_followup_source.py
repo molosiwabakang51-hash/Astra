@@ -15,7 +15,8 @@ class GroundedFollowUpTests(unittest.TestCase):
                         MAIN.index("dialogue.respond(clean, tasks, notes, completed)"))
         self.assertIn("cannot verify", DISTRESS)
         self.assertIn("Are you physically safe", DISTRESS)
-        self.assertIn("local emergency service", DISTRESS)
+        self.assertIn("contact a local ", DISTRESS)
+        self.assertIn("emergency service or a trusted person", DISTRESS)
         for missing in ("http://", "https://", "OkHttp", "java.net"):
             self.assertNotIn(missing, DISTRESS)
 
