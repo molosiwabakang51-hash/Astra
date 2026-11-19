@@ -25,6 +25,40 @@ class AstraFollowUpAnchorTest {
         assertTrue(prompt.length < 1100)
     }
 
+    @Test fun numericFollowUpSelectsFourthItemBeyondTruncatedSummary() {
+        val outline = """
+            Overview of financial management: detailed introduction to money decisions.
+            1. Investing: allocating assets to expected long-run opportunities.
+            Investing can be evaluated using time horizons, costs and risk limits.
+            2. Personal finance: arranging savings, liquidity and responsible debt.
+            Budgets track income, spending, obligations and emergency reserves.
+            3. Corporate finance: selecting investment projects and funding.
+            Working capital, cost of capital and governance affect firm value.
+            4. Financial Markets: currencies, equity indices, bonds and derivatives.
+            This includes the mechanics of liquidity, futures and market structure.
+        """.trimIndent()
+        val history = listOf(
+            msg("You", "Teach me finance"),
+            msg("Astra", outline)
+        )
+        val focused = AstraFollowUpAnchor.enrich("go into more detail for 4", history)
+        assertTrue(focused.contains("USER-SELECTED ITEM 4"))
+        assertTrue(focused.contains("Financial Markets: currencies"))
+        assertTrue(focused.contains("mechanics of liquidity"))
+        assertTrue(focused.contains("Explain specifically item 4"))
+        assertFalse(focused.contains("Leverage can magnify exposure"))
+    }
+
+    @Test fun missingNumberedItemIsNeverInvented() {
+        val history = listOf(
+            msg("You", "Explain bonds"),
+            msg("Astra", "Bonds are debt agreements with coupons and principal.")
+        )
+        val focused = AstraFollowUpAnchor.enrich("go into more detail for 4", history)
+        assertTrue(focused.contains("Item 4 was not located"))
+        assertTrue(focused.contains("instead of guessing"))
+    }
+
     @Test fun unambiguousQueriesRemainUntouched() {
         val history = listOf(msg("You", "Hello"), msg("Astra", "Hello there"))
         assertEquals("What is bond duration?",
