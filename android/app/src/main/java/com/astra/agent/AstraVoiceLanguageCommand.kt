@@ -55,14 +55,27 @@ internal object AstraVoiceLanguageCommand {
             "british english", "english uk" -> SpeechLanguage.ENGLISH_UK
             "russian", "русский" -> SpeechLanguage.RUSSIAN
             "setswana", "tswana" -> SpeechLanguage.SETSWANA
-            "french", "français", "francais" -> SpeechLanguage.FRENCH
-            "spanish", "español", "espanol" -> SpeechLanguage.SPANISH
-            "portuguese", "português", "portugues" -> SpeechLanguage.PORTUGUESE
+            "french", "français", "francais", "french france", "parisian french" ->
+                SpeechLanguage.FRENCH
+            "french canada", "canadian french", "québécois", "quebec french" ->
+                SpeechLanguage.FRENCH_CANADA
+            "spanish", "español", "espanol", "spanish spain" -> SpeechLanguage.SPANISH
+            "spanish mexico", "mexican spanish" -> SpeechLanguage.SPANISH_MEXICO
+            "portuguese", "português", "portugues", "portuguese portugal" ->
+                SpeechLanguage.PORTUGUESE
+            "portuguese brazil", "brazilian portuguese" ->
+                SpeechLanguage.PORTUGUESE_BRAZIL
             "german", "deutsch" -> SpeechLanguage.GERMAN
             "swahili", "kiswahili" -> SpeechLanguage.SWAHILI
             "japanese", "日本語" -> SpeechLanguage.JAPANESE
             "mandarin", "chinese", "mandarin chinese", "中文" ->
                 SpeechLanguage.MANDARIN
+            "arabic", "العربية" -> SpeechLanguage.ARABIC
+            "hindi", "हिन्दी", "हिंदी" -> SpeechLanguage.HINDI
+            "korean", "한국어" -> SpeechLanguage.KOREAN
+            "italian", "italiano" -> SpeechLanguage.ITALIAN
+            "turkish", "türkçe" -> SpeechLanguage.TURKISH
+            "urdu", "اردو" -> SpeechLanguage.URDU
             else -> return null
         }
         val reply = when (language) {
@@ -70,13 +83,22 @@ internal object AstraVoiceLanguageCommand {
                 AstraReplyLanguage.Choice.ENGLISH
             SpeechLanguage.RUSSIAN -> AstraReplyLanguage.Choice.RUSSIAN
             SpeechLanguage.SETSWANA -> AstraReplyLanguage.Choice.SETSWANA
-            SpeechLanguage.FRENCH -> AstraReplyLanguage.Choice.FRENCH
-            SpeechLanguage.SPANISH -> AstraReplyLanguage.Choice.SPANISH
-            SpeechLanguage.PORTUGUESE -> AstraReplyLanguage.Choice.PORTUGUESE
+            SpeechLanguage.FRENCH, SpeechLanguage.FRENCH_CANADA ->
+                AstraReplyLanguage.Choice.FRENCH
+            SpeechLanguage.SPANISH, SpeechLanguage.SPANISH_MEXICO ->
+                AstraReplyLanguage.Choice.SPANISH
+            SpeechLanguage.PORTUGUESE, SpeechLanguage.PORTUGUESE_BRAZIL ->
+                AstraReplyLanguage.Choice.PORTUGUESE
             SpeechLanguage.GERMAN -> AstraReplyLanguage.Choice.GERMAN
             SpeechLanguage.SWAHILI -> AstraReplyLanguage.Choice.SWAHILI
             SpeechLanguage.JAPANESE -> AstraReplyLanguage.Choice.JAPANESE
             SpeechLanguage.MANDARIN -> AstraReplyLanguage.Choice.MANDARIN
+            SpeechLanguage.ARABIC -> AstraReplyLanguage.Choice.ARABIC
+            SpeechLanguage.HINDI -> AstraReplyLanguage.Choice.HINDI
+            SpeechLanguage.KOREAN -> AstraReplyLanguage.Choice.KOREAN
+            SpeechLanguage.ITALIAN -> AstraReplyLanguage.Choice.ITALIAN
+            SpeechLanguage.TURKISH -> AstraReplyLanguage.Choice.TURKISH
+            SpeechLanguage.URDU -> AstraReplyLanguage.Choice.URDU
         }
         return Selection(language, reply)
     }
@@ -86,10 +108,10 @@ internal object AstraVoiceLanguageCommand {
             ". Local AI replies will prefer this language. Dictation and " +
             "speech playback will use " + selection.speech.displayName + ". " +
             if (offlineVoiceAvailable) {
-                "A compatible non-network speech voice was detected. " +
+                "An installed non-network voice with the exact language and region was detected. " +
                     "Offline recognition depends on installed Android language data."
             } else {
-                "An offline voice for this language is not confirmed on this phone. " +
+                "An offline voice for this exact language and regional accent is not confirmed on this phone. " +
                     "Install its Android voice and recognition language packs " +
                     "before expecting offline speech. Text learning still works."
             }
@@ -101,11 +123,20 @@ internal object AstraVoiceLanguageCommand {
         SpeechLanguage.RUSSIAN -> "Здравствуйте. Я Астра."
         SpeechLanguage.SETSWANA -> "Dumela. Ke nna Astra."
         SpeechLanguage.FRENCH -> "Bonjour. Je suis Astra."
+        SpeechLanguage.FRENCH_CANADA -> "Bonjour. Je suis Astra."
         SpeechLanguage.SPANISH -> "Hola. Soy Astra."
+        SpeechLanguage.SPANISH_MEXICO -> "Hola. Soy Astra."
         SpeechLanguage.PORTUGUESE -> "Olá. Sou a Astra."
+        SpeechLanguage.PORTUGUESE_BRAZIL -> "Olá. Sou a Astra."
         SpeechLanguage.GERMAN -> "Hallo. Ich bin Astra."
         SpeechLanguage.SWAHILI -> "Habari. Mimi ni Astra."
         SpeechLanguage.JAPANESE -> "こんにちは。アストラです。"
         SpeechLanguage.MANDARIN -> "你好。我是阿斯特拉。"
+        SpeechLanguage.ARABIC -> "مرحباً. أنا أسترا."
+        SpeechLanguage.HINDI -> "नमस्ते। मैं एस्ट्रा हूँ।"
+        SpeechLanguage.KOREAN -> "안녕하세요. 저는 아스트라입니다."
+        SpeechLanguage.ITALIAN -> "Ciao. Sono Astra."
+        SpeechLanguage.TURKISH -> "Merhaba. Ben Astra."
+        SpeechLanguage.URDU -> "السلام علیکم۔ میں آسٹرا ہوں۔"
     }
 }
