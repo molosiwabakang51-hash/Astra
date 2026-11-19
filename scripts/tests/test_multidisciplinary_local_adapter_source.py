@@ -22,7 +22,7 @@ class MultidisciplinaryAdapterSourceTest(unittest.TestCase):
 
     def test_does_not_modify_qwen_weights_or_send_private_text(self):
         self.assertIn("private fun teacherLabel(message: String)", ADAPTER)
-        self.assertIn("train after opted-in", ADAPTER.lower())
+        self.assertIn("trains after opted-in", ADAPTER.lower())
         self.assertIn("ASTRA_NEURAL_TOPIC_V2", ADAPTER)
         self.assertIn("ASTRA_NEURAL_TOPIC_V1", ADAPTER)
         self.assertIn("for (row in 0 until 3)", ADAPTER)
