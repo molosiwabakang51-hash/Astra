@@ -5,7 +5,7 @@ import java.util.Locale
 /**
  * A local, deterministic English grammar, reading and writing curriculum. Lessons and quiz answers are
  * original authored examples, not claims of neural reasoning or live tutoring.
- * Only small integer counters/bitsets persist in existing Astra preferences.
+ * Only small, subject-isolated integer counters/bitsets persist in Astra preferences.
  * No internet, third-party service, bundled model or file access is required.
  */
 internal class AstraEnglishCourse(
@@ -29,12 +29,12 @@ internal class AstraEnglishCourse(
     }
 
     companion object {
-        private const val LAST = "astra_math_last_lesson"
-        private const val VISITED = "astra_math_lessons_visited"
-        private const val MASTERED = "astra_math_quizzes_mastered"
-        private const val PENDING = "astra_math_pending_quiz"
-        private const val ATTEMPTS = "astra_math_quiz_attempts"
-        private const val CORRECT = "astra_math_quiz_correct"
+        private const val LAST = "astra_english_last_lesson"
+        private const val VISITED = "astra_english_lessons_visited"
+        private const val MASTERED = "astra_english_quizzes_mastered"
+        private const val PENDING = "astra_english_pending_quiz"
+        private const val ATTEMPTS = "astra_english_quiz_attempts"
+        private const val CORRECT = "astra_english_quiz_correct"
 
         val lessons: List<Lesson> = listOf(
             Lesson(
