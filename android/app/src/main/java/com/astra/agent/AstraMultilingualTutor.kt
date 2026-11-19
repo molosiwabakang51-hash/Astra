@@ -209,7 +209,21 @@ internal class AstraMultilingualTutor(
             """^(?:(?:oui|yes|ok|okay)\s+)?next\s+(?:(?:language|french|spanish|setswana|portuguese|german|swahili|japanese|mandarin)\s+)?lesson(?:\s+(?:please|s'il vous plaît|s'il vous plait))?$""",
             RegexOption.IGNORE_CASE
         )
-        if (nextLesson.matches(lower)) {
+        val nativeNext = when (current()) {
+            Language.FRENCH -> lower in setOf(
+                "leçon suivante", "prochaine leçon",
+                "leçon suivante s'il vous plaît", "prochaine leçon s'il vous plaît"
+            )
+            Language.SPANISH -> lower in setOf("siguiente lección", "próxima lección")
+            Language.PORTUGUESE -> lower in setOf("próxima lição", "lição seguinte")
+            Language.GERMAN -> lower in setOf("nächste lektion", "nächste stunde")
+            Language.SETSWANA -> lower == "thuto e e latelang"
+            Language.SWAHILI -> lower in setOf("somo linalofuata", "somo lijalo")
+            Language.JAPANESE -> lower in setOf("次のレッスン", "次の授業")
+            Language.MANDARIN -> lower in setOf("下一课", "下一节课")
+            null -> false
+        }
+        if (nextLesson.matches(lower) || nativeNext) {
             val language = current() ?: return "Select a course first: 'learn setswana'."
             val next = (readInt(key(language, "lesson"), 1) + 1)
                 .coerceAtMost(lessonCount(language))
