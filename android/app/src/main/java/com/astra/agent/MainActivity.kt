@@ -5213,7 +5213,7 @@ class MainActivity :
                                     }
                                     HorizontalDivider(
                                         modifier = Modifier.padding(horizontal = 16.dp),
-                                        color = AstraAurora.line
+                                        color = AstraAurora.raised
                                     )
                                     listOf(
                                         "Chat", "Tasks", "Notes", "Tools", "Settings", "Study"
@@ -5236,7 +5236,7 @@ class MainActivity :
                                                             .background(
                                                                 if (tab == index)
                                                                     AstraAurora.cyan.copy(alpha = 0.20f)
-                                                                else AstraAurora.line.copy(alpha = 0.40f),
+                                                                else AstraAurora.raised.copy(alpha = 0.40f),
                                                                 RoundedCornerShape(12.dp)
                                                             ),
                                                         contentAlignment = Alignment.Center
@@ -5251,7 +5251,7 @@ class MainActivity :
                                                         title,
                                                         style = MaterialTheme.typography.bodyMedium,
                                                         color = if (tab == index) Color.White
-                                                            else AstraAurora.text
+                                                            else AstraAurora.ink
                                                     )
                                                     Spacer(Modifier.weight(1f))
                                                     if (tab == index) {
@@ -5274,7 +5274,7 @@ class MainActivity :
                                     if (tab == 0) {
                                         HorizontalDivider(
                                             modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                                            color = AstraAurora.line
+                                            color = AstraAurora.raised
                                         )
                                         Text(
                                             "QUICK ACTIONS",
