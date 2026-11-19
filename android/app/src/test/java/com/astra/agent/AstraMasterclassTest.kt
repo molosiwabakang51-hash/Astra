@@ -72,6 +72,15 @@ class AstraMasterclassTest {
             .contains("Quiz attempts: 0"))
     }
 
+    @Test fun bondPriceWorkedCaseIsArithmeticallyCorrect() {
+        val price = 50.0 / 1.06 + 1050.0 / (1.06 * 1.06)
+        assertEquals(981.67, price, 0.01)
+        val bondLesson = AstraMasterclass.units("finance")
+            .first { it.title.contains("Bond valuation") }
+        assertTrue(bondLesson.workedCase.contains("P981.67"))
+        assertTrue(bondLesson.workedCase.contains("50/1.06"))
+    }
+
     @Test fun quizRecoversOnRestartAndInvalidAnswersPreserveIt() {
         val first = course()
         first.respond("english workshop 2")
