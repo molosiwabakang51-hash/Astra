@@ -17,6 +17,11 @@ import java.nio.charset.StandardCharsets
  */
 internal object AstraBackupCodec {
     const val MAX_BYTES = 8_000_000
+    // The archived-chat codec already preserves full 16k AI replies and
+    // long pasted documents. Backup restore must not reject valid active
+    // conversations merely because a single turn exceeded the legacy 12k
+    // limit. The existing 8 MB total-file cap still bounds allocations.
+    internal const val MAX_HISTORY_TEXT_UNITS = 250_000
     private const val FORMAT = "astra-local-backup"
     private const val VERSION = 1
 
@@ -117,7 +122,7 @@ internal object AstraBackupCodec {
                     val role = entry.optString("role")
                     val text = entry.opt("text")
                     if (role !in setOf("You", "Astra") ||
-                        text !is String || text.length > 12_000
+                        text !is String || text.length > MAX_HISTORY_TEXT_UNITS
                     ) {
                         throw IllegalArgumentException("Invalid chat message in backup.")
                     }
