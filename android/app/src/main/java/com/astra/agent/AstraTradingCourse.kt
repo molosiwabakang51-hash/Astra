@@ -190,7 +190,9 @@ internal class AstraTradingCourse(
         if (command.length > 90) return null
         return when (command) {
             "trading course", "day trading course", "trading syllabus", "learn trading",
-            "learn day trading", "teach me day trading", "start trading course" -> syllabus()
+            "learn day trading", "teach me day trading", "start trading course",
+            "teach me forex", "learn forex", "study forex",
+            "teach me index derivatives", "learn index derivatives" -> syllabus()
             "trading progress", "my trading progress" -> progress()
             "next trading lesson" -> lesson((readInt(LAST, 0) + 1).coerceIn(1, lessons.size))
             "trading quiz", "quiz me on trading" -> quiz(readInt(LAST, 1).coerceIn(1, lessons.size))
@@ -228,6 +230,8 @@ internal class AstraTradingCourse(
         }
         appendLine()
         append("Choose 'trading lesson 1', 'next trading lesson', 'trading quiz 1', or 'trading progress'.")
+        appendLine()
+        append("For in-depth Forex and index-derivative cases: 'trading workshop'.")
     }.trim()
 
     private fun lesson(index: Int): String {
