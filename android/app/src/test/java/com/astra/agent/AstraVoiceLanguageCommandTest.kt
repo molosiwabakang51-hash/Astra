@@ -28,6 +28,8 @@ class AstraVoiceLanguageCommandTest {
             "Talk to me in German" to SpeechLanguage.GERMAN,
             "Listen in Russian" to SpeechLanguage.RUSSIAN,
             "Use Setswana for voice" to SpeechLanguage.SETSWANA,
+            "Please use French for voice" to SpeechLanguage.FRENCH,
+            "Listen to me in Spanish" to SpeechLanguage.SPANISH,
             "Set speech language to Japanese" to SpeechLanguage.JAPANESE,
             "Switch voice to Mandarin Chinese" to SpeechLanguage.MANDARIN,
             "Parle français" to SpeechLanguage.FRENCH,
