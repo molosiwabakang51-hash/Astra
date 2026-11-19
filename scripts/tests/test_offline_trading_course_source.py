@@ -18,9 +18,7 @@ class TradingCourseSourceTest(unittest.TestCase):
         self.assertIn("CHECK YOUR THINKING", COURSE)
         self.assertIn("quiz", COURSE)
         self.assertIn("private const val VALID_MASK = 0x0000FFFF", COURSE)
-        self.assertIn("TRADING COURSE PROGRESS", COURSE) if False else self.assertIn(
-            "DAY TRADING COURSE PROGRESS", COURSE
-        )
+        self.assertIn("DAY TRADING COURSE PROGRESS", COURSE)
 
     def test_study_and_main_processor_are_wired_to_deterministic_engine(self):
         self.assertIn("AstraTradingCourse.lessons.mapIndexed", CATALOG)
