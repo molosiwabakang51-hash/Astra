@@ -3260,6 +3260,29 @@ class MainActivity :
                         return
                     }
 
+                    // An explicit spoken-language choice synchronizes
+                    // dictation, spoken replies and local AI output preference.
+                    // It does not download a speech model or claim Android
+                    // already supports the selected offline locale.
+                    AstraVoiceLanguageCommand.parse(normalized)?.let { chosen ->
+                        speechLanguage = chosen.speech
+                        aiReplyLanguage = chosen.reply
+                        storage.setString("speech_language", chosen.speech.tag)
+                        storage.setString("astra_ai_reply_language", chosen.reply.id)
+                        selectOfflineVoice()
+                        history.add(ChatMessage("You", message))
+                        history.add(ChatMessage("Astra",
+                            AstraVoiceLanguageCommand.confirmation(
+                                chosen, offlineVoiceAvailable
+                            )
+                        ))
+                        while (history.size > MAX_HISTORY) history.removeAt(0)
+                        input = ""
+                        persist()
+                        keyboard?.hide()
+                        return
+                    }
+
                     AstraReplyLanguage.parseCommand(normalized)?.let { chosen ->
                         aiReplyLanguage = chosen
                         storage.setString("astra_ai_reply_language", chosen.id)
@@ -6757,7 +6780,10 @@ class MainActivity :
                                                     "Try 'reply in Setswana', 'reply in French', " +
                                                     "or 'reply in auto' in chat. " +
                                                     "The smaller model may not produce fluent answers " +
-                                                    "in every language. Voice settings are independent.",
+                                                    "in every language. For a combined language switch, " +
+                                                    "say 'speak in French', 'listen in Russian', or " +
+                                                    "'use Setswana for voice'. Offline speech also requires " +
+                                                    "installed Android language packs.",
                                                 style = MaterialTheme.typography.bodySmall
                                             )
                                         }
@@ -6969,7 +6995,7 @@ class MainActivity :
                                             if (offlineVoiceAvailable) {
                                                 "Offline voice: $offlineVoiceName"
                                             } else {
-                                                "Offline English voice unavailable."
+                                                "No offline " + speechLanguage.displayName + " voice detected."
                                             }
                                         )
                                     }
@@ -6982,7 +7008,7 @@ class MainActivity :
                                                 selectOfflineVoice()
 
                                                 speak(
-                                                    "Astra voice test.",
+                                                    AstraVoiceLanguageCommand.testPhrase(speechLanguage),
                                                     localOnlyTts
                                                 )
                                             }
