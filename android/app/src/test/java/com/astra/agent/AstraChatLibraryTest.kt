@@ -192,4 +192,42 @@ class AstraChatLibraryTest {
         }
         assertFalse(chats.isEmpty())
     }
+
+    @Test fun chatTitlesAndSearchSnippetsPreserveWholeEmojiCharacters() {
+        // A 100-code-unit title must never end with half an emoji.
+        val title = AstraChatLibrary.title("x".repeat(99) + "🧠" + "research")
+        assertEquals("x".repeat(99), title)
+        val fitting = AstraChatLibrary.title("x".repeat(98) + "🧠" + "research")
+        assertEquals("x".repeat(98) + "🧠", fitting)
+
+        // Start of preview would otherwise land on the low surrogate.
+        val early = AstraChatArchive.Chat(
+            "early", "Unrelated",
+            listOf(AstraChatArchive.Message("Astra",
+                "🧠" + "a".repeat(34) + "needle" + "z".repeat(75)))
+        )
+        val starts = AstraChatLibrary.searchWithPreview(listOf(early), "needle")
+            .single().snippet!!
+        assertTrue(starts.contains("🧠"))
+        assertTrue(starts.contains("needle"))
+        // End of preview would otherwise land on the high surrogate.
+        val late = AstraChatArchive.Chat(
+            "late", "Unrelated",
+            listOf(AstraChatArchive.Message("You",
+                "needle" + "a".repeat(64) + "🧠" + "tail"))
+        )
+        val ends = AstraChatLibrary.searchWithPreview(listOf(late), "needle")
+            .single().snippet!!
+        assertFalse(ends.contains("🧠"))
+        for (value in listOf(title, fitting, starts, ends)) {
+            for (i in value.indices) {
+                if (value[i].isHighSurrogate()) {
+                    assertTrue(i + 1 < value.length && value[i + 1].isLowSurrogate())
+                }
+                if (value[i].isLowSurrogate()) {
+                    assertTrue(i > 0 && value[i - 1].isHighSurrogate())
+                }
+            }
+        }
+    }
 }
