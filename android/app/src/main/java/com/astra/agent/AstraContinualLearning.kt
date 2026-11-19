@@ -21,9 +21,38 @@ import kotlin.math.tanh
  * Prediction can enrich knowledge retrieval, NEVER execute tool commands.
  */
 internal class AstraContinualLearning(private val file: File) {
-    enum class Topic { RUSSIAN, FINANCE, GENERAL }
+    // Keep the first three V1 ordinals for lossless migration of existing
+    // locally trained Russian, Finance and General output-layer weights.
+    enum class Topic {
+        RUSSIAN, FINANCE, GENERAL,
+        FRENCH, SPANISH, PORTUGUESE, GERMAN, SETSWANA, SWAHILI,
+        JAPANESE, MANDARIN, TRADING, MATHEMATICS, PHYSICS,
+        CHEMISTRY, BIOLOGY, COMPUTING, HISTORY, LAW, CREATIVE_WRITING
+    }
     data class Prediction(val topic: Topic, val confidence: Double)
     data class State(val steps: Int, val lastLoss: Double)
+
+    private val labelRules = listOf(
+        Topic.RUSSIAN to Regex("""russian|russki|cyrillic|привет|здравствуйте|русск|\p{IsCyrillic}"""),
+        Topic.FRENCH to Regex("""french|français|francais|bonjour|merci|grammaire|subjonctif"""),
+        Topic.SPANISH to Regex("""spanish|español|espanol|hola|buenos días|castellano"""),
+        Topic.PORTUGUESE to Regex("""portuguese|português|portugues|olá|obrigado"""),
+        Topic.GERMAN to Regex("""german|deutsch|guten tag|danke|deutsche"""),
+        Topic.SETSWANA to Regex("""setswana|tswana|dumela|ke a leboga|batswana"""),
+        Topic.SWAHILI to Regex("""swahili|kiswahili|habari|asante"""),
+        Topic.JAPANESE to Regex("""japanese|nihongo|hiragana|katakana|こんにちは|ありがとう|\p{IsHiragana}|\p{IsKatakana}"""),
+        Topic.MANDARIN to Regex("""mandarin|chinese|pinyin|hanzi|中文|你好|\p{IsHan}"""),
+        Topic.TRADING to Regex("""forex|day.?trad|stock index|index futures|margin call|leverage|stop.loss|currency pair|candlestick|slippage|spread trading|derivative"""),
+        Topic.MATHEMATICS to Regex("""algebra|calculus|equation|derivative of|integral|trigonometr|geometry|linear algebra|probability theorem|matrix|polynomial"""),
+        Topic.PHYSICS to Regex("""physics|newton.?s law|mechanics|gravity|kinetic energy|relativity|quantum|electric circuit|thermodynamic|particle accelerat"""),
+        Topic.CHEMISTRY to Regex("""chemistry|chemical|molecule|stoichiometry|periodic table|covalent|oxidation|organic compound"""),
+        Topic.BIOLOGY to Regex("""biology|biological|photosynth|genetic|genome|dna|ecology|ecosystem|neuron|immunology"""),
+        Topic.COMPUTING to Regex("""computer science|algorithm|programming|python|kotlin|android|database|sql|software|data structure|operating system|cybersecurity|machine learning"""),
+        Topic.HISTORY to Regex("""history|historical|archaeology|civilization|world war|ancient empire|historian"""),
+        Topic.LAW to Regex("""\blaw\b|legal|constitutional|legislation|lawsuit|jurisdiction|court ruling|contract law"""),
+        Topic.CREATIVE_WRITING to Regex("""poetry|poem|novel|storytelling|fiction writing|creative writing|literature|character arc"""),
+        Topic.FINANCE to Regex("""\bbond\b|yield|dividend|portfolio|equity|invest|financ|interest|convexity|duration|cash.?flow|compound|pension|valuation|balance sheet|accounting""")
+    )
 
     private val inputs = 128
     private val hidden = 24
@@ -136,15 +165,14 @@ internal class AstraContinualLearning(private val file: File) {
         return x
     }
 
+    /** Inspect the deterministic training label without updating or saving weights. */
+    internal fun trainingLabel(message: String): Topic = teacherLabel(message)
+
     private fun teacherLabel(message: String): Topic {
         val lower = message.lowercase(Locale.ROOT)
-        return when {
-            Regex("""russian|russki|cyrillic|привет|здравствуйте|русск|\p{IsCyrillic}""")
-                .containsMatchIn(lower) -> Topic.RUSSIAN
-            Regex("""bond|yield|dividend|portfolio|equity|invest|financ|interest|convexity|duration|cash.?flow|compound""")
-                .containsMatchIn(lower) -> Topic.FINANCE
-            else -> Topic.GENERAL
-        }
+        return labelRules.firstOrNull { (_, pattern) ->
+            pattern.containsMatchIn(lower)
+        }?.first ?: Topic.GENERAL
     }
 
     private fun resetWeights() {
@@ -164,7 +192,7 @@ internal class AstraContinualLearning(private val file: File) {
         try {
             FileOutputStream(temp).use { raw ->
                 DataOutputStream(raw).use { stream ->
-                    stream.writeUTF("ASTRA_NEURAL_TOPIC_V1")
+                    stream.writeUTF("ASTRA_NEURAL_TOPIC_V2")
                     stream.writeInt(steps)
                     stream.writeDouble(lastLoss)
                     for (values in arrayOf(w1, b1, w2, b2)) {
@@ -189,16 +217,34 @@ internal class AstraContinualLearning(private val file: File) {
         if (!file.isFile || file.length() > 50_000L) return
         runCatching {
             DataInputStream(file.inputStream().buffered()).use { stream ->
-                check(stream.readUTF() == "ASTRA_NEURAL_TOPIC_V1")
+                val header = stream.readUTF()
+                require(header == "ASTRA_NEURAL_TOPIC_V2" ||
+                    header == "ASTRA_NEURAL_TOPIC_V1") {
+                    "Unsupported local topic-adapter version."
+                }
                 val loadedSteps = stream.readInt()
                 val loss = stream.readDouble()
                 require(loadedSteps in 0..10_000_000 && loss.isFinite())
-                val read = arrayOf(w1, b1, w2, b2)
-                for (values in read) {
-                    for (i in values.indices) {
-                        val value = stream.readDouble()
-                        require(value.isFinite() && kotlin.math.abs(value) < 100.0)
-                        values[i] = value
+                fun readWeight(): Double {
+                    val value = stream.readDouble()
+                    require(value.isFinite() && kotlin.math.abs(value) < 100.0)
+                    return value
+                }
+                for (values in arrayOf(w1, b1)) {
+                    for (i in values.indices) values[i] = readWeight()
+                }
+                if (header == "ASTRA_NEURAL_TOPIC_V1") {
+                    // V1 had only three outputs. Preserve their trained
+                    // weights and biases at identical ordinal positions.
+                    for (row in 0 until 3) {
+                        for (column in 0 until hidden) {
+                            w2[row * hidden + column] = readWeight()
+                        }
+                    }
+                    for (row in 0 until 3) b2[row] = readWeight()
+                } else {
+                    for (values in arrayOf(w2, b2)) {
+                        for (i in values.indices) values[i] = readWeight()
                     }
                 }
                 steps = loadedSteps
