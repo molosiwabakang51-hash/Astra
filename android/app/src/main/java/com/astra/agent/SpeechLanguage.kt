@@ -15,7 +15,13 @@ internal enum class SpeechLanguage(val tag: String, val displayName: String) {
     GERMAN("de-DE", "German (Germany)"),
     SWAHILI("sw-KE", "Swahili (Kenya)"),
     JAPANESE("ja-JP", "Japanese (Japan)"),
-    MANDARIN("zh-CN", "Mandarin Chinese (China)");
+    MANDARIN("zh-CN", "Mandarin Chinese (China)"),
+    ARABIC("ar-SA", "Arabic (Saudi Arabia)"),
+    HINDI("hi-IN", "Hindi (India)"),
+    KOREAN("ko-KR", "Korean (South Korea)"),
+    ITALIAN("it-IT", "Italian (Italy)"),
+    TURKISH("tr-TR", "Turkish (Türkiye)"),
+    URDU("ur-PK", "Urdu (Pakistan)");
 
     companion object {
         fun fromTag(tag: String?): SpeechLanguage =
