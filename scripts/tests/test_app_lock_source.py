@@ -54,7 +54,14 @@ class AstraAppLockSourceTest(unittest.TestCase):
         self.assertIn("BiometricPrompt.Builder(activity)", LOCK)
         self.assertIn("BiometricManager.Authenticators.BIOMETRIC_STRONG", LOCK)
         self.assertIn("BiometricManager.Authenticators.DEVICE_CREDENTIAL", LOCK)
-        self.assertIn(".getBoolean(ENABLED_KEY, false)", LOCK)
+        # The original getBoolean() could throw on a corrupt pref; a
+        # simple catch/default-false would bypass an already-enabled lock.
+        self.assertNotIn(".getBoolean(ENABLED_KEY, false)", LOCK)
+        self.assertIn("prefs.contains(ENABLED_KEY)", LOCK)
+        self.assertIn("prefs.all[ENABLED_KEY]", LOCK)
+        self.assertIn("enabledFromStoredPreference(", LOCK)
+        self.assertIn("if (!present) false else (value as? Boolean ?: true)", LOCK)
+        self.assertIn("}.getOrElse { true }", LOCK)
         self.assertIn("onAuthenticationSucceeded", LOCK)
         self.assertIn("onAuthenticationError", LOCK)
         self.assertNotIn("onAuthenticationFailed", LOCK)
