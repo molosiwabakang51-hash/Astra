@@ -54,6 +54,33 @@ class AstraSpeechSessionTest {
         }
     }
 
+    @Test fun privateSpeechRequiresActiveDisplayUnlockedKeyguardAndFocusedWindow() {
+        assertTrue(AstraSpeechPrivacy.mayUseVoice(
+            foreground = true, appLockEnabled = false, workspaceUnlocked = false,
+            displayInteractive = true, deviceUnlocked = true, windowFocused = true
+        ))
+        assertFalse(AstraSpeechPrivacy.mayUseVoice(
+            foreground = true, appLockEnabled = false, workspaceUnlocked = true,
+            displayInteractive = false, deviceUnlocked = true, windowFocused = true
+        ))
+        assertFalse(AstraSpeechPrivacy.mayUseVoice(
+            foreground = true, appLockEnabled = false, workspaceUnlocked = true,
+            displayInteractive = true, deviceUnlocked = false, windowFocused = true
+        ))
+        assertFalse(AstraSpeechPrivacy.mayUseVoice(
+            foreground = true, appLockEnabled = false, workspaceUnlocked = true,
+            displayInteractive = true, deviceUnlocked = true, windowFocused = false
+        ))
+        assertFalse(AstraSpeechPrivacy.mayUseVoice(
+            foreground = false, appLockEnabled = false, workspaceUnlocked = true,
+            displayInteractive = true, deviceUnlocked = true, windowFocused = true
+        ))
+        assertFalse(AstraSpeechPrivacy.mayUseVoice(
+            foreground = true, appLockEnabled = true, workspaceUnlocked = false,
+            displayInteractive = true, deviceUnlocked = true, windowFocused = true
+        ))
+    }
+
     @Test fun microphoneAndTextToSpeechAreForegroundAndUnlockOnly() {
         assertTrue(AstraSpeechPrivacy.mayUseVoice(true, false, false))
         assertTrue(AstraSpeechPrivacy.mayUseVoice(true, true, true))
