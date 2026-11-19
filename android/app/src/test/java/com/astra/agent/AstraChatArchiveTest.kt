@@ -102,4 +102,28 @@ class AstraChatArchiveTest {
             assertEquals("Message $index", chats.first().messages.first().text)
         }
     }
+
+    @Test fun archivedTitlesAndGeneratedTitlesKeepCompleteUnicode() {
+        val longTitle = "t".repeat(99) + "🌍" + "suffix"
+        val original = AstraChatArchive.Chat(
+            "some-id", longTitle,
+            listOf(AstraChatArchive.Message("You",
+                "A".repeat(54) + "🧠" + "topic"))
+        )
+        val restored = AstraChatArchive.decode(
+            AstraChatArchive.encode(listOf(original))).single()
+        assertEquals("t".repeat(99), restored.title)
+        assertEquals("A".repeat(54),
+            AstraChatArchive.title(original.messages))
+
+        // Also cover hostile overlong title data supplied by an import.
+        val json = org.json.JSONArray().put(
+            org.json.JSONObject()
+                .put("id", "id")
+                .put("title", "B".repeat(99) + "🌍")
+                .put("messages", org.json.JSONArray())
+        ).toString()
+        assertEquals("B".repeat(99),
+            AstraChatArchive.decode(json).single().title)
+    }
 }
