@@ -22,7 +22,7 @@ internal object AstraChatArchive {
             val ids = mutableSetOf<String>()
             for (i in 0 until minOf(array.length(), MAX_CHATS)) {
                 val item = array.optJSONObject(i) ?: continue
-                val id = item.optString("id").take(80)
+                val id = AstraUnicodeBounds.prefix(item.optString("id"), 80)
                 if (id.isBlank() || !ids.add(id)) continue
                 val entries = item.optJSONArray("messages") ?: continue
                 val messages = mutableListOf<Message>()
@@ -34,7 +34,7 @@ internal object AstraChatArchive {
                         messages.add(Message(role, text))
                     }
                 }
-                output.add(Chat(id, item.optString("title").take(100), messages))
+                output.add(Chat(id, AstraUnicodeBounds.prefix(item.optString("title"), 100), messages))
             }
             output
         } catch (_: Exception) {
@@ -58,8 +58,8 @@ internal object AstraChatArchive {
                     )
                 }
             array.put(
-                JSONObject().put("id", chat.id.take(80))
-                    .put("title", chat.title.take(100))
+                JSONObject().put("id", AstraUnicodeBounds.prefix(chat.id, 80))
+                    .put("title", AstraUnicodeBounds.prefix(chat.title, 100))
                     .put("messages", messages)
             )
         }
@@ -68,6 +68,8 @@ internal object AstraChatArchive {
 
     fun title(messages: List<Message>): String =
         messages.firstOrNull { it.role == "You" && it.text.isNotBlank() }
-            ?.text?.replace(Regex("\\s+"), " ")?.take(55)
+            ?.text?.replace(Regex("\\s+"), " ")?.let {
+                AstraUnicodeBounds.prefix(it, 55)
+            }
             ?: "New conversation"
 }
