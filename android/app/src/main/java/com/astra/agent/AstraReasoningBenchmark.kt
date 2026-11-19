@@ -1,0 +1,88 @@
+package com.astra.agent
+
+import java.util.Locale
+
+/**
+ * On-phone A/B probes for the same installed Qwen3 1.7B model.
+ *
+ * A complete run sends every synthetic problem in a fresh, isolated native
+ * conversation in both modes. These narrow tests measure correctness and
+ * latency; they are not an earned general-intelligence rating.
+ */
+internal object AstraReasoningBenchmark {
+    enum class Probe(val title: String, val question: String) {
+        ENTAILMENT(
+            "Logical entailment",
+            "Every sapphire is a stone. Some stones are heavy. " +
+                "Does it necessarily follow that every sapphire is heavy? " +
+                "Reply with only YES or NO."
+        ),
+        PROFIT_LOSS(
+            "Multi-step profit or loss",
+            "A trader buys 40 units at P12 each, sells 15 units at P14 " +
+                "and the remaining 25 at P10, with no fees. " +
+                "What is the total profit or loss in pula? " +
+                "Reply with a signed number only (negative for loss)."
+        )
+    }
+
+    enum class Mode { FAST, CAREFUL }
+
+    data class Sample(
+        val probe: Probe,
+        val mode: Mode,
+        val passed: Boolean,
+        val milliseconds: Long,
+        val answerPreview: String
+    )
+
+    fun prompt(probe: Probe, mode: Mode): String =
+        if (mode == Mode.CAREFUL) "Think carefully: " + probe.question
+        else probe.question
+
+    fun score(probe: Probe, answer: String): Boolean {
+        // Grade ONLY the visible final answer, never hidden reasoning or a
+        // footnote containing the correct number in an incorrect explanation.
+        val text = AstraOfflinePolicy.publicReply(answer).trim()
+            .replace("**", "").trim().lowercase(Locale.ROOT)
+        return when (probe) {
+            Probe.ENTAILMENT -> Regex("""^no[.!]?$""").matches(text)
+            Probe.PROFIT_LOSS ->
+                Regex("""^[-−]\s*(?:p\s*)?20(?:\.0{1,2})?[.!]?$""").matches(text)
+        }
+    }
+
+    fun sample(probe: Probe, mode: Mode, answer: String, elapsedMs: Long): Sample =
+        Sample(
+            probe, mode, score(probe, answer), elapsedMs.coerceAtLeast(0),
+            AstraOfflinePolicy.publicReply(answer).replace(Regex("""\s+"""), " ")
+                .trim().take(120)
+        )
+
+    fun render(samples: List<Sample>, loadedModel: String?): String {
+        val fast = samples.filter { it.mode == Mode.FAST }
+        val careful = samples.filter { it.mode == Mode.CAREFUL }
+        return buildString {
+            appendLine("ON-DEVICE 1.7B REASONING A/B")
+            appendLine("Loaded model: " + (loadedModel ?: "unverified"))
+            appendLine("Fast: " + fast.count { it.passed } + "/" + fast.size)
+            appendLine("Careful: " + careful.count { it.passed } + "/" + careful.size)
+            for (result in samples) {
+                appendLine(
+                    (if (result.passed) "PASS" else "UNVERIFIED") + " " +
+                        result.mode.name + " · " + result.probe.title +
+                        " · " + result.milliseconds + " ms"
+                )
+                if (!result.passed) {
+                    appendLine("Visible reply: " +
+                        result.answerPreview.ifEmpty { "<no final answer>" })
+                }
+            }
+            append(
+                "These are two synthetic spot checks, not a 10/10 rating. " +
+                    "Longer thinking can cost substantial RAM, heat and time. " +
+                    "Compare outcomes on the same phone in airplane mode."
+            )
+        }
+    }
+}
