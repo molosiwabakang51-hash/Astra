@@ -1424,6 +1424,19 @@ private class AstraProcessor(
         val lower =
             clean.lowercase(Locale.ENGLISH)
 
+        // Explicit distress never falls through to a small local LLM or a
+        // pending task/note confirmation. Keep responses grounded and private.
+        AstraDistressSupport.respond(clean)?.let {
+            dialogue.dismissIncompletePrompt()
+            return AssistantResult(it)
+        }
+        // A short, independently checked offline fact card fixes the reported
+        // Shiller identity hallucination without claiming live browsing.
+        AstraVerifiedEconomics.respond(clean)?.let {
+            dialogue.dismissIncompletePrompt()
+            return AssistantResult(it)
+        }
+
         AstraConversationCommands.classify(lower)?.let { command ->
             return AssistantResult(
                 "",
@@ -3323,6 +3336,26 @@ class MainActivity :
                                     }
                             }
                         }
+                    }
+
+                    // Reviewing Astra's own earlier claims is different from
+                    // remembering user-authored facts. Explicit chat-review
+                    // requests see both roles with labels, never a model guess.
+                    val chatReview = AstraChatReview.respond(
+                        message, history.map {
+                            AstraChatArchive.Message(it.role, it.text)
+                        }
+                    )
+                    if (chatReview != null) {
+                        dialogue.dismissIncompletePrompt()
+                        dialogueAwaiting = false
+                        history.add(ChatMessage("You", message))
+                        history.add(ChatMessage("Astra", chatReview))
+                        while (history.size > MAX_HISTORY) history.removeAt(0)
+                        persist()
+                        input = ""
+                        keyboard?.hide()
+                        return
                     }
 
                     // Evidence-grounded analysis is opt-in and runs on the phone.
