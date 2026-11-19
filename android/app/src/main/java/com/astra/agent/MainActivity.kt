@@ -2275,7 +2275,41 @@ class MainActivity :
             ).show()
             return
         }
-        tts?.speak(speechText, TextToSpeech.QUEUE_FLUSH, null, "astra")
+        // A long detailed lesson may exceed Android's maximum per-utterance
+        // limit. First segment replaces previous audio; remaining segments
+        // queue in order. The existing lock/onStop handlers stop the entire
+        // queue rather than allowing private speech in the background.
+        val speechPlan = AstraSpeechChunks.partition(
+            speechText,
+            maxChars = (TextToSpeech.getMaxSpeechInputLength() - 200)
+                .coerceIn(256, 3_000)
+        )
+        val utteranceId = "astra-" + android.os.SystemClock.uptimeMillis()
+        var speechFailed = false
+        for ((index, segment) in speechPlan.utterances.withIndex()) {
+            val mode = if (index == 0) TextToSpeech.QUEUE_FLUSH
+                else TextToSpeech.QUEUE_ADD
+            if (tts?.speak(segment, mode, null, utteranceId + "-" + index) !=
+                TextToSpeech.SUCCESS
+            ) {
+                speechFailed = true
+                break
+            }
+        }
+        if (speechFailed) {
+            tts?.stop()
+            Toast.makeText(
+                this,
+                "Speech playback failed. Your complete response remains in chat.",
+                Toast.LENGTH_LONG
+            ).show()
+        } else if (speechPlan.truncated) {
+            Toast.makeText(
+                this,
+                "Spoken playback was limited for safety. The full response remains in chat.",
+                Toast.LENGTH_LONG
+            ).show()
+        }
     }
 
     private fun initializeRecognizer() {
