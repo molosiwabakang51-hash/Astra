@@ -25,7 +25,14 @@ class AstraBiometricLockContractTests(unittest.TestCase):
         self.assertEqual(self.manifest.count('android:exported="true"'), 1)
 
     def test_opt_in_defaults_off_and_never_downgrades_to_voice_or_weak_biometrics(self):
-        self.assertIn('getBoolean(ENABLED_KEY, false)', self.lock)
+        # A missing key defaults to off, but corrupt existing preferences
+        # must never disable an already opted-in lock.
+        self.assertIn('prefs.contains(ENABLED_KEY)', self.lock)
+        self.assertIn('prefs.all[ENABLED_KEY]', self.lock)
+        self.assertIn('enabledFromStoredPreference(', self.lock)
+        self.assertIn('if (!present) false else (value as? Boolean ?: true)', self.lock)
+        self.assertIn('}.getOrElse { true }', self.lock)
+        self.assertNotIn('.getBoolean(ENABLED_KEY, false)', self.lock)
         self.assertIn('BIOMETRIC_STRONG', self.lock)
         self.assertIn('DEVICE_CREDENTIAL', self.lock)
         self.assertNotIn('BIOMETRIC_WEAK', self.lock)
