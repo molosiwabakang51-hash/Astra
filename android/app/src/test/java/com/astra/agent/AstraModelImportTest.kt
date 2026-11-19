@@ -173,4 +173,42 @@ class AstraModelImportTest {
         assertEquals(model.size.toLong(), count)
     }
 
+    @Test fun stalledProviderCannotSpinForeverOnZeroByteReads() = runBlocking {
+        val source = object : java.io.InputStream() {
+            override fun read(): Int = 0
+            override fun read(bytes: ByteArray, offset: Int, length: Int): Int = 0
+        }
+        val output = ByteArrayOutputStream()
+        val failure = runCatching {
+            AstraModelImport.copyBounded(
+                source, output, MessageDigest.getInstance("SHA-256"), {}
+            )
+        }.exceptionOrNull()
+        assertTrue(failure is IllegalArgumentException)
+        assertTrue(failure?.message.orEmpty().contains("stopped making read progress"))
+        assertEquals(0, output.size())
+    }
+
+    @Test fun intermittentZeroReadsRecoverWhenProviderMakesProgress() = runBlocking {
+        val source = object : java.io.InputStream() {
+            var calls = 0
+            override fun read(): Int = error("bulk reads only")
+            override fun read(bytes: ByteArray, offset: Int, length: Int): Int {
+                calls++
+                return when (calls) {
+                    in 1..8, in 10..17 -> 0
+                    9 -> { bytes[offset] = 71; 1 }
+                    18 -> { bytes[offset] = 72; 1 }
+                    else -> -1
+                }
+            }
+        }
+        val output = ByteArrayOutputStream()
+        val copied = AstraModelImport.copyBounded(
+            source, output, MessageDigest.getInstance("SHA-256"), {}
+        )
+        assertEquals(2L, copied)
+        assertArrayEquals(byteArrayOf(71, 72), output.toByteArray())
+    }
+
 }
