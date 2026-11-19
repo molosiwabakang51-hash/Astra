@@ -60,12 +60,12 @@ internal object AstraStudyLayout {
  */
 internal object AstraStudyTopicFilter {
     fun apply(topics: List<AstraStudyCatalog.Topic>, rawQuery: String): List<AstraStudyCatalog.Topic> {
-        val query = rawQuery.trim().take(80).lowercase(java.util.Locale.ROOT)
+        val query = AstraStudySearch.query(rawQuery)
         if (query.isEmpty()) return topics
         return topics.filter { topic ->
-            topic.title.lowercase(java.util.Locale.ROOT).contains(query) ||
-                topic.description.lowercase(java.util.Locale.ROOT).contains(query) ||
-                topic.command.lowercase(java.util.Locale.ROOT).contains(query)
+            AstraStudySearch.matches(topic.title, query) ||
+                AstraStudySearch.matches(topic.description, query) ||
+                AstraStudySearch.matches(topic.command, query)
         }
     }
 }
@@ -79,14 +79,14 @@ internal object AstraStudySubjectFilter {
         subjects: List<AstraStudyCatalog.Subject>,
         rawQuery: String
     ): List<AstraStudyCatalog.Subject> {
-        val query = rawQuery.trim().take(80).lowercase(java.util.Locale.ROOT)
+        val query = AstraStudySearch.query(rawQuery)
         if (query.isEmpty()) return subjects
         return subjects.filter { subject ->
-            subject.title.lowercase(java.util.Locale.ROOT).contains(query) ||
-                subject.description.lowercase(java.util.Locale.ROOT).contains(query) ||
+            AstraStudySearch.matches(subject.title, query) ||
+                AstraStudySearch.matches(subject.description, query) ||
                 subject.topics.any { topic ->
-                    topic.title.lowercase(java.util.Locale.ROOT).contains(query) ||
-                        topic.description.lowercase(java.util.Locale.ROOT).contains(query)
+                    AstraStudySearch.matches(topic.title, query) ||
+                        AstraStudySearch.matches(topic.description, query)
                 }
         }
     }
