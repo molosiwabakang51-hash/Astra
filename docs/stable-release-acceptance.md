@@ -63,6 +63,26 @@ APK. GitHub Actions debug builds may use different signing certificates.
 13. **Study depth and memory:** Open the Study Hub and choose different subjects rather than accepting a default Finance launch. Test one detailed workshop, quiz, spaced-review due/next controls and independent progress in two courses. Reopen Astra and verify progress persists. Record whether full lessons are substantively useful; the presence of a course button alone is not a pass.
 14. **Device-library privacy and retrieval:** Authorize a folder once using the Android system picker, import a supported text-bearing document, then verify a relevant citation in airplane mode. Restart the app and confirm the retained permission works without repeated prompting. Revoke permission and verify further access fails safely; originals must remain unchanged. Separately verify that shared-storage filename searches do not silently read file contents. Record incomplete indexes and unsupported media types rather than reporting full-device learning.
 
+15. **Model picker through secure lock:** Enable Astra's fingerprint/PIN app lock,
+    set its background delay to Immediately, open Settings, choose **Import offline
+    model once**, and select the downloaded exact **Qwen3-1.7B-Q4_K_M.gguf**
+    through Android Files. If Astra locks while Files is open, authenticate and
+    verify it returns to **Settings**, not an empty new chat. A live MiB progress
+    indication and SHA-256 verified completion must appear. Repeat with a
+    deliberately too-small, incomplete or wrong GGUF: the original file must
+    remain untouched and Astra must explain the real failure rather than
+    silently switching chat or claiming success. Test with airplane mode and
+    sufficient free storage (at least about 1.3 GB beyond the selected source).
+    A successfully built APK alone does not pass this phone test.
+16. **Core navigation tray:** Tap Astra's orb/identity in Chat and in the empty
+    conversation welcome. Verify a smooth left-edge scrimmed drawer with
+    six named destinations, a clearly highlighted active destination, scrolling,
+    readable contrast, 48dp+ touch areas and screen-reader names. Check all
+    retained chat options (search, saved conversations, rename, copy, share,
+    speech, mission control, new and confirmed clear) still work. Close with
+    scrim/back and test large Android font scaling, landscape/narrow screens
+    and biometric lock; private items must never appear while locked.
+
 ## Honest release labels
 
 - **EXPERIMENTAL:** Compiles and passes automated source/unit/APK checks,
