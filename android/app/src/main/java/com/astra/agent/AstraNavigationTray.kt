@@ -13,15 +13,14 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.DrawerState
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalDrawerSheet
@@ -68,6 +67,7 @@ internal enum class AstraTrayAction(
  */
 @Composable
 internal fun AstraNavigationTray(
+    drawerState: DrawerState,
     selected: AstraNavSection,
     hasAssistantReply: Boolean,
     missionControlExpanded: Boolean,
@@ -77,6 +77,7 @@ internal fun AstraNavigationTray(
 ) {
     val curvedEdge = RoundedCornerShape(topEnd = 34.dp, bottomEnd = 34.dp)
     ModalDrawerSheet(
+        drawerState = drawerState,
         modifier = Modifier.width(320.dp).fillMaxHeight(),
         drawerShape = curvedEdge,
         drawerContainerColor = AstraAurora.night,
@@ -90,8 +91,8 @@ internal fun AstraNavigationTray(
                         listOf(Color(0xFF14253A), AstraAurora.night, Color(0xFF080D1C))
                     )
                 )
-                .statusBarsPadding()
-                .navigationBarsPadding()
+                // ModalDrawerSheet handles status/navigation insets; avoid
+                // double padding and a visually detached header.
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 17.dp)
         ) {
