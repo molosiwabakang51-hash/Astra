@@ -6002,40 +6002,31 @@ class MainActivity :
                                             "connection is needed for AI conversation. " +
                                             "Built-in tasks, notes and calculators run locally first."
                                         )
-                                        val modelIncluded = onDeviceBrain.isModelBundled()
                                         val advancedInstalled =
                                             onDeviceBrain.hasAdvancedModel()
-                                        val modelImported = AstraModelImport.appearsInstalled(
-                                            applicationContext
-                                        )
                                         Text(
-                                            when {
-                                                advancedInstalled ->
-                                                    "QWEN3 1.7B AVAILABLE · PREFERRED MODEL"
-                                                modelIncluded || modelImported ->
-                                                    "QWEN3 0.6B AVAILABLE · COMPACT FALLBACK"
-                                                else -> "NO LOCAL MODEL · IMPORT THE FREE 1.7B MODEL"
-                                            },
+                                            if (advancedInstalled)
+                                                "QWEN3 1.7B AVAILABLE · REQUIRED CONVERSATION MODEL"
+                                            else "QWEN3 1.7B REQUIRED · DOWNLOAD OR IMPORT MODEL",
                                             style = MaterialTheme.typography.labelMedium,
-                                            color = if (modelIncluded || modelImported || advancedInstalled)
+                                            color = if (advancedInstalled)
                                                 MaterialTheme.colorScheme.primary
                                             else MaterialTheme.colorScheme.error
                                         )
                                         Text(
-                                            "For data-saving updates, import Qwen3 GGUF once " +
-                                                "from Downloads, or select your previous large " +
-                                                "Astra APK / GitHub ZIP. The AI model is checked " +
-                                                "locally and kept across correctly signed app updates. " +
-                                                "Nothing is downloaded by the import process.",
+                                            "For LITE updates, import Qwen3 1.7B once from Downloads " +
+                                                "or select a FULL Astra APK/ZIP containing the 1.7B model. " +
+                                                "The import verifies SHA-256 locally and signed updates " +
+                                                "retain the model. Older 0.6B APKs cannot supply it.",
                                             style = MaterialTheme.typography.bodySmall
                                         )
                                         Text(
-                                            "Astra automatically uses Qwen3 1.7B when available. " +
-                                                "The 0.6B model is a recovery fallback, not a " +
-                                                "performance limit. Neither model needs paid APIs " +
-                                                "or subscriptions. Download the free 1.7B GGUF " +
-                                                "once, then import it here; future signed updates " +
-                                                "preserve the model.",
+                                            "Astra now requires Qwen3 1.7B Q4_K_M for every " +
+                                                "general AI reply; it never switches to Qwen3 0.6B. " +
+                                                "FULL builds bundle 1.7B; LITE keeps its 300 MB cap " +
+                                                "and imports 1.7B once. If it is missing or cannot " +
+                                                "load safely, Astra reports the problem instead " +
+                                                "of pretending to answer with a weaker model.",
                                             style = MaterialTheme.typography.bodySmall
                                         )
                                         OutlinedButton(
