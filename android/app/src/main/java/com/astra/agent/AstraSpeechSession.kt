@@ -45,6 +45,11 @@ internal object AstraSpeechPrivacy {
     fun mayUseVoice(
         foreground: Boolean,
         appLockEnabled: Boolean,
-        workspaceUnlocked: Boolean
-    ): Boolean = foreground && (!appLockEnabled || workspaceUnlocked)
+        workspaceUnlocked: Boolean,
+        displayInteractive: Boolean = true,
+        deviceUnlocked: Boolean = true,
+        windowFocused: Boolean = true
+    ): Boolean =
+        foreground && displayInteractive && deviceUnlocked && windowFocused &&
+            (!appLockEnabled || workspaceUnlocked)
 }
