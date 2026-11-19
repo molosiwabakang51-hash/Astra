@@ -17,6 +17,16 @@ internal object AstraGenerationPolicy {
         """(?i)\b(?:in detail|detailed|thorough|comprehensive|step.by.step|explain fully|show your work|compare and contrast|derive|proof|analy[sz]e|essay|report|tutorial|teach me|walk me through|deep dive|write code|implement|give examples|course|lesson plan|study guide)\b"""
     )
 
+    // Explicit answer-depth instructions in languages supported by the
+    // offline assistant. Match complete phrases, not substrings inside
+    // unrelated words; do not translate or change the user's message.
+    private val multilingualShort = Regex(
+        """(?iu)\b(?:brièvement|réponse courte|en une phrase|brevemente|respuesta corta|en una frase|kurz|in einem satz|кратко|коротко|одним предложением|ka bokhutshwane)\b"""
+    )
+    private val multilingualLong = Regex(
+        """(?iu)\b(?:en détail|explique en détail|en detalle|explica en detalle|ausführlich|im detail|подробно|детально|пошагово|ka botlalo)\b"""
+    )
+
     // A long pasted source can contain its own instructions about brevity.
     // When the owner explicitly marks the final request, apply response-length
     // cues to that request rather than to quoted or pasted source material.
@@ -45,8 +55,10 @@ internal object AstraGenerationPolicy {
         // When source material contains competing length instructions, the
         // first explicit cue in the active request wins. This also preserves
         // "Briefly explain ... in detail" as a brief owner request.
-        val briefCue = short.find(question)
-        val detailedCue = long.find(question)
+        val briefCue = listOfNotNull(short.find(question), multilingualShort.find(question))
+            .minByOrNull { it.range.first }
+        val detailedCue = listOfNotNull(long.find(question), multilingualLong.find(question))
+            .minByOrNull { it.range.first }
         if (briefCue != null && (detailedCue == null ||
                 briefCue.range.first <= detailedCue.range.first)) {
             return Depth.BRIEF
