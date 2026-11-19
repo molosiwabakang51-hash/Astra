@@ -5113,6 +5113,7 @@ class MainActivity :
                     scrimColor = Color.Black.copy(alpha = 0.62f),
                     drawerContent = {
                         AstraNavigationTray(
+                            drawerState = drawerState,
                             selected = AstraNavSection.entries[tab.coerceIn(0, 5)],
                             hasAssistantReply = history.any { it.role == "Astra" },
                             missionControlExpanded = commandDeckExpanded,
