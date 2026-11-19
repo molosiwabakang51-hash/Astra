@@ -122,10 +122,10 @@ class AstraLessonSpeechTest {
         val cards = (1..24).map { number ->
             "Expression$number" + "é".repeat(64)
         }
-        val lesson = "French lesson 1/21 — Long pronunciation practice\\n\\n" +
+        val lesson = "French lesson 1/21 — Long pronunciation practice\n\n" +
             cards.mapIndexed { index, phrase ->
                 "$phrase — English gloss ${index + 1}"
-            }.joinToString("\\n")
+            }.joinToString("\n")
         val sample = AstraLessonSpeech.fromLesson(lesson, SpeechLanguage.FRENCH)!!
         assertTrue(sample.phraseCount in 1 until cards.size)
         assertTrue(sample.spokenText.length <= 700)
@@ -136,17 +136,18 @@ class AstraLessonSpeechTest {
     }
 
     @Test fun punctuationAndUnicodeStayIntactAtSpeechLimit() {
-        val phrase = "مرحبا بك؟"
-        val lesson = "French lesson 1/21 — Punctuation test\\n\\n" +
-            (1..24).joinToString("\\n") { number ->
-                "Mot${number}🧠 — gloss"
-            } + "\\n$phrase — hello"
-        val sample = AstraLessonSpeech.fromLesson(lesson, SpeechLanguage.FRENCH)!!
+        val lesson = "Japanese lesson 1/21 — Punctuation test\n\n" +
+            "今日はいい天気です。 — Good weather\n" +
+            (1..23).joinToString("\n") { number ->
+                "単語${number}🧠 — gloss"
+            }
+        val sample = AstraLessonSpeech.fromLesson(lesson, SpeechLanguage.JAPANESE)!!
+        assertEquals(24, sample.phraseCount)
         assertTrue(sample.spokenText.length <= 700)
         assertEquals(sample.phraseCount, sample.spokenText.split(" ").size)
-        assertFalse(sample.spokenText.contains(".."))
-        assertFalse(sample.spokenText.contains("🧠."))
-        assertTrue(sample.spokenText.contains("🧠"))
+        assertTrue(sample.spokenText.startsWith("今日はいい天気です。 "))
+        assertFalse(sample.spokenText.contains("。。"))
+        assertTrue(sample.spokenText.contains("🧠."))
         assertFalse(sample.spokenText.contains("�"))
     }
 }
