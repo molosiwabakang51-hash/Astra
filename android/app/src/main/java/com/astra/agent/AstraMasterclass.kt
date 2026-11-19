@@ -13,7 +13,10 @@ import java.util.Locale
  */
 internal class AstraMasterclass(
     private val readInt: (String, Int) -> Int,
-    private val writeInt: (String, Int) -> kotlin.Unit
+    private val writeInt: (String, Int) -> kotlin.Unit,
+    private val todayUtcDay: () -> Int = {
+        (System.currentTimeMillis() / 86_400_000L).toInt()
+    }
 ) {
     internal data class Unit(
         val title: String,
@@ -106,6 +109,9 @@ internal class AstraMasterclass(
             cmd.isBlank() || cmd == "course" || cmd == "syllabus" ->
                 syllabus(subject, list)
             cmd == "progress" -> progress(subject, list)
+            cmd == "review" || cmd == "review due" -> dueReview(subject, list)
+            cmd == "review next" -> nextReview(subject, list)
+            cmd == "review plan" -> reviewPlan(subject, list)
             cmd == "next" -> show(subject,
                 (read(subject, "last") + 1).coerceIn(1, list.size), list)
             cmd == "quiz" -> quiz(subject,
@@ -207,10 +213,92 @@ internal class AstraMasterclass(
             write(subject, "correct", read(subject, "correct").coerceAtMost(999_999) + 1)
             mark(subject, "mastered", pending)
         }
+        val today = todayUtcDay().coerceIn(0, 1_000_000)
+        val previousDue = read(subject, "review_due_" + pending, -1)
+        val previous = if (previousDue >= 0) {
+            AstraWorkshopReview.State(
+                read(subject, "review_streak_" + pending).coerceIn(0, 1_000),
+                read(subject, "review_interval_" + pending).coerceIn(0, 120),
+                previousDue.coerceIn(0, 1_000_000)
+            )
+        } else null
+        val schedule = AstraWorkshopReview.afterAnswer(today, correct, previous)
+        write(subject, "review_due_" + pending, schedule.dueUtcDay)
+        write(subject, "review_streak_" + pending, schedule.streak)
+        write(subject, "review_interval_" + pending, schedule.intervalDays)
         return (if (correct) "Correct." else "Not quite. Answer: " + unit.answer + ".") +
             " " + unit.rationale + "\nNext: '" +
             subject + " workshop " + (pending + 1).coerceAtMost(list.size) +
             "' or '" + subject + " workshop progress'."
+    }
+
+    private fun hasLegacyPass(subject: String, number: Int): Boolean {
+        val segment = (number - 1) / 30
+        val bit = 1 shl ((number - 1) % 30)
+        return (read(subject, "mastered_" + segment) and bit) != 0
+    }
+
+    private fun dueDay(subject: String, number: Int, today: Int): Int? {
+        val stored = read(subject, "review_due_" + number, -1)
+        // Previously earned completion is never discarded on upgrade.
+        // A one-time review becomes available for legacy mastered chapters.
+        return when {
+            stored >= 0 -> stored.coerceIn(0, 1_000_000)
+            hasLegacyPass(subject, number) -> today
+            else -> null
+        }
+    }
+
+    private fun reviews(subject: String, list: List<Unit>, today: Int) =
+        list.indices.mapNotNull { i ->
+            val n = i + 1
+            dueDay(subject, n, today)?.let { due -> n to due }
+        }.sortedWith(compareBy<Pair<Int, Int>> { it.second }.thenBy { it.first })
+
+    private fun dueReview(subject: String, list: List<Unit>): String {
+        val today = todayUtcDay().coerceIn(0, 1_000_000)
+        val all = reviews(subject, list, today)
+        val due = all.filter { it.second <= today }
+        return buildString {
+            appendLine(subjectNames.getValue(subject).uppercase(Locale.ROOT) +
+                " · SPACED REVIEW")
+            appendLine("Due now: " + due.size + "; scheduled later: " +
+                (all.size - due.size) + ".")
+            if (due.isEmpty()) appendLine("No quizzes currently due.")
+            due.take(12).forEach { (number, _) ->
+                appendLine(number.toString() + ". " + list[number - 1].title)
+            }
+            if (due.size > 12) appendLine("Showing 12 of " + due.size + " due chapters.")
+            appendLine("Say '" + subject + " workshop review next' to practise.")
+            append("Review intervals encourage recall; they do not certify mastery.")
+        }.trim()
+    }
+
+    private fun nextReview(subject: String, list: List<Unit>): String {
+        val today = todayUtcDay().coerceIn(0, 1_000_000)
+        val number = reviews(subject, list, today)
+            .firstOrNull { it.second <= today }?.first
+            ?: return "No " + subject + " workshop reviews are due today. " +
+                "Say '" + subject + " workshop review plan' to check upcoming practice."
+        return quiz(subject, number, list)
+    }
+
+    private fun reviewPlan(subject: String, list: List<Unit>): String {
+        val today = todayUtcDay().coerceIn(0, 1_000_000)
+        val all = reviews(subject, list, today)
+        if (all.isEmpty()) return "No " + subject + " review schedule yet. " +
+            "Take a workshop quiz to create one."
+        return buildString {
+            appendLine(subjectNames.getValue(subject).uppercase(Locale.ROOT) +
+                " · REVIEW PLAN")
+            all.take(12).forEach { (number, day) ->
+                appendLine(number.toString() + ". " + list[number - 1].title +
+                    " — " + if (day <= today) "Due" else
+                    "In " + (day - today) + " day(s)")
+            }
+            if (all.size > 12) appendLine("Showing 12 of " + all.size + " scheduled chapters.")
+            append("Use '" + subject + " workshop review next' for a due quiz.")
+        }.trim()
     }
 
     private fun progress(subject: String, list: List<Unit>): String {
@@ -225,6 +313,7 @@ internal class AstraMasterclass(
             "Mastery quizzes passed: " + mastered + "/" + list.size + ".\n" +
             "Quiz attempts: " + attempts + "; correct: " + correct + ". " +
             "Last chapter: " + (if (last == 0) "none" else last.toString()) + ".\n" +
-            "A passed short quiz is only one measure; finish the independent exercise."
+            "A passed short quiz is only one measure; finish the independent exercise.\n" +
+            "Use '" + subject + " workshop review' for scheduled recall practice."
     }
 }
