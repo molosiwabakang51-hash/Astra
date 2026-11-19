@@ -84,10 +84,19 @@ internal object AstraLessonSpeech {
         }.take(24).distinct()
         if (phrases.isEmpty()) return null
 
-        val spoken = phrases.joinToString(". ")
-            .let { if (it.endsWith(".") || it.endsWith("!") || it.endsWith("?")) it else "$it." }
-            .take(700)
-        if (spoken.isBlank()) return null
-        return Sample(target, spoken, phrases.size)
+        // Never cut a word, grapheme cluster, or voice-card example midstream.
+        // The former .take(700) could cut a phrase (or a UTF-16 surrogate
+        // pair), while phraseCount incorrectly included phrases not spoken.
+        val spokenPhrases = ArrayList<String>(phrases.size)
+        var totalLength = 0
+        for (phrase in phrases) {
+            val complete = if (phrase.last() in ".!?。！？؟") phrase else "$phrase."
+            val extra = complete.length + if (spokenPhrases.isEmpty()) 0 else 1
+            if (totalLength + extra > 700) break
+            spokenPhrases.add(complete)
+            totalLength += extra
+        }
+        if (spokenPhrases.isEmpty()) return null
+        return Sample(target, spokenPhrases.joinToString(" "), spokenPhrases.size)
     }
 }
