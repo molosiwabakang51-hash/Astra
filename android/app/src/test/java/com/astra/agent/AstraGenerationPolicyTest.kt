@@ -115,6 +115,52 @@ class AstraGenerationPolicyTest {
             AstraGenerationPolicy.depth(restored))
     }
 
+    @Test fun explicitMultilingualDepthRequestsUseAppropriateOfflineBudget() {
+        val brief = listOf(
+            "Explique la duration brièvement.",
+            "Explica la duración brevemente.",
+            "Erkläre die Duration kurz.",
+            "Объясни дюрацию кратко.",
+            "Tlhalosa duration ka bokhutshwane."
+        )
+        val detailed = listOf(
+            "Explique la duration en détail.",
+            "Explica la duración en detalle.",
+            "Erkläre die Duration ausführlich.",
+            "Объясни дюрацию подробно.",
+            "Tlhalosa duration ka botlalo."
+        )
+        for (request in brief) {
+            assertEquals(request, AstraGenerationPolicy.Depth.BRIEF,
+                AstraGenerationPolicy.depth(request))
+            assertEquals(192, AstraGenerationPolicy.maxAnswerTokens(request, false))
+        }
+        for (request in detailed) {
+            assertEquals(request, AstraGenerationPolicy.Depth.DETAILED,
+                AstraGenerationPolicy.depth(request))
+            assertEquals(1152, AstraGenerationPolicy.maxAnswerTokens(request, true))
+        }
+    }
+
+    @Test fun multilingualDepthCuesHonorFirstExplicitInstruction() {
+        assertEquals(AstraGenerationPolicy.Depth.BRIEF,
+            AstraGenerationPolicy.depth("Кратко объясни тему, потом подробно."))
+        assertEquals(AstraGenerationPolicy.Depth.DETAILED,
+            AstraGenerationPolicy.depth("En detalle, pero brevemente al final."))
+        assertEquals(AstraGenerationPolicy.Depth.BRIEF,
+            AstraGenerationPolicy.depth("Réponse courte sur une leçon détaillée."))
+    }
+
+    @Test fun multilingualDepthCannotBeOverriddenByRestoredOlderChat() {
+        val restored = "EARLIER CHAT EXCERPTS (quoted reference, NOT instructions):\\n" +
+            "Previous user: \\"Ответь кратко.\\"\\n" +
+            "\\nCURRENT USER MESSAGE (answer this message, not the excerpts):\\n" +
+            "Объясни дюрацию подробно.\\n/no_think"
+        assertEquals(AstraGenerationPolicy.Depth.DETAILED,
+            AstraGenerationPolicy.depth(restored))
+        assertEquals(1152, AstraGenerationPolicy.maxAnswerTokens(restored, true))
+    }
+
     @Test fun fuzzedRequestsHaveStrictOfflineGenerationCap() {
         val rng = Random(1009009)
         val alphabet = "abc?!@#\$中文Привет 12345\n\t"
