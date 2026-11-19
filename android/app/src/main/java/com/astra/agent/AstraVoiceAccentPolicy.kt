@@ -21,10 +21,32 @@ internal object AstraVoiceAccentPolicy {
         val available = Locale.forLanguageTag(availableTag)
         if (requested.language.isBlank() || requested.country.isBlank() ||
             available.language.isBlank() || available.country.isBlank()) return false
-        return requested.language.equals(available.language, ignoreCase = true) &&
-            requested.country.equals(available.country, ignoreCase = true) &&
-            (requested.script.isBlank() ||
-                requested.script.equals(available.script, ignoreCase = true))
+        if (!requested.language.equals(available.language, ignoreCase = true) ||
+            !requested.country.equals(available.country, ignoreCase = true)
+        ) return false
+
+        // "zh-CN" normally indicates simplified Mandarin. Android TTS may
+        // advertise a zh-Hant-CN voice with the same region but a conflicting
+        // Traditional-script tag. Never treat it as a script-exact match.
+        // Voices without an explicit script retain the regional default.
+        val requiredScript = when {
+            requested.script.isNotBlank() -> requested.script
+            requested.language.equals("zh", ignoreCase = true) -> when (
+                requested.country.uppercase(Locale.ROOT)
+            ) {
+                "CN", "SG" -> "Hans"
+                "TW", "HK", "MO" -> "Hant"
+                else -> ""
+            }
+            else -> ""
+        }
+        return when {
+            requested.script.isNotBlank() ->
+                requiredScript.equals(available.script, ignoreCase = true)
+            requiredScript.isNotBlank() && available.script.isNotBlank() ->
+                requiredScript.equals(available.script, ignoreCase = true)
+            else -> true
+        }
     }
 
     fun choose(

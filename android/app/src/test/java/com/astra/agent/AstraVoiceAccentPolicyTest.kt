@@ -109,4 +109,24 @@ class AstraVoiceAccentPolicyTest {
                 AstraReplyLanguage.Choice.AUTO,
                 "こんにちは。今日は何を勉強しますか？"))
     }
+
+    @Test fun mandarinVoicesRejectContradictoryScriptsWithinSameRegion() {
+        assertTrue(AstraVoiceAccentPolicy.sameAccent("zh-CN", "zh-CN"))
+        assertTrue(AstraVoiceAccentPolicy.sameAccent("zh-CN", "zh-Hans-CN"))
+        assertFalse(AstraVoiceAccentPolicy.sameAccent("zh-CN", "zh-Hant-CN"))
+        assertTrue(AstraVoiceAccentPolicy.sameAccent("zh-TW", "zh-Hant-TW"))
+        assertFalse(AstraVoiceAccentPolicy.sameAccent("zh-TW", "zh-Hans-TW"))
+        assertTrue(AstraVoiceAccentPolicy.sameAccent("zh-Hans-CN", "zh-Hans-CN"))
+        assertFalse(AstraVoiceAccentPolicy.sameAccent("zh-Hans-CN", "zh-CN"))
+        val options = listOf(
+            candidate("zh-Hant-CN", name = "traditional"),
+            candidate("zh-Hans-CN", name = "simplified", quality = 320),
+            candidate("zh-Hans-CN", name = "network", network = true, quality = 500)
+        )
+        assertEquals("simplified",
+            AstraVoiceAccentPolicy.choose("zh-CN", options, offlineOnly = true)?.name)
+        assertNull(AstraVoiceAccentPolicy.choose(
+            "zh-CN", options.filter { it.name == "traditional" }, offlineOnly = true
+        ))
+    }
 }
