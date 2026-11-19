@@ -43,8 +43,15 @@ internal object AstraReasoningBenchmark {
     fun score(probe: Probe, answer: String): Boolean {
         // Grade ONLY the visible final answer, never hidden reasoning or a
         // footnote containing the correct number in an incorrect explanation.
-        val text = AstraOfflinePolicy.publicReply(answer).trim()
-            .replace("**", "").trim().lowercase(Locale.ROOT)
+        val visible = AstraOfflinePolicy.publicReply(answer)
+        // Local retrieval can append a citation footer after generation.
+        // Grade the model's answer, not facts embedded in that footer.
+        val footer = Regex(
+            """(?im)^\\s*(?:Open-course references:|Retrieved local book passages(?: \\(verify originals\\))?:?)\\s*$"""
+        )
+        val text = visible.substring(0, footer.find(visible)?.range?.first
+            ?: visible.length).trim().replace("**", "")
+            .trim().lowercase(Locale.ROOT)
         return when (probe) {
             Probe.ENTAILMENT -> Regex("""^no[.!]?$""").matches(text)
             Probe.PROFIT_LOSS ->
