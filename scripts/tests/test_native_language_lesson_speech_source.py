@@ -17,7 +17,13 @@ class LessonAccentRoutingTest(unittest.TestCase):
         self.assertIn("phraseCount", LESSON)
         self.assertIn("AstraLessonSpeech.fromLesson(", MAIN)
         self.assertIn("val speechText = lessonSpeech?.spokenText ?: text", MAIN)
-        self.assertIn('tts?.speak(speechText, TextToSpeech.QUEUE_FLUSH, null, "astra")', MAIN)
+        # Speech may be split into bounded ordered utterances, but the
+        # source remains the language-extracted spokenText instead of English glosses.
+        self.assertIn("AstraSpeechChunks.partition(", MAIN)
+        self.assertIn("speechText,", MAIN)
+        self.assertIn("tts?.speak(segment, mode", MAIN)
+        self.assertIn("TextToSpeech.QUEUE_FLUSH", MAIN)
+        self.assertIn("TextToSpeech.QUEUE_ADD", MAIN)
 
     def test_regional_accents_and_fail_closed_installed_voice_check(self):
         for name in ("RUSSIAN", "SETSWANA", "FRENCH_CANADA", "SPANISH_MEXICO",
