@@ -10,7 +10,7 @@ internal object AstraChatLibrary {
     private val whitespace = Regex("\\s+")
 
     fun title(raw: String): String =
-        raw.trim().replace(whitespace, " ").take(100)
+        AstraUnicodeBounds.prefix(raw.trim().replace(whitespace, " "), 100)
 
     fun rename(
         chats: List<AstraChatArchive.Chat>,
@@ -92,7 +92,7 @@ internal object AstraChatLibrary {
                         val start = (index - 35).coerceAtLeast(0)
                         val end = (index + term.length + 65)
                             .coerceAtMost(message.text.length)
-                        val excerpt = message.text.substring(start, end)
+                        val excerpt = AstraUnicodeBounds.slice(message.text, start, end)
                             .replace(whitespace, " ").trim()
                         val before = if (start > 0) "…" else ""
                         val after = if (end < message.text.length) "…" else ""

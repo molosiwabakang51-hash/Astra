@@ -4,6 +4,9 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.io.ByteArrayOutputStream
 import java.io.InputStream
+import java.nio.ByteBuffer
+import java.nio.charset.CodingErrorAction
+import java.nio.charset.CharacterCodingException
 import java.nio.charset.StandardCharsets
 
 /**
@@ -148,7 +151,9 @@ internal object AstraBackupCodec {
             if (value !is String || value.length > limit) {
                 throw IllegalArgumentException("Invalid $key setting in backup.")
             }
-            result[key] = value
+            result[key] = if (key == "astra_chat_archive") {
+                validateArchive(value)
+            } else value
         }
         for (key in booleans) {
             val value = data.opt(key)
@@ -180,18 +185,91 @@ internal object AstraBackupCodec {
         )
     }
 
+    /**
+     * Archive decoding is intentionally tolerant when opening a damaged
+     * local cache. Backup restoration cannot be tolerant: silently skipping
+     * invalid archived chats would permanently discard conversations.
+     *
+     * Keep old backups without this field (or with the old empty default)
+     * importable as an empty archive.
+     */
+    private fun validateArchive(raw: String): String {
+        if (raw.isBlank()) return "[]"
+        val chats = try {
+            JSONArray(raw)
+        } catch (_: Exception) {
+            throw IllegalArgumentException("The archived chats in this backup are damaged.")
+        }
+        if (chats.length() > AstraChatArchive.MAX_CHATS) {
+            throw IllegalArgumentException("The backup contains too many archived chats.")
+        }
+        val uniqueIds = HashSet<String>()
+        for (i in 0 until chats.length()) {
+            val item = chats.optJSONObject(i)
+                ?: throw IllegalArgumentException("Invalid archived chat entry in backup.")
+            val id = item.opt("id")
+            val title = item.opt("title")
+            if (id !is String || id.isBlank() || id.length > 80 ||
+                !uniqueIds.add(id) || title !is String || title.length > 100
+            ) {
+                throw IllegalArgumentException("Invalid archived chat identity in backup.")
+            }
+            val messages = item.optJSONArray("messages")
+                ?: throw IllegalArgumentException("Missing archived chat messages in backup.")
+            if (messages.length() > AstraChatArchive.MAX_MESSAGES) {
+                throw IllegalArgumentException("An archived chat has too many messages.")
+            }
+            for (j in 0 until messages.length()) {
+                val entry = messages.optJSONObject(j)
+                    ?: throw IllegalArgumentException("Invalid archived message in backup.")
+                val role = entry.opt("role")
+                if (role !is String || role !in setOf("You", "Astra") ||
+                    entry.opt("text") !is String
+                ) {
+                    throw IllegalArgumentException("Invalid archived message data in backup.")
+                }
+            }
+        }
+        return raw
+    }
+
     /** Avoid loading arbitrarily large user-selected files into memory. */
     fun readLimited(stream: InputStream): String {
         val bytes = ByteArrayOutputStream()
         val buffer = ByteArray(8192)
+        var consecutiveEmptyReads = 0
         while (true) {
             val count = stream.read(buffer)
             if (count < 0) break
+            if (count == 0) {
+                // Some document providers transiently return zero bytes
+                // without EOF. A stalled provider must not freeze Astra's
+                // restore screen indefinitely or consume unlimited CPU.
+                if (++consecutiveEmptyReads > 16) {
+                    throw IllegalArgumentException(
+                        "The selected backup stopped providing data. " +
+                            "Choose a local copy and try importing again."
+                    )
+                }
+                continue
+            }
+            consecutiveEmptyReads = 0
             if (bytes.size().toLong() + count > MAX_BYTES) {
                 throw IllegalArgumentException("Backup exceeds the 8 MB safety limit.")
             }
             bytes.write(buffer, 0, count)
         }
-        return bytes.toString("UTF-8")
+        // Replacement characters silently corrupt names, multilingual
+        // notes and chat messages. Reject malformed UTF-8 instead of
+        // restoring altered private data.
+        return try {
+            StandardCharsets.UTF_8.newDecoder()
+                .onMalformedInput(CodingErrorAction.REPORT)
+                .onUnmappableCharacter(CodingErrorAction.REPORT)
+                .decode(ByteBuffer.wrap(bytes.toByteArray()))
+                .toString()
+        } catch (_: CharacterCodingException) {
+            throw IllegalArgumentException("The selected backup is not valid UTF-8.")
+        }
     }
 }
