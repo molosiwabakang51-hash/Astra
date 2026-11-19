@@ -101,7 +101,25 @@ internal object AstraModelImport {
                 BufferedInputStream(source, 64 * 1024).use { buffered ->
                     val signature = ByteArray(4)
                     buffered.mark(4)
-                    val signatureSize = buffered.read(signature)
+                    var signatureSize = 0
+                    var stalledHeaderReads = 0
+                    // OpenDocument providers may return a short first read.
+                    // Assemble all four signature bytes before deciding that
+                    // a valid GGUF or APK is an unsupported file.
+                    while (signatureSize < signature.size) {
+                        val count = buffered.read(
+                            signature, signatureSize, signature.size - signatureSize
+                        )
+                        if (count < 0) break
+                        if (count == 0) {
+                            require(++stalledHeaderReads <= 16) {
+                                "Selected model file provider stopped responding."
+                            }
+                        } else {
+                            signatureSize += count
+                            stalledHeaderReads = 0
+                        }
+                    }
                     buffered.reset()
                     val isArchive = signatureSize == 4 &&
                         signature[0] == 'P'.code.toByte() &&
@@ -122,6 +140,14 @@ internal object AstraModelImport {
                             }
                         }.getOrNull()
                         if (declaredBytes != null) {
+                            require(declaredBytes in
+                                ADVANCED_MIN_BYTES..ADVANCED_MAX_BYTES
+                            ) {
+                                "Selected GGUF is ${declaredBytes / 1048576L} MiB; " +
+                                    "the verified Qwen3 1.7B Q4_K_M model is " +
+                                    "approximately 1.2 GiB. Your file may be " +
+                                    "incomplete, a different quantization, or 0.6B."
+                            }
                             val available = StatFs(dir.absolutePath).availableBytes
                             require(hasSpaceForKnownGguf(available, declaredBytes)) {
                                 val required = maxOf(MIN_BYTES, declaredBytes) + FREE_HEADROOM
