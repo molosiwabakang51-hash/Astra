@@ -3339,6 +3339,24 @@ class MainActivity :
                         return
                     }
 
+                    // Explicit review may inspect prior assistant mistakes.
+                    // Keep this read-only, label model claims as unverified and
+                    // never add assistant replies to the private user-memory index.
+                    val chatReview = AstraConversationReview.respond(
+                        normalized,
+                        history.map { AstraChatArchive.Message(it.role, it.text) }
+                    )
+                    if (chatReview != null) {
+                        dialogue.dismissIncompletePrompt()
+                        history.add(ChatMessage("You", message))
+                        history.add(ChatMessage("Astra", chatReview))
+                        while (history.size > MAX_HISTORY) history.removeAt(0)
+                        input = ""
+                        persist()
+                        keyboard?.hide()
+                        return
+                    }
+
                     // Explicit, source-grounded local recall. This search never
                     // sends notes, tasks or chat content to a language model.
                     val memoryRequest = AstraMemoryRecall.parse(message)
