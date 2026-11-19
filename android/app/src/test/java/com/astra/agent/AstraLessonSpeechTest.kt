@@ -117,4 +117,36 @@ class AstraLessonSpeechTest {
         assertEquals(24, result.phraseCount)
         assertTrue(result.spokenText.length <= 700)
     }
+
+    @Test fun longVocabularyLessonsStopOnlyBetweenCompletePhrases() {
+        val cards = (1..24).map { number ->
+            "Expression$number" + "é".repeat(64)
+        }
+        val lesson = "French lesson 1/21 — Long pronunciation practice\\n\\n" +
+            cards.mapIndexed { index, phrase ->
+                "$phrase — English gloss ${index + 1}"
+            }.joinToString("\\n")
+        val sample = AstraLessonSpeech.fromLesson(lesson, SpeechLanguage.FRENCH)!!
+        assertTrue(sample.phraseCount in 1 until cards.size)
+        assertTrue(sample.spokenText.length <= 700)
+        val expected = cards.take(sample.phraseCount)
+            .joinToString(" ") { "$it." }
+        assertEquals(expected, sample.spokenText)
+        assertFalse(sample.spokenText.contains(cards[sample.phraseCount]))
+    }
+
+    @Test fun punctuationAndUnicodeStayIntactAtSpeechLimit() {
+        val phrase = "مرحبا بك؟"
+        val lesson = "French lesson 1/21 — Punctuation test\\n\\n" +
+            (1..24).joinToString("\\n") { number ->
+                "Mot${number}🧠 — gloss"
+            } + "\\n$phrase — hello"
+        val sample = AstraLessonSpeech.fromLesson(lesson, SpeechLanguage.FRENCH)!!
+        assertTrue(sample.spokenText.length <= 700)
+        assertEquals(sample.phraseCount, sample.spokenText.split(" ").size)
+        assertFalse(sample.spokenText.contains(".."))
+        assertFalse(sample.spokenText.contains("🧠."))
+        assertTrue(sample.spokenText.contains("🧠"))
+        assertFalse(sample.spokenText.contains("�"))
+    }
 }
