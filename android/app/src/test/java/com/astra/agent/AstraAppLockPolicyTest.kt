@@ -98,4 +98,20 @@ class AstraAppLockPolicyTest {
         }
     }
 
+
+    @Test fun damagedInactivityPreferenceDoesNotSilentlyDisableAnEnabledLock() {
+        val p = AstraAppLockPolicy
+        org.junit.Assert.assertEquals(0L, p.idleTimeoutFromStoredPreference(false, null))
+        org.junit.Assert.assertEquals(0L, p.idleTimeoutFromStoredPreference(true, 0L))
+        org.junit.Assert.assertEquals(120_000L, p.idleTimeoutFromStoredPreference(true, 120_000L))
+        org.junit.Assert.assertEquals(900_000L, p.idleTimeoutFromStoredPreference(true, 900_000L))
+        for (bad in listOf<Any?>(null, false, "Off", 0, -1L, 30_000L, 900_001L)) {
+            val deadline = p.idleTimeoutFromStoredPreference(true, bad)
+            org.junit.Assert.assertEquals("Corrupted idle timeout escaped safeguard", 120_000L, deadline)
+            assertFalse(p.shouldLockForInactivity(true, deadline, 119_999L))
+            assertTrue(p.shouldLockForInactivity(true, deadline, 120_000L))
+            assertFalse(p.shouldLockForInactivity(false, deadline, 9_000_000L))
+        }
+    }
+
 }
