@@ -203,11 +203,21 @@ internal class AstraMultilingualTutor(
                 }
             }
         }
-        if (lower == "next language lesson") {
+        // Keep active lessons coherent when a learner mixes a courteous
+        // French phrase with English. Do not match arbitrary general chat.
+        val nextLesson = Regex(
+            """^(?:(?:oui|yes|ok|okay)\s+)?next\s+(?:(?:language|french|spanish|setswana|portuguese|german|swahili|japanese|mandarin)\s+)?lesson(?:\s+(?:please|s'il vous plaît|s'il vous plait))?$""",
+            RegexOption.IGNORE_CASE
+        )
+        if (nextLesson.matches(lower)) {
             val language = current() ?: return "Select a course first: 'learn setswana'."
             val next = (readInt(key(language, "lesson"), 1) + 1)
                 .coerceAtMost(lessonCount(language))
             return lesson(language, next)
+        }
+        if (current() == Language.FRENCH && lower == "oui") {
+            return "Oui — yes. Continue with 'next language lesson' " +
+                "or 'oui next lesson s'il vous plaît'."
         }
         if (lower in setOf("skip language question", "skip language quiz")) {
             val language = current() ?: return "No active language quiz."
