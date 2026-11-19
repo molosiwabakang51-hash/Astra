@@ -6,17 +6,21 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class AstraReasoningBenchmarkTest {
-    @Test fun onlyExplicitCarefulModeSelectsNativeThinking() {
+    @Test fun pairedBenchmarkUsesIdenticalQuestionsWithOnlyModeSwitchChanged() {
         for (probe in AstraReasoningBenchmark.Probe.entries) {
-            val quick = AstraReasoningBenchmark.prompt(probe, AstraReasoningBenchmark.Mode.FAST)
-            val careful = AstraReasoningBenchmark.prompt(
-                probe, AstraReasoningBenchmark.Mode.CAREFUL)
-            assertFalse(AstraReasoningMode.enabled(quick))
-            assertTrue(AstraReasoningMode.enabled(careful))
+            val question = AstraReasoningBenchmark.prompt(probe)
+            assertEquals(probe.question, question)
+            assertFalse(AstraReasoningMode.enabled(question))
             assertTrue(AstraConversationContext.userPrompt(
-                quick, emptyList(), false).endsWith("\n/no_think"))
+                question, emptyList(), false, thinkingRequested = false
+            ).endsWith("\n/no_think"))
             assertTrue(AstraConversationContext.userPrompt(
-                careful, emptyList(), false).endsWith("\n/think"))
+                question, emptyList(), false, thinkingRequested = true
+            ).endsWith("\n/think"))
+            assertEquals(1792, AstraGenerationPolicy.maxAnswerTokens(
+                question, advancedModel = true, thinkingRequested = true))
+            assertEquals(768, AstraGenerationPolicy.maxAnswerTokens(
+                question, advancedModel = true, thinkingRequested = false))
         }
     }
 
