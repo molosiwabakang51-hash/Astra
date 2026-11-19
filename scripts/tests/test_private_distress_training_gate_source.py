@@ -23,7 +23,7 @@ class SensitiveTrainingGateTest(unittest.TestCase):
         self.assertIn("AstraLearningSignals.eligible(normalized)", MAIN)
         self.assertIn("if (neuralTrainingEnabled &&", MAIN)
         self.assertIn("astra_neural_learning_opt_in", MAIN)
-        self.assertIn("AstraDistressSupport.respond(raw:", SUPPORT)
+        self.assertIn("fun respond(raw: String): String?", SUPPORT)
         for forbidden in ("http://", "https://", "OkHttp", "network", "upload"):
             self.assertNotIn(forbidden, SIGNALS)
 
