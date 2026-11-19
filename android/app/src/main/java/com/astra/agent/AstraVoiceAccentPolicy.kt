@@ -44,7 +44,9 @@ internal object AstraVoiceAccentPolicy {
      * The preferred AI language takes priority over a separately configured
      * recognition locale. An English or French utterance must not be read using
      * a voice with the wrong language merely because it was selected for STT.
-     * In automatic mode, only clear script cues affect routing.
+     * In automatic mode, strong script or long-language evidence may
+     * override the selected dictation voice. Ambiguity keeps the configured
+     * locale and never authorizes a wrong-region voice fallback.
      */
     fun forReply(
         configured: SpeechLanguage,
@@ -89,13 +91,22 @@ internal object AstraVoiceAccentPolicy {
             val count = excerpt.count { it in first..last }
             return count >= 8 && count * 2 > letterCount
         }
+        val kana = excerpt.count { it in '\u3040'..'\u30FF' }
+        val han = excerpt.count { it in '\u4E00'..'\u9FFF' }
         return when {
-            dominant('\u3040', '\u30FF') -> SpeechLanguage.JAPANESE
+            // Japanese combines kana and Han characters; a Chinese-only
+            // detector incorrectly classifies ordinary mixed Japanese text.
+            dominant('\u3040', '\u30FF') ||
+                (kana >= 3 && (kana + han) * 2 > letterCount) ->
+                SpeechLanguage.JAPANESE
             dominant('\uAC00', '\uD7AF') -> SpeechLanguage.KOREAN
             dominant('\u0900', '\u097F') -> SpeechLanguage.HINDI
             dominant('\u0400', '\u052F') -> SpeechLanguage.RUSSIAN
+            dominant('\u0600', '\u06FF') ->
+                if (excerpt.count { it in "پچگڑےں" } >= 2)
+                    SpeechLanguage.URDU else SpeechLanguage.ARABIC
             dominant('\u4E00', '\u9FFF') -> SpeechLanguage.MANDARIN
-            else -> configured
+            else -> AstraSpokenLanguageHeuristics.detect(excerpt, configured) ?: configured
         }
     }
 }
