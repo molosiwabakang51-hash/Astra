@@ -2921,7 +2921,7 @@ class MainActivity :
                 var renameChatDraft by remember { mutableStateOf("") }
                 var deleteChatId by remember { mutableStateOf<String?>(null) }
                 var returnToChatLibrary by remember { mutableStateOf(false) }
-                var navigationPopupOpen by remember { mutableStateOf(false) }
+                val drawerState = rememberDrawerState(DrawerValue.Closed)
                 var commandDeckExpanded by remember { mutableStateOf(false) }
 
                 var pendingBackupRestore by remember {
@@ -5105,6 +5105,65 @@ class MainActivity :
                     )
                 }
 
+                // A translucent scrim preserves hierarchy: the navigation
+                // sheet is an edge surface, not a popup anchored to the logo.
+                ModalNavigationDrawer(
+                    drawerState = drawerState,
+                    gesturesEnabled = drawerState.isOpen,
+                    scrimColor = Color.Black.copy(alpha = 0.62f),
+                    drawerContent = {
+                        AstraNavigationTray(
+                            selected = AstraNavSection.entries[tab.coerceIn(0, 5)],
+                            hasAssistantReply = history.any { it.role == "Astra" },
+                            missionControlExpanded = commandDeckExpanded,
+                            onClose = { researchScope.launch { drawerState.close() } },
+                            onNavigate = { section ->
+                                val destination = AstraNavSection.entries.indexOf(section)
+                                if (destination == 5) studyOpenToken++
+                                tab = destination
+                                researchScope.launch { drawerState.close() }
+                            },
+                            onAction = { action ->
+                                when (action) {
+                                    AstraTrayAction.NEW_CHAT -> startNewConversation()
+                                    AstraTrayAction.CONVERSATIONS -> {
+                                        chatSearchQuery = ""
+                                        showChatSwitcher = true
+                                    }
+                                    AstraTrayAction.FIND_CHAT -> {
+                                        findInChatQuery = ""
+                                        showFindInChat = true
+                                    }
+                                    AstraTrayAction.MEMORY_SEARCH -> {
+                                        memorySearchQuery = ""
+                                        showMemorySearch = true
+                                    }
+                                    AstraTrayAction.RENAME_CHAT -> {
+                                        renameActiveChat = true
+                                        renameChatDraft = activeChatTitle.ifBlank {
+                                            history.firstOrNull { it.role == "You" }
+                                                ?.text?.take(55) ?: "New conversation"
+                                        }
+                                        returnToChatLibrary = false
+                                    }
+                                    AstraTrayAction.COPY_CHAT ->
+                                        copyText(exportConversation(history))
+                                    AstraTrayAction.SHARE_CHAT ->
+                                        shareText(exportConversation(history))
+                                    AstraTrayAction.MISSION ->
+                                        commandDeckExpanded = !commandDeckExpanded
+                                    AstraTrayAction.READ_ALOUD -> {
+                                        val reply = history.lastOrNull { it.role == "Astra" }
+                                            ?.text.orEmpty()
+                                        if (reply.isNotBlank()) speak(reply, localOnlyTts)
+                                    }
+                                    AstraTrayAction.CLEAR_CHAT -> showClearDialog = true
+                                }
+                                researchScope.launch { drawerState.close() }
+                            }
+                        )
+                    }
+                ) {
                 Scaffold(
                     modifier = Modifier.background(
                         androidx.compose.ui.graphics.Brush.verticalGradient(
@@ -5138,7 +5197,9 @@ class MainActivity :
                                     modifier = Modifier
                                         .heightIn(min = 48.dp)
                                         .semantics { contentDescription = "Open Astra navigation and chat options" }
-                                        .clickable { navigationPopupOpen = true },
+                                        .clickable {
+                                            researchScope.launch { drawerState.open() }
+                                        },
                                     contentAlignment = Alignment.CenterStart
                                 ) {
                                     AstraBrand(
@@ -5146,154 +5207,7 @@ class MainActivity :
                                         thinking = offlineJob?.isActive == true
                                     )
                                 }
-                                DropdownMenu(
-                                    expanded = navigationPopupOpen,
-                                    onDismissRequest = { navigationPopupOpen = false }
-                                ) {
-                                    listOf(
-                                        "Chat", "Tasks", "Notes", "Tools", "Settings", "Study"
-                                    ).forEachIndexed { index, title ->
-                                        DropdownMenuItem(
-                                            text = {
-                                                Row(
-                                                    verticalAlignment = Alignment.CenterVertically,
-                                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                                                ) {
-                                                    AstraNavigationGlyph(
-                                                        section = AstraNavSection.entries[index],
-                                                        tint = MaterialTheme.colorScheme.primary
-                                                    )
-                                                    Text(title, style = MaterialTheme.typography.bodyMedium)
-                                                    if (tab == index) Text("✓")
-                                                }
-                                            },
-                                            onClick = {
-                                                if (index == 5) studyOpenToken++
-                                                tab = index
-                                                navigationPopupOpen = false
-                                            }
-                                        )
-                                    }
-                                    if (tab == 0) {
-                                        HorizontalDivider()
-                                        Text(
-                                            "CHAT OPTIONS",
-                                            modifier = Modifier.padding(
-                                                start = 16.dp, top = 8.dp, bottom = 4.dp
-                                            ),
-                                            style = MaterialTheme.typography.labelSmall,
-                                            color = MaterialTheme.colorScheme.primary
-                                        )
 
-
-                                        DropdownMenuItem(
-                                            text = { Text("Find in chat") },
-                                            onClick = {
-                                                navigationPopupOpen = false
-                                                findInChatQuery = ""
-                                                showFindInChat = true
-                                            }
-                                        )
-
-                                        DropdownMenuItem(
-                                            text = { Text("Search all local memory") },
-                                            onClick = {
-                                                navigationPopupOpen = false
-                                                memorySearchQuery = ""
-                                                showMemorySearch = true
-                                            }
-                                        )
-
-                                        DropdownMenuItem(
-                                            text = {
-                                                Text("Copy chat")
-                                            },
-                                            onClick = {
-
-                                                navigationPopupOpen = false
-
-                                                copyText(
-                                                    exportConversation(
-                                                        history
-                                                    )
-                                                )
-                                            }
-                                        )
-
-                                        DropdownMenuItem(
-                                            text = {
-                                                Text("Share chat")
-                                            },
-                                            onClick = {
-
-                                                navigationPopupOpen = false
-
-                                                shareText(
-                                                    exportConversation(
-                                                        history
-                                                    )
-                                                )
-                                            }
-                                        )
-
-                                        DropdownMenuItem(
-                                            text = {
-                                                Text("New conversation")
-                                            },
-                                            onClick = {
-
-                                                navigationPopupOpen = false
-
-                                                startNewConversation()
-                                            }
-                                        )
-                                        DropdownMenuItem(
-                                            text = { Text("Conversations") },
-                                            onClick = {
-                                                navigationPopupOpen = false
-                                                chatSearchQuery = ""
-                                                showChatSwitcher = true
-                                            }
-                                        )
-                                        DropdownMenuItem(
-                                            text = { Text("Rename current chat") },
-                                            onClick = {
-                                                navigationPopupOpen = false
-                                                renameActiveChat = true
-                                                renameChatDraft = activeChatTitle.ifBlank {
-                                                    history.firstOrNull {
-                                                        it.role == "You"
-                                                    }?.text?.take(55) ?: "New conversation"
-                                                }
-                                                returnToChatLibrary = false
-                                            }
-                                        )
-                                        DropdownMenuItem(
-                                            text = { Text(if (commandDeckExpanded) "Hide mission control" else "Show mission control") },
-                                            onClick = {
-                                                commandDeckExpanded = !commandDeckExpanded
-                                                navigationPopupOpen = false
-                                            }
-                                        )
-                                        DropdownMenuItem(
-                                            text = { Text("Read last response aloud") },
-                                            enabled = history.any { it.role == "Astra" },
-                                            onClick = {
-                                                navigationPopupOpen = false
-                                                val reply = history.lastOrNull { it.role == "Astra" }?.text.orEmpty()
-                                                if (reply.isNotBlank()) speak(reply, localOnlyTts)
-                                            }
-                                        )
-                                        DropdownMenuItem(
-                                            text = { Text("Clear current chat") },
-                                            onClick = {
-                                                navigationPopupOpen = false
-                                                showClearDialog = true
-                                            }
-                                        )
-                                    }
-
-                                }
                             }
 
                             // Visible build identification makes old APKs unmistakable.
@@ -5373,7 +5287,7 @@ class MainActivity :
                                         item(key = "astra-welcome") {
                                             AstraWelcomePanel(
                                                 onOpenNavigation = {
-                                                    navigationPopupOpen = true
+                                                    researchScope.launch { drawerState.open() }
                                                 },
                                                 onOpenStudy = {
                                                     studyOpenToken++
@@ -7397,6 +7311,7 @@ class MainActivity :
                         }
                     }
                 }
+                } // end the curved Astra navigation drawer
             }
         }
     }
