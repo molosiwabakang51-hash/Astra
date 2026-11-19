@@ -5,8 +5,8 @@ import sys
 from pathlib import Path
 from zipfile import ZipFile
 
-MODEL = "assets/qwen3-0.6b-q4km.gguf"
-EXPECTED_SHA256 = "7af3fdf842f87b24672f8a7f1dd50404043f0bfb71093ff91c31d2b49df4631d"
+MODEL = "assets/Qwen3-1.7B-Q4_K_M.gguf"
+EXPECTED_SHA256 = "d2387ca2dbfee2ffabce7120d3770dadca0b293052bc2f0e138fdc940d9bc7b5"
 
 
 def main(apk_path: Path) -> None:
@@ -14,6 +14,8 @@ def main(apk_path: Path) -> None:
         raise RuntimeError("APK not found: " + str(apk_path))
     with ZipFile(apk_path) as apk:
         names = apk.namelist()
+        if "assets/qwen3-0.6b-q4km.gguf" in names:
+            raise RuntimeError("FULL APK must not ship obsolete 0.6B model weights")
         if MODEL not in names:
             raise RuntimeError("APK has no bundled Qwen3 weights: " + MODEL)
         for notice in (
