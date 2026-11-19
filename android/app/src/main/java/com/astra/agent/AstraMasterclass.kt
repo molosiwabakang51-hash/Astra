@@ -43,7 +43,9 @@ internal class AstraMasterclass(
             "english" to AstraMasterEnglish.units,
             "trading" to AstraMasterTrading.units,
             "french" to AstraMasterFrench.units,
-            "physics" to AstraMasterPhysics.units
+            "physics" to AstraMasterPhysics.units,
+            "russian" to AstraMasterRussian.units,
+            "computing" to AstraMasterComputing.units
         )
         private val subjectNames = mapOf(
             "finance" to "Finance",
@@ -51,7 +53,9 @@ internal class AstraMasterclass(
             "english" to "English",
             "trading" to "Day Trading",
             "french" to "French",
-            "physics" to "Physics"
+            "physics" to "Physics",
+            "russian" to "Russian",
+            "computing" to "Computer Science"
         )
 
         fun units(subject: String): List<Unit> = tracks[subject].orEmpty()
@@ -81,10 +85,18 @@ internal class AstraMasterclass(
         writeInt(key(subject, suffix), value)
 
     fun respond(raw: String): String? {
-        val text = raw.trim().lowercase(Locale.ROOT)
+        val original = raw.trim().lowercase(Locale.ROOT)
             .replace(Regex("""\s+"""), " ").trimEnd('.', '?', '!')
+        // A full human subject name and the compact command are equivalent.
+        val text = when {
+            original.startsWith("computer science ") ->
+                "computing " + original.removePrefix("computer science ")
+            original.startsWith("computer_science ") ->
+                "computing " + original.removePrefix("computer_science ")
+            else -> original
+        }
         if (text.length > 90) return null
-        val match = Regex("""^(finance|math|english|trading|french|physics) (?:masterclass|workshop)(?:\s+(.*))?$""")
+        val match = Regex("""^(finance|math|english|trading|french|physics|russian|computing) (?:masterclass|workshop)(?:\s+(.*))?$""")
             .matchEntire(text) ?: return null
         val subject = match.groupValues[1]
         val cmd = match.groupValues[2].trim()
