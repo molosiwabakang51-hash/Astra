@@ -50,6 +50,25 @@ class AstraMultilingualTutorTest {
         assertTrue(coach.respond("Next french lesson")!!.contains("lesson 5/21"))
     }
 
+    @Test fun eightLanguagesAdvanceUsingLocalNativeNextLessonPhrases() {
+        val coach = tutor()
+        val phrases = mapOf(
+            "french" to "leçon suivante s'il vous plaît",
+            "spanish" to "siguiente lección",
+            "portuguese" to "próxima lição",
+            "german" to "nächste lektion",
+            "setswana" to "thuto e e latelang",
+            "swahili" to "somo linalofuata",
+            "japanese" to "次のレッスン",
+            "mandarin" to "下一课"
+        )
+        for ((language, phrase) in phrases) {
+            assertTrue(coach.respond("learn $language")!!.contains("lesson 1/21"))
+            val next = coach.respond(phrase)
+            assertTrue("$language failed: $phrase -> $next", next!!.contains("lesson 2/21"))
+        }
+    }
+
     @Test fun tutorDoesNotHijackUnrelatedMixedLanguageConversation() {
         val coach = tutor()
         coach.respond("learn french")
