@@ -58,9 +58,15 @@ internal object AstraVoiceAccentPolicy {
                 else SpeechLanguage.ENGLISH_US
             AstraReplyLanguage.Choice.RUSSIAN -> SpeechLanguage.RUSSIAN
             AstraReplyLanguage.Choice.SETSWANA -> SpeechLanguage.SETSWANA
-            AstraReplyLanguage.Choice.FRENCH -> SpeechLanguage.FRENCH
-            AstraReplyLanguage.Choice.SPANISH -> SpeechLanguage.SPANISH
-            AstraReplyLanguage.Choice.PORTUGUESE -> SpeechLanguage.PORTUGUESE
+            AstraReplyLanguage.Choice.FRENCH ->
+                if (configured == SpeechLanguage.FRENCH_CANADA) configured
+                else SpeechLanguage.FRENCH
+            AstraReplyLanguage.Choice.SPANISH ->
+                if (configured == SpeechLanguage.SPANISH_MEXICO) configured
+                else SpeechLanguage.SPANISH
+            AstraReplyLanguage.Choice.PORTUGUESE ->
+                if (configured == SpeechLanguage.PORTUGUESE_BRAZIL) configured
+                else SpeechLanguage.PORTUGUESE
             AstraReplyLanguage.Choice.GERMAN -> SpeechLanguage.GERMAN
             AstraReplyLanguage.Choice.SWAHILI -> SpeechLanguage.SWAHILI
             AstraReplyLanguage.Choice.JAPANESE -> SpeechLanguage.JAPANESE
@@ -74,15 +80,21 @@ internal object AstraVoiceAccentPolicy {
         }
         if (explicit != null) return explicit
 
-        // A bounded detector: avoid guessing among closely related languages
-        // based on ambiguous Latin or Arabic-script fragments.
+        // In AUTO mode only strong script evidence can override the configured
+        // voice. A foreign word inside an English reply is not sufficient.
         val excerpt = text.take(600)
+        val letterCount = excerpt.count { it.isLetter() }
+        if (letterCount < 12) return configured
+        fun dominant(first: Char, last: Char): Boolean {
+            val count = excerpt.count { it in first..last }
+            return count >= 8 && count * 2 > letterCount
+        }
         return when {
-            excerpt.any { it in '\u3040'..'\u30FF' } -> SpeechLanguage.JAPANESE
-            excerpt.any { it in '\uAC00'..'\uD7AF' } -> SpeechLanguage.KOREAN
-            excerpt.any { it in '\u0900'..'\u097F' } -> SpeechLanguage.HINDI
-            excerpt.any { it in '\u0400'..'\u052F' } -> SpeechLanguage.RUSSIAN
-            excerpt.any { it in '\u4E00'..'\u9FFF' } -> SpeechLanguage.MANDARIN
+            dominant('\u3040', '\u30FF') -> SpeechLanguage.JAPANESE
+            dominant('\uAC00', '\uD7AF') -> SpeechLanguage.KOREAN
+            dominant('\u0900', '\u097F') -> SpeechLanguage.HINDI
+            dominant('\u0400', '\u052F') -> SpeechLanguage.RUSSIAN
+            dominant('\u4E00', '\u9FFF') -> SpeechLanguage.MANDARIN
             else -> configured
         }
     }
