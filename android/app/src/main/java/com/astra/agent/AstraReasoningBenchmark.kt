@@ -36,9 +36,10 @@ internal object AstraReasoningBenchmark {
         val answerPreview: String
     )
 
-    fun prompt(probe: Probe, mode: Mode): String =
-        if (mode == Mode.CAREFUL) "Think carefully: " + probe.question
-        else probe.question
+    // The exact same user question is used in both modes. Only the
+    // internal Qwen soft switch differs; otherwise a verbal "think
+    // carefully" instruction could confound the A/B accuracy comparison.
+    fun prompt(probe: Probe): String = probe.question
 
     fun score(probe: Probe, answer: String): Boolean {
         // Grade ONLY the visible final answer, never hidden reasoning or a
