@@ -44,20 +44,56 @@ class AstraReasoningBenchmarkTest {
         }
     }
 
-    @Test fun reportDisclosesRealModelAndNeverClaimsGeneralIntelligenceScore() {
-        val p = AstraReasoningBenchmark.Probe.ENTAILMENT
-        val a = AstraReasoningBenchmark.sample(p, AstraReasoningBenchmark.Mode.FAST,
+    @Test fun completeReportDisclosesBothAccuracyAndLatencyWithoutGeneralRating() {
+        val logic = AstraReasoningBenchmark.Probe.ENTAILMENT
+        val profit = AstraReasoningBenchmark.Probe.PROFIT_LOSS
+        val a = AstraReasoningBenchmark.sample(logic, AstraReasoningBenchmark.Mode.FAST,
             "YES", 250L)
-        val b = AstraReasoningBenchmark.sample(p, AstraReasoningBenchmark.Mode.CAREFUL,
+        val b = AstraReasoningBenchmark.sample(logic, AstraReasoningBenchmark.Mode.CAREFUL,
             "NO", 1500L)
-        val report = AstraReasoningBenchmark.render(listOf(a, b), "Qwen3 1.7B · Q4_K_M")
-        assertTrue(report.contains("Fast: 0/1"))
-        assertTrue(report.contains("Careful: 1/1"))
+        val c = AstraReasoningBenchmark.sample(profit, AstraReasoningBenchmark.Mode.FAST,
+            "-20", 350L)
+        val d = AstraReasoningBenchmark.sample(profit, AstraReasoningBenchmark.Mode.CAREFUL,
+            "20", 2500L)
+        val samples = listOf(a, b, c, d)
+        assertTrue(AstraReasoningBenchmark.isComplete(samples))
+        val report = AstraReasoningBenchmark.render(samples, "Qwen3 1.7B · Q4_K_M")
+        assertTrue(report.contains("Fast: 1/2"))
+        assertTrue(report.contains("Careful: 1/2"))
+        assertTrue(report.contains("Fast average elapsed: 300 ms"))
+        assertTrue(report.contains("Careful average elapsed: 2000 ms"))
         assertTrue(report.contains("1500 ms"))
         assertTrue(report.contains("Qwen3 1.7B"))
         assertTrue(report.contains("not a 10/10 rating"))
         assertFalse(report.contains("private"))
         assertEquals(1500L, b.milliseconds)
+    }
+
+    @Test fun incompleteDuplicateOrUnknownModelNeverReceivesABScore() {
+        val logic = AstraReasoningBenchmark.Probe.ENTAILMENT
+        val a = AstraReasoningBenchmark.sample(logic, AstraReasoningBenchmark.Mode.FAST,
+            "NO", 100L)
+        val b = AstraReasoningBenchmark.sample(logic, AstraReasoningBenchmark.Mode.CAREFUL,
+            "NO", 500L)
+        val duplicate = listOf(a, b, a, b)
+        assertFalse(AstraReasoningBenchmark.isComplete(duplicate))
+        val partial = listOf(a, b)
+        assertFalse(AstraReasoningBenchmark.isComplete(partial))
+        for (samples in listOf(duplicate, partial)) {
+            val report = AstraReasoningBenchmark.render(samples, "Qwen3 1.7B · Q4_K_M")
+            assertTrue(report.contains("NO SCORE"))
+            assertFalse(report.contains("Fast: 2/2"))
+            assertFalse(report.contains("Careful: 2/2"))
+        }
+        val complete = listOf(a, b,
+            AstraReasoningBenchmark.sample(AstraReasoningBenchmark.Probe.PROFIT_LOSS,
+                AstraReasoningBenchmark.Mode.FAST, "-20", 100L),
+            AstraReasoningBenchmark.sample(AstraReasoningBenchmark.Probe.PROFIT_LOSS,
+                AstraReasoningBenchmark.Mode.CAREFUL, "-20", 300L))
+        assertTrue(AstraReasoningBenchmark.isComplete(complete))
+        assertTrue(AstraReasoningBenchmark.render(complete, null).contains("NO SCORE"))
+        assertTrue(AstraReasoningBenchmark.render(complete,
+            "Qwen3 0.6B · Q4_K_M").contains("NO SCORE"))
     }
 
     @Test fun citedSourcesCannotSupplyAnOtherwiseWrongAnswer() {
