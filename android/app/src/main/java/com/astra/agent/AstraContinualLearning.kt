@@ -165,6 +165,9 @@ internal class AstraContinualLearning(private val file: File) {
         return x
     }
 
+    /** Inspect the deterministic training label without updating or saving weights. */
+    internal fun trainingLabel(message: String): Topic = teacherLabel(message)
+
     private fun teacherLabel(message: String): Topic {
         val lower = message.lowercase(Locale.ROOT)
         return labelRules.firstOrNull { (_, pattern) ->
