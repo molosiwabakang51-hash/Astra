@@ -9,6 +9,7 @@ ROOT = Path(__file__).resolve().parents[2]
 JAVA = ROOT / "android/app/src/main/java/com/astra/agent"
 GLYPHS = (JAVA / "AstraNavigationGlyph.kt").read_text(encoding="utf-8")
 MAIN = (JAVA / "MainActivity.kt").read_text(encoding="utf-8")
+TRAY = (JAVA / "AstraNavigationTray.kt").read_text(encoding="utf-8")
 
 
 class NavigationGlyphSourceTest(unittest.TestCase):
@@ -20,13 +21,17 @@ class NavigationGlyphSourceTest(unittest.TestCase):
         self.assertNotIn("http://", GLYPHS)
         self.assertNotIn("https://", GLYPHS)
 
-    def test_real_dropdown_uses_vectors_and_retains_text_labels(self):
-        self.assertIn("AstraNavigationGlyph(", MAIN)
-        self.assertIn("section = AstraNavSection.entries[index]", MAIN)
-        self.assertIn('"Chat", "Tasks", "Notes", "Tools", "Settings", "Study"', MAIN)
+    def test_curved_navigation_drawer_uses_vectors_and_retains_labels(self):
+        self.assertIn("AstraNavigationGlyph(", TRAY)
+        self.assertIn("section = section", TRAY)
+        self.assertIn("ModalDrawerSheet(", TRAY)
+        self.assertIn("ModalNavigationDrawer(", MAIN)
+        self.assertIn("drawerState.open()", MAIN)
+        self.assertIn("tab = destination", MAIN)
+        self.assertNotIn("navigationPopupOpen", MAIN)
         self.assertNotIn('listOf("◌", "✓", "▤", "⌘", "⚙", "✦")[index]', MAIN)
-        self.assertIn("navigationPopupOpen = true", MAIN)
-        self.assertIn("tab = index", MAIN)
+        for destination in ("Chat", "Tasks", "Notes", "Tools", "Settings", "Study"):
+            self.assertIn('"' + destination + '"', TRAY)
 
 
 if __name__ == "__main__":
