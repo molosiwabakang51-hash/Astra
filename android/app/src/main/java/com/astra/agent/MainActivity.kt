@@ -6378,7 +6378,8 @@ class MainActivity :
                                             "AI reasoning A/B (Qwen3 1.7B): run the same " +
                                                 "two synthetic logic and multistep problems in " +
                                                 "fast and careful modes, with isolated model " +
-                                                "sessions. Four local generations may be slow " +
+                                                "sessions. Both modes have the same 768-token " +
+                                                "cap. Four local generations may be slow " +
                                                 "and consume battery. Use airplane mode. " +
                                                 "These results do not establish a 10/10 rating.",
                                             style = MaterialTheme.typography.bodySmall
@@ -6429,7 +6430,9 @@ class MainActivity :
                                                                     Int.MIN_VALUE + 400 + index * 2 +
                                                                         modeIndex,
                                                                     reasoningModeOverride =
-                                                                        mode == AstraReasoningBenchmark.Mode.CAREFUL
+                                                                        mode == AstraReasoningBenchmark.Mode.CAREFUL,
+                                                                    diagnosticMaxTokens =
+                                                                        AstraReasoningBenchmark.COMPARISON_TOKEN_CAP
                                                                 )
                                                                 val elapsed =
                                                                     (System.nanoTime() - start) / 1_000_000
