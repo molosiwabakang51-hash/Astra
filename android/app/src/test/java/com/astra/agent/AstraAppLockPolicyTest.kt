@@ -82,4 +82,20 @@ class AstraAppLockPolicyTest {
         assertFalse(AstraAppLockPolicy.requiresUnlock(false, true))
         assertFalse(AstraAppLockPolicy.requiresUnlock(false, false))
     }
+
+    @Test fun corruptSavedLockPreferenceCannotSilentlyDisableProtection() {
+        assertFalse(AstraAppLockPolicy.enabledFromStoredPreference(false, null))
+        assertFalse(AstraAppLockPolicy.enabledFromStoredPreference(false, "corrupt"))
+        assertFalse(AstraAppLockPolicy.enabledFromStoredPreference(true, false))
+        assertTrue(AstraAppLockPolicy.enabledFromStoredPreference(true, true))
+        for (bad in listOf<Any?>(
+            null, "false", "true", "", 0, 1L, 0.0, byteArrayOf(0)
+        )) {
+            assertTrue("Invalid lock preference unexpectedly bypassed authentication",
+                AstraAppLockPolicy.enabledFromStoredPreference(true, bad))
+            assertFalse(AstraAppLockPolicy.unlockedOnColdLaunch(
+                AstraAppLockPolicy.enabledFromStoredPreference(true, bad)))
+        }
+    }
+
 }
