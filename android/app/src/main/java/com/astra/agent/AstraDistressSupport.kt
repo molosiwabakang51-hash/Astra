@@ -10,6 +10,7 @@ import java.util.Locale
 internal object AstraDistressSupport {
     fun respond(raw: String): String? {
         val message = raw.trim().lowercase(Locale.ROOT)
+            .replace('’', '\'')
             .replace(Regex("""\s+"""), " ")
         if (message.length !in 5..600) return null
         val imminent = listOf(
