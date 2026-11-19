@@ -57,10 +57,16 @@ internal object AstraConversationReview {
             val priorQuery = history.asReversed().asSequence()
                 .filter { it.role == "You" }
                 .take(8)
-                .mapNotNull { mentions.matchEntire(it.text.trim()) }
+                .mapNotNull { previous ->
+                    mentions.matchEntire(previous.text.trim())?.groupValues?.get(1)
+                        ?: compoundReview.pattern.let {
+                            Regex(it, RegexOption.IGNORE_CASE)
+                                .matchEntire(previous.text.trim())?.groupValues?.get(1)
+                        }
+                }
                 .firstOrNull()
             if (priorQuery != null) {
-                return earlierMentions(priorQuery.groupValues[1], history)
+                return earlierMentions(priorQuery, history)
             }
         }
         val match = mentions.matchEntire(command)
