@@ -148,7 +148,14 @@ internal object AstraConversationContext {
             if (availableText < 10) break
             // Do not cut immediately after an escaped backslash: otherwise
             // the following closing quote could become escaped too.
-            val bounded = source.take(availableText).removeSuffix("\\")
+            val cutoff = minOf(availableText, source.length)
+            // UTF-16 .take() can split an emoji or supplementary-script
+            // character in half. Never send malformed quoted history to Qwen.
+            val safeCutoff = if (cutoff in 1 until source.length &&
+                source[cutoff - 1].isHighSurrogate() &&
+                source[cutoff].isLowSurrogate()
+            ) cutoff - 1 else cutoff
+            val bounded = source.substring(0, safeCutoff).removeSuffix("\\")
             if (bounded.length < 10) continue
             selected.add(item.index to (prefix + bounded + suffix))
             remaining -= selected.last().second.length
