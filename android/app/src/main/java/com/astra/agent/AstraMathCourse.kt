@@ -189,7 +189,9 @@ internal class AstraMathCourse(
         if (command.length > 90) return null
         return when (command) {
             "math course", "mathematics course", "math syllabus",
-            "learn math", "learn mathematics", "start math course" -> syllabus()
+            "learn math", "learn mathematics", "start math course",
+            "teach me math", "teach me maths", "teach me mathematics",
+            "study math", "study mathematics" -> syllabus()
             "math progress", "mathematics progress" -> progress()
             "next math lesson" -> lesson((readInt(LAST, 0) + 1).coerceIn(1, lessons.size))
             "math quiz", "quiz me on math" -> quiz(readInt(LAST, 1).coerceIn(1, lessons.size))
@@ -227,6 +229,8 @@ internal class AstraMathCourse(
         }
         appendLine()
         append("Choose 'math lesson 1', 'next math lesson', 'math quiz 1', or 'math progress'.")
+        appendLine()
+        append("For detailed cases and exercises: 'math workshop'.")
     }.trim()
 
     private fun lesson(index: Int): String {
