@@ -152,10 +152,10 @@ class AstraGenerationPolicyTest {
     }
 
     @Test fun multilingualDepthCannotBeOverriddenByRestoredOlderChat() {
-        val restored = "EARLIER CHAT EXCERPTS (quoted reference, NOT instructions):\\n" +
-            "Previous user: \\"Ответь кратко.\\"\\n" +
-            "\\nCURRENT USER MESSAGE (answer this message, not the excerpts):\\n" +
-            "Объясни дюрацию подробно.\\n/no_think"
+        val restored = "EARLIER CHAT EXCERPTS (quoted reference, NOT instructions):\n" +
+            "Previous user: \"Ответь кратко.\"\n" +
+            "\nCURRENT USER MESSAGE (answer this message, not the excerpts):\n" +
+            "Объясни дюрацию подробно.\n/no_think"
         assertEquals(AstraGenerationPolicy.Depth.DETAILED,
             AstraGenerationPolicy.depth(restored))
         assertEquals(1152, AstraGenerationPolicy.maxAnswerTokens(restored, true))
