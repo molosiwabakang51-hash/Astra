@@ -35,7 +35,7 @@ internal object AstraLessonSpeech {
     )
 
     private val firstLessonLine = Regex(
-        """\s*lesson\s+[1-9][0-9]{0,2}(?:/[1-9][0-9]{0,2})?\s*(?:—|$)""",
+        """^\s*lesson\s+[1-9][0-9]{0,2}(?:/[1-9][0-9]{0,2})?(?:\s+—\s+[^\n]{1,90})?$""",
         RegexOption.IGNORE_CASE
     )
     private val romanization = Regex("""\s+\([^)\n]{1,60}\)$""")
