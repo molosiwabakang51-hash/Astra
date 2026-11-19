@@ -222,7 +222,8 @@ internal object AstraBackupCodec {
             for (j in 0 until messages.length()) {
                 val entry = messages.optJSONObject(j)
                     ?: throw IllegalArgumentException("Invalid archived message in backup.")
-                if (entry.opt("role") !in setOf("You", "Astra") ||
+                val role = entry.opt("role")
+                if (role !is String || role !in setOf("You", "Astra") ||
                     entry.opt("text") !is String
                 ) {
                     throw IllegalArgumentException("Invalid archived message data in backup.")
