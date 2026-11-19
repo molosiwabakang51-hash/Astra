@@ -201,4 +201,47 @@ class AstraBackupCodecTest {
         }
         assertTrue("Expected invalid backup to be rejected", rejected)
     }
+
+    @Test fun zeroByteReadsDoNotHangAndOccasionalEmptyReadsRemainSafe() {
+        val valid = AstraBackupCodec.encode(example).toByteArray(Charsets.UTF_8)
+        val intermittent = object : java.io.InputStream() {
+            var offset = 0
+            var zeroNext = true
+            override fun read(): Int =
+                if (offset < valid.size) valid[offset++].toInt() and 0xff else -1
+            override fun read(buffer: ByteArray, off: Int, len: Int): Int {
+                if (zeroNext) {
+                    zeroNext = false
+                    return 0
+                }
+                zeroNext = true
+                if (offset >= valid.size) return -1
+                val length = minOf(len, 63, valid.size - offset)
+                valid.copyInto(buffer, off, offset, offset + length)
+                offset += length
+                return length
+            }
+        }
+        val recovered = AstraBackupCodec.readLimited(intermittent)
+        assertEquals(AstraBackupCodec.parse(AstraBackupCodec.encode(example)).values,
+            AstraBackupCodec.parse(recovered).values)
+
+        val stalled = object : java.io.InputStream() {
+            override fun read(): Int = 0
+            override fun read(buffer: ByteArray, off: Int, len: Int): Int = 0
+        }
+        assertRejects { AstraBackupCodec.readLimited(stalled) }
+    }
+
+    @Test fun malformedUtf8MustNotSilentlyReplacePrivateChatCharacters() {
+        val invalid = byteArrayOf(0x7b, 0x22, 0x78, 0x22, 0x3a, 0x22,
+            0xc3.toByte(), 0x28, 0x22, 0x7d)
+        assertRejects {
+            AstraBackupCodec.readLimited(ByteArrayInputStream(invalid))
+        }
+        val truncated = byteArrayOf(0xe2.toByte(), 0x82.toByte())
+        assertRejects {
+            AstraBackupCodec.readLimited(ByteArrayInputStream(truncated))
+        }
+    }
 }
