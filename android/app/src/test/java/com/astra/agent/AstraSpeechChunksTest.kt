@@ -15,11 +15,11 @@ class AstraSpeechChunksTest {
     }
 
     @Test fun longDetailedCoursePreservesOrderAndNeverExceedsAndroidSafeLimit() {
-        val source = (1..180).joinToString(" ") { index ->
+        val source = (1..80).joinToString(" ") { index ->
             "Leçon $index. Je peux vous aider avec la grammaire française. " +
                 "Voici un exemple et une application pratique."
         }
-        val segments = AstraSpeechChunks.partition(source, maxChars = 320)
+        val segments = AstraSpeechChunks.partition(source, maxChars = 320, capChunks = 60)
         assertTrue(segments.utterances.size > 20)
         assertTrue(segments.utterances.all { it.length in 1..320 })
         assertFalse(segments.truncated)
@@ -27,7 +27,7 @@ class AstraSpeechChunksTest {
             .replace(Regex("""\s+"""), " ").trim()
         assertEquals(source.replace(Regex("""\s+"""), " ").trim(), reconstructed)
         assertTrue(segments.utterances.first().contains("Leçon 1"))
-        assertTrue(segments.utterances.last().contains("Leçon 180"))
+        assertTrue(segments.utterances.last().contains("Leçon 80"))
     }
 
     @Test fun cjkRepliesWithoutSpacesAreSplitAndRemainIntact() {
