@@ -292,7 +292,8 @@ internal class AstraOnDeviceBrain(
                         turns.dropLast(1).map {
                             AstraConversationContext.Turn(it.role, it.content)
                         },
-                        restoringConversation
+                        restoringConversation,
+                        thinkingRequested = AstraReasoningMode.enabled(finalMessage)
                     ),
                     AstraReplyLanguage.fromId(selectedReplyLanguageId)
                 )
