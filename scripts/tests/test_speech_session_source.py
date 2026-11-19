@@ -35,7 +35,8 @@ class SpeechSessionSourceTests(unittest.TestCase):
         self.assertIn("override fun onStop()", MAIN)
         self.assertIn("tts?.stop()", MAIN)
         self.assertIn("recognizer?.cancel()", MAIN)
-        self.assertIn("foreground && (!appLockEnabled || workspaceUnlocked)", SESSION)
+        self.assertIn("foreground && displayInteractive && deviceUnlocked && windowFocused", SESSION)
+        self.assertIn("(!appLockEnabled || workspaceUnlocked)", SESSION)
 
     def test_dictation_has_no_persistence_or_network_dependency(self):
         for forbidden in ("SharedPreferences(", "http://", "https://",
