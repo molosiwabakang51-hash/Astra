@@ -42,7 +42,58 @@ class AstraKnowledgeLearningTest {
         val output = model.predict("teach alphabet")
         assertTrue(output.confidence in 0.0..1.0)
         // Model only predicts a retrieval topic; it exposes no task or action API.
-        assertTrue(AstraContinualLearning.Topic.entries.size == 3)
+        assertEquals(20, AstraContinualLearning.Topic.entries.size)
+        assertTrue(AstraContinualLearning.Topic.entries.contains(
+            AstraContinualLearning.Topic.COMPUTING
+        ))
+    }
+
+    @Test fun broadSubjectsCanTrainWithoutPersistingRawConversation() {
+        val domains = mapOf(
+            "Explain French grammar and pronouns" to AstraContinualLearning.Topic.FRENCH,
+            "How does Russian verb aspect work" to AstraContinualLearning.Topic.RUSSIAN,
+            "Explain stock index futures and margin call" to AstraContinualLearning.Topic.TRADING,
+            "How do I solve calculus integrals?" to AstraContinualLearning.Topic.MATHEMATICS,
+            "Explain Newton's laws in physics" to AstraContinualLearning.Topic.PHYSICS,
+            "Explain organic chemistry" to AstraContinualLearning.Topic.CHEMISTRY,
+            "Explain photosynthesis in biology" to AstraContinualLearning.Topic.BIOLOGY,
+            "Explain an algorithm in computer science" to AstraContinualLearning.Topic.COMPUTING,
+            "Teach me World War history" to AstraContinualLearning.Topic.HISTORY,
+            "Explain contract law" to AstraContinualLearning.Topic.LAW,
+            "Teach me creative writing poetry" to AstraContinualLearning.Topic.CREATIVE_WRITING,
+            "What is Setswana grammar?" to AstraContinualLearning.Topic.SETSWANA
+        )
+        for ((message, expected) in domains) {
+            val state = File(Files.createTempDirectory("astra-domain").toFile(), "adapter.bin")
+            val learner = AstraContinualLearning(state)
+            repeat(120) { learner.learn(message) }
+            assertEquals(message, expected, learner.predict(message).topic)
+            assertTrue(learner.predict(message).confidence > 0.45)
+            assertTrue(state.isFile)
+            assertFalse(state.readText(Charsets.ISO_8859_1).contains(message))
+        }
+    }
+
+    @Test fun v1TopicWeightsMigrateWithoutErasingLearningSteps() {
+        val location = File(Files.createTempDirectory("astra-neural-v1").toFile(),
+            "adapter.bin")
+        java.io.DataOutputStream(location.outputStream()).use { output ->
+            output.writeUTF("ASTRA_NEURAL_TOPIC_V1")
+            output.writeInt(37)
+            output.writeDouble(0.14)
+            // 128 * 24 first-layer weights, then 24 biases.
+            repeat(128 * 24 + 24) { output.writeDouble(0.005) }
+            // V1 contained three 24-unit output rows and three biases.
+            repeat(3 * 24 + 3) { output.writeDouble(0.03) }
+        }
+        val migrated = AstraContinualLearning(location)
+        assertEquals(37, migrated.status().steps)
+        assertEquals(0.14, migrated.status().lastLoss, 1e-9)
+        migrated.learn("Explain neural networks and computer science")
+        assertEquals(38, migrated.status().steps)
+        val restored = AstraContinualLearning(location)
+        assertEquals(38, restored.status().steps)
+        assertEquals(AstraContinualLearning.Topic.entries.size, 20)
     }
 
     @Test fun sourceBoundedRetrievalAndAttributionExcludeOtherTopics() {
