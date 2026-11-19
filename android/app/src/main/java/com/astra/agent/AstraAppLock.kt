@@ -152,7 +152,7 @@ internal object AstraAppLockPolicy {
      * for deterministic JVM regression testing.
      */
     fun enabledFromStoredPreference(present: Boolean, value: Any?): Boolean =
-        if (!present) false else value as? Boolean ?: true
+        if (!present) false else (value as? Boolean ?: true)
 
     val backgroundDelaysMillis: List<Long> = listOf(0L, 30_000L, 120_000L, 300_000L)
     // Off is the migration-safe default; selected limits apply only while active.
