@@ -6002,11 +6002,40 @@ class MainActivity :
                                             )
                                         }
                                         if (modelImportStatus.isNotBlank()) {
-                                            Text(
-                                                modelImportStatus,
-                                                style = MaterialTheme.typography.bodySmall,
-                                                color = MaterialTheme.colorScheme.primary
-                                            )
+                                            val importFailed = modelImportStatus
+                                                .startsWith("MODEL IMPORT FAILED")
+                                            val importReady = modelImportStatus
+                                                .startsWith("QWEN3 1.7B READY")
+                                            val statusTint = when {
+                                                importFailed -> MaterialTheme.colorScheme.error
+                                                importReady -> AstraAurora.mint
+                                                else -> AstraAurora.cyan
+                                            }
+                                            Surface(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                shape = RoundedCornerShape(17.dp),
+                                                color = statusTint.copy(alpha = 0.09f),
+                                                border = androidx.compose.foundation.BorderStroke(
+                                                    1.dp, statusTint.copy(alpha = 0.36f)
+                                                )
+                                            ) {
+                                                Column(Modifier.padding(13.dp)) {
+                                                    Text(
+                                                        if (importFailed) "IMPORT NEEDS ATTENTION"
+                                                        else if (importReady) "MODEL VERIFIED"
+                                                        else "MODEL IMPORT STATUS",
+                                                        color = statusTint,
+                                                        fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                                                        style = MaterialTheme.typography.labelSmall
+                                                    )
+                                                    Spacer(Modifier.height(5.dp))
+                                                    Text(
+                                                        modelImportStatus,
+                                                        style = MaterialTheme.typography.bodyMedium,
+                                                        color = MaterialTheme.colorScheme.onSurface
+                                                    )
+                                                }
+                                            }
                                         }
                                         Text(
                                             "The full APK includes model weights. With the smaller APK, " +
