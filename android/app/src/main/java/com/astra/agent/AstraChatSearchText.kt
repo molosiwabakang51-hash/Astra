@@ -67,11 +67,11 @@ internal object AstraChatSearchText {
         val normalized = Normalizer.normalize(
             String(Character.toChars(cp)), Normalizer.Form.NFD
         ).lowercase(Locale.ROOT)
-        return normalized.filter { c ->
-            val type = Character.getType(c)
-            type != Character.NON_SPACING_MARK.toInt() &&
-                type != Character.COMBINING_SPACING_MARK.toInt() &&
-                type != Character.ENCLOSING_MARK.toInt()
-        }
+        // Fold the combining-diacritic block used by most Latin accents
+        // and by Russian Ё, but preserve Indic vowel signs, Arabic harakat,
+        // Hebrew niqqud and other script-specific combining marks.
+        // Removing every Unicode mark would merge *different words* in those
+        // languages, yielding misleading search results.
+        return normalized.filterNot { it in '\\u0300'..'\\u036F' }
     }
 }
