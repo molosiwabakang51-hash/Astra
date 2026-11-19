@@ -11,6 +11,7 @@ import kotlinx.coroutines.withContext
 import java.io.BufferedInputStream
 import java.io.File
 import java.io.FileOutputStream
+import java.io.FilterInputStream
 import java.io.InputStream
 import java.io.OutputStream
 import java.security.MessageDigest
@@ -98,7 +99,10 @@ internal object AstraModelImport {
                 ?: error("Cannot open selected model document.")
             val digest = MessageDigest.getInstance("SHA-256")
             val total = input.use { source ->
-                BufferedInputStream(source, 64 * 1024).use { buffered ->
+                // BufferedInputStream may misinterpret a zero-byte provider
+                // read as EOF. Guard the raw provider before buffering.
+                BufferedInputStream(guardTransientEmptyReads(source), 64 * 1024)
+                    .use { buffered ->
                     val signature = readPrefix4(buffered)
                     val signatureSize = signature.size
                     val isArchive = signatureSize == 4 &&
@@ -172,6 +176,28 @@ internal object AstraModelImport {
             if (partial.exists()) partial.delete()
         }
     }
+
+    /**
+     * A broken Android DocumentsProvider can return 0 for a positive-sized
+     * bulk read, even without reaching EOF. BufferedInputStream may treat
+     * that result as -1, creating a false "unsupported GGUF" outcome.
+     * Retry transient empties at the original provider boundary and give up
+     * after 17 consecutive empty reads, never looping forever.
+     */
+    internal fun guardTransientEmptyReads(source: InputStream): InputStream =
+        object : FilterInputStream(source) {
+            override fun read(b: ByteArray, off: Int, len: Int): Int {
+                if (len == 0) return 0
+                var stalled = 0
+                while (true) {
+                    val bytes = super.read(b, off, len)
+                    if (bytes != 0) return bytes
+                    require(++stalled <= 16) {
+                        "Selected model file provider stopped responding."
+                    }
+                }
+            }
+        }
 
     /**
      * Peek at the first four bytes without consuming them. Android Files and
