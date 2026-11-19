@@ -12,6 +12,7 @@ GRADLE = ROOT / "android/app/build.gradle.kts"
 BRAIN = ROOT / "android/app/src/main/java/com/astra/agent/AstraOnDeviceBrain.kt"
 IMPORT = ROOT / "android/app/src/main/java/com/astra/agent/AstraModelImport.kt"
 CONTEXT = ROOT / "android/app/src/main/java/com/astra/agent/AstraConversationContext.kt"
+TRAY = ROOT / "android/app/src/main/java/com/astra/agent/AstraNavigationTray.kt"
 
 
 def main():
@@ -20,10 +21,12 @@ def main():
     brain = BRAIN.read_text(encoding="utf-8")
     importer = IMPORT.read_text(encoding="utf-8")
     conversation_context = CONTEXT.read_text(encoding="utf-8")
+    tray = TRAY.read_text(encoding="utf-8")
 
     required = {
-        "Astra icon opens navigation": 'clickable { navigationPopupOpen = true }',
-        "Astra logo contains chat/settings options": 'listOf(\n                                        "Chat", "Tasks", "Notes", "Tools", "Settings", "Study"',
+        "Astra icon opens navigation": 'drawerState.open()',
+        "Astra uses a true modal navigation drawer": 'ModalNavigationDrawer(',
+        "Astra navigation tray is attached to main UI": 'AstraNavigationTray(',
         "Chat deck starts collapsed": 'var commandDeckExpanded by remember { mutableStateOf(false) }',
         "Chat takes remaining space": 'Modifier.weight(1f)',
         "Qwen is installed on device": 'AstraOnDeviceBrain(applicationContext',
@@ -35,7 +38,7 @@ def main():
         "On-phone source extraction is integrated": 'AstraGroundedMemory.retrieve(',
         "Memory analysis UI remains in icon menu": 'Text("Ask with evidence")',
         "Memory recall stays off-device model prompt": 'AstraMemoryRecall.find(',
-        "Compact logo offers memory search": 'Text("Search all local memory")',
+        "Compact logo offers memory search": 'AstraTrayAction.MEMORY_SEARCH -> {',
         "Strict on-device AI challenge is wired in": 'AstraOfflineSelfTest.evaluate(',
         "Build identity is in the chat header": '"●  LOCAL  ·  v" + ASTRA_VERSION',
     }
@@ -52,6 +55,13 @@ def main():
     for description, pattern in forbidden.items():
         if re.search(pattern, app):
             raise RuntimeError(f"Regression: {description}")
+
+    for destination in ("CHAT", "TASKS", "NOTES", "TOOLS", "SETTINGS", "STUDY"):
+        if "AstraNavSection." + destination not in tray:
+            raise RuntimeError("Missing vector-labelled navigation destination: " + destination)
+    if ('ModalDrawerSheet(' not in tray or 'AstraNavigationGlyph(' not in tray or
+            'AstraTrayAction.CLEAR_CHAT' not in app):
+        raise RuntimeError("Curved icon navigation must retain text, vectors and safe clear")
 
     study = (ROOT / "android/app/src/main/java/com/astra/agent/AstraStudyCatalog.kt").read_text(encoding="utf-8")
     welcome = (ROOT / "android/app/src/main/java/com/astra/agent/AstraWelcomePanel.kt").read_text(encoding="utf-8")
@@ -75,7 +85,7 @@ def main():
 
     if '?: "0.12.1"' not in config or "?: 28" not in config:
         raise RuntimeError("Release identity is not Astra 0.12.1 (versionCode 28)")
-    print("PASS: Astra icon menu, compact chat, offline model, version stamp")
+    print("PASS: Astra curved icon drawer, compact chat, offline model, version stamp")
     print("PASS: no legacy bottom tabs, top-right overflow, or obsolete fallback")
 
 
