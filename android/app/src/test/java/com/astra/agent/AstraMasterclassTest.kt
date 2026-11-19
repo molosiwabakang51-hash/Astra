@@ -18,7 +18,9 @@ class AstraMasterclassTest {
         assertEquals(14, AstraMasterclass.units("math").size)
         assertEquals(15, AstraMasterclass.units("english").size)
         assertEquals(14, AstraMasterclass.units("trading").size)
-        assertEquals(57, AstraMasterclass.tracks.values.sumOf { it.size })
+        assertEquals(16, AstraMasterclass.units("french").size)
+        assertEquals(19, AstraMasterclass.units("physics").size)
+        assertEquals(92, AstraMasterclass.tracks.values.sumOf { it.size })
         for ((id, chapters) in AstraMasterclass.tracks) {
             assertTrue(id.isNotBlank())
             assertEquals(chapters.size, chapters.map { it.title }.toSet().size)
@@ -110,6 +112,31 @@ class AstraMasterclassTest {
         assertNull(engine.respond("x".repeat(200)))
         assertTrue(engine.respond("finance workshop 100").orEmpty().contains("1 to 14"))
         assertTrue(engine.respond("english workshop quiz -1").orEmpty().contains("1 to 15"))
+    }
+
+    @Test fun frenchAndPhysicsWorkshopsPreserveIndependentProgressOnRestart() {
+        val course = course()
+        assertTrue(course.respond("french workshop 1")!!.contains("WORKSHOP 1/16"))
+        assertTrue(course.respond("physics workshop 1")!!.contains("WORKSHOP 1/19"))
+        val french = AstraMasterclass.units("french")[0].answer
+        course.respond("french workshop quiz 1")
+        assertTrue(course.respond("french workshop answer " + french)!!.contains("Correct."))
+        assertTrue(course().respond("french workshop progress")!!
+            .contains("Mastery quizzes passed: 1/16"))
+        assertTrue(course().respond("physics workshop progress")!!
+            .contains("Mastery quizzes passed: 0/19"))
+        assertTrue(course.respond("physics workshop quiz 20")!!.contains("1 to 19"))
+    }
+
+    @Test fun addedWorkshopContentIsMoreThanTinyVocabularyCards() {
+        for (subject in listOf("french", "physics")) {
+            for (unit in AstraMasterclass.units(subject)) {
+                assertTrue(unit.explanation.length >= 180)
+                assertTrue(unit.workedCase.length >= 95)
+                assertTrue(unit.independentExercise.length >= 80)
+                assertEquals(3, unit.choices.distinct().size)
+            }
+        }
     }
 
     @Test fun originalFoundationLessonsUseIsolatedProgressKeys() {

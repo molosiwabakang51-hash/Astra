@@ -19,7 +19,9 @@ class AstraSubjectAtlasTest {
             val subject = AstraStudyCatalog.find(entry.id)!!
             assertEquals(entry.title, subject.title)
             assertTrue(subject.description.contains(entry.category))
-            assertEquals(5, subject.topics.size)
+            // Physics now includes 19 real offline advanced workshops,
+            // their roadmap and progress actions in addition to atlas entries.
+            assertEquals(if (entry.id == "physics") 27 else 5, subject.topics.size)
             assertEquals("atlas syllabus " + entry.id, subject.topics.first().command)
             assertFalse(subject.topics.first().requiresModel)
             assertEquals(4, subject.topics.drop(1).count { it.requiresModel })
@@ -86,7 +88,9 @@ class AstraSubjectAtlasTest {
             "finance" to Pair("finance", 14),
             "mathematics" to Pair("math", 14),
             "english" to Pair("english", 15),
-            "day_trading" to Pair("trading", 14)
+            "day_trading" to Pair("trading", 14),
+            "french" to Pair("french", 16),
+            "physics" to Pair("physics", 19)
         )
         for ((subjectId, courseInfo) in expected) {
             val subject = AstraStudyCatalog.find(subjectId)!!

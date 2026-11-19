@@ -41,13 +41,17 @@ internal class AstraMasterclass(
             "finance" to AstraMasterFinance.units,
             "math" to AstraMasterMath.units,
             "english" to AstraMasterEnglish.units,
-            "trading" to AstraMasterTrading.units
+            "trading" to AstraMasterTrading.units,
+            "french" to AstraMasterFrench.units,
+            "physics" to AstraMasterPhysics.units
         )
         private val subjectNames = mapOf(
             "finance" to "Finance",
             "math" to "Mathematics",
             "english" to "English",
-            "trading" to "Day Trading"
+            "trading" to "Day Trading",
+            "french" to "French",
+            "physics" to "Physics"
         )
 
         fun units(subject: String): List<Unit> = tracks[subject].orEmpty()
@@ -80,7 +84,7 @@ internal class AstraMasterclass(
         val text = raw.trim().lowercase(Locale.ROOT)
             .replace(Regex("""\s+"""), " ").trimEnd('.', '?', '!')
         if (text.length > 90) return null
-        val match = Regex("""^(finance|math|english|trading) (?:masterclass|workshop)(?:\s+(.*))?$""")
+        val match = Regex("""^(finance|math|english|trading|french|physics) (?:masterclass|workshop)(?:\s+(.*))?$""")
             .matchEntire(text) ?: return null
         val subject = match.groupValues[1]
         val cmd = match.groupValues[2].trim()
