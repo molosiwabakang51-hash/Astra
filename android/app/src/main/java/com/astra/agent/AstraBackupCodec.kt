@@ -4,6 +4,9 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.io.ByteArrayOutputStream
 import java.io.InputStream
+import java.nio.ByteBuffer
+import java.nio.charset.CodingErrorAction
+import java.nio.charset.CharacterCodingException
 import java.nio.charset.StandardCharsets
 
 /**
@@ -184,14 +187,39 @@ internal object AstraBackupCodec {
     fun readLimited(stream: InputStream): String {
         val bytes = ByteArrayOutputStream()
         val buffer = ByteArray(8192)
+        var consecutiveEmptyReads = 0
         while (true) {
             val count = stream.read(buffer)
             if (count < 0) break
+            if (count == 0) {
+                // Some document providers transiently return zero bytes
+                // without EOF. A stalled provider must not freeze Astra's
+                // restore screen indefinitely or consume unlimited CPU.
+                if (++consecutiveEmptyReads > 16) {
+                    throw IllegalArgumentException(
+                        "The selected backup stopped providing data. " +
+                            "Choose a local copy and try importing again."
+                    )
+                }
+                continue
+            }
+            consecutiveEmptyReads = 0
             if (bytes.size().toLong() + count > MAX_BYTES) {
                 throw IllegalArgumentException("Backup exceeds the 8 MB safety limit.")
             }
             bytes.write(buffer, 0, count)
         }
-        return bytes.toString("UTF-8")
+        // Replacement characters silently corrupt names, multilingual
+        // notes and chat messages. Reject malformed UTF-8 instead of
+        // restoring altered private data.
+        return try {
+            StandardCharsets.UTF_8.newDecoder()
+                .onMalformedInput(CodingErrorAction.REPORT)
+                .onUnmappableCharacter(CodingErrorAction.REPORT)
+                .decode(ByteBuffer.wrap(bytes.toByteArray()))
+                .toString()
+        } catch (_: CharacterCodingException) {
+            throw IllegalArgumentException("The selected backup is not valid UTF-8.")
+        }
     }
 }
