@@ -47,7 +47,7 @@ internal object AstraReasoningBenchmark {
         // Local retrieval can append a citation footer after generation.
         // Grade the model's answer, not facts embedded in that footer.
         val footer = Regex(
-            """(?im)^\\s*(?:Open-course references:|Retrieved local book passages(?: \\(verify originals\\))?:?)\\s*$"""
+            """(?im)^\s*(?:Open-course references:|Retrieved local book passages(?: \(verify originals\))?:?)\s*$"""
         )
         val text = visible.substring(0, footer.find(visible)?.range?.first
             ?: visible.length).trim().replace("**", "")
