@@ -17,7 +17,7 @@ internal object AstraVoiceLanguageCommand {
 
     private val englishCommand = Regex(
         """^(?:(?:please\s+)?(?:speak|talk)(?:\s+to\s+me)?(?:\s+in)?|""" +
-            """(?:please\s+)?listen\s+in|(?:please\s+)?use\s+.+?\s+for\s+voice|""" +
+            """(?:please\s+)?listen(?:\s+to\s+me)?\s+in|""" +
             """set\s+(?:my\s+)?(?:voice|speech)\s+language\s+to|""" +
             """switch\s+(?:the\s+)?voice\s+to)\s+([\p{L} -]{2,45})$""",
         RegexOption.IGNORE_CASE
@@ -40,13 +40,15 @@ internal object AstraVoiceLanguageCommand {
                 lower.contains("deutsch") -> "german"
                 else -> "russian"
             }
-            lower.startsWith("use ") && lower.endsWith(" for voice") ->
-                lower.removePrefix("use ").removeSuffix(" for voice").trim()
+            (lower.startsWith("use ") || lower.startsWith("please use ")) &&
+                lower.endsWith(" for voice") ->
+                lower.removePrefix("please ").removePrefix("use ")
+                    .removeSuffix(" for voice").trim()
             else -> englishCommand.matchEntire(normalized)?.groupValues?.get(1)
                 ?.lowercase(Locale.ROOT)?.trim() ?: return null
         }
 
-        val name = requested.replace(" (", "(").trim()
+        val name = requested.trim()
         val language = when (name) {
             "english", "american english", "english us", "english usa" ->
                 SpeechLanguage.ENGLISH_US
