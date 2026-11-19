@@ -99,28 +99,8 @@ internal object AstraModelImport {
             val digest = MessageDigest.getInstance("SHA-256")
             val total = input.use { source ->
                 BufferedInputStream(source, 64 * 1024).use { buffered ->
-                    val signature = ByteArray(4)
-                    buffered.mark(4)
-                    var signatureSize = 0
-                    var stalledHeaderReads = 0
-                    // OpenDocument providers may return a short first read.
-                    // Assemble all four signature bytes before deciding that
-                    // a valid GGUF or APK is an unsupported file.
-                    while (signatureSize < signature.size) {
-                        val count = buffered.read(
-                            signature, signatureSize, signature.size - signatureSize
-                        )
-                        if (count < 0) break
-                        if (count == 0) {
-                            require(++stalledHeaderReads <= 16) {
-                                "Selected model file provider stopped responding."
-                            }
-                        } else {
-                            signatureSize += count
-                            stalledHeaderReads = 0
-                        }
-                    }
-                    buffered.reset()
+                    val signature = readPrefix4(buffered)
+                    val signatureSize = signature.size
                     val isArchive = signatureSize == 4 &&
                         signature[0] == 'P'.code.toByte() &&
                         signature[1] == 'K'.code.toByte()
@@ -191,6 +171,33 @@ internal object AstraModelImport {
         } finally {
             if (partial.exists()) partial.delete()
         }
+    }
+
+    /**
+     * Peek at the first four bytes without consuming them. Android Files and
+     * cloud-backed document providers are allowed to perform short reads.
+     * The model importer must still detect GGUF/ZIP reliably and must never
+     * spin on repeated empty reads.
+     */
+    internal fun readPrefix4(input: BufferedInputStream): ByteArray {
+        val signature = ByteArray(4)
+        input.mark(4)
+        var size = 0
+        var stalled = 0
+        while (size < signature.size) {
+            val count = input.read(signature, size, signature.size - size)
+            if (count < 0) break
+            if (count == 0) {
+                require(++stalled <= 16) {
+                    "Selected model file provider stopped responding."
+                }
+            } else {
+                size += count
+                stalled = 0
+            }
+        }
+        input.reset()
+        return signature.copyOf(size)
     }
 
     // Exposed within the module so JVM tests can validate nested APK ZIP
