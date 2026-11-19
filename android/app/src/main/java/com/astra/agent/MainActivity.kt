@@ -2233,9 +2233,17 @@ class MainActivity :
         val savedLanguage = getSharedPreferences("astra", Context.MODE_PRIVATE)
             .getString("astra_ai_reply_language", "auto")
         val preferred = AstraReplyLanguage.fromId(savedLanguage)
-        val selected = AstraVoiceAccentPolicy.forReply(
+        // Fixed bilingual course cards contain English explanations alongside
+        // the language being taught. Pronounce only the authored target-language
+        // examples with an accent-matched installed voice; leave English glosses
+        // visible in chat instead of mispronouncing the lesson aloud.
+        val lessonSpeech = AstraLessonSpeech.fromLesson(
+            text, selectedSpeechLanguage()
+        )
+        val selected = lessonSpeech?.language ?: AstraVoiceAccentPolicy.forReply(
             selectedSpeechLanguage(), preferred, text
         )
+        val speechText = lessonSpeech?.spokenText ?: text
         val match = try {
             matchingSpeechVoice(selected, offlineOnly)
         } catch (_: Exception) {
@@ -2267,7 +2275,7 @@ class MainActivity :
             ).show()
             return
         }
-        tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, "astra")
+        tts?.speak(speechText, TextToSpeech.QUEUE_FLUSH, null, "astra")
     }
 
     private fun initializeRecognizer() {
