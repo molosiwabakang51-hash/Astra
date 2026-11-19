@@ -2145,25 +2145,60 @@ class MainActivity :
         )
 
     /**
-     * Pick an installed non-network voice matching the user's language.
-     * Never silently read Japanese or Setswana through an English voice.
+     * Android setLanguage(Locale) may silently choose a nearby regional accent.
+     * Select a concrete installed voice and verify the result instead.
      */
+    private fun matchingSpeechVoice(
+        language: SpeechLanguage,
+        offlineOnly: Boolean
+    ): Voice? {
+        val available = tts?.voices.orEmpty()
+        val candidates = available.map { voice ->
+            AstraVoiceAccentPolicy.Candidate(
+                name = voice.name,
+                localeTag = voice.locale.toLanguageTag(),
+                networkRequired = voice.isNetworkConnectionRequired,
+                installed = voice.features?.contains(
+                    TextToSpeech.Engine.KEY_FEATURE_NOT_INSTALLED
+                ) != true,
+                quality = voice.quality
+            )
+        }
+        val match = AstraVoiceAccentPolicy.choose(
+            language.tag, candidates, offlineOnly
+        ) ?: return null
+        return available.firstOrNull {
+            it.name == match.name &&
+                AstraVoiceAccentPolicy.sameAccent(
+                    language.tag, it.locale.toLanguageTag()
+                )
+        }
+    }
+
+    private fun confirmedSpeechVoice(
+        language: SpeechLanguage,
+        offlineOnly: Boolean
+    ): Boolean {
+        val active = tts?.voice ?: return false
+        return AstraVoiceAccentPolicy.sameAccent(
+            language.tag, active.locale.toLanguageTag()
+        ) && (!offlineOnly || !active.isNetworkConnectionRequired) &&
+            active.features?.contains(TextToSpeech.Engine.KEY_FEATURE_NOT_INSTALLED) != true
+    }
+
     private fun selectOfflineVoice() {
-        val target = Locale.forLanguageTag(selectedSpeechLanguage().tag)
+        val selected = selectedSpeechLanguage()
         offlineVoiceAvailable = false
         offlineVoiceName = ""
         if (!ttsReady) return
         try {
-            val options = tts?.voices.orEmpty().filter { voice ->
-                !voice.isNetworkConnectionRequired &&
-                    voice.locale.language.equals(target.language, ignoreCase = true)
-            }
-            val picked = options.firstOrNull {
-                it.locale.country.equals(target.country, ignoreCase = true)
-            } ?: options.firstOrNull()
-            if (picked != null && tts?.setVoice(picked) == TextToSpeech.SUCCESS) {
+            val voice = matchingSpeechVoice(selected, offlineOnly = true)
+            if (voice != null &&
+                tts?.setVoice(voice) == TextToSpeech.SUCCESS &&
+                confirmedSpeechVoice(selected, offlineOnly = true)
+            ) {
                 offlineVoiceAvailable = true
-                offlineVoiceName = picked.name
+                offlineVoiceName = voice.name + " · " + voice.locale.toLanguageTag()
             }
         } catch (_: Exception) {
             offlineVoiceAvailable = false
@@ -2178,31 +2213,42 @@ class MainActivity :
                 speechForeground, secureLockEnabled, workspaceUnlocked
             )
         ) return
-        val selected = selectedSpeechLanguage()
-        selectOfflineVoice()
-        if (offlineOnly && !offlineVoiceAvailable) {
+        val savedLanguage = getSharedPreferences("astra", Context.MODE_PRIVATE)
+            .getString("astra_ai_reply_language", "auto")
+        val preferred = AstraReplyLanguage.fromId(savedLanguage)
+        val selected = AstraVoiceAccentPolicy.forReply(
+            selectedSpeechLanguage(), preferred, text
+        )
+        val match = try {
+            matchingSpeechVoice(selected, offlineOnly)
+        } catch (_: Exception) {
+            null
+        }
+        if (match == null) {
             Toast.makeText(
                 this,
-                "No offline " + selected.displayName + " voice installed. " +
-                    "Install its Android text-to-speech data or select another language.",
+                "No installed " + selected.displayName +
+                    (if (offlineOnly) " offline" else "") +
+                    " voice matches this language and regional accent. " +
+                    "Install the matching Android speech pack or choose another accent.",
                 Toast.LENGTH_LONG
             ).show()
             return
         }
-        if (!offlineVoiceAvailable) {
-            val locale = Locale.forLanguageTag(selected.tag)
-            val status = tts?.setLanguage(locale)
-            if (status == TextToSpeech.LANG_NOT_SUPPORTED ||
-                status == TextToSpeech.LANG_MISSING_DATA
-            ) {
-                Toast.makeText(
-                    this,
-                    "No compatible " + selected.displayName +
-                        " speech voice installed.",
-                    Toast.LENGTH_LONG
-                ).show()
-                return
-            }
+        val accepted = try {
+            tts?.setVoice(match) == TextToSpeech.SUCCESS &&
+                confirmedSpeechVoice(selected, offlineOnly)
+        } catch (_: Exception) {
+            false
+        }
+        if (!accepted) {
+            Toast.makeText(
+                this,
+                "The speech engine could not select the requested " +
+                    selected.displayName + " accent. Speech was not played.",
+                Toast.LENGTH_LONG
+            ).show()
+            return
         }
         tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, "astra")
     }
@@ -3257,6 +3303,29 @@ class MainActivity :
                                 }
                             }
                         }
+                        return
+                    }
+
+                    // An explicit spoken-language choice synchronizes
+                    // dictation, spoken replies and local AI output preference.
+                    // It does not download a speech model or claim Android
+                    // already supports the selected offline locale.
+                    AstraVoiceLanguageCommand.parse(normalized)?.let { chosen ->
+                        speechLanguage = chosen.speech
+                        aiReplyLanguage = chosen.reply
+                        storage.setString("speech_language", chosen.speech.tag)
+                        storage.setString("astra_ai_reply_language", chosen.reply.id)
+                        selectOfflineVoice()
+                        history.add(ChatMessage("You", message))
+                        history.add(ChatMessage("Astra",
+                            AstraVoiceLanguageCommand.confirmation(
+                                chosen, offlineVoiceAvailable
+                            )
+                        ))
+                        while (history.size > MAX_HISTORY) history.removeAt(0)
+                        input = ""
+                        persist()
+                        keyboard?.hide()
                         return
                     }
 
@@ -6775,7 +6844,10 @@ class MainActivity :
                                                     "Try 'reply in Setswana', 'reply in French', " +
                                                     "or 'reply in auto' in chat. " +
                                                     "The smaller model may not produce fluent answers " +
-                                                    "in every language. Voice settings are independent.",
+                                                    "in every language. For a combined language switch, " +
+                                                    "say 'speak in French', 'listen in Russian', or " +
+                                                    "'use Setswana for voice'. Offline speech also requires " +
+                                                    "installed Android language packs.",
                                                 style = MaterialTheme.typography.bodySmall
                                             )
                                         }
@@ -6987,7 +7059,9 @@ class MainActivity :
                                             if (offlineVoiceAvailable) {
                                                 "Offline voice: $offlineVoiceName"
                                             } else {
-                                                "Offline English voice unavailable."
+                                                "No installed offline voice matching " +
+                                                     speechLanguage.displayName + " (" +
+                                                     speechLanguage.tag + ")."
                                             }
                                         )
                                     }
@@ -7000,7 +7074,7 @@ class MainActivity :
                                                 selectOfflineVoice()
 
                                                 speak(
-                                                    "Astra voice test.",
+                                                    AstraVoiceLanguageCommand.testPhrase(speechLanguage),
                                                     localOnlyTts
                                                 )
                                             }

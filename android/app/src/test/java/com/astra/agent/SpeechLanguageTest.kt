@@ -20,7 +20,12 @@ class SpeechLanguageTest {
             assertEquals(language, SpeechLanguage.fromTag(tag.lowercase()))
             assertEquals(tag, language.tag)
         }
-        assertEquals(11, SpeechLanguage.entries.size)
+        assertEquals(20, SpeechLanguage.entries.size)
+        assertEquals(SpeechLanguage.FRENCH_CANADA, SpeechLanguage.fromTag("fr-CA"))
+        assertEquals(SpeechLanguage.SPANISH_MEXICO, SpeechLanguage.fromTag("es-MX"))
+        assertEquals(SpeechLanguage.PORTUGUESE_BRAZIL, SpeechLanguage.fromTag("pt-BR"))
+        assertEquals(SpeechLanguage.ARABIC, SpeechLanguage.fromTag("ar-SA"))
+        assertEquals(SpeechLanguage.HINDI, SpeechLanguage.fromTag("hi-IN"))
     }
 
     @Test fun tagSelectionIsStable() {
