@@ -54,6 +54,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.draw.alpha
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
@@ -2824,13 +2825,14 @@ class MainActivity :
                     mutableStateOf<kotlinx.coroutines.Job?>(null)
                 }
                 var modelImportRunning by remember { mutableStateOf(false) }
-                var modelImportStatus by remember { mutableStateOf("") }
+                var modelImportStatus by rememberSaveable { mutableStateOf("") }
+                var showModelImportResult by rememberSaveable { mutableStateOf(false) }
                 var confirmOneTimeModelDownload by remember { mutableStateOf(false) }
                 var modelDownloadJob by remember {
                     mutableStateOf<kotlinx.coroutines.Job?>(null)
                 }
 
-                var tab by remember {
+                var tab by rememberSaveable {
                     mutableIntStateOf(0)
                 }
                 // Re-open the subject catalog instead of retaining an old topic.
@@ -4135,10 +4137,22 @@ class MainActivity :
                     rememberLauncherForActivityResult(
                         ActivityResultContracts.OpenDocument()
                     ) { selected ->
-                        if (selected != null && !modelImportRunning &&
-                            offlineJob?.isActive != true && !offlineModelTestRunning) {
+                        // File providers may recreate the activity when returning
+                        // from the system picker. Always return to the model
+                        // settings and show a persistent outcome, not a new chat.
+                        tab = 4
+                        if (selected == null) {
+                            modelImportStatus = "No model selected. Import was cancelled."
+                            showModelImportResult = true
+                        } else if (modelImportRunning || offlineJob?.isActive == true ||
+                            offlineModelTestRunning) {
+                            modelImportStatus = "Model import is busy. Stop the current AI " +
+                                "generation or self-test, then select the file again."
+                            showModelImportResult = true
+                        } else {
                             modelImportRunning = true
                             modelImportStatus = "Importing a locally saved model..."
+                            showModelImportResult = true
                             researchScope.launch {
                                 try {
                                     val bytes = AstraModelImport.importDocument(
@@ -4153,6 +4167,7 @@ class MainActivity :
                                         "MODEL READY ON THIS PHONE · " +
                                             (bytes / (1024 * 1024)) + " MiB verified. " +
                                             "No network was used."
+                                    showModelImportResult = true
                                 } catch (cancel: kotlinx.coroutines.CancellationException) {
                                     modelImportStatus = "Model import cancelled."
                                     throw cancel
@@ -4160,12 +4175,51 @@ class MainActivity :
                                     modelImportStatus =
                                         "MODEL IMPORT FAILED: " +
                                             (error.message ?: "Cannot read the model document.")
+                                    showModelImportResult = true
                                 } finally {
                                     modelImportRunning = false
                                 }
                             }
                         }
                     }
+
+                if (showModelImportResult) {
+                    AlertDialog(
+                        onDismissRequest = {
+                            // Keep progress visible while copying the 1.2 GB
+                            // file. Closing the notice never cancels the import.
+                            showModelImportResult = false
+                        },
+                        title = {
+                            Text(if (modelImportRunning) "Preparing Astra 1.7B"
+                                else if (modelImportStatus.startsWith("MODEL READY"))
+                                    "Model verified"
+                                else if (modelImportStatus.startsWith("MODEL IMPORT FAILED"))
+                                    "Model import failed"
+                                else "Model import")
+                        },
+                        text = {
+                            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                                if (modelImportRunning) {
+                                    LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                                }
+                                Text(modelImportStatus)
+                                if (!modelImportRunning &&
+                                    modelImportStatus.startsWith("MODEL IMPORT FAILED")) {
+                                    Text("Astra did not delete the selected download. " +
+                                        "Check that it is the official Qwen3 1.7B Q4_K_M " +
+                                        "GGUF, that there is enough free storage, " +
+                                        "and that the file can be read locally.")
+                                }
+                            }
+                        },
+                        confirmButton = {
+                            TextButton(onClick = { showModelImportResult = false }) {
+                                Text(if (modelImportRunning) "Continue in background" else "OK")
+                            }
+                        }
+                    )
+                }
 
                 val microphonePermission =
                     rememberLauncherForActivityResult(
@@ -5119,23 +5173,95 @@ class MainActivity :
                                 }
                                 DropdownMenu(
                                     expanded = navigationPopupOpen,
-                                    onDismissRequest = { navigationPopupOpen = false }
+                                    onDismissRequest = { navigationPopupOpen = false },
+                                    modifier = Modifier
+                                        .width(312.dp)
+                                        .background(
+                                            androidx.compose.ui.graphics.Brush.verticalGradient(
+                                                listOf(
+                                                    AstraAurora.surface,
+                                                    AstraAurora.night,
+                                                    AstraAurora.surface
+                                                )
+                                            ),
+                                            RoundedCornerShape(24.dp)
+                                        )
                                 ) {
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(start = 18.dp, end = 18.dp, top = 14.dp, bottom = 10.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        AstraNavigationGlyph(
+                                            section = AstraNavSection.CHAT,
+                                            tint = AstraAurora.cyan
+                                        )
+                                        Spacer(Modifier.width(12.dp))
+                                        Column {
+                                            Text(
+                                                "ASTRA / NAVIGATION",
+                                                style = MaterialTheme.typography.labelMedium,
+                                                color = AstraAurora.cyan
+                                            )
+                                            Text(
+                                                "Your private command centre",
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = AstraAurora.muted
+                                            )
+                                        }
+                                    }
+                                    HorizontalDivider(
+                                        modifier = Modifier.padding(horizontal = 16.dp),
+                                        color = AstraAurora.line
+                                    )
                                     listOf(
                                         "Chat", "Tasks", "Notes", "Tools", "Settings", "Study"
                                     ).forEachIndexed { index, title ->
                                         DropdownMenuItem(
+                                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 2.dp)
+                                                .background(
+                                                    if (tab == index) AstraAurora.cyan.copy(alpha = 0.16f)
+                                                    else Color.Transparent,
+                                                    RoundedCornerShape(16.dp)
+                                                ),
                                             text = {
                                                 Row(
                                                     verticalAlignment = Alignment.CenterVertically,
-                                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                                    horizontalArrangement = Arrangement.spacedBy(14.dp)
                                                 ) {
-                                                    AstraNavigationGlyph(
-                                                        section = AstraNavSection.entries[index],
-                                                        tint = MaterialTheme.colorScheme.primary
+                                                    Box(
+                                                        modifier = Modifier
+                                                            .size(36.dp)
+                                                            .background(
+                                                                if (tab == index)
+                                                                    AstraAurora.cyan.copy(alpha = 0.20f)
+                                                                else AstraAurora.line.copy(alpha = 0.40f),
+                                                                RoundedCornerShape(12.dp)
+                                                            ),
+                                                        contentAlignment = Alignment.Center
+                                                    ) {
+                                                        AstraNavigationGlyph(
+                                                            section = AstraNavSection.entries[index],
+                                                            tint = if (tab == index)
+                                                                AstraAurora.cyan else AstraAurora.muted
+                                                        )
+                                                    }
+                                                    Text(
+                                                        title,
+                                                        style = MaterialTheme.typography.bodyMedium,
+                                                        color = if (tab == index) Color.White
+                                                            else AstraAurora.text
                                                     )
-                                                    Text(title, style = MaterialTheme.typography.bodyMedium)
-                                                    if (tab == index) Text("✓")
+                                                    Spacer(Modifier.weight(1f))
+                                                    if (tab == index) {
+                                                        Box(
+                                                            Modifier.size(7.dp).background(
+                                                                AstraAurora.cyan,
+                                                                RoundedCornerShape(50)
+                                                            )
+                                                        )
+                                                    }
                                                 }
                                             },
                                             onClick = {
@@ -5146,11 +5272,14 @@ class MainActivity :
                                         )
                                     }
                                     if (tab == 0) {
-                                        HorizontalDivider()
+                                        HorizontalDivider(
+                                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                                            color = AstraAurora.line
+                                        )
                                         Text(
-                                            "CHAT OPTIONS",
+                                            "QUICK ACTIONS",
                                             modifier = Modifier.padding(
-                                                start = 16.dp, top = 8.dp, bottom = 4.dp
+                                                start = 20.dp, top = 8.dp, bottom = 8.dp
                                             ),
                                             style = MaterialTheme.typography.labelSmall,
                                             color = MaterialTheme.colorScheme.primary
