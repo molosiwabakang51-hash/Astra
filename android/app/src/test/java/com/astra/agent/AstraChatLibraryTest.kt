@@ -98,6 +98,32 @@ class AstraChatLibraryTest {
         assertEquals(listOf(a, b), snapshot)
     }
 
+    @Test fun accentInsensitiveSearchFindsTitlesAndOriginalMessageSnippets() {
+        val accented = listOf(
+            AstraChatArchive.Chat("fr", "Études de marché",
+                listOf(AstraChatArchive.Message("Astra", "Analyse de rentabilité"))),
+            AstraChatArchive.Chat("coffee", "Daily expenses",
+                listOf(AstraChatArchive.Message("You",
+                    "🧠".repeat(40) + "Le café coûtait P30, pas P40."))),
+            AstraChatArchive.Chat("rus", "Russian words",
+                listOf(AstraChatArchive.Message("You", "Ёж изучает экономику.")))
+        )
+        val title = AstraChatLibrary.searchWithPreview(accented, "etudes")
+        assertEquals(listOf("fr"), title.map { it.chat.id })
+        assertEquals(null, title.single().snippet)
+
+        val msg = AstraChatLibrary.searchWithPreview(accented, "CAFE").single()
+        assertEquals("coffee", msg.chat.id)
+        assertTrue(msg.snippet!!.contains("café"))
+        assertFalse(msg.snippet!!.contains("\uFFFD"))
+        val russian = AstraChatLibrary.searchWithPreview(accented, "еж").single()
+        assertEquals("rus", russian.chat.id)
+        assertTrue(russian.snippet!!.contains("Ёж"))
+        // Accent matching only affects retrieval; stored data is unchanged.
+        assertEquals("Études de marché", accented.first().title)
+        assertTrue(accented[1].messages.single().text.contains("café"))
+    }
+
     @Test fun searchesFortyConversationsWithTwoThousandMessagesEach() {
         val chats = (0 until AstraChatArchive.MAX_CHATS).map { index ->
             AstraChatArchive.Chat(
