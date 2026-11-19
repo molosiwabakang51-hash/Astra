@@ -212,10 +212,17 @@ internal object AstraStudyCatalog {
             "day_trading" -> "trading"
             "french" -> "french"
             "physics" -> "physics"
+            "russian" -> "russian"
+            "computer_science" -> "computing"
             else -> null
         }
         if (course == null) subject else {
-            subject.copy(topics = subject.topics + listOf(
+            // Keep the existing Russian quiz as the final card: the original
+            // offline tutor and navigation tests depend on that contract.
+            val existing = if (subject.id == "russian") {
+                subject.topics.dropLast(1)
+            } else subject.topics
+            subject.copy(topics = existing + listOf(
                 Topic(
                     "Advanced workshop roadmap",
                     "Deep practical modules beyond the original foundation chapters.",
@@ -232,7 +239,9 @@ internal object AstraStudyCatalog {
                     course + " workshop quiz"),
                 Topic("Workshop progress", "Review advanced chapter mastery stored privately.",
                     course + " workshop progress")
-            ))
+            ) + if (subject.id == "russian") {
+                listOf(subject.topics.last())
+            } else emptyList())
         }
     }
     fun find(id: String?): Subject? = subjects.firstOrNull { it.id == id }

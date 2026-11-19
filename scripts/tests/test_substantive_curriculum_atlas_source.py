@@ -11,7 +11,7 @@ MAIN = (JAVA / "MainActivity.kt").read_text(encoding="utf-8")
 
 
 class SubstantiveCurriculumTest(unittest.TestCase):
-    def test_92_detailed_authored_workshops(self):
+    def test_128_detailed_authored_workshops(self):
         expected = {
             "AstraMasterFinance.kt": 14,
             "AstraMasterMath.kt": 14,
@@ -19,8 +19,10 @@ class SubstantiveCurriculumTest(unittest.TestCase):
             "AstraMasterTrading.kt": 14,
             "AstraMasterFrench.kt": 16,
             "AstraMasterPhysics.kt": 19,
+            "AstraMasterRussian.kt": 18,
+            "AstraMasterComputing.kt": 18,
         }
-        self.assertEqual(92, sum(expected.values()))
+        self.assertEqual(128, sum(expected.values()))
         for filename, count in expected.items():
             content = (JAVA / filename).read_text(encoding="utf-8")
             self.assertEqual(count, content.count("        AstraMasterclass.Unit("))
