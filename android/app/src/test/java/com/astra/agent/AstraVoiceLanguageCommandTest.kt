@@ -10,7 +10,9 @@ class AstraVoiceLanguageCommandTest {
     @Test fun allSupportedAndroidSpeechLocalesHaveMatchingAiLanguage() {
         val names = listOf(
             "English", "British English", "Russian", "Setswana", "French",
-            "Spanish", "Portuguese", "German", "Swahili", "Japanese", "Mandarin"
+            "Spanish", "Portuguese", "German", "Swahili", "Japanese", "Mandarin",
+            "French Canada", "Spanish Mexico", "Portuguese Brazil",
+            "Arabic", "Hindi", "Korean", "Italian", "Turkish", "Urdu"
         )
         assertEquals(SpeechLanguage.entries.size, names.size)
         for (name in names) {
