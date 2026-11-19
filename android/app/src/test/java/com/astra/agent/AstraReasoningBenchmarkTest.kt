@@ -21,6 +21,16 @@ class AstraReasoningBenchmarkTest {
                 question, advancedModel = true, thinkingRequested = true))
             assertEquals(768, AstraGenerationPolicy.maxAnswerTokens(
                 question, advancedModel = true, thinkingRequested = false))
+            val cap = AstraReasoningBenchmark.COMPARISON_TOKEN_CAP
+            assertEquals(768, cap)
+            val fastBudget = AstraGenerationPolicy.effectiveBudget(
+                AstraGenerationPolicy.maxAnswerTokens(question, true,
+                    thinkingRequested = false), cap)
+            val carefulBudget = AstraGenerationPolicy.effectiveBudget(
+                AstraGenerationPolicy.maxAnswerTokens(question, true,
+                    thinkingRequested = true), cap)
+            assertEquals(cap, fastBudget)
+            assertEquals(cap, carefulBudget)
         }
     }
 
