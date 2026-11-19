@@ -36,6 +36,10 @@ class AstraChatSearchTextTest {
         assertEquals("Pula", text.substring(hit.start, hit.endExclusive))
         assertNull(AstraChatSearchText.find(text, "not-present"))
         assertNull(AstraChatSearchText.find("Москва", "Moskva"))
+        // Script-specific vowel signs carry meaning and must not be stripped
+        // as though they were optional Latin accents.
+        assertNull(AstraChatSearchText.find("किताब", "कतब"))
+        assertNull(AstraChatSearchText.find("مُدَرِّس", "مدرس"))
         assertNull(AstraChatSearchText.find("café", " \u0301"))
         assertNull(AstraChatSearchText.find(text, ""))
     }
