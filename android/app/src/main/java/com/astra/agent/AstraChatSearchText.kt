@@ -72,6 +72,6 @@ internal object AstraChatSearchText {
         // Hebrew niqqud and other script-specific combining marks.
         // Removing every Unicode mark would merge *different words* in those
         // languages, yielding misleading search results.
-        return normalized.filterNot { it in '\\u0300'..'\\u036F' }
+        return normalized.filterNot { it.code in 0x0300..0x036F }
     }
 }
