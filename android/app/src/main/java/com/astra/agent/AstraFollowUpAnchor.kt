@@ -71,7 +71,7 @@ internal object AstraFollowUpAnchor {
     private val numberedDigits = Regex("""^([1-9]|1[0-9]|20)(st|nd|rd|th)?$""")
 
     private fun selectedNumber(lower: String): Int? {
-        val prefix = numberIntroductions.firstOrNull(lower::startsWith) ?: return null
+        val prefix = numberIntroductions.firstOrNull { lower.startsWith(it) } ?: return null
         var value = lower.removePrefix(prefix).trim()
         if (value.startsWith("the ")) value = value.removePrefix("the ")
         for (label in listOf("point ", "item ", "number ", "step ", "option ")) {
@@ -114,8 +114,8 @@ internal object AstraFollowUpAnchor {
         val lower = original.lowercase(Locale.ROOT)
             .replace(Regex("""\s+"""), " ")
             .trimEnd('?', '.', '!', ' ')
-        val selectedNumber = selectedNumber(lower)
-        if (lower !in followUps && selectedNumber == null) return prompt
+        val selectedIndex = selectedNumber(lower)
+        if (lower !in followUps && selectedIndex == null) return prompt
         // Only the last *completed* user/assistant exchange is an anchor.
         // Never pair a newer question with an older assistant reply when its
         // actual response was stopped, interrupted or lost after process death.
