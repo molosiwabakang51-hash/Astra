@@ -25,10 +25,11 @@ internal object AstraRtfText {
     private data class Frame(val hidden: Boolean, val unicodeFallbackCount: Int)
 
     fun extract(input: InputStream): String {
+        val protectedInput = AstraProgressInputStream(input)
         val data = ByteArrayOutputStream()
         val buffer = ByteArray(8192)
         while (true) {
-            val n = input.read(buffer)
+            val n = protectedInput.read(buffer)
             if (n < 0) break
             require(data.size() + n <= MAX_BYTES) {
                 "RTF exceeds the safe offline extraction limit."
