@@ -74,8 +74,9 @@ internal object AstraDocumentText {
     private fun readBounded(stream: InputStream, maximum: Int): ByteArray {
         val result = ByteArrayOutputStream()
         val buffer = ByteArray(32 * 1024)
+        val progress = AstraProgressInputStream(stream)
         while (true) {
-            val count = stream.read(buffer)
+            val count = progress.read(buffer)
             if (count < 0) break
             require(result.size() + count <= maximum) {
                 "Document exceeds the safe offline extraction limit."
