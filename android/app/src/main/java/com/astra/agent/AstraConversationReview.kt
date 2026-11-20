@@ -11,6 +11,13 @@ internal object AstraConversationReview {
         """^(?:recall|find|show|review)\s+(?:my\s+)?(?:earlier|previous|past)\s+(?:mentions|messages|references|answers)\s+(?:of|about|to)\s+(.+?)[.!?]*$""",
         RegexOption.IGNORE_CASE
     )
+    // A question about what Astra *said* is a request for earlier assistant
+    // words, not for a plausible reconstruction by the language model.
+    private val assistantRecall = Regex(
+        """^what did (?:you|astra) (?:say|mention|explain|claim)\s+""" +
+            """(?:(?:earlier|previously)\s+)?about\s+(.+?)[.!?]*$""",
+        RegexOption.IGNORE_CASE
+    )
     private val mistake = Regex(
         """^(?:do you see your mistake|what was your mistake|where were you wrong|correct your earlier answer)[.?!]*$""",
         RegexOption.IGNORE_CASE
@@ -69,6 +76,12 @@ internal object AstraConversationReview {
                 return earlierMentions(priorQuery, history)
             }
         }
+        val earlierAssistant = assistantRecall.matchEntire(command)
+        if (earlierAssistant != null) {
+            val term = earlierAssistant.groupValues[1].trim().trimEnd('.', '?', '!')
+            if (term.length !in 2..65) return null
+            return earlierMentions(term, history, onlyAssistant = true)
+        }
         val match = mentions.matchEntire(command)
         if (match != null) {
             val term = match.groupValues[1].trim().trimEnd('.', '?', '!')
@@ -81,7 +94,8 @@ internal object AstraConversationReview {
 
     private fun earlierMentions(
         term: String,
-        history: List<AstraChatArchive.Message>
+        history: List<AstraChatArchive.Message>,
+        onlyAssistant: Boolean = false
     ): String {
         val words = Regex("""[\p{L}\p{N}]+""")
             .findAll(term.lowercase(Locale.ROOT)).map { it.value }
@@ -95,6 +109,8 @@ internal object AstraConversationReview {
         val matching = history.withIndex().filter { entry ->
             if (entry.value.role != "You" && entry.value.role != "Astra") {
                 false
+            } else if (onlyAssistant && entry.value.role != "Astra") {
+                false
             } else if (entry.value.text.trim().startsWith("ASTRA // CHAT REVIEW")) {
                 false
             } else {
@@ -106,11 +122,13 @@ internal object AstraConversationReview {
         }.takeLast(5)
         if (matching.isEmpty()) {
             return "No earlier mentions of '" + term + "' found in this chat. " +
-                "Both user messages and previous Astra responses were checked."
+                (if (onlyAssistant) "Previous Astra responses were checked." else
+                    "Both user messages and previous Astra responses were checked.")
         }
         return buildString {
             appendLine("ASTRA // CHAT REVIEW · " + term)
             appendLine("Earlier Astra replies are unverified claims, not proven facts.")
+            if (onlyAssistant) appendLine("Only previous Astra replies were searched.")
             appendLine()
             for (item in matching) {
                 val excerpt = item.value.text.replace(Regex("""\s+"""), " ")
