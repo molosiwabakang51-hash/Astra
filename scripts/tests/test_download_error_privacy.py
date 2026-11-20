@@ -21,7 +21,7 @@ class ModelDownloadPrivacyTests(unittest.TestCase):
         self.assertIn("failure.message.orEmpty().lowercase", SAFE)
         self.assertNotIn("return source", SAFE)
         self.assertNotIn("return failure.message", SAFE)
-        self.assertIn("HTTP 416", SAFE)
+        self.assertIn('"http 416" in source', SAFE)
         self.assertIn("SHA-256", SAFE)
 
 
