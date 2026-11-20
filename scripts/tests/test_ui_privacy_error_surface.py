@@ -32,11 +32,21 @@ class OwnerErrorPrivacySurfaceTests(unittest.TestCase):
     def test_mapper_does_not_copy_raw_provider_content(self):
         self.assertIn("fun forOwner(operation: Operation, failure: Exception): String", POLICY)
         self.assertIn("val description = generateSequence(", POLICY)
-        self.assertIn("when (category(failure))", POLICY)
+        self.assertIn("val cause = category(failure)", POLICY)
+        self.assertIn("val reason = when (cause)", POLICY)
         self.assertNotIn('return failure.message', POLICY)
         self.assertNotIn('return description', POLICY)
         self.assertNotIn('throw failure', POLICY)
         self.assertIn('return "$heading $reason $advice"', POLICY)
+
+    def test_native_startup_deadline_cannot_be_mistaken_for_network_or_bad_weights(self):
+        self.assertIn(
+            "error.message == AstraNativeStartupWait.TIMEOUT_ADVICE", POLICY
+        )
+        self.assertIn(") return Cause.STARTUP", POLICY)
+        self.assertIn('Cause.STARTUP -> "The offline AI engine did not finish', POLICY)
+        self.assertIn("cause == Cause.STARTUP", POLICY)
+        self.assertNotIn('return error.message', POLICY)
 
     def test_other_model_download_failure_remains_separately_sanitized(self):
         self.assertIn("AstraDownloadFailureMessage.forOwner(error)", MAIN)
