@@ -107,6 +107,91 @@ class AstraFollowUpAnchorTest {
         assertTrue(third.contains("Modules: organize"))
     }
 
+    @Test fun spokenNumbersAndOrdinalFollowUpsSelectTheActualRecentItem() {
+        val history = listOf(
+            msg("You", "Give me the four steps for analysing a bond."),
+            msg("Astra", """
+                1. Estimate the cash flows and dates.
+                2. Choose a suitable discount yield.
+                3. Calculate the present value of every payment.
+                4. Measure modified duration and convexity.
+                Explain how prices react when market yields change.
+            """.trimIndent())
+        )
+        for (phrase in listOf(
+            "explain number four",
+            "Explain the fourth one!",
+            "can you explain point 4?",
+            "break down step four",
+            "go into more detail on the 4th point",
+            "what about the fourth",
+            "tell me more about item four"
+        )) {
+            val focused = AstraFollowUpAnchor.enrich(phrase, history)
+            assertTrue(phrase, focused.contains("USER-SELECTED ITEM 4"))
+            assertTrue(phrase, focused.contains("Measure modified duration and convexity"))
+            assertTrue(phrase, focused.contains("market yields change"))
+            assertFalse(phrase, focused.contains("Choose a suitable discount yield"))
+            assertFalse(phrase, focused.contains("Estimate the cash flows"))
+        }
+        val second = AstraFollowUpAnchor.enrich("what about the second one?", history)
+        assertTrue(second.contains("USER-SELECTED ITEM 2"))
+        assertTrue(second.contains("Choose a suitable discount yield"))
+        assertFalse(second.contains("Measure modified duration"))
+    }
+
+    @Test fun informalFollowUpsStayWithTheNewestCompletedTopic() {
+        val history = listOf(
+            msg("You", "Discuss Russian grammar."),
+            msg("Astra", "Russian grammar uses cases and grammatical gender."),
+            msg("You", "Now teach me about bond yields."),
+            msg("Astra", "Bond prices often move inversely to market yields.")
+        )
+        for (phrase in listOf(
+            "go deeper", "tell me more", "break it down",
+            "explain it more simply", "show me an example",
+            "can you give me an example", "how does that work",
+            "why is that", "what do you mean by that", "please continue"
+        )) {
+            val focused = AstraFollowUpAnchor.enrich(phrase, history)
+            assertTrue(phrase, focused.contains("bond yields"))
+            assertTrue(phrase, focused.contains("Bond prices often move inversely"))
+            assertFalse(phrase, focused.contains("Russian grammar uses cases"))
+        }
+    }
+
+    @Test fun naturalFollowUpsAreNotConfusedWithNewTopicsOrOldIncompleteAnswers() {
+        val history = listOf(
+            msg("You", "Explain portfolio diversification."),
+            msg("Astra", "A diversified portfolio may reduce single-issuer risk.")
+        )
+        for (question in listOf(
+            "Explain two factor authentication",
+            "break down 2-factor authentication",
+            "tell me more about equities",
+            "explain twentieth-century history",
+            "what about 2026?",
+            "explain four possible strategies",
+            "could you explain bond maturity instead",
+            "explain 1rd"
+        )) {
+            assertEquals(question, question,
+                AstraFollowUpAnchor.enrich(question, history))
+        }
+        for (question in listOf("go deeper", "explain number four", "tell me more")) {
+            assertEquals(question, question,
+                AstraFollowUpAnchor.enrich(question, emptyList()))
+            assertEquals(question, question,
+                AstraFollowUpAnchor.enrich(question, listOf(
+                    msg("You", "Discuss portfolio risk"),
+                    msg("Astra", "The response was interrupted when Astra closed.")
+                )))
+        }
+        val missing = AstraFollowUpAnchor.enrich("explain number twelve", history)
+        assertTrue(missing.contains("Item 12 was not located"))
+        assertTrue(missing.contains("instead of guessing"))
+    }
+
     @Test fun numberedFollowUpsHandleBulletsAndNeverInventMissingItems() {
         val history = listOf(
             msg("You", "Give me a study plan."),
