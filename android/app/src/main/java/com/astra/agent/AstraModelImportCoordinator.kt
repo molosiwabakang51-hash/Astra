@@ -130,24 +130,43 @@ internal object AstraModelImportCoordinator {
             } catch (failure: Exception) {
                 publish(app, Snapshot(true, "failed", failureMessage(failure)))
             } finally {
-                try {
-                    if (heldGrant) {
-                        runCatching {
-                            app.contentResolver.releasePersistableUriPermission(
-                                selected, Intent.FLAG_GRANT_READ_URI_PERMISSION
-                            )
-                        }
+                if (heldGrant) {
+                    runCatching {
+                        app.contentResolver.releasePersistableUriPermission(
+                            selected, Intent.FLAG_GRANT_READ_URI_PERMISSION
+                        )
                     }
-                    // Preserve the last success/failure status for a recreated
-                    // activity. No private file URI is persisted or displayed.
-                    current.value = current.value.copy(running = false)
-                } finally {
-                    importJob = null
-                    gate.release()
                 }
             }
         }
         importJob = job
+        // invokeOnCompletion runs even when Android cancels a scheduled job
+        // before its body starts. Cleaning up only inside the coroutine
+        // would otherwise leave the single-flight gate locked forever.
+        job.invokeOnCompletion { outcome ->
+            try {
+                if (outcome is CancellationException &&
+                    current.value.stage == "copying"
+                ) {
+                    val cancelledByOwner = outcome.message ==
+                        "Owner cancelled model import"
+                    publish(
+                        app,
+                        Snapshot(
+                            true,
+                            if (cancelledByOwner) "cancelled" else "interrupted",
+                            if (cancelledByOwner)
+                                "Model import cancelled. Existing weights are untouched."
+                            else "Model import interrupted. The original GGUF is untouched."
+                        )
+                    )
+                }
+                current.value = current.value.copy(running = false)
+            } finally {
+                importJob = null
+                gate.release()
+            }
+        }
         return true
     }
 
