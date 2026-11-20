@@ -48,6 +48,17 @@ internal object AstraModelDownload {
         if (partial.isFile && partial.length() > MAX_BYTES) {
             check(partial.delete()) { "Cannot clear oversized incomplete download." }
         }
+        // Process death may happen after all bytes are saved but before the
+        // verified GGUF is atomically installed. Recover it before even
+        // opening an HTTPS connection (no redownload/data use required).
+        val recoveredBytes = AstraCompletedModelDownload.promoteIfVerified(
+            partial, target, MIN_BYTES, MAX_BYTES,
+            AstraModelImport.ADVANCED_SHA256, ::sha256
+        )
+        if (recoveredBytes != null) {
+            onProgress(recoveredBytes, recoveredBytes)
+            return@withContext recoveredBytes
+        }
         val offset = partial.takeIf { it.isFile }?.length() ?: 0L
         val connection = URL(MODEL_URL).openConnection() as HttpsURLConnection
         try {
