@@ -53,7 +53,7 @@ internal object AstraConversationReview {
         val compoundReview = compoundReviewPattern.matchEntire(command)
         if (compoundReview != null) {
             return earlierMentions(compoundReview.groupValues[1], history) +
-                "\n\n" + reviewMistake(history)
+                "\n\n" + reviewMistake(history, compoundReview.groupValues[1])
         }
         if (lower == "in this chat" || lower == "earlier than this") {
             val priorQuery = history.asReversed().asSequence()
@@ -88,10 +88,21 @@ internal object AstraConversationReview {
             .filter { it.length > 2 && it !in setOf("earlier", "mentions", "about", "the") }
             .take(6).toList()
         if (words.isEmpty()) return "Specify a topic to review."
+        // Search whole words, not substrings: e.g. "bond" must not match
+        // "bondage" and "usd" must not match "usdc". Quoted previous model
+        // reviews are not evidence of an earlier original conversation claim.
+        val wordTokens = Regex("""[\p{L}\p{N}]+""")
         val matching = history.withIndex().filter { entry ->
-            (entry.value.role == "You" || entry.value.role == "Astra") &&
-                words.all { it in entry.value.text.lowercase(Locale.ROOT) } &&
-                !entry.value.text.trim().startsWith("ASTRA // CHAT REVIEW")
+            if (entry.value.role != "You" && entry.value.role != "Astra") {
+                false
+            } else if (entry.value.text.trim().startsWith("ASTRA // CHAT REVIEW")) {
+                false
+            } else {
+                val present = wordTokens.findAll(
+                    entry.value.text.lowercase(Locale.ROOT)
+                ).map { it.value }.toSet()
+                words.all { it in present }
+            }
         }.takeLast(5)
         if (matching.isEmpty()) {
             return "No earlier mentions of '" + term + "' found in this chat. " +
@@ -110,24 +121,67 @@ internal object AstraConversationReview {
         }.trimEnd().take(2_000)
     }
 
-    private fun reviewMistake(history: List<AstraChatArchive.Message>): String {
-        val earlierReplies = history.asReversed()
-            .filter { it.role == "Astra" }.take(24)
-        if (earlierReplies.any { it.text.contains("Niall Shiller", ignoreCase = true) }) {
-            return "Yes. I wrongly attributed Irrational Exuberance to " +
-                "'Niall Shiller', then repeated the error after you challenged it. " +
-                "Robert J. Shiller is the actual author. He teaches at Yale, " +
-                "not the University of Chicago, as I claimed. My refusal to " +
-                "acknowledge those errors was another mistake."
+    private fun reviewMistake(
+        history: List<AstraChatArchive.Message>,
+        requestedTopic: String? = null
+    ): String {
+        // A free-form "do you see your mistake?" refers to the most recent
+        // owner discussion, not a stale unrelated mistake in an older turn.
+        val lastOwnerText = history.asReversed().firstOrNull { it.role == "You" }
+            ?.text.orEmpty()
+        val topic = (requestedTopic ?: lastOwnerText).lowercase(Locale.ROOT)
+        val reviewingShiller = topic.contains("shiller") ||
+            topic.contains("stiller") || topic.contains("irrational exuberance")
+        val earlierReplies = history.withIndex().filter {
+            it.value.role == "Astra" &&
+                !it.value.text.trim().startsWith("ASTRA // CHAT REVIEW")
         }
-        val last = earlierReplies.firstOrNull()?.text
+        if (reviewingShiller) {
+            // Correct only an attribution that the assistant actually made.
+            // Merely quoting a name or saying "Niall is NOT the author"
+            // must never trigger a fabricated confession of an error.
+            val falseAttribution = earlierReplies.lastOrNull { entry ->
+                val claim = entry.value.text.replace(Regex("""\s+"""), " ")
+                    .lowercase(Locale.ROOT)
+                claim.contains("niall shiller wrote irrational exuberance") ||
+                    claim.contains("irrational exuberance was written by niall shiller") ||
+                    claim.contains("irrational exuberance was authored by niall shiller")
+            }
+            if (falseAttribution != null) {
+                val chicagoClaim = earlierReplies.any { entry ->
+                    val claim = entry.value.text.lowercase(Locale.ROOT)
+                    (claim.contains("robert j. shiller") ||
+                        claim.contains("robert j shiller")) &&
+                        claim.contains("chicago") &&
+                        !claim.contains("not the university of chicago") &&
+                        !claim.contains("not at the university of chicago")
+                }
+                return buildString {
+                    append("Yes. In my earlier message #")
+                    append(falseAttribution.index + 1)
+                    append(", I wrongly attributed Irrational Exuberance to ")
+                    append("'Niall Shiller'. Its author is Robert J. Shiller, ")
+                    append("the Yale economist.")
+                    if (chicagoClaim) {
+                        append(" I also gave a Chicago affiliation for Robert J. ")
+                        append("Shiller; that claim was incorrect.")
+                    }
+                    append(" These corrections refer to documented statements ")
+                    append("in this chat; other claims remain unverified.")
+                }
+            }
+        }
+        // Do not diagnose an unspecified mistake or present the assistant's
+        // previous prose as a verified source. Ask for an exact claim instead.
+        val last = earlierReplies.lastOrNull()?.value?.text
         return if (last == null) {
             "There is no earlier Astra response in this chat to review."
         } else {
             "I cannot identify a particular factual error confidently yet. " +
-                "My latest response began: " +
+                "My most recent original answer began: " +
                 last.replace(Regex("""\s+"""), " ").take(160) +
-                ". Which statement should I check?"
+                ". Which exact claim should I verify?"
         }
     }
+
 }
