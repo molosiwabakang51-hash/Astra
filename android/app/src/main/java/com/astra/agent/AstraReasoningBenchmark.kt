@@ -89,7 +89,7 @@ internal object AstraReasoningBenchmark {
     internal fun normalizedAnswer(raw: String): String {
         val answer = AstraOfflinePolicy.publicReply(raw)
         val footer = Regex(
-            """(?im)^\s*(?:Open-course references:|Retrieved local book passages)\s*$"""
+            """(?im)^\s*(?:Open-course references:|Retrieved local book passages(?: \(verify originals\))?:?)\s*$"""
         )
         return answer.substring(0, footer.find(answer)?.range?.first
             ?: answer.length).trim().lowercase(Locale.ROOT)
