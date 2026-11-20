@@ -2158,12 +2158,15 @@ class MainActivity :
     private var speechForeground = false
     private var screenOffReceiverRegistered = false
 
-    // Hardware screen-off can arrive before an Activity lifecycle callback,
-    // so stop Android TTS immediately even when the app-lock toggle is off.
+    // Hardware screen-off may precede Activity onPause/onStop. Cancel both
+    // dictation and speech immediately, even with app lock disabled.
     private val screenOffReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
             if (intent?.action == Intent.ACTION_SCREEN_OFF) {
                 speechForeground = false
+                speechSession.cancel()
+                recognizer?.cancel()
+                listening = false
                 tts?.stop()
             }
         }
@@ -7738,6 +7741,9 @@ class MainActivity :
         super.onWindowFocusChanged(hasFocus)
         if (!hasFocus) {
             speechForeground = false
+            speechSession.cancel()
+            recognizer?.cancel()
+            listening = false
             tts?.stop()
         } else if (lifecycle.currentState.isAtLeast(
                 androidx.lifecycle.Lifecycle.State.RESUMED
@@ -7748,9 +7754,13 @@ class MainActivity :
     }
 
     override fun onPause() {
-        // onStop may be delayed when Home, screen-off, recent apps or an
-        // authentication overlay obscures Astra. Stop queued TTS now.
+        // onStop may be delayed after Home, screen-off or an overlay.
+        // Invalidate recognition callbacks before they can send dictated
+        // text into a hidden or locked conversation.
         speechForeground = false
+        speechSession.cancel()
+        recognizer?.cancel()
+        listening = false
         tts?.stop()
         idleLockHandler.removeCallbacks(idleLockRunnable)
         super.onPause()
