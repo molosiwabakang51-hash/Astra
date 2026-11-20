@@ -23,6 +23,7 @@ import android.speech.tts.TextToSpeech
 import android.speech.tts.Voice
 import android.widget.Toast
 
+import androidx.activity.compose.BackHandler
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -1399,6 +1400,68 @@ private object UtilityEngine {
     }
 }
 
+
+/**
+ * Maps unambiguous everyday English to existing, offline and auditable commands.
+ * Requests that merely discuss an action are left to the conversation model.
+ * No model-generated text is executed as a tool or interpreted as permission.
+ */
+private object AstraNaturalLanguage {
+    fun canonical(raw: String): String {
+        val text = raw.trim().replace(Regex("""\\s+"""), " ")
+        val clean = text.trimEnd('?', '!', '.').trim()
+        val prefix = """(?:please\\s+)?(?:can you\\s+|could you\\s+|would you\\s+|will you\\s+|i want you to\\s+|i'd like you to\\s+)?"""
+        fun match(action: String): MatchResult? =
+            Regex("^$prefix$action$", RegexOption.IGNORE_CASE).matchEntire(clean)
+
+        // Never turn a quoted example or a question *about* a command into a write.
+        if (clean.startsWith("why ", true) || clean.startsWith("how ", true) ||
+            clean.startsWith("what happens", true) || clean.startsWith("explain ", true) ||
+            clean.startsWith("do not ", true) || clean.startsWith("don't ", true)
+        ) return raw
+
+        match("""(?:show|list|display|tell me|let me see)\\s+(?:all\\s+)?(?:my\\s+)?(?:outstanding\\s+|pending\\s+)?tasks""")?.let {
+            return "show tasks"
+        }
+        match("""(?:show|list|display|let me see)\\s+(?:all\\s+)?(?:my\\s+)?notes""")?.let {
+            return "show notes"
+        }
+        match("""(?:show|list|display)\\s+(?:my\\s+)?completed tasks""")?.let {
+            return "show completed tasks"
+        }
+        match("""(?:open|go to|take me to|switch to|navigate to)\\s+(?:the\\s+|my\\s+)?(?:settings|preferences)""")?.let {
+            return "open settings"
+        }
+        match("""(?:open|go to|take me to|switch to|navigate to)\\s+(?:the\\s+|my\\s+)?tasks(?: screen| page)?""")?.let {
+            return "open tasks"
+        }
+        match("""(?:open|go to|take me to|switch to|navigate to)\\s+(?:the\\s+|my\\s+)?notes(?: screen| page)?""")?.let {
+            return "open notes"
+        }
+        match("""(?:open|go to|take me to|switch to|navigate to)\\s+(?:the\\s+)?tools(?: screen| page)?""")?.let {
+            return "open tools"
+        }
+        match("""(?:show|open|go to|take me to)\\s+(?:my\\s+)?(?:previous\\s+)?conversations""")?.let {
+            return "open conversations"
+        }
+        match("""(?:what can you do|how can you help me|show me what you can do)""")?.let {
+            return "help"
+        }
+        // Specific, explicit writes only. The original command processor
+        // retains its own validation and persistence semantics.
+        match("""(?:add|create|make)\\s+(?:a\\s+|new\\s+)?task\\s+(?:to\\s+|for\\s+|called\\s+)?(.+)""")?.let {
+            return "add task " + it.groupValues[1]
+        }
+        match("""(?:please\\s+)?(?:remember|make a note of|write down|save a note that)\\s+(?:that\\s+)?(.+)""")?.let {
+            return "remember that " + it.groupValues[1]
+        }
+        match("""(?:mark|set)\\s+task\\s+(\\d+)\\s+(?:as\\s+)?(?:done|complete|completed)""")?.let {
+            return "done " + it.groupValues[1]
+        }
+        return raw
+    }
+}
+
 // ============================================================
 // MIDDLE OFFICE — COMMAND PROCESSOR
 // ============================================================
@@ -1422,7 +1485,7 @@ private class AstraProcessor(
         completed: MutableList<String>
     ): AssistantResult {
 
-        val clean = AstraInput.normalize(raw)
+        val clean = AstraInput.normalize(AstraNaturalLanguage.canonical(raw))
             .trimEnd('?', '!')
             .replace(
                 Regex("""\s+"""),
@@ -3002,6 +3065,42 @@ class MainActivity :
                 var returnToChatLibrary by remember { mutableStateOf(false) }
                 var navigationPopupOpen by remember { mutableStateOf(false) }
                 var commandDeckExpanded by remember { mutableStateOf(false) }
+                // Track actual top-level destinations rather than exiting on Back.
+                // The stack is UI-only; no private conversation data is copied.
+                val tabBackStack = remember { mutableStateListOf<Int>() }
+                var restoringTabFromBack by remember { mutableStateOf(false) }
+                var observedTab by remember { mutableIntStateOf(tab) }
+                LaunchedEffect(tab) {
+                    if (tab != observedTab) {
+                        if (restoringTabFromBack) {
+                            restoringTabFromBack = false
+                        } else {
+                            tabBackStack.add(observedTab)
+                            if (tabBackStack.size > 20) tabBackStack.removeAt(0)
+                        }
+                        observedTab = tab
+                    }
+                }
+                BackHandler(
+                    enabled = navigationPopupOpen || showChatSwitcher ||
+                        commandDeckExpanded || showFindInChat || showMemorySearch ||
+                        tab != 0
+                ) {
+                    when {
+                        navigationPopupOpen -> navigationPopupOpen = false
+                        showChatSwitcher -> showChatSwitcher = false
+                        showFindInChat -> showFindInChat = false
+                        showMemorySearch -> showMemorySearch = false
+                        commandDeckExpanded -> commandDeckExpanded = false
+                        tab != 0 -> {
+                            restoringTabFromBack = true
+                            tab = if (tabBackStack.isNotEmpty()) {
+                                tabBackStack.removeAt(tabBackStack.lastIndex)
+                            } else 0
+                        }
+                    }
+                }
+
 
                 var pendingBackupRestore by remember {
                     mutableStateOf<AstraBackupCodec.Payload?>(null)
