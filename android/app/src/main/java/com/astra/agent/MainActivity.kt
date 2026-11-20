@@ -3577,8 +3577,9 @@ class MainActivity :
                                 dialogue.reset()
                                 workflowSession.reset()
                             } catch (failure: Exception) {
-                                reply = "Workflow could not be saved. " +
-                                    (failure.message ?: "No changes were applied.")
+                                reply = AstraPrivateError.forOwner(
+                                    AstraPrivateError.Operation.WORKFLOW_SAVE, failure
+                                )
                             }
                         }
                         dialogueAwaiting = reply.startsWith("WORKFLOW PREVIEW")
@@ -4128,8 +4129,9 @@ class MainActivity :
                                 linkedLibraryFolder =
                                     AstraFolderAccess.linked(applicationContext)
                                 folderImportStatus =
-                                    "Could not retain folder access: " +
-                                    (failure.message ?: "Android rejected access.")
+                                    AstraPrivateError.forOwner(
+                                    AstraPrivateError.Operation.FOLDER_LINK, failure
+                                )
                             }
                         }
                     }
@@ -6978,9 +6980,9 @@ class MainActivity :
                                                                     applicationContext
                                                                 )
                                                             folderImportStatus =
-                                                                "Folder import failed: " +
-                                                                    (failure.message ?:
-                                                                        "The folder was unavailable.")
+                                                                AstraPrivateError.forOwner(
+                                                                    AstraPrivateError.Operation.FOLDER_IMPORT, failure
+                                                                )
                                                         } finally {
                                                             bookImportRunning = false
                                                         }
@@ -6998,7 +7000,9 @@ class MainActivity :
                                                         "Already imported private books remain."
                                                 } catch (failure: Exception) {
                                                     folderImportStatus =
-                                                        failure.message ?: "Cannot revoke access."
+                                                        AstraPrivateError.forOwner(
+                                                            AstraPrivateError.Operation.FOLDER_REVOKE, failure
+                                                        )
                                                 }
                                             }) { Text("Forget folder authorization") }
                                         }
