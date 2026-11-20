@@ -25,7 +25,11 @@ internal object AstraPrivateError {
         VOCAB_CLEAR,
         MODEL_SELF_TEST,
         LANGUAGE_CHECKS,
-        LIBRARY_SYNC
+        LIBRARY_SYNC,
+        WORKFLOW_SAVE,
+        FOLDER_LINK,
+        FOLDER_IMPORT,
+        FOLDER_REVOKE
     }
 
     private enum class Cause { STORAGE, ACCESS, UNSUPPORTED, MEMORY, MODEL, NETWORK, UNKNOWN }
@@ -77,6 +81,10 @@ internal object AstraPrivateError {
             Operation.MODEL_SELF_TEST -> "Offline AI self-test did not finish."
             Operation.LANGUAGE_CHECKS -> "Conversation checks did not finish."
             Operation.LIBRARY_SYNC -> "Public course update did not finish."
+            Operation.WORKFLOW_SAVE -> "Workflow could not be saved."
+            Operation.FOLDER_LINK -> "Could not retain folder access."
+            Operation.FOLDER_IMPORT -> "Folder import did not finish."
+            Operation.FOLDER_REVOKE -> "Could not revoke linked-folder access."
         }
         val reason = when (category(failure)) {
             Cause.STORAGE -> "Internal phone storage may be full."
@@ -107,6 +115,14 @@ internal object AstraPrivateError {
                 "Check the installed 1.7B model, available RAM and retry the check."
             Operation.LIBRARY_SYNC ->
                 "Check internet access for public learning resources and retry."
+            Operation.WORKFLOW_SAVE ->
+                "Review the current tasks and notes before trying the workflow again."
+            Operation.FOLDER_LINK ->
+                "Choose the folder again and approve Android's read-only access."
+            Operation.FOLDER_IMPORT ->
+                "Check the linked folder's access and retry the import in Settings."
+            Operation.FOLDER_REVOKE ->
+                "Review folder authorization in Settings and try again."
         }
         return "$heading $reason $advice"
     }
