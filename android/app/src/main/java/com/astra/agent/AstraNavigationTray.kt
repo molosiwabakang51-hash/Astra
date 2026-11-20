@@ -315,7 +315,7 @@ internal fun AstraNavigationTray(
                                 Box(
                                     Modifier.size(7.dp)
                                         .background(
-                                            accent.copy(alpha = if (disabled) 0.25f else 0.8f),
+                                            accent.copy(alpha = if (disabled) 0.65f else 0.8f),
                                             CircleShape
                                         )
                                 )
