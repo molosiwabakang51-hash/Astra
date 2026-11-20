@@ -73,6 +73,19 @@ class AstraConversationReviewTest {
         assertFalse(answer.contains("refusal"))
     }
 
+    @Test fun negatedChicagoAffiliationDoesNotBecomeAnotherConfessedError() {
+        val current = listOf(
+            msg("Astra", "Niall Shiller wrote Irrational Exuberance."),
+            msg("Astra", "Robert J. Shiller is associated with Yale, not Chicago."),
+            msg("You", "review earlier mentions of Shiller")
+        )
+        val correction = AstraConversationReview.respond(
+            "Do you see your mistake?", current
+        )!!
+        assertTrue(correction.contains("wrongly attributed"))
+        assertFalse(correction.contains("Chicago"))
+    }
+
     @Test fun priorChatReviewOutputIsNotOriginalConversationEvidence() {
         val current = listOf(
             msg("Astra", "Bond investment returns depend on yield changes."),
