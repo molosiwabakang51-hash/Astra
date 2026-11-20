@@ -6,6 +6,7 @@ import android.net.Uri
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -41,8 +42,19 @@ internal object AstraModelImportCoordinator {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val current = MutableStateFlow(Snapshot())
     val snapshots: StateFlow<Snapshot> = current
+    @Volatile private var importJob: Job? = null
+    @Volatile private var ownerRequestedCancel = false
 
     fun isRunning(): Boolean = gate.isRunning()
+
+    /** Stop only the current model copy, never an installed or backup GGUF. */
+    fun cancel(): Boolean {
+        val job = importJob ?: return false
+        if (!gate.isRunning() || !job.isActive) return false
+        ownerRequestedCancel = true
+        job.cancel(CancellationException("Owner cancelled model import"))
+        return true
+    }
 
     /** Error text is safe to persist: never include provider-specific paths or URIs. */
     internal fun failureMessage(failure: Exception): String {
@@ -70,6 +82,7 @@ internal object AstraModelImportCoordinator {
     /** Return false if another import is already active; never launch two copies. */
     fun start(context: Context, selected: Uri): Boolean {
         if (!gate.acquire()) return false
+        ownerRequestedCancel = false
         val app = context.applicationContext
         publish(
             app,
@@ -83,7 +96,7 @@ internal object AstraModelImportCoordinator {
             )
             true
         }.getOrDefault(false)
-        scope.launch {
+        val job = scope.launch {
             try {
                 val bytes = AstraModelImport.importDocument(app, selected) { copied ->
                     publish(
@@ -104,31 +117,55 @@ internal object AstraModelImportCoordinator {
                     )
                 )
             } catch (cancel: CancellationException) {
+                val userCancelled = ownerRequestedCancel
                 publish(
                     app,
                     Snapshot(
-                        true, "interrupted",
-                        "Model import interrupted. The original downloaded GGUF remains intact."
+                        true, if (userCancelled) "cancelled" else "interrupted",
+                        if (userCancelled) {
+                            "Model import cancelled. Installed models and the downloaded GGUF are intact."
+                        } else {
+                            "Model import interrupted. The downloaded GGUF remains intact."
+                        }
                     )
                 )
                 throw cancel
             } catch (failure: Exception) {
                 publish(app, Snapshot(true, "failed", failureMessage(failure)))
-            } finally {
-                try {
-                    if (heldGrant) {
-                        runCatching {
-                            app.contentResolver.releasePersistableUriPermission(
-                                selected, Intent.FLAG_GRANT_READ_URI_PERMISSION
-                            )
-                        }
+            }
+        }
+        importJob = job
+        // invokeOnCompletion runs even when Android cancels a scheduled job
+        // before its body starts. Cleaning up only inside the coroutine
+        // would otherwise leave the single-flight gate locked forever.
+        job.invokeOnCompletion { outcome ->
+            try {
+                if (heldGrant) {
+                    runCatching {
+                        app.contentResolver.releasePersistableUriPermission(
+                            selected, Intent.FLAG_GRANT_READ_URI_PERMISSION
+                        )
                     }
-                    // Preserve the last success/failure status for a recreated
-                    // activity. No private file URI is persisted or displayed.
-                    current.value = current.value.copy(running = false)
-                } finally {
-                    gate.release()
                 }
+                if (outcome is CancellationException &&
+                    current.value.stage == "copying"
+                ) {
+                    val cancelledByOwner = ownerRequestedCancel
+                    publish(
+                        app,
+                        Snapshot(
+                            true,
+                            if (cancelledByOwner) "cancelled" else "interrupted",
+                            if (cancelledByOwner)
+                                "Model import cancelled. Existing weights are untouched."
+                            else "Model import interrupted. The original GGUF is untouched."
+                        )
+                    )
+                }
+                current.value = current.value.copy(running = false)
+            } finally {
+                importJob = null
+                gate.release()
             }
         }
         return true

@@ -72,6 +72,16 @@ class ModelPickerRecoveryTests(unittest.TestCase):
         )
         self.assertIn("if (partial.exists())", IMPORT)
 
+    def test_owner_can_cancel_process_wide_import_without_orphaning_saf_grant(self):
+        self.assertIn("fun cancel(): Boolean", COORD)
+        self.assertIn("ownerRequestedCancel = true", COORD)
+        self.assertIn("job.cancel(CancellationException(", COORD)
+        self.assertIn("job.invokeOnCompletion { outcome ->", COORD)
+        self.assertIn("releasePersistableUriPermission(", COORD)
+        self.assertIn("gate.release()", COORD)
+        self.assertIn("AstraModelImportCoordinator.cancel()", MAIN)
+        self.assertIn('Text("Cancel model import")', MAIN)
+
     def test_security_remains_a_gate_after_picker(self):
         self.assertIn(
             "AstraAppLockPolicy.requiresUnlock(", MAIN
