@@ -2194,80 +2194,23 @@ class MainActivity :
     private val importModelLauncher = registerForActivityResult(
         ActivityResultContracts.OpenDocument()
     ) { selected ->
+        // The Files callback can be delivered after an Activity recreation.
+        // Only the app-process coordinator owns the large copy and its SAF grant.
         modelSetupRequested = true
         if (selected == null) {
             updateModelImportStatus(
-                "No model selected. Choose your downloaded Qwen3 1.7B Q4_K_M GGUF again.",
+                "No model selected. Choose the downloaded Qwen3 1.7B GGUF again.",
                 "cancelled"
             )
-        } else if (modelImportRunning) {
+        } else if (!AstraModelImportCoordinator.start(applicationContext, selected)) {
             updateModelImportStatus(
-                "Another model operation is running. Finish it before importing again.",
+                "A 1.7B model import is already active. Check progress in Settings.",
                 "busy"
             )
         } else {
             modelImportRunning = true
-            updateModelImportStatus("Reading selected file; checking local storage...", "copying")
-            // A one-time persistable read grant protects slow SAF providers
-            // and background screen-lock transitions. Never store the URI.
-            val retainedPermission = runCatching {
-                contentResolver.takePersistableUriPermission(
-                    selected, Intent.FLAG_GRANT_READ_URI_PERMISSION
-                )
-                true
-            }.getOrDefault(false)
-            lifecycleScope.launch {
-                try {
-                    val bytes = AstraModelImport.importDocument(
-                        applicationContext, selected
-                    ) { copied ->
-                        withContext(Dispatchers.Main.immediate) {
-                            updateModelImportStatus(
-                                "Importing Qwen3 1.7B: " +
-                                    (copied / 1048576L) +
-                                    " MiB copied. Keep Astra open until SHA-256 verification finishes.",
-                                "copying"
-                            )
-                        }
-                    }
-                    updateModelImportStatus(
-                        "QWEN3 1.7B READY · " + (bytes / 1048576L) +
-                            " MiB verified. You can now use offline conversation.",
-                        "ready"
-                    )
-                    Toast.makeText(
-                        this@MainActivity,
-                        "Qwen3 1.7B imported and verified.", Toast.LENGTH_LONG
-                    ).show()
-                } catch (cancel: CancellationException) {
-                    updateModelImportStatus(
-                        "Model import interrupted. Select the downloaded GGUF again; " +
-                            "the original file was not changed.", "interrupted"
-                    )
-                    throw cancel
-                } catch (error: Exception) {
-                    updateModelImportStatus(
-                        "MODEL IMPORT FAILED: " +
-                            (error.message ?: "Could not read the selected GGUF.") +
-                            " Check free storage and confirm that this is the official " +
-                            "Qwen3-1.7B-Q4_K_M.gguf, not a 0.6B model.", "failed"
-                    )
-                    Toast.makeText(
-                        this@MainActivity,
-                        "Model import failed. Open Settings for the exact reason.",
-                        Toast.LENGTH_LONG
-                    ).show()
-                } finally {
-                    if (retainedPermission) {
-                        runCatching {
-                            contentResolver.releasePersistableUriPermission(
-                                selected, Intent.FLAG_GRANT_READ_URI_PERMISSION
-                            )
-                        }
-                    }
-                    modelImportRunning = false
-                }
-            }
+            modelImportStatus =
+                "Reading the selected Qwen3 1.7B file; verifying storage..."
         }
     }
 
@@ -2791,18 +2734,31 @@ class MainActivity :
         super.onCreate(savedInstanceState)
         val modelPrefs = getSharedPreferences("astra", Context.MODE_PRIVATE)
         val previousStage = modelPrefs.getString("astra_model_import_stage", "idle")
-        modelImportStatus = if (previousStage == "copying" ||
-            previousStage == "selecting"
-        ) {
-            "Previous model import was interrupted by an Android restart or " +
-                "file-picker transition. Choose the Qwen3 1.7B GGUF again; " +
-                "your original downloaded file remains unchanged."
+        val activeImport = AstraModelImportCoordinator.isRunning()
+        modelImportRunning = activeImport
+        modelImportStatus = if (activeImport) {
+            AstraModelImportCoordinator.snapshots.value.message
+        } else if (previousStage == "copying" || previousStage == "selecting") {
+            "Previous 1.7B import stopped when Android ended the app process. " +
+                "Select the same downloaded GGUF again; the original file is intact."
         } else {
             modelPrefs.getString("astra_model_import_status", "").orEmpty()
         }
-        modelSetupRequested = previousStage in setOf("copying", "selecting")
-        if (modelSetupRequested) {
+        modelSetupRequested = activeImport ||
+            previousStage in setOf("copying", "selecting")
+        if (!activeImport && modelSetupRequested) {
             updateModelImportStatus(modelImportStatus, "interrupted")
+        }
+        // Observe progress from the process-wide import rather than tying the
+        // 1.28 GB copy to this Activity's lifecycle. A recreated Activity can
+        // immediately show the same import stage without restarting its copy.
+        lifecycleScope.launch {
+            AstraModelImportCoordinator.snapshots.collect { snapshot ->
+                if (snapshot.message.isNotBlank()) {
+                    modelImportStatus = snapshot.message
+                    modelImportRunning = snapshot.running
+                }
+            }
         }
         // A dynamically registered system screen-off receiver needs no
         // extra permission. onPause/onStop remain fallback stop paths if
