@@ -5,6 +5,9 @@ import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import org.junit.Rule
+import org.junit.rules.TemporaryFolder
+import java.io.File
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.security.MessageDigest
@@ -13,6 +16,53 @@ import java.util.zip.ZipInputStream
 import java.util.zip.ZipOutputStream
 
 class AstraModelImportTest {
+    @get:Rule val recoveryFiles = TemporaryFolder()
+
+    @Test fun interruptedSafImportReclaimsStaleBytesWithoutTouchingInstalledWeights() {
+        val directory = recoveryFiles.newFolder("stale-saf")
+        val installed = File(directory, AstraModelImport.ADVANCED_NAME)
+            .apply { writeBytes("verified-model".toByteArray()) }
+        val stale = File(directory, "qwen3-model.importing")
+            .apply { writeBytes(ByteArray(512 * 1024)) }
+        val resumedDownload = File(directory, AstraModelImport.ADVANCED_NAME + ".downloading")
+            .apply { writeText("partial resumable bytes") }
+
+        AstraModelImport.discardInterruptedCopy(stale)
+
+        assertTrue(!stale.exists())
+        assertTrue(installed.isFile)
+        assertEquals("verified-model", installed.readText())
+        assertTrue(resumedDownload.isFile)
+        assertEquals("partial resumable bytes", resumedDownload.readText())
+    }
+
+    @Test fun interruptedFullApkAssetCopyIsClearedBeforeNewPreparation() {
+        val directory = recoveryFiles.newFolder("stale-full")
+        val stale = File(directory, AstraModelImport.ADVANCED_NAME + ".partial")
+            .apply { writeBytes(ByteArray(512 * 1024)) }
+        val backup = File(directory, AstraModelImport.ADVANCED_NAME + ".before-import")
+            .apply { writeText("working backup") }
+
+        AstraModelImport.discardInterruptedCopy(stale)
+
+        assertTrue(!stale.exists())
+        assertTrue(backup.isFile)
+        assertEquals("working backup", backup.readText())
+        assertTrue(stale.writeText("fresh attempt").let { stale.length() > 0 })
+    }
+
+    @Test fun unexpectedDirectoryAtTempPathFailsClosedWithoutDeletingContents() {
+        val directory = recoveryFiles.newFolder("unusual-temp")
+        val tempDir = File(directory, "qwen3-model.importing").apply { mkdirs() }
+        val privateFile = File(tempDir, "keep.txt").apply { writeText("do not remove") }
+        val failure = runCatching {
+            AstraModelImport.discardInterruptedCopy(tempDir)
+        }.exceptionOrNull()
+        assertTrue(failure is IllegalStateException)
+        assertTrue(failure?.message.orEmpty().contains("Cannot clear"))
+        assertEquals("do not remove", privateFile.readText())
+    }
+
     private fun zip(vararg entries: Pair<String, ByteArray>): ByteArray {
         val result = ByteArrayOutputStream()
         ZipOutputStream(result).use { output ->
