@@ -14,7 +14,7 @@ internal object AstraGenerationPolicy {
         """(?i)\b(?:briefly|short answer|in one sentence|in a few words|one line|one word|tl;dr|be concise|keep it short)\b"""
     )
     private val long = Regex(
-        """(?i)\b(?:in detail|in more detail|go into (?:more )?details?|elaborate(?: on)?|expand on|tell me more|go deeper|show me how|put (?:this|it) into practice|apply this in practice|how do i apply this|detailed|thorough|comprehensive|step.by.step|explain fully|show your work|compare and contrast|derive|proof|analy[sz]e|essay|report|tutorial|teach me|walk me through|deep dive|write code|implement|give examples|course|lesson plan|study guide)\b"""
+        """(?i)\b(?:in detail|in more detail|go into (?:more )?details?|elaborate(?: on)?|expand on|tell me more|go deeper|show me how|put (?:this theory|this|it) into practice|apply this in practice|how do i apply this|detailed|thorough|comprehensive|step.by.step|explain fully|show your work|compare and contrast|derive|proof|analy[sz]e|essay|report|tutorial|teach me|walk me through|deep dive|write code|implement|give examples|course|lesson plan|study guide)\b"""
     )
 
     // Explicit answer-depth instructions in languages supported by the
