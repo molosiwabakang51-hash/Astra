@@ -24,7 +24,86 @@ class AstraConversationReviewTest {
         assertTrue(answer.contains("wrongly"))
         assertTrue(answer.contains("Robert J. Shiller"))
         assertTrue(answer.contains("Yale"))
-        assertTrue(answer.contains("refusal"))
+        assertTrue(answer.contains("message #2"))
+        assertFalse(answer.contains("refusal"))
+    }
+
+    @Test fun unrelatedNewTopicDoesNotReviveStaleShillerError() {
+        val current = chat + listOf(
+            msg("You", "How do I calculate bond convexity?"),
+            msg("Astra", "Bond convexity depends on the timing of cash flows."),
+            msg("You", "I think that calculation may be incorrect")
+        )
+        val answer = AstraConversationReview.respond(
+            "Do you see your mistake?", current
+        )!!
+        assertTrue(answer.contains("cannot identify"))
+        assertTrue(answer.contains("Bond convexity"))
+        assertFalse(answer.contains("Niall Shiller"))
+        assertFalse(answer.contains("Chicago"))
+    }
+
+    @Test fun mentioningIncorrectNameAsAWarningDoesNotCreateAnAdmittedError() {
+        val current = listOf(
+            msg("You", "Who wrote Irrational Exuberance?"),
+            msg("Astra", "Robert J. Shiller wrote it, not Niall Shiller."),
+            msg("You", "Review earlier mentions of Shiller")
+        )
+        val answer = AstraConversationReview.respond(
+            "Do you see your mistake?", current
+        )!!
+        assertTrue(answer.contains("cannot identify"))
+        assertFalse(answer.contains("I wrongly attributed"))
+    }
+
+    @Test fun doesNotInventChicagoOrRepeatedMistakesWhenOnlyAuthorshipWasWrong() {
+        val current = listOf(
+            msg("You", "Who wrote Irrational Exuberance?"),
+            msg("Astra", "Niall Shiller wrote Irrational Exuberance."),
+            msg("You", "Review earlier mentions of Shiller")
+        )
+        val answer = AstraConversationReview.respond(
+            "Do you see your mistake?", current
+        )!!
+        assertTrue(answer.contains("wrongly attributed"))
+        assertTrue(answer.contains("message #2"))
+        assertTrue(answer.contains("Yale"))
+        assertFalse(answer.contains("Chicago"))
+        assertFalse(answer.contains("repeated"))
+        assertFalse(answer.contains("refusal"))
+    }
+
+    @Test fun priorChatReviewOutputIsNotOriginalConversationEvidence() {
+        val current = listOf(
+            msg("Astra", "Bond investment returns depend on yield changes."),
+            msg("You", "Review earlier mentions of bond"),
+            msg("Astra", "ASTRA // CHAT REVIEW · bond\\nQuoted past remarks."),
+            msg("You", "Do you see your mistake?")
+        )
+        val answer = AstraConversationReview.respond(
+            "Do you see your mistake?", current
+        )!!
+        assertTrue(answer.contains("cannot identify"))
+        assertTrue(answer.contains("Bond investment returns"))
+        assertFalse(answer.contains("Quoted past remarks"))
+    }
+
+    @Test fun reviewMatchesWholeTopicWordsNotUnrelatedSubstrings() {
+        val current = listOf(
+            msg("Astra", "USDC is a stablecoin."),
+            msg("You", "I need to understand bonds."),
+            msg("Astra", "We discussed bondage as a concept."),
+            msg("Astra", "A bond is a debt security.")
+        )
+        val usd = AstraConversationReview.respond(
+            "Review earlier mentions of USD", current
+        )!!
+        assertTrue(usd.contains("No earlier mentions"))
+        val bond = AstraConversationReview.respond(
+            "Review earlier mentions of bond", current
+        )!!
+        assertTrue(bond.contains("A bond is a debt security"))
+        assertFalse(bond.contains("bondage as a concept"))
     }
 
     @Test fun earlierMentionReviewQuotesBothRolesButLabelsModelClaims() {
