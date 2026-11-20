@@ -27,6 +27,23 @@ class AstraAuroraDesignTest {
         assertTrue(AstraAurora.motionEnabled(1f))
     }
 
+    @Test fun liveMotionPolicyRespectsAllDisabledOrInvalidSystemScales() {
+        for (scale in listOf(
+            0f, -0.1f, -100f, Float.NaN, Float.POSITIVE_INFINITY,
+            Float.NEGATIVE_INFINITY
+        )) {
+            assertTrue("Reduced motion must stay static for scale $scale",
+                !AstraAurora.motionEnabled(scale))
+        }
+        for (scale in listOf(0.1f, 0.5f, 1f, 2f, 10f)) {
+            assertTrue("Enabled system motion remains opt-in for $scale",
+                AstraAurora.motionEnabled(scale))
+        }
+        assertTrue(!AstraAurora.motionEnabled(0f))
+        assertTrue(AstraAurora.motionEnabled(1f))
+        assertTrue(!AstraAurora.motionEnabled(0f))
+    }
+
     @Test fun headerStatusUsesObservedVoiceAndGenerationState() {
         org.junit.Assert.assertEquals("LOCAL ASSISTANT", AstraAurora.statusLabel(false, false))
         org.junit.Assert.assertEquals("GENERATING", AstraAurora.statusLabel(false, true))
