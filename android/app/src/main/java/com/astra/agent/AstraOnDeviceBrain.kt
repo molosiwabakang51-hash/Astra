@@ -12,7 +12,6 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
-import kotlinx.coroutines.withTimeout
 import java.io.File
 import java.io.FileOutputStream
 import java.security.MessageDigest
@@ -178,7 +177,7 @@ internal class AstraOnDeviceBrain(
                 }.also { engine = it }
                 // Upstream initializes JNI asynchronously. Wait for the engine
                 // to be ready instead of racing model loading against init.
-                val initialized = withTimeout(30_000L) {
+                val initialized = AstraNativeStartupWait.awaitReady {
                     current.state.first { state ->
                         state is InferenceEngine.State.Initialized ||
                             state is InferenceEngine.State.ModelReady ||
