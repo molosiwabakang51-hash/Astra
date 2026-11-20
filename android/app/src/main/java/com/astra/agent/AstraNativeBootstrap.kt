@@ -15,12 +15,17 @@ internal object AstraNativeBootstrap {
             "Check that the installed APK is the correct arm64 build; " +
             "your downloaded GGUF, chats and notes remain stored locally."
 
+    /**
+     * Shared recovery for synchronous engine setup and JNI method calls.
+     * Do not change the supplied cause or use its potentially sensitive text
+     * in messages shown to the owner.
+     */
+    fun recover(failure: LinkageError): IllegalStateException =
+        IllegalStateException(RECOVERY_ADVICE, failure)
+
     fun <T> acquire(factory: () -> T): T = try {
         factory()
     } catch (failure: LinkageError) {
-        // Failure causes may include filesystem paths or internal loader
-        // details. They remain attached for developer diagnosis but are never
-        // interpolated into the owner-visible message or stored in the chat.
-        throw IllegalStateException(RECOVERY_ADVICE, failure)
+        throw recover(failure)
     }
 }
