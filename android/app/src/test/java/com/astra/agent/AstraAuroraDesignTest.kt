@@ -34,6 +34,22 @@ class AstraAuroraDesignTest {
         org.junit.Assert.assertEquals("LISTENING", AstraAurora.statusLabel(true, true))
     }
 
+    @Test fun coreStatusAndDisabledTrayUseHighContrastThemeText() {
+        // The status colours must stay readable on Astra's dark base;
+        // disabled navigation actions use the same un-faded muted colour.
+        for (statusColor in listOf(
+            AstraAurora.muted, AstraAurora.mint, AstraAurora.violet
+        )) {
+            assertTrue(
+                "Core status needs readable contrast on the dark header.",
+                AstraAurora.contrast(statusColor, AstraAurora.background) >= 4.5
+            )
+        }
+        assertTrue(
+            AstraAurora.contrast(AstraAurora.muted, AstraAurora.raised) >= 4.5
+        )
+    }
+
     @Test fun readableTypographyIsNotThin() {
         assertTrue(AstraReadableTypography.bodyLarge.fontWeight!!.weight >= FontWeight.Medium.weight)
         assertTrue(AstraReadableTypography.bodySmall.fontWeight!!.weight >= FontWeight.Medium.weight)
