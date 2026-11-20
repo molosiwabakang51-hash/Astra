@@ -39,13 +39,17 @@ internal object AstraFollowUpAnchor {
         val selectedNumber = numberedFollowUp.matchEntire(lower)
             ?.groupValues?.getOrNull(1)?.toIntOrNull()
         if (lower !in followUps && selectedNumber == null) return prompt
-        val lastAssistant = currentChat.lastOrNull {
-            it.role == "Astra" && it.text.isNotBlank() &&
-                !it.text.startsWith("ASTRA // THINKING") &&
-                !it.text.startsWith("Offline response")
-        } ?: return prompt
-        val lastUser = currentChat.lastOrNull {
+        // Only the last *completed* user/assistant exchange is an anchor.
+        // Never pair a newer question with an older assistant reply when its
+        // actual response was stopped, interrupted or lost after process death.
+        val latestPair = currentChat.takeLast(2)
+        if (latestPair.size != 2) return prompt
+        val lastUser = latestPair[0].takeIf {
             it.role == "You" && it.text.isNotBlank()
+        } ?: return prompt
+        val lastAssistant = latestPair[1].takeIf {
+            it.role == "Astra" && it.text.isNotBlank() &&
+                !AstraInterruptedReply.isIncomplete(it.text)
         } ?: return prompt
 
         val question = quote(lastUser.text.take(260))
