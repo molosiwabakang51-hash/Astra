@@ -32,7 +32,7 @@ internal object AstraSpreadsheetText {
         var sharedXml: ByteArray? = null
         var scanned = 0
         var entries = 0
-        ZipInputStream(input.buffered()).use { archive ->
+        ZipInputStream(AstraProgressInputStream(input).buffered()).use { archive ->
             while (true) {
                 val entry = archive.nextEntry ?: break
                 require(++entries <= MAX_ENTRIES) { "XLSX has too many archive entries." }
