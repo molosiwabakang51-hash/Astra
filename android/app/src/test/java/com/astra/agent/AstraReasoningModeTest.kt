@@ -65,7 +65,7 @@ class AstraReasoningModeTest {
         assertEquals(1792, AstraGenerationPolicy.maxAnswerTokens(
             question, advancedModel = true
         ))
-        assertEquals(448, AstraGenerationPolicy.maxAnswerTokens(
+        assertEquals(672, AstraGenerationPolicy.maxAnswerTokens(
             question, advancedModel = false
         ))
         assertEquals(768, AstraGenerationPolicy.maxAnswerTokens(
