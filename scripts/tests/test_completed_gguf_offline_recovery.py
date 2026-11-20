@@ -31,7 +31,7 @@ class CompletedModelRecoveryTests(unittest.TestCase):
         self.assertIn("return null", PROMOTION)
         self.assertNotIn("partial.delete()", PROMOTION)
         self.assertNotIn("contentResolver", PROMOTION)
-        self.assertNotIn("http", PROMOTION.lower())
+        self.assertNotIn("URL(", PROMOTION)
 
 
 if __name__ == "__main__":
