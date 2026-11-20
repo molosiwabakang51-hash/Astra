@@ -3384,14 +3384,21 @@ class MainActivity :
                             history.map { AstraChatArchive.Message(it.role, it.text) }
                         )
                     } else prompt
-                    val turns = AstraConversationHistory.forRecovery(history).mapNotNull { entry ->
-                        val role = when (entry.role) {
-                            "You" -> "user"
-                            "Astra" -> "assistant"
-                            else -> null
-                        }
-                        role?.let { AstraOnDeviceBrain.Turn(it, entry.text) }
-                    } + AstraOnDeviceBrain.Turn("user", focusedPrompt)
+                    val turns = AstraConversationHistory.forRecovery(history)
+                        .filterNot { entry ->
+                            // Save interrupted partials in the visible chat,
+                            // but never replay them as a finished assistant
+                            // statement after a native reload or Stop/retry.
+                            entry.role == "Astra" &&
+                                AstraInterruptedReply.isIncomplete(entry.text)
+                        }.mapNotNull { entry ->
+                            val role = when (entry.role) {
+                                "You" -> "user"
+                                "Astra" -> "assistant"
+                                else -> null
+                            }
+                            role?.let { AstraOnDeviceBrain.Turn(it, entry.text) }
+                        } + AstraOnDeviceBrain.Turn("user", focusedPrompt)
                     val generation = chatGeneration
                     val placeholder = "ASTRA // THINKING OFFLINE..."
                     var displayed = placeholder
