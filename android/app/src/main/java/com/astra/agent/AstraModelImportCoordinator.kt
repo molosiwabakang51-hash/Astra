@@ -6,6 +6,7 @@ import android.net.Uri
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -41,8 +42,17 @@ internal object AstraModelImportCoordinator {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val current = MutableStateFlow(Snapshot())
     val snapshots: StateFlow<Snapshot> = current
+    @Volatile private var importJob: Job? = null
 
     fun isRunning(): Boolean = gate.isRunning()
+
+    /** Stop only the current model copy, never an installed or backup GGUF. */
+    fun cancel(): Boolean {
+        val job = importJob ?: return false
+        if (!gate.isRunning() || !job.isActive) return false
+        job.cancel(CancellationException("Owner cancelled model import"))
+        return true
+    }
 
     /** Error text is safe to persist: never include provider-specific paths or URIs. */
     internal fun failureMessage(failure: Exception): String {
@@ -83,7 +93,7 @@ internal object AstraModelImportCoordinator {
             )
             true
         }.getOrDefault(false)
-        scope.launch {
+        val job = scope.launch {
             try {
                 val bytes = AstraModelImport.importDocument(app, selected) { copied ->
                     publish(
@@ -104,11 +114,16 @@ internal object AstraModelImportCoordinator {
                     )
                 )
             } catch (cancel: CancellationException) {
+                val userCancelled = cancel.message == "Owner cancelled model import"
                 publish(
                     app,
                     Snapshot(
-                        true, "interrupted",
-                        "Model import interrupted. The original downloaded GGUF remains intact."
+                        true, if (userCancelled) "cancelled" else "interrupted",
+                        if (userCancelled) {
+                            "Model import cancelled. Installed models and the downloaded GGUF are intact."
+                        } else {
+                            "Model import interrupted. The downloaded GGUF remains intact."
+                        }
                     )
                 )
                 throw cancel
@@ -127,10 +142,12 @@ internal object AstraModelImportCoordinator {
                     // activity. No private file URI is persisted or displayed.
                     current.value = current.value.copy(running = false)
                 } finally {
+                    importJob = null
                     gate.release()
                 }
             }
         }
+        importJob = job
         return true
     }
 
