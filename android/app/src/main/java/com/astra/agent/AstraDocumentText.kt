@@ -47,28 +47,36 @@ internal object AstraDocumentText {
 
     const val FORMATS = "TXT, MD, EPUB, HTML, CSV, TSV, JSON, XML, DOCX, RTF, XLSX, PPTX, ODT or text PDF"
 
-    fun extract(format: String, input: InputStream, pdfContext: Context? = null): String = when (format) {
-        "html" -> html(decode(readBounded(input, MAX_TEXT_BYTES)))
-        "csv" -> table(decode(readBounded(input, MAX_TEXT_BYTES)), ',')
-        "tsv" -> table(decode(readBounded(input, MAX_TEXT_BYTES)), '\t')
-        "json" -> json(decode(readBounded(input, MAX_TEXT_BYTES)))
-        "xml" -> xml(readBounded(input, MAX_TEXT_BYTES), office = false)
-        "docx" -> docx(input)
-        "rtf" -> AstraRtfText.extract(input)
-        "xlsx" -> AstraSpreadsheetText.extract(input)
-        "pptx" -> officeArchive(input, "pptx")
-        "odt" -> officeArchive(input, "odt")
-        "pdf" -> AstraPdfText.extract(
-            requireNotNull(pdfContext) { "PDF import requires an Android device context." }, input
-        )
-        else -> throw IllegalArgumentException("Unsupported document format: $format.")
+    fun extract(format: String, input: InputStream, pdfContext: Context? = null): String {
+        // Wrap before buffering and archive/PDF parsing, not only the final
+        // per-entry extractor: those libraries may otherwise block on a
+        // broken provider that repeatedly reports zero bytes.
+        val protectedInput = AstraProgressInputStream(input)
+        return when (format) {
+            "html" -> html(decode(readBounded(protectedInput, MAX_TEXT_BYTES)))
+            "csv" -> table(decode(readBounded(protectedInput, MAX_TEXT_BYTES)), ',')
+            "tsv" -> table(decode(readBounded(protectedInput, MAX_TEXT_BYTES)), '\t')
+            "json" -> json(decode(readBounded(protectedInput, MAX_TEXT_BYTES)))
+            "xml" -> xml(readBounded(protectedInput, MAX_TEXT_BYTES), office = false)
+            "docx" -> docx(protectedInput)
+            "rtf" -> AstraRtfText.extract(protectedInput)
+            "xlsx" -> AstraSpreadsheetText.extract(protectedInput)
+            "pptx" -> officeArchive(protectedInput, "pptx")
+            "odt" -> officeArchive(protectedInput, "odt")
+            "pdf" -> AstraPdfText.extract(
+                requireNotNull(pdfContext) { "PDF import requires an Android device context." },
+                protectedInput
+            )
+            else -> throw IllegalArgumentException("Unsupported document format: $format.")
+        }
     }
 
     private fun readBounded(stream: InputStream, maximum: Int): ByteArray {
         val result = ByteArrayOutputStream()
         val buffer = ByteArray(32 * 1024)
+        val progress = AstraProgressInputStream(stream)
         while (true) {
-            val count = stream.read(buffer)
+            val count = progress.read(buffer)
             if (count < 0) break
             require(result.size() + count <= maximum) {
                 "Document exceeds the safe offline extraction limit."

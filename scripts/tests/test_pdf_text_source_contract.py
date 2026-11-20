@@ -26,7 +26,8 @@ class OfflinePdfSourceContractTest(unittest.TestCase):
         self.assertIn('"pdf" to "pdf"', DOC)
         self.assertIn('"pdf" -> AstraPdfText.extract(', DOC)
         self.assertIn("pdfContext = applicationContext", MAIN)
-        self.assertIn("AstraDocumentText.extract(format, input, pdfContext)", BOOKS)
+        self.assertIn("AstraDocumentText.extract(format, protectedInput, pdfContext)", BOOKS)
+        self.assertIn("AstraProgressInputStream(input)", BOOKS)
 
     def test_pdf_input_pages_and_output_are_bounded_and_mark_truncation(self):
         self.assertIn("MAX_PDF_BYTES = 4 * 1024 * 1024", PDF)
