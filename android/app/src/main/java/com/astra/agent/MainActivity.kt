@@ -2988,6 +2988,8 @@ class MainActivity :
                 var offlineModelTestRunning by remember { mutableStateOf(false) }
                 var languageBenchmarkRunning by remember { mutableStateOf(false) }
                 var languageBenchmarkStatus by remember { mutableStateOf("") }
+                var reasoningBenchmarkRunning by remember { mutableStateOf(false) }
+                var reasoningBenchmarkStatus by remember { mutableStateOf("") }
                 var benchmarkHistory by remember {
                     mutableStateOf(storage.getString("astra_private_benchmark_trends", ""))
                 }
@@ -6524,7 +6526,9 @@ class MainActivity :
                                             ) {
                                                 Text("Run language checks")
                                             }
-                                            if (languageBenchmarkRunning) {
+                                            if (languageBenchmarkRunning &&
+                                                !reasoningBenchmarkRunning
+                                            ) {
                                                 TextButton(
                                                     onClick = {
                                                         languageBenchmarkJob?.cancel()
@@ -6582,7 +6586,8 @@ class MainActivity :
                                                 onDeviceBrain.hasLocalModel(),
                                             onClick = {
                                                 languageBenchmarkRunning = true
-                                                languageBenchmarkStatus =
+                                                reasoningBenchmarkRunning = true
+                                                reasoningBenchmarkStatus =
                                                     "Starting eight private offline reasoning checks..."
                                                 languageBenchmarkJob = researchScope.launch {
                                                     val results = mutableListOf<
@@ -6591,7 +6596,7 @@ class MainActivity :
                                                     try {
                                                         val probes = AstraReasoningBenchmark.Probe.entries
                                                         for ((index, probe) in probes.withIndex()) {
-                                                            languageBenchmarkStatus =
+                                                            reasoningBenchmarkStatus =
                                                                 "Reasoning check ${index + 1}/${probes.size}: " +
                                                                     probe.title + "..."
                                                             val started = System.nanoTime()
@@ -6612,21 +6617,22 @@ class MainActivity :
                                                                 )
                                                             )
                                                         }
-                                                        languageBenchmarkStatus =
+                                                        reasoningBenchmarkStatus =
                                                             AstraReasoningBenchmark.render(
                                                                 results, onDeviceBrain.loadedModelLabel()
                                                             )
                                                     } catch (cancel: CancellationException) {
-                                                        languageBenchmarkStatus =
+                                                        reasoningBenchmarkStatus =
                                                             "Reasoning checks cancelled. " +
                                                                 "Partial results are not scored."
                                                         throw cancel
                                                     } catch (error: Exception) {
-                                                        languageBenchmarkStatus =
+                                                        reasoningBenchmarkStatus =
                                                             "Reasoning checks interrupted: " +
                                                                 "the offline engine did not finish. " +
                                                                 "See Model setup and diagnostics for details."
                                                     } finally {
+                                                        reasoningBenchmarkRunning = false
                                                         languageBenchmarkRunning = false
                                                         languageBenchmarkJob = null
                                                     }
@@ -6635,11 +6641,20 @@ class MainActivity :
                                         ) {
                                             Text("Run reasoning checks")
                                         }
-                                        if (languageBenchmarkRunning) {
+                                        if (reasoningBenchmarkRunning) {
                                             TextButton(onClick = {
                                                 languageBenchmarkJob?.cancel()
-                                            }) {
-                                                Text("Stop active checks")
+                                            }) { Text("Stop reasoning checks") }
+                                        }
+                                        if (reasoningBenchmarkStatus.isNotBlank()) {
+                                            Text(
+                                                reasoningBenchmarkStatus,
+                                                style = MaterialTheme.typography.bodySmall
+                                            )
+                                            if (!reasoningBenchmarkRunning) {
+                                                TextButton(onClick = {
+                                                    copyText(reasoningBenchmarkStatus)
+                                                }) { Text("Copy reasoning results") }
                                             }
                                         }
                                         Text(
