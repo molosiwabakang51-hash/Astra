@@ -17,9 +17,10 @@ class OfficeDocumentSourceContract(unittest.TestCase):
     def test_formats_enter_actual_local_book_import_pipeline(self):
         for extension in ("pptx", "odt"):
             self.assertIn(f'"{extension}" to "{extension}"', EXTRACT)
-            self.assertIn(f'"{extension}" -> officeArchive(input, "{extension}")', EXTRACT)
+            self.assertIn(f'"{extension}" -> officeArchive(protectedInput, "{extension}")', EXTRACT)
         self.assertIn("AstraDocumentText.format(title)", BOOKS)
-        self.assertIn("AstraDocumentText.extract(format, input, pdfContext)", BOOKS)
+        self.assertIn("AstraDocumentText.extract(format, protectedInput, pdfContext)", BOOKS)
+        self.assertIn("AstraProgressInputStream(input)", BOOKS)
         self.assertIn("val format = AstraDocumentText.format(filename) ?: return false", FOLDER)
         self.assertIn('if (format == "pdf" && size != null &&', FOLDER)
         self.assertIn("AstraPdfText.sizeAllowed(size)", FOLDER)
