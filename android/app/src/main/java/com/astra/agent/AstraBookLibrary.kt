@@ -300,8 +300,9 @@ internal class AstraBookLibrary(
         val output = ByteArrayOutputStream()
         val buffer = ByteArray(32 * 1024)
         var total = 0
+        val progress = AstraProgressInputStream(stream)
         while (true) {
-            val count = stream.read(buffer)
+            val count = progress.read(buffer)
             if (count == -1) break
             total += count
             require(total <= maximum) { "Book exceeds the " +
