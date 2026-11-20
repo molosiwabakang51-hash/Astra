@@ -121,6 +121,55 @@ class AstraFollowUpAnchorTest {
         assertTrue(missing.contains("instead of guessing"))
     }
 
+    @Test fun interruptedLatestAnswerNeverAnchorsToAnEarlierTopic() {
+        val history = listOf(
+            msg("You", "Explain leverage"),
+            msg("Astra", "Leverage amplifies gains and losses."),
+            msg("You", "Teach me how to calculate bond duration"),
+            msg("Astra", "Bond duration uses discounted cash flows.\n\n[Response stopped]")
+        )
+        val question = "put this theory into practice"
+        assertEquals(question, AstraFollowUpAnchor.enrich(question, history))
+        assertEquals("explain point 2",
+            AstraFollowUpAnchor.enrich("explain point 2", history))
+    }
+
+    @Test fun processKilledResponseDoesNotReuseAnOlderAssistantAnswer() {
+        val history = listOf(
+            msg("You", "Study English grammar"),
+            msg("Astra", "English sentences have subjects and verbs."),
+            msg("You", "Teach me finance"),
+            msg("Astra", "The response was interrupted when Astra closed.")
+        )
+        assertEquals("go into more detail",
+            AstraFollowUpAnchor.enrich("go into more detail", history))
+    }
+
+    @Test fun followUpDoesNotPairUnansweredRecentQuestionWithOldAnswer() {
+        val history = listOf(
+            msg("You", "Explain bonds"),
+            msg("Astra", "Bonds pay interest."),
+            msg("You", "Now teach French")
+        )
+        assertEquals("put it into practice",
+            AstraFollowUpAnchor.enrich("put it into practice", history))
+    }
+
+    @Test fun completedNewExchangeStillAnchorsNormallyAfterInterruption() {
+        val history = listOf(
+            msg("You", "Explain leverage"),
+            msg("Astra", "Leverage magnifies loss.\n\n[Response interrupted]"),
+            msg("You", "Explain bonds"),
+            msg("Astra", "Bonds are issued by borrowers.")
+        )
+        val result = AstraFollowUpAnchor.enrich(
+            "go into more detail", history
+        )
+        assertTrue(result.contains("Explain bonds"))
+        assertTrue(result.contains("Bonds are issued by borrowers"))
+        assertFalse(result.contains("Leverage magnifies"))
+    }
+
     @Test fun ordinaryQuestionsWithNumbersRemainUnmodified() {
         val history = listOf(
             msg("You", "Bond duration"),
