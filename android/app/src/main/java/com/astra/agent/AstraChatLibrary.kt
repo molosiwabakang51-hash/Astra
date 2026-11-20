@@ -83,14 +83,14 @@ internal object AstraChatLibrary {
         if (term.isEmpty()) return chats.map { SearchHit(it, null) }
 
         return chats.mapNotNull { chat ->
-            if (chat.title.contains(term, ignoreCase = true)) {
+            if (AstraChatSearchText.contains(chat.title, term)) {
                 SearchHit(chat, null)
             } else {
                 val match = chat.messages.asReversed().firstNotNullOfOrNull { message ->
-                    val index = message.text.indexOf(term, ignoreCase = true)
-                    if (index < 0) null else {
-                        val start = (index - 35).coerceAtLeast(0)
-                        val end = (index + term.length + 65)
+                    val match = AstraChatSearchText.find(message.text, term)
+                    if (match == null) null else {
+                        val start = (match.start - 35).coerceAtLeast(0)
+                        val end = (match.endExclusive + 65)
                             .coerceAtMost(message.text.length)
                         val excerpt = AstraUnicodeBounds.slice(message.text, start, end)
                             .replace(whitespace, " ").trim()
