@@ -191,6 +191,38 @@ class AstraLanguageBenchmarkTest {
         assertEquals(10, AstraLanguageBenchmark.Probe.entries.distinct().size)
     }
 
+    @Test fun repeatedProbeOutcomesCannotInflateOnDeviceScore() {
+        val arithmetic = AstraLanguageBenchmark.outcome(
+            AstraLanguageBenchmark.Probe.ARITHMETIC, "42", 15L
+        )
+        val error = runCatching {
+            AstraLanguageBenchmark.render(
+                listOf(arithmetic, arithmetic), "Qwen3 1.7B"
+            )
+        }.exceptionOrNull()
+        assertTrue(error is IllegalArgumentException)
+        assertTrue(error?.message.orEmpty().contains("Duplicate"))
+    }
+
+    @Test fun uniquePartialAndFullReportsStillRenderCorrectly() {
+        val distinct = listOf(
+            AstraLanguageBenchmark.outcome(
+                AstraLanguageBenchmark.Probe.ARITHMETIC, "42", 10L
+            ),
+            AstraLanguageBenchmark.outcome(
+                AstraLanguageBenchmark.Probe.RUSSIAN, "incorrect", 12L
+            )
+        )
+        val report = AstraLanguageBenchmark.render(distinct, "Qwen3 1.7B")
+        assertTrue(report.contains("1/2 checks passed"))
+        assertTrue(report.contains("UNVERIFIED"))
+        val full = AstraLanguageBenchmark.Probe.entries.map {
+            AstraLanguageBenchmark.outcome(it, "", 0L)
+        }
+        assertTrue(AstraLanguageBenchmark.render(full, null)
+            .contains("0/10 checks passed"))
+    }
+
     @Test fun errorOutputsNeverCountAsSuccessfulUnderstanding() {
         for (probe in AstraLanguageBenchmark.Probe.entries) {
             assertFalse(AstraLanguageBenchmark.score(probe, ""))
