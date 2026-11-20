@@ -1,5 +1,6 @@
 package com.astra.agent
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -142,6 +143,11 @@ internal fun AstraStudyHub(
 ) {
     var selectedId by remember { mutableStateOf<String?>(null) }
     val selected = AstraStudyCatalog.find(selectedId)
+    // Inside the Study Hub, system Back must reverse subject selection
+    // before the parent Activity's BackHandler leaves Study entirely.
+    BackHandler(enabled = selected != null) {
+        selectedId = null
+    }
     var subjectQuery by remember { mutableStateOf("") }
     var selectedField by remember { mutableStateOf<String?>(null) }
     var topicQuery by remember(selectedId) { mutableStateOf("") }
