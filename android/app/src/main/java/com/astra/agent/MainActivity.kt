@@ -2202,15 +2202,15 @@ class MainActivity :
                 "No model selected. Choose the downloaded Qwen3 1.7B GGUF again.",
                 "cancelled"
             )
-        } else if (!AstraModelImportCoordinator.start(applicationContext, selected)) {
-            updateModelImportStatus(
-                "A 1.7B model import is already active. Check progress in Settings.",
-                "busy"
-            )
         } else {
-            modelImportRunning = true
-            modelImportStatus =
-                "Reading the selected Qwen3 1.7B file; verifying storage..."
+            // A stale Activity result cannot start a second 1.28 GB import.
+            // Always read the coordinator's most recent state: an invalid or
+            // tiny file may already have failed by the time this callback ends.
+            val started = AstraModelImportCoordinator.start(applicationContext, selected)
+            val snapshot = AstraModelImportCoordinator.snapshots.value
+            modelImportRunning = snapshot.running
+            modelImportStatus = if (started) snapshot.message else
+                "A model import is already active. " + snapshot.message
         }
     }
 
@@ -2223,9 +2223,11 @@ class MainActivity :
         try {
             importModelLauncher.launch(arrayOf("*/*"))
         } catch (failure: Exception) {
+            // Do not persist arbitrary provider exception text: it may
+            // contain private local paths or document URIs.
             updateModelImportStatus(
                 "MODEL IMPORT FAILED: Android could not open Files. " +
-                    (failure.message ?: "Try again from Settings."), "failed"
+                    "Try again from Settings.", "failed"
             )
         }
     }
