@@ -22,6 +22,17 @@ class AstraModelImportCoordinatorTest {
         gate.release()
     }
 
+    @Test fun verifiedGGUFStatusDoesNotPretendNativeGenerationSucceeded() {
+        val status = AstraModelImportCoordinator.verifiedFileMessage(1_278_000_000L)
+        assertTrue(status.contains("FILE VERIFIED"))
+        assertTrue(status.contains("SHA-256 verified"))
+        assertTrue(status.contains("Test on-device AI"))
+        assertTrue(status.contains("confirm offline generation"))
+        assertFalse(status.contains("Offline conversation is available"))
+        assertFalse(status.contains("OFFLINE TEST VERIFIED"))
+        assertFalse(status.contains("READY"))
+    }
+
     @Test fun concurrentPickerResultsCannotStartTwoCopyJobs() {
         val gate = AstraModelImportGate()
         val pool = Executors.newFixedThreadPool(8)

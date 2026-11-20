@@ -79,6 +79,11 @@ internal object AstraModelImportCoordinator {
         return "MODEL IMPORT FAILED: $reason The downloaded file was not changed."
     }
 
+    /** A successful SHA-256 import verifies stored bytes, not live JNI inference. */
+    internal fun verifiedFileMessage(bytes: Long): String =
+        "QWEN3 1.7B FILE VERIFIED · ${bytes / 1048576L} MiB SHA-256 verified. " +
+            "Run Settings → Test on-device AI to confirm offline generation."
+
     /** Return false if another import is already active; never launch two copies. */
     fun start(context: Context, selected: Uri): Boolean {
         if (!gate.acquire()) return false
@@ -112,8 +117,7 @@ internal object AstraModelImportCoordinator {
                     app,
                     Snapshot(
                         true, "ready",
-                        "QWEN3 1.7B READY · ${bytes / 1048576L} MiB SHA-256 verified. " +
-                            "Offline conversation is available."
+                        verifiedFileMessage(bytes)
                     )
                 )
             } catch (cancel: CancellationException) {
