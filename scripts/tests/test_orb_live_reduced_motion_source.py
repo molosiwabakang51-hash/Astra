@@ -9,6 +9,9 @@ ORBIT = (ROOT / "android/app/src/main/java/com/astra/agent/AstraAurora.kt").read
 MAIN = (ROOT / "android/app/src/main/java/com/astra/agent/MainActivity.kt").read_text(
     encoding="utf-8"
 )
+VISUALS = (ROOT / "android/app/src/main/java/com/astra/agent/AstraVisuals.kt").read_text(
+    encoding="utf-8"
+)
 
 
 class LiveReducedMotionSourceTests(unittest.TestCase):
@@ -39,7 +42,8 @@ class LiveReducedMotionSourceTests(unittest.TestCase):
         for forbidden in ("requestPermissions", "HttpURLConnection", "WebView(",
                           "URL(", "Thread.sleep", "getLastKnownLocation"):
             self.assertNotIn(forbidden, ORBIT)
-        self.assertIn("AstraOrb(", MAIN)
+        self.assertIn("AstraBrand(", MAIN)
+        self.assertIn("AstraOrb(", VISUALS)
 
 
 if __name__ == "__main__":
