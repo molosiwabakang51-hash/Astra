@@ -72,6 +72,21 @@ internal object AstraModelImport {
 
     fun appearsInstalled(context: Context): Boolean = advancedInstalled(context)
 
+    /**
+     * Partial copies are NOT resumable; remove them before checking available
+     * storage. Otherwise a process-killed 1.2 GB copy can occupy the only
+     * free space and permanently block the next import or FULL asset setup.
+     * Never remove an installed GGUF, pre-import backup, or resumable
+     * `.downloading` file through this function.
+     */
+    internal fun discardInterruptedCopy(partial: File) {
+        if (partial.exists()) {
+            check(partial.isFile && partial.delete()) {
+                "Cannot clear an interrupted model copy. Free storage in Settings."
+            }
+        }
+    }
+
     suspend fun importDocument(
         context: Context,
         uri: Uri,
@@ -79,6 +94,11 @@ internal object AstraModelImport {
     ): Long = withContext(Dispatchers.IO) {
         val dir = advancedFile(context).parentFile ?: throw IllegalStateException("Model storage unavailable.")
         require(dir.isDirectory || dir.mkdirs()) { "Cannot create model storage." }
+        val partial = File(dir, "qwen3-model.importing")
+        // A crashed process may have left over a gigabyte in this file.
+        // Delete it BEFORE computing free space, or every later attempt may
+        // fail even with enough capacity after cleanup.
+        discardInterruptedCopy(partial)
         // A smaller GGUF is no longer accepted. Reserve enough room for the
         // pinned 1.7B model, then enforce headroom during streamed copying.
         require(hasImportStartingSpace(StatFs(dir.absolutePath).availableBytes)) {
@@ -92,8 +112,6 @@ internal object AstraModelImport {
             onProgress(copied)
         }
 
-        val partial = File(dir, "qwen3-model.importing")
-        partial.delete()
         try {
             val input = context.contentResolver.openInputStream(uri)
                 ?: error("Cannot open selected model document.")
