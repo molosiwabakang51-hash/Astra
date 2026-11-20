@@ -78,7 +78,7 @@ internal object AstraGenerationPolicy {
      * owner-initiated spot checks, not ordinary chat.
      */
     fun effectiveBudget(normal: Int, diagnosticMaximum: Int?): Int {
-        require(normal in 32..1152) { "Invalid native model token budget." }
+        require(normal in 32..1792) { "Invalid native model token budget." }
         return diagnosticMaximum?.coerceIn(32, normal) ?: normal
     }
 
@@ -90,8 +90,12 @@ internal object AstraGenerationPolicy {
     fun maxAnswerTokens(
         question: String,
         advancedModel: Boolean,
-        hasReferences: Boolean = false
+        hasReferences: Boolean = false,
+        thinkingRequested: Boolean = AstraReasoningMode.enabled(question)
     ): Int {
+        // Only an explicit request enables larger private deliberation.
+        // Native generation is still bounded, with no remote computation.
+        if (advancedModel && thinkingRequested) return 1792
         val tier = depth(question)
         val effective = if (hasReferences && tier == Depth.STANDARD)
             Depth.DETAILED else tier

@@ -46,7 +46,9 @@ internal object AstraConversationContext {
             "Match the user's requested depth: answer briefly for simple questions " +
             "and provide structured explanations, examples and tradeoffs for detailed " +
             "tutorials or open-book questions. Never pretend that an excerpt is " +
-            "a verified fact; clearly distinguish source evidence from inference. /no_think"
+            "a verified fact; clearly distinguish source evidence from inference. " +
+            "Follow the explicit /think or /no_think marker in the latest user prompt; " +
+            "do not reveal internal deliberation."
 
     /**
      * One bounded entry point for the latest user message. The native-model
@@ -59,12 +61,13 @@ internal object AstraConversationContext {
     fun userPrompt(
         message: String,
         earlier: List<Turn>,
-        restoringContext: Boolean
+        restoringContext: Boolean,
+        thinkingRequested: Boolean = AstraReasoningMode.enabled(message)
     ): String {
         // Keep the same head/tail as the initial native-model entry point.
         val current = currentUserMessage(message)
         if (!restoringContext || current.isEmpty() || earlier.isEmpty()) {
-            return AstraOfflinePolicy.modelPrompt(current)
+            return AstraOfflinePolicy.modelPrompt(current, thinkingRequested)
         }
 
         // Reserve all of the current question first. Longer user questions
@@ -72,7 +75,7 @@ internal object AstraConversationContext {
         val room = (MAX_USER_PROMPT - current.length -
             HISTORY_HEADER.length - CURRENT_HEADER.length - 8)
             .coerceAtMost(MAX_HISTORY)
-        if (room < 70) return AstraOfflinePolicy.modelPrompt(current)
+        if (room < 70) return AstraOfflinePolicy.modelPrompt(current, thinkingRequested)
 
         val valid = earlier.withIndex().filter {
             (it.value.role == "user" || it.value.role == "assistant") &&
@@ -145,12 +148,19 @@ internal object AstraConversationContext {
             if (availableText < 10) break
             // Do not cut immediately after an escaped backslash: otherwise
             // the following closing quote could become escaped too.
-            val bounded = source.take(availableText).removeSuffix("\\")
+            val cutoff = minOf(availableText, source.length)
+            // UTF-16 .take() can split an emoji or supplementary-script
+            // character in half. Never send malformed quoted history to Qwen.
+            val safeCutoff = if (cutoff in 1 until source.length &&
+                source[cutoff - 1].isHighSurrogate() &&
+                source[cutoff].isLowSurrogate()
+            ) cutoff - 1 else cutoff
+            val bounded = source.substring(0, safeCutoff).removeSuffix("\\")
             if (bounded.length < 10) continue
             selected.add(item.index to (prefix + bounded + suffix))
             remaining -= selected.last().second.length
         }
-        if (selected.isEmpty()) return AstraOfflinePolicy.modelPrompt(current)
+        if (selected.isEmpty()) return AstraOfflinePolicy.modelPrompt(current, thinkingRequested)
 
         val composed = HISTORY_HEADER +
             selected.sortedBy { it.first }.joinToString("") { it.second } +
@@ -160,7 +170,7 @@ internal object AstraConversationContext {
         check(composed.length <= MAX_USER_PROMPT) {
             "Earlier chat excerpts exceeded the bounded offline prompt."
         }
-        return AstraOfflinePolicy.modelPrompt(composed)
+        return AstraOfflinePolicy.modelPrompt(composed, thinkingRequested)
     }
 
     // Use literal prefix checks instead of a complex regular expression.

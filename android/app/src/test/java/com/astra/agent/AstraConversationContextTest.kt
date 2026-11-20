@@ -423,4 +423,25 @@ class AstraConversationContextTest {
         )
         assertEquals("Hello\n/no_think", result)
     }
+
+    @Test fun truncatedHistoryNeverSplitsUnicodeSurrogatePairs() {
+        // The 250-character excerpt ends between the two UTF-16 units
+        // of the emoji. This must be omitted intact, not half-decoded.
+        val previous = "A".repeat(249) + "🧠" + " after emoji"
+        val restored = AstraConversationContext.userPrompt(
+            "What does this mean?", listOf(turn("user", previous)), true
+        )
+        assertTrue(restored.contains("A".repeat(249)))
+        assertFalse(restored.contains("🧠"))
+        for (index in restored.indices) {
+            if (restored[index].isHighSurrogate()) {
+                assertTrue(index + 1 < restored.length)
+                assertTrue(restored[index + 1].isLowSurrogate())
+            }
+            if (restored[index].isLowSurrogate()) {
+                assertTrue(index > 0)
+                assertTrue(restored[index - 1].isHighSurrogate())
+            }
+        }
+    }
 }
