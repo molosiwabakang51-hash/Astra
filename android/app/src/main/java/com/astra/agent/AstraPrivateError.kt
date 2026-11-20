@@ -1,5 +1,6 @@
 package com.astra.agent
 
+import java.io.IOException
 import java.util.Locale
 
 /**
@@ -32,9 +33,20 @@ internal object AstraPrivateError {
         FOLDER_REVOKE
     }
 
-    private enum class Cause { STORAGE, ACCESS, UNSUPPORTED, MEMORY, STARTUP, MODEL, NETWORK, UNKNOWN }
+    private enum class Cause {
+        STORAGE, ACCESS, UNSUPPORTED, MEMORY, STARTUP, MODEL,
+        NETWORK, DOCUMENT_STALLED, UNKNOWN
+    }
 
     private fun category(error: Exception): Cause {
+        // Only recognize the exact internal stall signature from our bounded
+        // reader, including when an archive parser wraps its IOException.
+        // Never interpret arbitrary provider error text as public advice.
+        if (generateSequence(error as Throwable?) { it.cause }.take(3).any {
+                it is IOException &&
+                    it.message == AstraProgressInputStream.STALLED_PROVIDER
+            }
+        ) return Cause.DOCUMENT_STALLED
         // Only this audited, fixed engine-deadline message is a startup
         // timeout. A general "Qwen3" string is not evidence of corrupt weights.
         if (error is IllegalStateException &&
@@ -100,9 +112,13 @@ internal object AstraPrivateError {
             Cause.STARTUP -> "The offline AI engine did not finish starting in time."
             Cause.MODEL -> "The verified Qwen3 1.7B model may be unavailable or invalid."
             Cause.NETWORK -> "The connection may have timed out or been rejected."
+            Cause.DOCUMENT_STALLED ->
+                "The selected document provider stopped returning data."
             Cause.UNKNOWN -> "The cause could not be identified safely."
         }
-        val advice = if (operation == Operation.MODEL_CHAT &&
+        val advice = if (cause == Cause.DOCUMENT_STALLED) {
+            "Copy the file to Downloads and select it again from Settings."
+        } else if (operation == Operation.MODEL_CHAT &&
             cause == Cause.STARTUP
         ) {
             "Close other apps and retry, or restart Astra. " +
