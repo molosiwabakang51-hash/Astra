@@ -1408,9 +1408,9 @@ private object UtilityEngine {
  */
 private object AstraNaturalLanguage {
     fun canonical(raw: String): String {
-        val text = raw.trim().replace(Regex("""\\s+"""), " ")
+        val text = raw.trim().replace(Regex("""\s+"""), " ")
         val clean = text.trimEnd('?', '!', '.').trim()
-        val prefix = """(?:please\\s+)?(?:can you\\s+|could you\\s+|would you\\s+|will you\\s+|i want you to\\s+|i'd like you to\\s+)?"""
+        val prefix = """(?:please\s+)?(?:can you\s+|could you\s+|would you\s+|will you\s+|i want you to\s+|i'd like you to\s+)?"""
         fun match(action: String): MatchResult? =
             Regex("^$prefix$action$", RegexOption.IGNORE_CASE).matchEntire(clean)
 
@@ -1420,28 +1420,28 @@ private object AstraNaturalLanguage {
             clean.startsWith("do not ", true) || clean.startsWith("don't ", true)
         ) return raw
 
-        match("""(?:show|list|display|tell me|let me see)\\s+(?:all\\s+)?(?:my\\s+)?(?:outstanding\\s+|pending\\s+)?tasks""")?.let {
+        match("""(?:show|list|display|tell me|let me see)\s+(?:all\s+)?(?:my\s+)?(?:outstanding\s+|pending\s+)?tasks""")?.let {
             return "show tasks"
         }
-        match("""(?:show|list|display|let me see)\\s+(?:all\\s+)?(?:my\\s+)?notes""")?.let {
+        match("""(?:show|list|display|let me see)\s+(?:all\s+)?(?:my\s+)?notes""")?.let {
             return "show notes"
         }
-        match("""(?:show|list|display)\\s+(?:my\\s+)?completed tasks""")?.let {
+        match("""(?:show|list|display)\s+(?:my\s+)?completed tasks""")?.let {
             return "show completed tasks"
         }
-        match("""(?:open|go to|take me to|switch to|navigate to)\\s+(?:the\\s+|my\\s+)?(?:settings|preferences)""")?.let {
+        match("""(?:open|go to|take me to|switch to|navigate to)\s+(?:the\s+|my\s+)?(?:settings|preferences)""")?.let {
             return "open settings"
         }
-        match("""(?:open|go to|take me to|switch to|navigate to)\\s+(?:the\\s+|my\\s+)?tasks(?: screen| page)?""")?.let {
+        match("""(?:open|go to|take me to|switch to|navigate to)\s+(?:the\s+|my\s+)?tasks(?: screen| page)?""")?.let {
             return "open tasks"
         }
-        match("""(?:open|go to|take me to|switch to|navigate to)\\s+(?:the\\s+|my\\s+)?notes(?: screen| page)?""")?.let {
+        match("""(?:open|go to|take me to|switch to|navigate to)\s+(?:the\s+|my\s+)?notes(?: screen| page)?""")?.let {
             return "open notes"
         }
-        match("""(?:open|go to|take me to|switch to|navigate to)\\s+(?:the\\s+)?tools(?: screen| page)?""")?.let {
+        match("""(?:open|go to|take me to|switch to|navigate to)\s+(?:the\s+)?tools(?: screen| page)?""")?.let {
             return "open tools"
         }
-        match("""(?:show|open|go to|take me to)\\s+(?:my\\s+)?(?:previous\\s+)?conversations""")?.let {
+        match("""(?:show|open|go to|take me to)\s+(?:my\s+)?(?:previous\s+)?conversations""")?.let {
             return "open conversations"
         }
         match("""(?:what can you do|how can you help me|show me what you can do)""")?.let {
@@ -1449,13 +1449,13 @@ private object AstraNaturalLanguage {
         }
         // Specific, explicit writes only. The original command processor
         // retains its own validation and persistence semantics.
-        match("""(?:add|create|make)\\s+(?:a\\s+|new\\s+)?task\\s+(?:to\\s+|for\\s+|called\\s+)?(.+)""")?.let {
+        match("""(?:add|create|make)\s+(?:a\s+|new\s+)?task\s+(?:to\s+|for\s+|called\s+)?(.+)""")?.let {
             return "add task " + it.groupValues[1]
         }
-        match("""(?:please\\s+)?(?:remember|make a note of|write down|save a note that)\\s+(?:that\\s+)?(.+)""")?.let {
+        match("""(?:please\s+)?(?:remember|make a note of|write down|save a note that)\s+(?:that\s+)?(.+)""")?.let {
             return "remember that " + it.groupValues[1]
         }
-        match("""(?:mark|set)\\s+task\\s+(\\d+)\\s+(?:as\\s+)?(?:done|complete|completed)""")?.let {
+        match("""(?:mark|set)\s+task\s+(\d+)\s+(?:as\s+)?(?:done|complete|completed)""")?.let {
             return "done " + it.groupValues[1]
         }
         return raw
