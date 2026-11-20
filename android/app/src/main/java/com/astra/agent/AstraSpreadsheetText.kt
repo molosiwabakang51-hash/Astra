@@ -83,8 +83,9 @@ internal object AstraSpreadsheetText {
         val output = if (retain) ByteArrayOutputStream() else null
         val buffer = ByteArray(16 * 1024)
         var count = 0
+        val progress = AstraProgressInputStream(stream)
         while (true) {
-            val n = stream.read(buffer)
+            val n = progress.read(buffer)
             if (n < 0) break
             require(count + n <= max) { "XLSX entry exceeds safe extraction limit." }
             count += n
