@@ -178,7 +178,7 @@ internal class AstraOnDeviceBrain(
                 }.also { engine = it }
                 // Upstream initializes JNI asynchronously. Wait for the engine
                 // to be ready instead of racing model loading against init.
-                val initialized = withTimeout(30_000L) {
+                val initialized = AstraNativeStartupWait.awaitReady {
                     current.state.first { state ->
                         state is InferenceEngine.State.Initialized ||
                             state is InferenceEngine.State.ModelReady ||
