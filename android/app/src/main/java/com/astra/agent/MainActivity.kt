@@ -6390,7 +6390,8 @@ class MainActivity :
                                                                     ),
                                                                     generation,
                                                                     diagnosticMaxTokens =
-                                                                        AstraGenerationPolicy.DIAGNOSTIC_TOKEN_LIMIT
+                                                                        AstraGenerationPolicy.DIAGNOSTIC_TOKEN_LIMIT,
+                                                                diagnosticIsolated = true
                                                                 )
                                                                 val elapsed =
                                                                     (System.nanoTime() -
@@ -6426,7 +6427,8 @@ class MainActivity :
                                                                 ),
                                                                 memoryGeneration,
                                                                 diagnosticMaxTokens =
-                                                                    AstraGenerationPolicy.DIAGNOSTIC_TOKEN_LIMIT
+                                                                    AstraGenerationPolicy.DIAGNOSTIC_TOKEN_LIMIT,
+                                                            diagnosticIsolated = true
                                                             )
                                                             val remembered = onDeviceBrain.reply(
                                                                 listOf(
@@ -6444,7 +6446,8 @@ class MainActivity :
                                                                 ),
                                                                 memoryGeneration,
                                                                 diagnosticMaxTokens =
-                                                                    AstraGenerationPolicy.DIAGNOSTIC_TOKEN_LIMIT
+                                                                    AstraGenerationPolicy.DIAGNOSTIC_TOKEN_LIMIT,
+                                                            diagnosticIsolated = true
                                                             )
                                                             outcomes.add(
                                                                 AstraLanguageBenchmark.outcome(
@@ -6607,7 +6610,8 @@ class MainActivity :
                                                                     )
                                                                 ),
                                                                 Int.MIN_VALUE + 320 + index,
-                                                                diagnosticMaxTokens = 160
+                                                                diagnosticMaxTokens = 160,
+                                                                diagnosticIsolated = true
                                                             )
                                                             results.add(
                                                                 AstraReasoningBenchmark.outcome(
