@@ -131,8 +131,41 @@ class AstraPrivateErrorTest {
         assertFalse(text.contains("content://secret"))
     }
 
+    @Test fun workflowAndLinkedFolderErrorsDoNotLeakOwnerContent() {
+        val privateUri = "content://private.provider/tree/finance-family-documents"
+        val workflow = AstraPrivateError.forOwner(
+            AstraPrivateError.Operation.WORKFLOW_SAVE,
+            IOException("Unable to commit notes: household income and $privateUri")
+        )
+        assertTrue(workflow.contains("Workflow could not be saved"))
+        assertTrue(workflow.contains("Review the current tasks and notes"))
+        assertFalse(workflow.contains("household income"))
+        assertFalse(workflow.contains(privateUri))
+
+        val link = AstraPrivateError.forOwner(
+            AstraPrivateError.Operation.FOLDER_LINK,
+            SecurityException("Denied: $privateUri")
+        )
+        assertTrue(link.contains("read-only access"))
+        assertFalse(link.contains(privateUri))
+
+        val import = AstraPrivateError.forOwner(
+            AstraPrivateError.Operation.FOLDER_IMPORT,
+            IOException("Cannot read $privateUri")
+        )
+        assertTrue(import.contains("linked folder"))
+        assertFalse(import.contains(privateUri))
+
+        val revoke = AstraPrivateError.forOwner(
+            AstraPrivateError.Operation.FOLDER_REVOKE,
+            IOException("Could not unlink $privateUri")
+        )
+        assertTrue(revoke.contains("Review folder authorization"))
+        assertFalse(revoke.contains(privateUri))
+    }
+
     @Test fun operationCoverageIsCompleteAndOutputsAreDeterministic() {
-        assertEquals(13, operations.size)
+        assertEquals(17, operations.size)
         for (operation in operations) {
             val same = IllegalStateException("Unexpected internal failure: /secret/path")
             val first = AstraPrivateError.forOwner(operation, same)
