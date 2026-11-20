@@ -26,6 +26,34 @@ class AstraNaturalLanguageTest {
             AstraNaturalLanguage.canonical("Navigate to the tools page"))
     }
 
+    @Test fun everydayNavigationCanOpenChatAndStudyWithoutExactKeywords() {
+        assertEquals("open chat",
+            AstraNaturalLanguage.canonical("Please take me to the chat screen"))
+        assertEquals("open chat",
+            AstraNaturalLanguage.canonical("Could you return to my conversation?"))
+        assertEquals("open study",
+            AstraNaturalLanguage.canonical("I want you to open the Study Hub"))
+        assertEquals("open study",
+            AstraNaturalLanguage.canonical("Please go to my learning area"))
+        assertEquals("open study",
+            AstraNaturalLanguage.canonical("Could you start the study page?"))
+    }
+
+    @Test fun naturalReadOnlyTasksAndNotesStillPreserveExistingActions() {
+        assertEquals("show tasks",
+            AstraNaturalLanguage.canonical("Could you show me my pending tasks?"))
+        assertEquals("show notes",
+            AstraNaturalLanguage.canonical("Please bring up all my notes"))
+        assertEquals("show notes",
+            AstraNaturalLanguage.canonical("Pull up my notes"))
+        assertEquals("How do I open the Study Hub?",
+            AstraNaturalLanguage.canonical("How do I open the Study Hub?"))
+        assertEquals("Don't open chat",
+            AstraNaturalLanguage.canonical("Don't open chat"))
+        assertEquals("Teach me finance",
+            AstraNaturalLanguage.canonical("Teach me finance"))
+    }
+
     @Test fun explicitTaskAndNoteWritesPreserveUserContent() {
         assertEquals("add task revise bond duration",
             AstraNaturalLanguage.canonical("I want you to add a task to revise bond duration"))

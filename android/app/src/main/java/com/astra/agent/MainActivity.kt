@@ -155,6 +155,8 @@ private enum class AssistantAction {
     CLEAR_CHAT,
     COPY_CHAT,
     SHARE_CHAT,
+    OPEN_CHAT,
+    OPEN_STUDY,
     OPEN_TASKS,
     OPEN_NOTES,
     OPEN_TOOLS,
@@ -1426,14 +1428,22 @@ internal object AstraNaturalLanguage {
             clean.startsWith("do not ", true) || clean.startsWith("don't ", true)
         ) return raw
 
-        match("""(?:show|list|display|tell me|let me see)\s+(?:all\s+)?(?:my\s+)?(?:outstanding\s+|pending\s+)?tasks""")?.let {
+        match("""(?:show|list|display|tell me|let me see|show me|bring up|pull up)\s+(?:all\s+)?(?:my\s+)?(?:outstanding\s+|pending\s+)?tasks""")?.let {
             return "show tasks"
         }
-        match("""(?:show|list|display|let me see)\s+(?:all\s+)?(?:my\s+)?notes""")?.let {
+        match("""(?:show|list|display|let me see|show me|bring up|pull up)\s+(?:all\s+)?(?:my\s+)?notes""")?.let {
             return "show notes"
         }
         match("""(?:show|list|display)\s+(?:my\s+)?completed tasks""")?.let {
             return "show completed tasks"
+        }
+        // Navigate to live destinations without creating a new chat or
+        // interpreting free-form model output as an executable instruction.
+        match("""(?:open|go to|take me to|switch to|navigate to|return to)\s+(?:the\s+|my\s+)?(?:chat|conversation)(?:\s+(?:screen|page|view))?""")?.let {
+            return "open chat"
+        }
+        match("""(?:open|go to|take me to|switch to|navigate to|show|start)\s+(?:the\s+|my\s+)?(?:study|learning)(?:\s+(?:hub|screen|page|area))?""")?.let {
+            return "open study"
         }
         match("""(?:open|go to|take me to|switch to|navigate to)\s+(?:the\s+|my\s+)?(?:settings|preferences)""")?.let {
             return "open settings"
@@ -1538,6 +1548,14 @@ private class AstraProcessor(
                     "",
                     AssistantAction.SHARE_CHAT
                 )
+            }
+
+            "open chat" -> {
+                return AssistantResult("", AssistantAction.OPEN_CHAT)
+            }
+
+            "open study" -> {
+                return AssistantResult("", AssistantAction.OPEN_STUDY)
             }
 
             "open tasks" -> {
@@ -3971,6 +3989,15 @@ class MainActivity :
                                     history
                                 )
                             )
+                        }
+
+                        AssistantAction.OPEN_CHAT -> {
+                            tab = 0
+                        }
+
+                        AssistantAction.OPEN_STUDY -> {
+                            studyOpenToken++
+                            tab = 5
                         }
 
                         AssistantAction.OPEN_TASKS -> {
