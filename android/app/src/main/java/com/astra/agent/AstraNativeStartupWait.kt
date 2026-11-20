@@ -24,10 +24,11 @@ internal object AstraNativeStartupWait {
         operation: suspend () -> T
     ): T {
         require(timeoutMs > 0L) { "Native engine timeout must be positive." }
-        return withTimeoutOrNull(timeoutMs) {
+        val completed = withTimeoutOrNull(timeoutMs) {
             // Preserve successful nullable values without confusing them
             // with a withTimeoutOrNull timeout.
             Finished(operation())
-        }?.value ?: throw IllegalStateException(TIMEOUT_ADVICE)
+        } ?: throw IllegalStateException(TIMEOUT_ADVICE)
+        return completed.value
     }
 }
