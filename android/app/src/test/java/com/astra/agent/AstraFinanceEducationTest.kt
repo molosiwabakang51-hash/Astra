@@ -71,6 +71,50 @@ class AstraFinanceEducationTest {
         assertNull(AstraFinanceEducation.respond("Hello"))
     }
 
+    @Test fun customizedFinanceExplanationsDoNotCollapseIntoShortGlossary() {
+        val detailedRequests = listOf(
+            "Explain compound interest in detail",
+            "Explain bond duration with 5 worked examples",
+            "Could you explain convexity step-by-step?",
+            "Compare Macaulay duration versus modified duration",
+            "Please explain the difference between nominal and real returns",
+            "Explain annuities in Russian",
+            "What is dividend yield in French?",
+            "Help me understand compound interest using an equation",
+            "Explain inflation for a beginner",
+            "Explain yield to maturity, including calculations",
+            "Please explain diversification with a case study",
+            "What is leverage? Show examples",
+            "Explain portfolio diversification using a table",
+            "Explain compound interest with practice questions and a quiz"
+        )
+        detailedRequests.forEach { request ->
+            assertNull(
+                "A customized request must go to Qwen3, not the static glossary: $request",
+                AstraFinanceEducation.respond(request)
+            )
+        }
+    }
+
+    @Test fun shortDefinitionsRemainAvailableWithoutModel() {
+        for (request in listOf(
+            "Explain compound interest",
+            "What is yield to maturity?",
+            "What is leverage exactly?",
+            "What is the time value of money?",
+            "Explain risk and return",
+            "Explain foreign exchange risk"
+        )) {
+            assertNotNull(
+                "A short glossary question should work without a model: $request",
+                AstraFinanceEducation.respond(request)
+            )
+        }
+        assertNotNull(AstraFinanceEducation.respond(
+            "what are bonds and how can I invest in American bonds while in Africa?"
+        ))
+    }
+
     @Test fun accurateDurationAndYieldDistinctions() {
         val duration = AstraFinanceEducation.respond("explain bond duration")!!
         assertTrue(duration.contains("1-percentage-point"))

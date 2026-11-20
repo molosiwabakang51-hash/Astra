@@ -23,6 +23,27 @@ internal object AstraFinanceEducation {
         RegexOption.IGNORE_CASE
     )
 
+    /**
+     * Quick glossary answers are intentionally short and model-independent.
+     * Do not substitute them for a user's explicit request for deeper work,
+     * comparisons, language changes or examples: those need Qwen's context.
+     * This only chooses between local responders; it never executes tools.
+     */
+    private val asksForCustomizedExplanation = Regex(
+        """\b(?:in depth|in detail|detailed|thorough|comprehensive|exhaustive|""" +
+            """step[- ]by[- ]step|worked examples?|examples?|case stud(?:y|ies)|""" +
+            """practice questions?|exercises?|quiz|quizzes|homework|""" +
+            """derivations?|derive|proof|prove|equations?|formulas?|""" +
+            """compare|comparison|contrast|differences?|versus|vs\.?|""" +
+            """calculations?|calculate|demonstrate|illustrate|""" +
+            """walk me through|go deeper|expand on|elaborate|""" +
+            """tables?|charts?|graphs?|diagrams?|""" +
+            """in russian|in french|in setswana|in spanish|in german|""" +
+            """in portuguese|in swahili|in japanese|in mandarin|""" +
+            """for a beginner|for an expert|with|using|including)\b""",
+        RegexOption.IGNORE_CASE
+    )
+
     fun respond(raw: String): String? {
         val query = raw.trim().replace(Regex("""\s+"""), " ")
             .lowercase(Locale.ROOT)
@@ -38,6 +59,9 @@ internal object AstraFinanceEducation {
             (mentions(query, "shiller", "stiller") &&
                 mentions(query, "irrational exuberance"))) return shillerExuberance
         if (!explanatoryBeginning.containsMatchIn(query)) return null
+        // Explicitly customized or multi-part requests belong to the real
+        // conversational model, not the introductory offline glossary.
+        if (asksForCustomizedExplanation.containsMatchIn(query)) return null
 
         return when {
             mentions(query, "compound interest", "compounding interest",
