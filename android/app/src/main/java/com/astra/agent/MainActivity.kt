@@ -3076,10 +3076,14 @@ class MainActivity :
                         observedTab = tab
                     }
                 }
+                // A transition *to Chat* is still navigation. Enable Back
+                // whenever a genuine previous destination exists, even when
+                // Chat is the current tab; otherwise Android would exit.
+                val previousScreen = AstraTabBackPolicy.previous(tab, tabBackStack)
                 BackHandler(
                     enabled = navigationPopupOpen || showChatSwitcher ||
                         commandDeckExpanded || showFindInChat || showMemorySearch ||
-                        tab != 0
+                        previousScreen != null
                 ) {
                     when {
                         navigationPopupOpen -> navigationPopupOpen = false
@@ -3087,11 +3091,14 @@ class MainActivity :
                         showFindInChat -> showFindInChat = false
                         showMemorySearch -> showMemorySearch = false
                         commandDeckExpanded -> commandDeckExpanded = false
-                        tab != 0 -> {
-                            restoringTabFromBack = true
-                            tab = if (tabBackStack.isNotEmpty()) {
+                        previousScreen != null -> {
+                            // Drop the consumed history entry and any stale
+                            // duplicate entries beyond it.
+                            while (tabBackStack.size > previousScreen.remainingHistory) {
                                 tabBackStack.removeAt(tabBackStack.lastIndex)
-                            } else 0
+                            }
+                            restoringTabFromBack = true
+                            tab = previousScreen.tab
                         }
                     }
                 }
