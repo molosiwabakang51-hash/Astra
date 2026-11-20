@@ -122,8 +122,8 @@ internal object AstraConversationReview {
         }.takeLast(5)
         if (matching.isEmpty()) {
             return "No earlier mentions of '" + term + "' found in this chat. " +
-                if (onlyAssistant) "Previous Astra responses were checked." else
-                    "Both user messages and previous Astra responses were checked."
+                (if (onlyAssistant) "Previous Astra responses were checked." else
+                    "Both user messages and previous Astra responses were checked.")
         }
         return buildString {
             appendLine("ASTRA // CHAT REVIEW · " + term)
