@@ -3474,9 +3474,9 @@ class MainActivity :
                             } catch (cancel: CancellationException) {
                                 throw cancel
                             } catch (error: Exception) {
-                                "Offline model unavailable: " +
-                                    (error.message ?: "The on-device inference engine failed.") +
-                                    " Astra's built-in tools are still available."
+                                AstraPrivateError.forOwner(
+                                    AstraPrivateError.Operation.MODEL_CHAT, error
+                                )
                             }
                             if (stillActiveBubble()) {
                                 val visibleResponse = if (grounding != null) {
@@ -3577,8 +3577,9 @@ class MainActivity :
                                 dialogue.reset()
                                 workflowSession.reset()
                             } catch (failure: Exception) {
-                                reply = "Workflow could not be saved. " +
-                                    (failure.message ?: "No changes were applied.")
+                                reply = AstraPrivateError.forOwner(
+                                    AstraPrivateError.Operation.WORKFLOW_SAVE, failure
+                                )
                             }
                         }
                         dialogueAwaiting = reply.startsWith("WORKFLOW PREVIEW")
@@ -4075,7 +4076,9 @@ class MainActivity :
                                 } catch (error: Exception) {
                                     Toast.makeText(
                                         this@MainActivity,
-                                        error.message ?: "Could not export backup.",
+                                        AstraPrivateError.forOwner(
+                                            AstraPrivateError.Operation.BACKUP_EXPORT, error
+                                        ),
                                         Toast.LENGTH_LONG
                                     ).show()
                                 }
@@ -4101,7 +4104,9 @@ class MainActivity :
                                 } catch (error: Exception) {
                                     Toast.makeText(
                                         this@MainActivity,
-                                        error.message ?: "Could not read backup.",
+                                        AstraPrivateError.forOwner(
+                                            AstraPrivateError.Operation.BACKUP_READ, error
+                                        ),
                                         Toast.LENGTH_LONG
                                     ).show()
                                 }
@@ -4124,8 +4129,9 @@ class MainActivity :
                                 linkedLibraryFolder =
                                     AstraFolderAccess.linked(applicationContext)
                                 folderImportStatus =
-                                    "Could not retain folder access: " +
-                                    (failure.message ?: "Android rejected access.")
+                                    AstraPrivateError.forOwner(
+                                    AstraPrivateError.Operation.FOLDER_LINK, failure
+                                )
                             }
                         }
                     }
@@ -4168,8 +4174,9 @@ class MainActivity :
                                 } catch (cancel: CancellationException) {
                                     throw cancel
                                 } catch (error: Exception) {
-                                    bookImportStatus = "Book import failed: " +
-                                        (error.message ?: "unsupported file")
+                                    bookImportStatus = AstraPrivateError.forOwner(
+                                        AstraPrivateError.Operation.BOOK_IMPORT, error
+                                    )
                                 } finally {
                                     bookImportRunning = false
                                 }
@@ -4203,8 +4210,9 @@ class MainActivity :
                                     throw cancel
                                 } catch (error: Exception) {
                                     vocabularyImportStatus =
-                                        "Vocabulary import rejected; no changes: " +
-                                            (error.message ?: "Invalid TSV file.")
+                                        AstraPrivateError.forOwner(
+                                            AstraPrivateError.Operation.VOCAB_IMPORT, error
+                                        )
                                 } finally {
                                     vocabularyImportRunning = false
                                 }
@@ -4235,8 +4243,9 @@ class MainActivity :
                                 } catch (cancel: CancellationException) {
                                     throw cancel
                                 } catch (error: Exception) {
-                                    vocabularyImportStatus = "Vocabulary backup failed: " +
-                                        (error.message ?: "Cannot write archive.")
+                                    vocabularyImportStatus = AstraPrivateError.forOwner(
+                                        AstraPrivateError.Operation.VOCAB_EXPORT, error
+                                    )
                                 } finally {
                                     vocabularyImportRunning = false
                                 }
@@ -4271,10 +4280,9 @@ class MainActivity :
                                 } catch (cancel: CancellationException) {
                                     throw cancel
                                 } catch (error: Exception) {
-                                    vocabularyImportStatus = "Vocabulary restore failed: " +
-                                        (error.message ?: "Archive invalid.") +
-                                        " If disk storage failed, retrying is safe; " +
-                                        "existing words were not deleted."
+                                    vocabularyImportStatus = AstraPrivateError.forOwner(
+                                        AstraPrivateError.Operation.VOCAB_RESTORE, error
+                                    )
                                 } finally {
                                     vocabularyImportRunning = false
                                 }
@@ -4311,7 +4319,9 @@ class MainActivity :
                                                 " vocabulary. Built-in cards were kept."
                                     } catch (error: Exception) {
                                         vocabularyImportStatus =
-                                            error.message ?: "Could not clear private vocabulary."
+                                            AstraPrivateError.forOwner(
+                                                AstraPrivateError.Operation.VOCAB_CLEAR, error
+                                            )
                                     }
                                 }
                             }) { Text("Delete custom words") }
@@ -4345,8 +4355,9 @@ class MainActivity :
                                         importedBookCount = 0
                                         bookImportStatus = "Private book library cleared."
                                     } catch (error: Exception) {
-                                        bookImportStatus = "Could not delete all books: " +
-                                            (error.message ?: "Unknown local storage error.")
+                                        bookImportStatus = AstraPrivateError.forOwner(
+                                            AstraPrivateError.Operation.BOOK_CLEAR, error
+                                        )
                                     }
                                 }
                             }) { Text("Delete imported books") }
@@ -4698,7 +4709,9 @@ class MainActivity :
                                         } catch (error: Exception) {
                                             Toast.makeText(
                                                 this@MainActivity,
-                                                error.message ?: "Could not restore backup.",
+                                                AstraPrivateError.forOwner(
+                                                    AstraPrivateError.Operation.BACKUP_RESTORE, error
+                                                ),
                                                 Toast.LENGTH_LONG
                                             ).show()
                                         }
@@ -6302,8 +6315,9 @@ class MainActivity :
                                                                     "\nNo prompts were sent to an AI server."
                                                         } catch (error: Exception) {
                                                             offlineModelTestStatus =
-                                                                "OFFLINE TEST FAILED: " +
-                                                                    (error.message ?: "Unknown inference error")
+                                                                AstraPrivateError.forOwner(
+                                                                    AstraPrivateError.Operation.MODEL_SELF_TEST, error
+                                                                )
                                                         } finally {
                                                             // A Kotlin exception is recoverable. Only a
                                                             // process-level crash leaves the checkpoint set.
@@ -6518,8 +6532,9 @@ class MainActivity :
                                                             throw cancel
                                                         } catch (error: Exception) {
                                                             languageBenchmarkStatus =
-                                                                "Conversation checks interrupted: " +
-                                                                    (error.message ?: "Local inference error")
+                                                                AstraPrivateError.forOwner(
+                                                                    AstraPrivateError.Operation.LANGUAGE_CHECKS, error
+                                                                )
                                                         } finally {
                                                             languageBenchmarkRunning = false
                                                             languageBenchmarkJob = null
@@ -6965,9 +6980,9 @@ class MainActivity :
                                                                     applicationContext
                                                                 )
                                                             folderImportStatus =
-                                                                "Folder import failed: " +
-                                                                    (failure.message ?:
-                                                                        "The folder was unavailable.")
+                                                                AstraPrivateError.forOwner(
+                                                                    AstraPrivateError.Operation.FOLDER_IMPORT, failure
+                                                                )
                                                         } finally {
                                                             bookImportRunning = false
                                                         }
@@ -6985,7 +7000,9 @@ class MainActivity :
                                                         "Already imported private books remain."
                                                 } catch (failure: Exception) {
                                                     folderImportStatus =
-                                                        failure.message ?: "Cannot revoke access."
+                                                        AstraPrivateError.forOwner(
+                                                            AstraPrivateError.Operation.FOLDER_REVOKE, failure
+                                                        )
                                                 }
                                             }) { Text("Forget folder authorization") }
                                         }
@@ -7102,7 +7119,9 @@ class MainActivity :
                                                         throw cancel
                                                     } catch (error: Exception) {
                                                         knowledgeSyncStatus =
-                                                            error.message ?: "Library update failed."
+                                                            AstraPrivateError.forOwner(
+                                                                AstraPrivateError.Operation.LIBRARY_SYNC, error
+                                                            )
                                                     } finally {
                                                         knowledgeSyncRunning = false
                                                     }
