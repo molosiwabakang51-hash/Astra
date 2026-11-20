@@ -20,14 +20,90 @@ internal object AstraFollowUpAnchor {
         "how do i apply this",
         "can you show me how to do this",
         "go into more detail",
-        "explain that in more detail"
+        "explain that in more detail",
+        "go deeper",
+        "tell me more",
+        "elaborate",
+        "break it down",
+        "break that down",
+        "explain it more simply",
+        "explain that more simply",
+        "show me an example",
+        "give me an example",
+        "can you give me an example",
+        "how does that work",
+        "why is that",
+        "what do you mean by that",
+        "please continue",
+        "continue"
     )
-    // Support any numbered follow-up in a bounded range, not just item four.
-    // Intentionally avoid triggering on unrelated questions containing numbers.
-    private val numberedFollowUp = Regex(
-        """^(?:go into (?:more )?detail(?:s)? (?:for|on)|explain|expand(?: on)?|elaborate on|tell me more about|what about)\s+(?:(?:point|item|number|step|option)\s*)?([1-9]|1[0-9]|20)$""",
-        RegexOption.IGNORE_CASE
+
+    // Limit short, numbered-list follow-ups to the last completed same-chat
+    // exchange. Spoken words and ordinals must not be treated as arbitrary
+    // commands: a request like "explain 2-factor authentication" is untouched.
+    private val numberIntroductions = listOf(
+        "go into more details for ", "go into more details on ",
+        "go into more detail for ", "go into more detail on ",
+        "go into detail for ", "go into detail on ",
+        "tell me more about ", "could you explain ", "can you explain ",
+        "please explain ", "walk me through ", "elaborate on ",
+        "expand on ", "break down ", "what about ", "explain "
     )
+    private val spokenNumbers = buildMap<String, Int> {
+        val cardinals = listOf(
+            "one", "two", "three", "four", "five", "six", "seven",
+            "eight", "nine", "ten", "eleven", "twelve", "thirteen",
+            "fourteen", "fifteen", "sixteen", "seventeen", "eighteen",
+            "nineteen", "twenty"
+        )
+        val ordinals = listOf(
+            "first", "second", "third", "fourth", "fifth", "sixth",
+            "seventh", "eighth", "ninth", "tenth", "eleventh",
+            "twelfth", "thirteenth", "fourteenth", "fifteenth",
+            "sixteenth", "seventeenth", "eighteenth", "nineteenth",
+            "twentieth"
+        )
+        for (i in cardinals.indices) {
+            put(cardinals[i], i + 1)
+            put(ordinals[i], i + 1)
+        }
+    }
+    private val numberedDigits = Regex("""^([1-9]|1[0-9]|20)(st|nd|rd|th)?$""")
+
+    private fun selectedNumber(lower: String): Int? {
+        val prefix = numberIntroductions.firstOrNull(lower::startsWith) ?: return null
+        var value = lower.removePrefix(prefix).trim()
+        if (value.startsWith("the ")) value = value.removePrefix("the ")
+        for (label in listOf("point ", "item ", "number ", "step ", "option ")) {
+            if (value.startsWith(label)) {
+                value = value.removePrefix(label)
+                break
+            }
+        }
+        for (suffix in listOf(" one", " point", " item", " step", " option")) {
+            if (value.endsWith(suffix)) {
+                value = value.removeSuffix(suffix)
+                break
+            }
+        }
+        // "explain the fourth one", "explain number four" and "point 4"
+        // identify the same bounded item; multi-topic questions do not.
+        spokenNumbers[value]?.let { return it }
+        val match = numberedDigits.matchEntire(value) ?: return null
+        val number = match.groupValues[1].toInt()
+        val suffix = match.groupValues[2]
+        if (suffix.isNotEmpty()) {
+            val expected = when {
+                number in 11..13 -> "th"
+                number % 10 == 1 -> "st"
+                number % 10 == 2 -> "nd"
+                number % 10 == 3 -> "rd"
+                else -> "th"
+            }
+            if (suffix != expected) return null
+        }
+        return number
+    }
 
     fun enrich(
         prompt: String,
@@ -35,9 +111,10 @@ internal object AstraFollowUpAnchor {
     ): String {
         val original = prompt.trim()
         if (original.length > 150) return prompt
-        val lower = original.lowercase(Locale.ROOT).trimEnd('?', '.', '!', ' ')
-        val selectedNumber = numberedFollowUp.matchEntire(lower)
-            ?.groupValues?.getOrNull(1)?.toIntOrNull()
+        val lower = original.lowercase(Locale.ROOT)
+            .replace(Regex("""\s+"""), " ")
+            .trimEnd('?', '.', '!', ' ')
+        val selectedNumber = selectedNumber(lower)
         if (lower !in followUps && selectedNumber == null) return prompt
         // Only the last *completed* user/assistant exchange is an anchor.
         // Never pair a newer question with an older assistant reply when its
