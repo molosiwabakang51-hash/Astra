@@ -19,6 +19,48 @@ class AstraConversationReviewTest {
         msg("You", "recall earlier mentions of Shiller")
     )
 
+    @Test fun explicitAssistantRecallQuotesOnlyPastAstraReplies() {
+        val prior = listOf(
+            msg("You", "I personally think bonds have no rate risk"),
+            msg("Astra", "Bonds have interest-rate risk; modified duration estimates it."),
+            msg("You", "What did you say earlier about bonds?")
+        )
+        for (query in listOf(
+            "What did you say earlier about bonds?",
+            "What did Astra say about bonds",
+            "What did you explain about bonds?",
+            "What did you mention previously about bonds?"
+        )) {
+            val reply = AstraConversationReview.respond(query, prior)!!
+            assertTrue(reply.contains("ASTRA // CHAT REVIEW"))
+            assertTrue(reply.contains("Only previous Astra replies were searched"))
+            assertTrue(reply.contains("Bonds have interest-rate risk"))
+            assertTrue(reply.contains("unverified claims"))
+            assertFalse(reply.contains("I personally think bonds"))
+            assertFalse(reply.contains("No earlier mentions"))
+        }
+    }
+
+    @Test fun assistantRecallNeverInventsClaimsFromUserOnlyMemoryOrOtherChats() {
+        val userOnly = listOf(
+            msg("You", "I said that dividend yield measures income."),
+            msg("You", "What did you say about dividend yield?")
+        )
+        val reply = AstraConversationReview.respond(
+            "What did you say about dividend yield?", userOnly
+        )!!
+        assertTrue(reply.contains("No earlier mentions"))
+        assertTrue(reply.contains("Previous Astra responses were checked"))
+        assertFalse(reply.contains("Both user messages"))
+        // Ordinary owner memory queries and unfamiliar conversational forms
+        // continue through their original separate routes.
+        assertNull(AstraConversationReview.respond(
+            "What did I say about dividend yield?", userOnly
+        ))
+        assertNull(AstraConversationReview.respond("Explain bond duration", userOnly))
+        assertNull(AstraConversationReview.respond("What did you say to my boss", userOnly))
+    }
+
     @Test fun correctionOwnsEarlierMistakeRatherThanDoublingDown() {
         val answer = AstraConversationReview.respond("do you see your mistake?", chat)!!
         assertTrue(answer.contains("wrongly"))
