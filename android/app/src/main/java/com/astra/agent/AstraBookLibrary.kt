@@ -62,10 +62,13 @@ internal class AstraBookLibrary(
                 "Choose " + AstraDocumentText.FORMATS + "."
             )
         require(title.isNotBlank()) { "Book filename is missing." }
+        // Some SAF providers return repeated zero-byte reads indefinitely.
+        // Guard the raw stream before EPUB/ZIP, text and office decoders see it.
+        val protectedInput = AstraProgressInputStream(input)
         val body = when (format) {
-            "epub" -> epubText(input)
-            "txt", "markdown" -> decode(readBounded(input, MAX_INPUT_BYTES))
-            else -> AstraDocumentText.extract(format, input, pdfContext)
+            "epub" -> epubText(protectedInput)
+            "txt", "markdown" -> decode(readBounded(protectedInput, MAX_INPUT_BYTES))
+            else -> AstraDocumentText.extract(format, protectedInput, pdfContext)
         }.trim()
         require(body.length >= 60) { "This book contains too little readable text." }
         val all = chunks(body)
