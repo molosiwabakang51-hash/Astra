@@ -30,7 +30,9 @@ class IsolatedReasoningBenchmarkSourceChecks(unittest.TestCase):
         self.assertIn("copyText(reasoningBenchmarkStatus)", MAIN)
 
     def test_fixed_inputs_stay_offline_and_reports_reject_overclaiming(self):
-        self.assertIn("actual", "actual")  # Explicitly evaluate the fixed suite below.
+        self.assertIn("enum class Probe(", SUITE)
+        self.assertIn("PROJECT_NPV(", SUITE)
+        self.assertIn("FOREIGN_EXCHANGE_RISK(", SUITE)
         self.assertNotIn("HttpURLConnection", SUITE)
         self.assertNotIn("https://", SUITE)
         self.assertNotIn("personal memory", SUITE)
