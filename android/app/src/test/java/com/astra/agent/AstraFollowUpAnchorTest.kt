@@ -126,7 +126,7 @@ class AstraFollowUpAnchorTest {
             msg("You", "Explain leverage"),
             msg("Astra", "Leverage amplifies gains and losses."),
             msg("You", "Teach me how to calculate bond duration"),
-            msg("Astra", "Bond duration uses discounted cash flows.\\n\\n[Response stopped]")
+            msg("Astra", "Bond duration uses discounted cash flows.\n\n[Response stopped]")
         )
         val question = "put this theory into practice"
         assertEquals(question, AstraFollowUpAnchor.enrich(question, history))
@@ -158,7 +158,7 @@ class AstraFollowUpAnchorTest {
     @Test fun completedNewExchangeStillAnchorsNormallyAfterInterruption() {
         val history = listOf(
             msg("You", "Explain leverage"),
-            msg("Astra", "Leverage magnifies loss.\\n\\n[Response interrupted]"),
+            msg("Astra", "Leverage magnifies loss.\n\n[Response interrupted]"),
             msg("You", "Explain bonds"),
             msg("Astra", "Bonds are issued by borrowers.")
         )
