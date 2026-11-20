@@ -43,6 +43,7 @@ internal object AstraModelImportCoordinator {
     private val current = MutableStateFlow(Snapshot())
     val snapshots: StateFlow<Snapshot> = current
     @Volatile private var importJob: Job? = null
+    @Volatile private var ownerRequestedCancel = false
 
     fun isRunning(): Boolean = gate.isRunning()
 
@@ -50,6 +51,7 @@ internal object AstraModelImportCoordinator {
     fun cancel(): Boolean {
         val job = importJob ?: return false
         if (!gate.isRunning() || !job.isActive) return false
+        ownerRequestedCancel = true
         job.cancel(CancellationException("Owner cancelled model import"))
         return true
     }
@@ -80,6 +82,7 @@ internal object AstraModelImportCoordinator {
     /** Return false if another import is already active; never launch two copies. */
     fun start(context: Context, selected: Uri): Boolean {
         if (!gate.acquire()) return false
+        ownerRequestedCancel = false
         val app = context.applicationContext
         publish(
             app,
@@ -114,7 +117,7 @@ internal object AstraModelImportCoordinator {
                     )
                 )
             } catch (cancel: CancellationException) {
-                val userCancelled = cancel.message == "Owner cancelled model import"
+                val userCancelled = ownerRequestedCancel
                 publish(
                     app,
                     Snapshot(
@@ -147,8 +150,7 @@ internal object AstraModelImportCoordinator {
                 if (outcome is CancellationException &&
                     current.value.stage == "copying"
                 ) {
-                    val cancelledByOwner = outcome.message ==
-                        "Owner cancelled model import"
+                    val cancelledByOwner = ownerRequestedCancel
                     publish(
                         app,
                         Snapshot(
