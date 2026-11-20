@@ -30,6 +30,44 @@ class AstraPrivateErrorTest {
         }
     }
 
+    @Test fun recognizedZeroProgressDocumentStallHasFixedPrivateRecoveryAdvice() {
+        val internal = IOException(AstraProgressInputStream.STALLED_PROVIDER)
+        for (operation in listOf(
+            AstraPrivateError.Operation.BOOK_IMPORT,
+            AstraPrivateError.Operation.FOLDER_IMPORT,
+            AstraPrivateError.Operation.BACKUP_READ
+        )) {
+            val result = AstraPrivateError.forOwner(operation, internal)
+            assertTrue(result.contains("document provider stopped returning data"))
+            assertTrue(result.contains("Copy the file to Downloads"))
+            assertFalse(result.contains("content://"))
+        }
+        val wrapped = IOException(
+            "Read failed for content://com.private.provider/book?family=pension-data",
+            internal
+        )
+        val safe = AstraPrivateError.forOwner(
+            AstraPrivateError.Operation.BOOK_IMPORT, wrapped
+        )
+        assertTrue(safe.contains("Copy the file to Downloads"))
+        assertFalse(safe.contains("com.private.provider"))
+        assertFalse(safe.contains("pension-data"))
+        assertFalse(safe.contains("content://"))
+    }
+
+    @Test fun arbitraryProviderErrorsCannotForgePrivateStallClassification() {
+        val untrusted = IOException(
+            "The selected document provider stopped returning data from " +
+                "content://private-provider/secret"
+        )
+        val safe = AstraPrivateError.forOwner(
+            AstraPrivateError.Operation.BOOK_IMPORT, untrusted
+        )
+        assertTrue(safe.contains("cause could not be identified safely"))
+        assertFalse(safe.contains("private-provider"))
+        assertFalse(safe.contains("Copy the file to Downloads"))
+    }
+
     @Test fun storageAndAndroidFilePermissionHaveDistinctRemediation() {
         val outOfSpace = AstraPrivateError.forOwner(
             AstraPrivateError.Operation.BACKUP_EXPORT,

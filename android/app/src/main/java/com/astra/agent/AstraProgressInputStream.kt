@@ -14,9 +14,11 @@ import java.io.InputStream
  * Existing byte/entry limits remain enforced by the document parsers.
  */
 internal class AstraProgressInputStream(input: InputStream) : FilterInputStream(input) {
-    private companion object {
-        const val MAX_EMPTY_READS = 16
-        const val STALLED_PROVIDER =
+    companion object {
+        private const val MAX_EMPTY_READS = 16
+        // The exact, fixed message is shared with the owner-visible error
+        // boundary; arbitrary provider errors must never become UI text.
+        internal const val STALLED_PROVIDER =
             "The selected document provider stopped returning data. " +
                 "Copy the document to Downloads and retry the import."
     }
