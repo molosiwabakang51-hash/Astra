@@ -16,6 +16,9 @@ class FollowUpBudgetSourceTests(unittest.TestCase):
         self.assertIn("put (?:this theory|this|it) into practice", POLICY)
         self.assertIn("AstraGenerationPolicy.effectiveBudget(", BRAIN)
         self.assertIn("AstraGenerationPolicy.maxAnswerTokens(", BRAIN)
+        self.assertIn("CURRENT USER FOLLOW-UP:", POLICY)
+        self.assertIn("historyIsolated.startsWith(followUpPrefix)", POLICY)
+        self.assertIn("followUpAt + followUpRequest.length", POLICY)
         self.assertIn("finalMessage,", BRAIN)
 
     def test_back_reference_remains_same_chat_untrusted_only(self):
