@@ -171,6 +171,60 @@ class AstraModelImportTest {
         assertEquals(model.size.toLong(), count)
     }
 
+    @Test fun fullAssetCopyHandlesShortAndTransientZeroReadsWithoutDataLoss() = runBlocking {
+        val fixture = "GGUF bundled asset with short reads and no network".toByteArray()
+        val source = object : java.io.InputStream() {
+            var offset = 0
+            var calls = 0
+            override fun read(): Int =
+                if (offset == fixture.size) -1 else fixture[offset++].toInt() and 0xff
+            override fun read(bytes: ByteArray, start: Int, length: Int): Int {
+                calls++
+                if (calls == 1 || calls == 3 || calls == 5) return 0
+                if (offset == fixture.size) return -1
+                val lengthToCopy = minOf(length, 3, fixture.size - offset)
+                fixture.copyInto(bytes, start, offset, offset + lengthToCopy)
+                offset += lengthToCopy
+                return lengthToCopy
+            }
+        }
+        val out = ByteArrayOutputStream()
+        val digest = MessageDigest.getInstance("SHA-256")
+        val progress = mutableListOf<Long>()
+        val copied = AstraModelImport.copyBounded(source, out, digest) {
+            progress.add(it)
+        }
+        assertEquals(fixture.size.toLong(), copied)
+        assertArrayEquals(fixture, out.toByteArray())
+        assertArrayEquals(MessageDigest.getInstance("SHA-256").digest(fixture),
+            digest.digest())
+        assertEquals(listOf(fixture.size.toLong()), progress)
+    }
+
+    @Test fun fullAssetCopyStallFailsAndPreservesOnlyBoundedPartialOutput() = runBlocking {
+        val source = object : java.io.InputStream() {
+            var calls = 0
+            override fun read(): Int = error("bulk reads only")
+            override fun read(bytes: ByteArray, offset: Int, length: Int): Int {
+                calls++
+                if (calls == 1) {
+                    bytes[offset] = 71
+                    return 1
+                }
+                return 0
+            }
+        }
+        val out = ByteArrayOutputStream()
+        val failure = runCatching {
+            AstraModelImport.copyBounded(
+                source, out, MessageDigest.getInstance("SHA-256"), {}
+            )
+        }.exceptionOrNull()
+        assertTrue(failure is IllegalArgumentException)
+        assertTrue(failure?.message.orEmpty().contains("stopped making read progress"))
+        assertArrayEquals(byteArrayOf(71), out.toByteArray())
+    }
+
     @Test fun stalledProviderCannotSpinForeverOnZeroByteReads() = runBlocking {
         val source = object : java.io.InputStream() {
             override fun read(): Int = 0
