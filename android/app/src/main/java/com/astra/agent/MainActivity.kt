@@ -6197,6 +6197,20 @@ class MainActivity :
                                                 else "Import offline model once"
                                             )
                                         }
+                                        if (modelImportRunning &&
+                                            AstraModelImportCoordinator.isRunning()
+                                        ) {
+                                            OutlinedButton(
+                                                onClick = {
+                                                    if (AstraModelImportCoordinator.cancel()) {
+                                                        modelImportStatus =
+                                                            "Cancelling model import and safely clearing its temporary copy..."
+                                                    }
+                                                }
+                                            ) {
+                                                Text("Cancel model import")
+                                            }
+                                        }
                                         if (modelImportStatus.isNotBlank()) {
                                             Text(
                                                 modelImportStatus,
