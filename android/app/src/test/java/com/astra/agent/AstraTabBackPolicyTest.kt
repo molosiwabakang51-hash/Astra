@@ -42,7 +42,7 @@ class AstraTabBackPolicyTest {
 
     @Test fun DuplicateOrInvalidHistoryCannotTrapBackOnSameScreen() {
         assertEquals(
-            AstraTabBackPolicy.Target(4, 2),
+            AstraTabBackPolicy.Target(4, 1),
             AstraTabBackPolicy.previous(0, listOf(0, 4, 0, -1, 0, 99))
         )
         assertNull(AstraTabBackPolicy.previous(0, listOf(0, -1, 99)))
