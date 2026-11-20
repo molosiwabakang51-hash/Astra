@@ -45,6 +45,9 @@ internal class AstraOnDeviceBrain(
     private var engine: InferenceEngine? = null
     private val session = AstraInferenceSession()
     private val verifiedModels = AstraVerifiedModelCache()
+    // Prevent repeated native loads of the identical GGUF after a real
+    // loader failure; atomic re-import with a new file identity permits retry.
+    private val modelHealth = AstraModelHealth()
     @Volatile
     private var loadedModelPath: String? = null
     // A change of consent must not leave old book snippets in native KV-cache.
@@ -196,6 +199,14 @@ internal class AstraOnDeviceBrain(
                         // starting a large new JNI model allocation. This does
                         // not interfere with an already-running model session.
                         AstraNativeLoadGuard.requireCapacity(context)
+                        // This is only a native-load backoff. Do not quarantine
+                        // a healthy file for temporary Android low-RAM pressure,
+                        // prompt cancellation, or another unrelated exception.
+                        check(modelHealth.shouldAttempt(path)) {
+                            "The unchanged Qwen3 1.7B file failed its previous native load. " +
+                                "Re-import verified weights in Settings or restart Astra " +
+                                "to retry. Chats and model files are retained."
+                        }
                         AstraInferenceCheckpoint.mark(
                             context, AstraInferenceCheckpoint.MODEL_LOADING
                         )
@@ -204,7 +215,21 @@ internal class AstraOnDeviceBrain(
                         if (current.state.value is InferenceEngine.State.ModelReady) {
                             current.cleanUp()
                         }
-                        current.loadModel(path.absolutePath)
+                        try {
+                            current.loadModel(path.absolutePath)
+                        } catch (cancel: kotlinx.coroutines.CancellationException) {
+                            // Stop/retry must not turn a verified GGUF into a
+                            // permanently failed model in the current process.
+                            throw cancel
+                        } catch (failure: Exception) {
+                            modelHealth.recordFailure(path)
+                            throw IllegalStateException(
+                                "Qwen3 1.7B native model loading failed. " +
+                                    "The same file will not be loaded repeatedly " +
+                                    "until re-import or app restart.",
+                                failure
+                            )
+                        }
                         current.setSystemPrompt(AstraConversationContext.systemPrompt())
                         loadedModelPath = path.absolutePath
                         restoringConversation = true
