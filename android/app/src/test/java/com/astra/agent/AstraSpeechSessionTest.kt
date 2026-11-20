@@ -54,6 +54,22 @@ class AstraSpeechSessionTest {
         }
     }
 
+    @Test fun repeatedEarlyLifecycleStopsNeverDeliverStaleTranscript() {
+        val session = AstraSpeechSession()
+        val original = session.begin()
+        // Screen off, focus loss, pause, stop and app lock can arrive in
+        // different orders before a slow speech service calls onResults.
+        repeat(5) { session.cancel() }
+        assertFalse(session.complete(original))
+        assertFalse(session.accepts(original))
+        val newSession = session.begin()
+        assertTrue(session.accepts(newSession))
+        assertFalse(session.complete(original))
+        session.cancel()
+        assertFalse(session.complete(newSession))
+        assertFalse(session.isPending())
+    }
+
     @Test fun privateSpeechRequiresActiveDisplayUnlockedKeyguardAndFocusedWindow() {
         assertTrue(AstraSpeechPrivacy.mayUseVoice(
             foreground = true, appLockEnabled = false, workspaceUnlocked = false,
