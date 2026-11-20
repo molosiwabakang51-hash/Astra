@@ -25,7 +25,7 @@ class ImportedModelReadinessSourceTests(unittest.TestCase):
     def test_strict_offline_generation_challenge_is_still_separate(self):
         self.assertIn("AstraOfflineSelfTest.CHALLENGE", MAIN)
         self.assertIn("AstraOfflineSelfTest", SELF_TEST)
-        self.assertIn("OFFLINE TEST VERIFIED", MAIN)
+        self.assertIn("OFFLINE TEST VERIFIED", SELF_TEST)
 
 
 if __name__ == "__main__":
