@@ -54,6 +54,14 @@ class AstraProgressInputStreamTest {
         assertTrue(error is IOException)
     }
 
+    @Test fun invalidBufferOffsetsStillRejectWithoutTouchingProvider() {
+        val protected = AstraProgressInputStream(ByteArrayInputStream(byteArrayOf(1, 2)))
+        assertTrue(runCatching { protected.read(ByteArray(2), -1, 0) }.isFailure)
+        assertTrue(runCatching { protected.read(ByteArray(2), 3, 0) }.isFailure)
+        assertTrue(runCatching { protected.read(ByteArray(2), 1, 2) }.isFailure)
+        assertEquals(1, protected.read())
+    }
+
     @Test fun realTextImportFailsSafelyWithoutCreatingFalseKnowledge() {
         val library = AstraBookLibrary(
             java.nio.file.Files.createTempDirectory("astra-zero-read").toFile()
