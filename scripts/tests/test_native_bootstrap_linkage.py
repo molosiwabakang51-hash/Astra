@@ -20,7 +20,15 @@ class NativeStartupLinkageTests(unittest.TestCase):
 
     def test_only_java_linkage_failures_are_translated(self):
         self.assertIn("catch (failure: LinkageError)", BOOTSTRAP)
-        self.assertIn("throw IllegalStateException(RECOVERY_ADVICE, failure)", BOOTSTRAP)
+        self.assertIn("IllegalStateException(RECOVERY_ADVICE, failure)", BOOTSTRAP)
+        self.assertIn("throw recover(failure)", BOOTSTRAP)
+        self.assertIn("catch (linkage: LinkageError)", BRAIN)
+        self.assertIn("throw AstraNativeBootstrap.recover(linkage)", BRAIN)
+        self.assertIn("session.invalidate()", BRAIN)
+        self.assertLess(
+            BRAIN.index("catch (linkage: LinkageError)"),
+            BRAIN.index("catch (error: Exception)", BRAIN.index("catch (linkage: LinkageError)"))
+        )
         self.assertNotIn("catch (failure: Throwable)", BOOTSTRAP)
         self.assertNotIn("catch (failure: Error)", BOOTSTRAP)
         self.assertNotIn("OutOfMemoryError", BOOTSTRAP.split("fun <T> acquire")[1])
