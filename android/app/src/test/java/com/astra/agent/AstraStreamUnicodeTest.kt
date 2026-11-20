@@ -54,7 +54,7 @@ class AstraStreamUnicodeTest {
         assertFalse(out.append("Привет " + emoji.substring(1)))
         assertFalse(out.append(" 世界"))
         assertEquals("Привет � 世界", out.finish())
-        assertFalse(out.snapshot().any { it.isSurrogate() })
+        assertFalse(out.snapshot().any { (it.isHighSurrogate() || it.isLowSurrogate()) })
     }
 
     @Test fun aPairThatCannotFitNeverLeavesASingleHighSurrogate() {
@@ -83,7 +83,7 @@ class AstraStreamUnicodeTest {
         assertTrue(out.append("🧠".substring(1) + " further generation"))
         val final = out.finish()
         assertEquals(prefix, final)
-        assertFalse(final.any { it.isSurrogate() })
+        assertFalse(final.any { (it.isHighSurrogate() || it.isLowSurrogate()) })
     }
 
     @Test fun multipleSplitEmojisAndNormalNonEnglishTextRemainIntact() {
