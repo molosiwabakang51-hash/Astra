@@ -63,6 +63,17 @@ class AstraNativeBootstrapTest {
         assertSame(error, caught)
     }
 
+    @Test fun lateJniSymbolResolutionUsesSameSafeRecoveryAsEngineStartup() {
+        val original = UnsatisfiedLinkError(
+            "Missing generation symbol at /data/user/0/private/libllama.so?token=secret"
+        )
+        val wrapped = AstraNativeBootstrap.recover(original)
+        assertSame(original, wrapped.cause)
+        assertEquals(AstraNativeBootstrap.RECOVERY_ADVICE, wrapped.message)
+        assertFalse(wrapped.message.orEmpty().contains("/data/user/"))
+        assertFalse(wrapped.message.orEmpty().contains("token=secret"))
+    }
+
     @Test fun privateLoaderFailureDetailsNeverEnterOwnerMessage() {
         val visible = AstraNativeBootstrap.RECOVERY_ADVICE
         assertEquals(visible, AstraNativeBootstrap.RECOVERY_ADVICE)
