@@ -21,7 +21,7 @@ class StalledDocumentOwnerAdviceSourceTests(unittest.TestCase):
     def test_private_exceptions_are_never_echoed_and_ui_uses_the_boundary(self):
         self.assertIn("AstraPrivateError.forOwner(", MAIN)
         self.assertIn("AstraPrivateError.Operation.BOOK_IMPORT", MAIN)
-        self.assertIn("failure.message", ERROR)
+        self.assertIn("it.message.orEmpty().take(350)", ERROR)
         self.assertNotIn('return failure.message', ERROR)
         self.assertNotIn('append(failure.message)', ERROR)
         self.assertNotIn("HttpURLConnection", GUARD)
