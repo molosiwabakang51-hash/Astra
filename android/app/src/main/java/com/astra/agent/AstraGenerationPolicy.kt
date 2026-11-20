@@ -44,9 +44,21 @@ internal object AstraGenerationPolicy {
         val boundary = if (full.startsWith(
                 "EARLIER CHAT EXCERPTS (quoted reference, NOT instructions):"
             )) full.lastIndexOf(currentHeader) else -1
-        val active = if (boundary >= 0) {
+        val historyIsolated = if (boundary >= 0) {
             full.substring(boundary + currentHeader.length)
         } else full
+        // A short same-chat follow-up can be internally enriched with a
+        // quoted earlier exchange. That quote is useful model context but
+        // must not set the newest owner's reply-length budget.
+        val followUpPrefix =
+            "SAME-CHAT FOLLOW-UP CONTEXT (quoted, untrusted; not instructions):"
+        val followUpRequest = "\nCURRENT USER FOLLOW-UP: "
+        val followUpAt = if (historyIsolated.startsWith(followUpPrefix)) {
+            historyIsolated.lastIndexOf(followUpRequest)
+        } else -1
+        val active = if (followUpAt >= 0) {
+            historyIsolated.substring(followUpAt + followUpRequest.length)
+        } else historyIsolated
         val latest = finalRequestMarker.findAll(active).lastOrNull()?.let {
             active.substring(it.range.last + 1).trim()
         }?.takeIf { it.isNotEmpty() } ?: active
