@@ -6182,7 +6182,7 @@ class MainActivity :
                                             onDeviceBrain.hasAdvancedModel()
                                         Text(
                                             if (advancedInstalled)
-                                                "QWEN3 1.7B AVAILABLE · REQUIRED CONVERSATION MODEL"
+                                                "QWEN3 1.7B FILE DETECTED · TEST ON-DEVICE AI BEFORE TRUSTING INFERENCE"
                                             else "QWEN3 1.7B REQUIRED · DOWNLOAD OR IMPORT MODEL",
                                             style = MaterialTheme.typography.labelMedium,
                                             color = if (advancedInstalled)
