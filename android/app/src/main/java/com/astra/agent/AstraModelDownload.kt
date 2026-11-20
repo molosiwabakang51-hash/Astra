@@ -59,19 +59,38 @@ internal object AstraModelDownload {
             connection.setRequestProperty("User-Agent", "Astra-Android-offline-model-setup")
             if (offset > 0L) connection.setRequestProperty("Range", "bytes=$offset-")
             val status = connection.responseCode
-            if (status == 416 && offset in MIN_BYTES..MAX_BYTES) {
-                // Completed bytes may have survived a crash before final rename.
-                if (sha256(partial) != AstraModelImport.ADVANCED_SHA256) {
-                    // A complete but invalid partial cannot be resumed; discard
-                    // it so the next user-approved attempt starts cleanly.
+            when (AstraDownloadRange.rejectedResume(
+                status, offset, MIN_BYTES, MAX_BYTES
+            )) {
+                AstraDownloadRange.RejectedResume.VERIFY_COMPLETE -> {
+                    // HTTP 416 with a full-length local file often means the
+                    // download finished before a process died during rename.
+                    // Never discard these bytes without first verifying SHA.
+                    if (sha256(partial) == AstraModelImport.ADVANCED_SHA256) {
+                        AstraModelStorage.installVerified(partial, target)
+                        onProgress(target.length(), target.length())
+                        return@withContext target.length()
+                    }
                     check(partial.delete()) {
                         "Corrupted offline download could not be cleared."
                     }
-                    error("The saved download failed SHA-256. Please retry.")
+                    error("Saved model bytes failed SHA-256. Tap Download once to restart.")
                 }
-                AstraModelStorage.installVerified(partial, target)
-                onProgress(target.length(), target.length())
-                return@withContext target.length()
+                AstraDownloadRange.RejectedResume.DISCARD_SAVED_PARTIAL -> {
+                    // The server rejected an offset *inside* the 1.7B file.
+                    // Retaining those bytes would yield the same 416 on every
+                    // retry. Only .downloading is cleared; a verified installed
+                    // model, SAF GGUF and backups are never touched.
+                    check(partial.delete()) {
+                        "Rejected offline download could not be cleared safely."
+                    }
+                    error(
+                        "Saved model offset was rejected (HTTP 416). The stale " +
+                            "partial was cleared; tap Download once to restart " +
+                            "from the beginning. Existing installed weights are intact."
+                    )
+                }
+                AstraDownloadRange.RejectedResume.NONE -> Unit
             }
             val transfer = AstraDownloadRange.plan(
                 status, offset, connection.getHeaderField("Content-Range"),
