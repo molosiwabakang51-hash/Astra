@@ -70,6 +70,25 @@ internal object AstraVoiceAccentPolicy {
      * override the selected dictation voice. Ambiguity keeps the configured
      * locale and never authorizes a wrong-region voice fallback.
      */
+    /**
+     * Settings' "Test voice" is a diagnostic of the selected speech pack,
+     * regardless of a separately selected AI reply language. It must never
+     * pronounce a French, Setswana or Russian test phrase with an English
+     * voice simply because Chat's preferred reply language is English.
+     *
+     * Explicit pronunciation lessons still take precedence over automatic
+     * conversation detection. Both paths are subject to the same downstream
+     * exact-locale installed-voice and offline-only checks.
+     */
+    fun forPlayback(
+        configured: SpeechLanguage,
+        preferred: AstraReplyLanguage.Choice,
+        text: String,
+        lessonLanguage: SpeechLanguage? = null,
+        previewLanguage: SpeechLanguage? = null
+    ): SpeechLanguage =
+        previewLanguage ?: lessonLanguage ?: forReply(configured, preferred, text)
+
     fun forReply(
         configured: SpeechLanguage,
         preferred: AstraReplyLanguage.Choice,

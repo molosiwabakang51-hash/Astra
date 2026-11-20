@@ -2410,7 +2410,11 @@ class MainActivity :
         )
     }
 
-    private fun speak(text: String, offlineOnly: Boolean) {
+    private fun speak(
+        text: String,
+        offlineOnly: Boolean,
+        previewLanguage: SpeechLanguage? = null
+    ) {
         // Background/biometric/system-lock transitions may happen while the
         // local model is producing a reply. Never start playback while a
         // device keyguard, dark display or unfocused window is present.
@@ -2425,8 +2429,10 @@ class MainActivity :
         val lessonSpeech = AstraLessonSpeech.fromLesson(
             text, selectedSpeechLanguage()
         )
-        val selected = lessonSpeech?.language ?: AstraVoiceAccentPolicy.forReply(
-            selectedSpeechLanguage(), preferred, text
+        val selected = AstraVoiceAccentPolicy.forPlayback(
+            selectedSpeechLanguage(), preferred, text,
+            lessonLanguage = lessonSpeech?.language,
+            previewLanguage = previewLanguage
         )
         val speechText = lessonSpeech?.spokenText ?: text
         val match = try {
@@ -7485,7 +7491,8 @@ class MainActivity :
 
                                                 speak(
                                                     AstraVoiceLanguageCommand.testPhrase(speechLanguage),
-                                                    localOnlyTts
+                                                    localOnlyTts,
+                                                    previewLanguage = speechLanguage
                                                 )
                                             }
                                         ) {

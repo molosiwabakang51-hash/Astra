@@ -32,7 +32,8 @@ class SpokenLanguageAutoRoutingSourceTest(unittest.TestCase):
         self.assertIn("if (explicit != null) return explicit", POLICY)
         self.assertIn("matchingSpeechVoice(selected, offlineOnly)", MAIN)
         self.assertIn("confirmedSpeechVoice(selected, offlineOnly)", MAIN)
-        self.assertIn("AstraVoiceAccentPolicy.forReply(", MAIN)
+        self.assertIn("AstraVoiceAccentPolicy.forPlayback(", MAIN)
+        self.assertIn("previewLanguage ?: lessonLanguage ?: forReply(", POLICY)
 
 if __name__ == "__main__":
     unittest.main()

@@ -94,6 +94,66 @@ class AstraVoiceAccentPolicyTest {
                 AstraReplyLanguage.Choice.KOREAN, "안녕하세요."))
     }
 
+    @Test fun settingsVoiceTestUsesChosenSpeechLanguageNotAiReplyPreference() {
+        val policy = AstraVoiceAccentPolicy
+        val cases = listOf(
+            SpeechLanguage.RUSSIAN to "Здравствуйте. Я Астра.",
+            SpeechLanguage.FRENCH_CANADA to "Bonjour. Je suis Astra.",
+            SpeechLanguage.SETSWANA to "Dumela. Ke nna Astra.",
+            SpeechLanguage.SPANISH_MEXICO to "Hola. Soy Astra.",
+            SpeechLanguage.JAPANESE to "こんにちは。アストラです。",
+            SpeechLanguage.PORTUGUESE_BRAZIL to "Olá. Sou a Astra."
+        )
+        cases.forEach { (selected, phrase) ->
+            assertEquals(
+                "The Settings voice test must use the exact chosen regional pack: $selected",
+                selected, policy.forPlayback(
+                    selected, AstraReplyLanguage.Choice.ENGLISH, phrase,
+                    previewLanguage = selected
+                )
+            )
+        }
+    }
+
+    @Test fun normalAiAndLessonSpeechStillUseTheirExistingLanguageRules() {
+        val policy = AstraVoiceAccentPolicy
+        assertEquals(
+            SpeechLanguage.ENGLISH_US,
+            policy.forPlayback(
+                SpeechLanguage.RUSSIAN,
+                AstraReplyLanguage.Choice.ENGLISH,
+                "Hello. I am Astra."
+            )
+        )
+        assertEquals(
+            SpeechLanguage.RUSSIAN,
+            policy.forPlayback(
+                SpeechLanguage.ENGLISH_US,
+                AstraReplyLanguage.Choice.AUTO,
+                "Здравствуйте. Я Астра.",
+                lessonLanguage = SpeechLanguage.RUSSIAN
+            )
+        )
+        assertEquals(
+            SpeechLanguage.SPANISH_MEXICO,
+            policy.forPlayback(
+                SpeechLanguage.ENGLISH_US,
+                AstraReplyLanguage.Choice.ENGLISH,
+                "Hola. Soy Astra.",
+                lessonLanguage = SpeechLanguage.FRENCH,
+                previewLanguage = SpeechLanguage.SPANISH_MEXICO
+            )
+        )
+        assertEquals(
+            SpeechLanguage.ENGLISH_UK,
+            policy.forPlayback(
+                SpeechLanguage.ENGLISH_UK,
+                AstraReplyLanguage.Choice.AUTO,
+                "Your French word is bonjour. The answer is simple."
+            )
+        )
+    }
+
     @Test fun automaticModeAvoidsForeignQuotesConfusingMainLanguage() {
         val policy = AstraVoiceAccentPolicy
         assertEquals(SpeechLanguage.ENGLISH_UK,
