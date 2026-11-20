@@ -100,6 +100,24 @@ internal object AstraSpokenLanguageHeuristics {
         "have", "was", "were", "their", "after", "before", "because"
     )
 
+    // Automatic text-to-speech must also recognize a clearly English reply:
+    // otherwise an English answer can be spoken in an unrelated configured
+    // dictation language. These cues are intentionally stronger than a few
+    // translated words in a multilingual lesson or quoted source.
+    private val englishContentCues = englishMarkers + words(
+        "a", "an", "to", "of", "in", "for", "on", "it", "as", "we", "they",
+        "then", "first", "next", "finally", "step", "steps", "example", "examples",
+        "answer", "answers", "means", "not", "do", "does", "could",
+        "must", "more", "most", "some", "other", "same", "each",
+        "need", "use", "using", "if", "so", "very", "also"
+    )
+    private val englishStrongCues = words(
+        "the", "this", "that", "your", "you", "are", "is", "which", "what",
+        "here", "will", "should", "would", "have", "because", "please",
+        "these", "there", "their", "was", "were", "about", "from",
+        "after", "before", "does", "could", "when", "then"
+    )
+
     fun detect(text: String, configured: SpeechLanguage): SpeechLanguage? {
         if (text.length !in 40..50_000) return null
         val tokens = tokenPattern.findAll(text.take(900))
@@ -115,7 +133,23 @@ internal object AstraSpokenLanguageHeuristics {
                 matches * 3 < tokens.size || matches <= english) null
             else Result(profile, matches + anchors.size * 2, matches)
         }.sortedByDescending { it.score }
-        val best = matched.firstOrNull() ?: return null
+        val best = matched.firstOrNull()
+        if (best == null) {
+            // English uses Latin script, so script-based detection cannot
+            // rescue it. Require many distinct English cues and a dominant
+            // share of the reply, not a foreign lesson's short English gloss.
+            val englishHits = tokens.filter { it in englishContentCues }
+            val strongHits = englishHits.filter { it in englishStrongCues }
+            val clearlyEnglish = englishHits.size >= 8 &&
+                englishHits.toSet().size >= 6 &&
+                strongHits.toSet().size >= 3 &&
+                englishHits.size * 5 >= tokens.size * 2
+            if (!clearlyEnglish) return null
+            // Preserve an explicitly chosen English dialect where possible.
+            // A non-English dictation locale is not an English accent choice.
+            return if (configured == SpeechLanguage.ENGLISH_UK)
+                configured else SpeechLanguage.ENGLISH_US
+        }
         if (matched.size > 1 && best.score - matched[1].score < 4) return null
         return when (best.profile.language) {
             SpeechLanguage.FRENCH ->

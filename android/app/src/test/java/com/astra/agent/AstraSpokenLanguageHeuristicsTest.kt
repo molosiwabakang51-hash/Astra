@@ -33,6 +33,64 @@ class AstraSpokenLanguageHeuristicsTest {
         }
     }
 
+    @Test fun clearEnglishAutoReplyDoesNotUseForeignDictationVoice() {
+        val english =
+            "Here are the steps to solve the equation. First, write the expression " +
+                "clearly. Then you can divide both sides by the same number, and " +
+                "the answer will show whether this method works."
+        for (configured in listOf(
+            SpeechLanguage.RUSSIAN,
+            SpeechLanguage.SETSWANA,
+            SpeechLanguage.FRENCH,
+            SpeechLanguage.JAPANESE,
+            SpeechLanguage.SPANISH
+        )) {
+            assertEquals(configured.displayName,
+                SpeechLanguage.ENGLISH_US,
+                AstraVoiceAccentPolicy.forReply(configured, auto, english))
+        }
+        assertEquals(
+            SpeechLanguage.ENGLISH_UK,
+            AstraVoiceAccentPolicy.forReply(SpeechLanguage.ENGLISH_UK, auto, english)
+        )
+    }
+
+    @Test fun mixedForeignCourseAndShortQuotedEnglishRemainConfigured() {
+        val short = listOf(
+            "The answer is yes.",
+            "Hello! How can I help?",
+            "Astra can answer questions."
+        )
+        for (sample in short) {
+            assertEquals(sample, SpeechLanguage.RUSSIAN,
+                AstraVoiceAccentPolicy.forReply(SpeechLanguage.RUSSIAN, auto, sample))
+        }
+        // An English phrase embedded in a primarily French explanation is
+        // not sufficient evidence to force an English speech accent.
+        val french = "Bonjour, je suis Astra et je peux vous aider avec " +
+            "votre question. Voici les étapes: the quick example is hello. " +
+            "Ensuite nous pouvons continuer avec cette leçon et votre exercice."
+        assertEquals(SpeechLanguage.FRENCH,
+            AstraVoiceAccentPolicy.forReply(SpeechLanguage.ENGLISH_US, auto, french))
+        assertEquals(SpeechLanguage.FRENCH_CANADA,
+            AstraVoiceAccentPolicy.forReply(SpeechLanguage.FRENCH_CANADA, auto, french))
+    }
+
+    @Test fun explicitTextReplyChoiceStillOverridesEnglishAutoDetector() {
+        val english = "Here are the steps to solve the problem. First, you can " +
+            "examine the question, then explain the answer in your own words."
+        assertEquals(
+            SpeechLanguage.FRENCH,
+            AstraVoiceAccentPolicy.forReply(SpeechLanguage.ENGLISH_UK,
+                AstraReplyLanguage.Choice.FRENCH, english)
+        )
+        assertEquals(
+            SpeechLanguage.RUSSIAN,
+            AstraVoiceAccentPolicy.forReply(SpeechLanguage.ENGLISH_UK,
+                AstraReplyLanguage.Choice.RUSSIAN, english)
+        )
+    }
+
     @Test fun automaticRoutingKeepsUserSelectedRegionalAccents() {
         val french = "Bonjour, je suis Astra et je peux vous aider avec votre question. Voici les étapes que vous pouvez suivre pour apprendre."
         val spanish = "Hola, puedo ayudarte con tu pregunta. Primero, aquí tienes una explicación; después puedes hacer otra pregunta para aprender mejor."
