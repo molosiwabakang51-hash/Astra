@@ -32,11 +32,12 @@ internal class AstraOnDeviceBrain(
     data class Turn(val role: String, val content: String)
 
     companion object {
-        const val ASSET_NAME = "qwen3-0.6b-q4km.gguf"
-        const val MODEL_SHA256 =
-            "7af3fdf842f87b24672f8a7f1dd50404043f0bfb71093ff91c31d2b49df4631d"
-        const val MODEL_LABEL = "Qwen3 0.6B · Q4_K_M · offline"
-        private const val MIN_SIZE_BYTES = 450_000_000L
+        // Keep historic public aliases in sync with the actual required 1.7B
+        // asset. They must never identify obsolete 0.6B weights as the model.
+        const val ASSET_NAME = AstraModelImport.ADVANCED_NAME
+        const val MODEL_SHA256 = AstraModelImport.ADVANCED_SHA256
+        const val MODEL_LABEL = "Qwen3 1.7B · Q4_K_M · offline"
+        private const val MIN_SIZE_BYTES = 1_150_000_000L
         private const val DISK_HEADROOM_BYTES = 64L * 1024 * 1024
     }
 
@@ -316,6 +317,12 @@ internal class AstraOnDeviceBrain(
         expectedSha256: String,
         minimumBytes: Long
     ): File {
+        // Enforce the selected model requirement at the final native load
+        // boundary too, even if a future caller supplies legacy metadata.
+        require(name == AstraModelImport.ADVANCED_NAME &&
+            expectedSha256.equals(AstraModelImport.ADVANCED_SHA256, ignoreCase = true) &&
+            minimumBytes >= MIN_SIZE_BYTES
+        ) { "Only verified Qwen3 1.7B Q4_K_M may be loaded for conversation." }
         val workContext = currentCoroutineContext()
         verifiedModels.matching(name, expectedSha256)?.let { return it }
         // A manually imported GGUF may atomically replace the verified file
@@ -347,8 +354,7 @@ internal class AstraOnDeviceBrain(
         // Reclaim it BEFORE checking space so recovery does not fail merely
         // because the interrupted attempt is occupying that same space.
         AstraModelImport.discardInterruptedCopy(temporary)
-        val requiredBytes = if (name == AstraModelImport.ADVANCED_NAME)
-            1_350_000_000L else MIN_SIZE_BYTES
+        val requiredBytes = 1_350_000_000L
         require(StatFs(directory.absolutePath).availableBytes >=
             requiredBytes + DISK_HEADROOM_BYTES
         ) { "Not enough free phone storage to prepare the local language model." }

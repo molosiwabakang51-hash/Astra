@@ -54,11 +54,9 @@ internal object AstraModelImport {
         sizeBytes in ADVANCED_MIN_BYTES..ADVANCED_MAX_BYTES &&
             availableBytes >= maxOf(MIN_BYTES, sizeBytes) + FREE_HEADROOM
 
-    fun modelFile(context: Context): File =
-        AstraModelStorage.activeModel(
-            File(context.noBackupFilesDir, "offline-models"),
-            AstraOnDeviceBrain.ASSET_NAME
-        )
+    // Legacy API name retained for callers, but it must NEVER resolve the
+    // discontinued 0.6B model. The only installed conversation model is 1.7B.
+    fun modelFile(context: Context): File = advancedFile(context)
 
     fun advancedFile(context: Context): File =
         AstraModelStorage.activeModel(
