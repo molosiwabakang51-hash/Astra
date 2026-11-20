@@ -315,7 +315,7 @@ internal fun AstraNavigationTray(
                                 Box(
                                     Modifier.size(7.dp)
                                         .background(
-                                            accent.copy(alpha = if (disabled) 0.25f else 0.8f),
+                                            accent.copy(alpha = if (disabled) 0.65f else 0.8f),
                                             CircleShape
                                         )
                                 )
@@ -326,7 +326,7 @@ internal fun AstraNavigationTray(
                                          else "Show mission control")
                                     else action.label,
                                     modifier = Modifier.weight(1f),
-                                    color = if (disabled) AstraAurora.muted.copy(alpha = 0.45f)
+                                    color = if (disabled) AstraAurora.muted
                                             else if (AstraTrayPolicy.isDestructive(action))
                                                 Color(0xFFFFB6C0)
                                             else AstraAurora.ink,
