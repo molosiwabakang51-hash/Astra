@@ -5281,11 +5281,15 @@ class MainActivity :
                                                             " MiB · resumable"
                                                 }
                                             }
-                                            modelImportStatus =
-                                                "QWEN3 1.7B READY · " +
-                                                    (count / 1048576L) +
-                                                    " MiB verified on this phone. " +
-                                                    "No paid API or server is needed."
+                                            // SHA-256 proves the downloaded file's
+                                            // integrity, not that JNI has loaded
+                                            // it or produced tokens on this phone.
+                                            // Persist the owner-safe result so an
+                                            // Activity recreation retains it.
+                                            updateModelImportStatus(
+                                                AstraModelImportCoordinator.verifiedFileMessage(count),
+                                                "verified"
+                                            )
                                         } catch (cancel: CancellationException) {
                                             modelImportStatus =
                                                 "Download paused. Tap Get free model " +

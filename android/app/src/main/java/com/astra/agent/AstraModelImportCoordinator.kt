@@ -116,7 +116,7 @@ internal object AstraModelImportCoordinator {
                 publish(
                     app,
                     Snapshot(
-                        true, "ready",
+                        true, "verified",
                         verifiedFileMessage(bytes)
                     )
                 )

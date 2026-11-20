@@ -10,6 +10,16 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class AstraModelDownloadTest {
+    @Test fun completedModelDownloadOnlyCertifiesFileIntegrity() {
+        val displayed = AstraModelImportCoordinator.verifiedFileMessage(1_280_000_000L)
+        assertTrue(displayed.contains("QWEN3 1.7B FILE VERIFIED"))
+        assertTrue(displayed.contains("SHA-256 verified"))
+        assertTrue(displayed.contains("Test on-device AI"))
+        assertTrue(displayed.contains("confirm offline generation"))
+        assertTrue(!displayed.contains("QWEN3 1.7B READY"))
+        assertTrue(!displayed.contains("Offline conversation is available"))
+    }
+
     @Test fun stalledNetworkSourceCannotSpinForeverOrDiscardWrittenPartial() = runBlocking {
         val alreadyDownloaded = "good-partial".toByteArray()
         val output = ByteArrayOutputStream().apply { write(alreadyDownloaded) }
