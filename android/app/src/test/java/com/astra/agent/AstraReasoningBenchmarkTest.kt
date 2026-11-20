@@ -52,6 +52,8 @@ class AstraReasoningBenchmarkTest {
         assertFalse(B.score(B.Probe.WEIGHTED_RETURN, "\"6%\""))
         assertTrue(B.score(B.Probe.WEIGHTED_RETURN,
             "6%\n\nOpen-course references:\n[K1] unrelated"))
+        assertTrue(B.score(B.Probe.WEIGHTED_RETURN,
+            "6%\n\nRetrieved local book passages (verify originals):\n[K1] irrelevant"))
     }
 
     @Test fun privateThinkingTokensCannotInflateNumbersOrLeakInReport() {
