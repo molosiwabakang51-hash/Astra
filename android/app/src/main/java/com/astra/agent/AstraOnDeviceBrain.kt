@@ -103,7 +103,10 @@ internal class AstraOnDeviceBrain(
                     session.invalidate()
                 }
                 previousReplyLanguageId = selectedReplyLanguageId
-                val explicitBookQuery = AstraBookQuery.extract(finalMessage)
+                // Fixed benchmark prompts must not invoke user-library retrieval,
+                // even when their wording happens to resemble a book query.
+                val explicitBookQuery = if (diagnosticIsolated) null else
+                    AstraBookQuery.extract(finalMessage)
                 val question = explicitBookQuery ?: finalMessage
                 val permittedBooks = AstraDiagnosticContext.allowPrivateBooks(
                     explicitBookQuery != null,
