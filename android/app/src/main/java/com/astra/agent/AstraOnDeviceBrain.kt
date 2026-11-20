@@ -241,7 +241,7 @@ internal class AstraOnDeviceBrain(
                     loadPreparedModel(modelPath)
                 }
 
-                val answer = StringBuilder()
+                val answer = AstraStreamUnicode.StreamingBuffer(16_000)
                 var lastUiUpdate = 0L
                 val openReferences = if (diagnosticIsolated) emptyList() else runCatching {
                     val bundled = context.assets.open(AstraOpenLibrary.BUNDLED_ASSET)
@@ -302,23 +302,19 @@ internal class AstraOnDeviceBrain(
                 AstraInferenceCheckpoint.mark(
                     context, AstraInferenceCheckpoint.TOKEN_GENERATION
                 )
-                var outputTruncated = false
                 current.sendUserPrompt(requestPrompt, answerBudget).collect { part ->
-                    // Keep the existing UTF-16 cap without bisecting an emoji
-                    // or changing earlier streamed text after truncation.
-                    if (!outputTruncated) {
-                        outputTruncated = AstraStreamUnicode.appendCapped(
-                            answer, part, 16_000
-                        )
-                    }
+                    // JNI can split a supplementary character between two
+                    // token chunks. Hold an incomplete high surrogate until
+                    // the next chunk, rather than showing or persisting it.
+                    answer.append(part)
                     val now = System.nanoTime()
                     if (now - lastUiUpdate >= 200_000_000L) {
-                        val partial = AstraOfflinePolicy.publicReply(answer.toString())
+                        val partial = AstraOfflinePolicy.publicReply(answer.snapshot())
                         if (partial.isNotBlank()) onPartial(partial)
                         lastUiUpdate = now
                     }
                 }
-                val publicAnswer = AstraOfflinePolicy.publicReply(answer.toString())
+                val publicAnswer = AstraOfflinePolicy.publicReply(answer.finish())
                 if (publicAnswer.isBlank()) {
                     session.invalidate()
                     "The offline model did not produce a usable answer. Please try again."
