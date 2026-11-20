@@ -342,14 +342,17 @@ internal class AstraOnDeviceBrain(
                     "Open Settings to import the official Qwen3 GGUF again."
             )
         }
+        val temporary = File(directory, "$name.partial")
+        // A killed FULL asset extraction may leave a 1+ GB partial file.
+        // Reclaim it BEFORE checking space so recovery does not fail merely
+        // because the interrupted attempt is occupying that same space.
+        AstraModelImport.discardInterruptedCopy(temporary)
         val requiredBytes = if (name == AstraModelImport.ADVANCED_NAME)
             1_350_000_000L else MIN_SIZE_BYTES
         require(StatFs(directory.absolutePath).availableBytes >=
             requiredBytes + DISK_HEADROOM_BYTES
         ) { "Not enough free phone storage to prepare the local language model." }
 
-        val temporary = File(directory, "$name.partial")
-        temporary.delete()
         try {
             // FULL APK asset reads can be short or transiently return zero.
             // Reuse the bounded, cancellable GGUF stream copier used for Files
