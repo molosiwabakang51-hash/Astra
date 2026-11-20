@@ -5253,7 +5253,7 @@ class MainActivity :
                                         } catch (error: Exception) {
                                             modelImportStatus =
                                                 "Download interrupted: " +
-                                                    (error.message ?: "Check connection.") +
+                                                    AstraDownloadFailureMessage.forOwner(error) +
                                                     " Tap Get free model to retry."
                                         } finally {
                                             modelImportRunning = false
