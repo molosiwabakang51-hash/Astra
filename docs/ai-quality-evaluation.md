@@ -199,3 +199,27 @@ physical-device evidence. Run
 `python3 -m unittest discover -s scripts/tests -p 'test_quality_scorecard.py'`
 to catch missing/duplicated cases, altered weights and unsupported
 automatic scoring. This is **schema validation**, not an AI benchmark.
+
+## Validate a private, manually reviewed phone score
+
+After two complete physical-device runs, create a **local, uncommitted** JSON
+record with a top-level `runs` array of exactly two objects. Each run has
+`evidence` with `commit`, `android_version`, the actual 64-hex-character
+`model_sha256`, and verified boolean values `airplane_mode: true`,
+`wifi_disabled: true`, and `owner_signed_upgrade: true`. Each run also has
+`cases` with **all 30 IDs A1–F5**, each set to
+`{"status":"pass","evidence":"local-test-reference"}`,
+`{"status":"fail","evidence":"local-test-reference"}`, or
+`{"status":"unverified"}`. Evidence references should be opaque local test
+labels, **not** private transcripts, passwords, full device paths or URLs.
+
+Run `python3 scripts/quality/evaluate_phone_evidence.py /path/to/private-record.json`
+on a trusted computer. The validator refuses a numeric score when any case is
+unverified, any pass/fail lacks a local evidence reference, mandatory F1/F4/F5
+fails, or either run lacks verified offline/signed-upgrade metadata. It reports
+the **lower** of the two run totals divided by 10; it does not average away
+regressions. This script validates the **owner's attestations** only: it cannot
+detect invented results, verify Android hardware or certify stable release.
+Never commit or upload a private evidence record to GitHub. Its automated
+tests exercise **synthetic records solely to check the scoring rules**, not
+to award Astra real-world AI quality points.
