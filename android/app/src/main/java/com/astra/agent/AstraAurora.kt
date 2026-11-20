@@ -1,5 +1,9 @@
 package com.astra.agent
 
+import android.content.Context
+import android.database.ContentObserver
+import android.os.Handler
+import android.os.Looper
 import android.provider.Settings
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
@@ -12,6 +16,9 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -51,6 +58,15 @@ internal object AstraAurora {
     // All orbital animation is optional; the core still makes sense when static.
     fun motionEnabled(scale: Float): Boolean = scale.isFinite() && scale > 0f
 
+    // Read only the public Android animation preference. A failed read should
+    // avoid decorative motion rather than overriding an unknown accessibility
+    // preference. No privileged permission, sensors, polling or network use.
+    internal fun animatorScale(context: Context): Float = runCatching {
+        Settings.Global.getFloat(
+            context.contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f
+        )
+    }.getOrDefault(0f)
+
     /** Fixed geometry keeps the vector recognizable independent of display density. */
     fun pointAngle(index: Int, count: Int): Double {
         require(count in 1..64 && index in 0 until count)
@@ -89,12 +105,33 @@ internal fun AstraOrb(
     thinking: Boolean = false
 ) {
     val context = LocalContext.current
-    val motion = remember(context) {
-        AstraAurora.motionEnabled(runCatching {
-            Settings.Global.getFloat(
-                context.contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f
+    var motion by remember(context) {
+        mutableStateOf(AstraAurora.motionEnabled(AstraAurora.animatorScale(context)))
+    }
+    // Android can change Remove animations / Animator duration scale while
+    // the Activity stays open. A one-time remember() read would keep the
+    // old orbit running until recreation. Observe that setting only while
+    // this Astra core is in the Compose tree and unregister on disposal.
+    DisposableEffect(context) {
+        val observer = object : ContentObserver(Handler(Looper.getMainLooper())) {
+            override fun onChange(selfChange: Boolean) {
+                motion = AstraAurora.motionEnabled(AstraAurora.animatorScale(context))
+            }
+        }
+        val registered = runCatching {
+            context.contentResolver.registerContentObserver(
+                Settings.Global.getUriFor(Settings.Global.ANIMATOR_DURATION_SCALE),
+                false, observer
             )
-        }.getOrDefault(1f))
+        }.isSuccess
+        // Re-read after subscription to avoid missing a setting change
+        // between initial composition and observer registration.
+        motion = AstraAurora.motionEnabled(AstraAurora.animatorScale(context))
+        onDispose {
+            if (registered) runCatching {
+                context.contentResolver.unregisterContentObserver(observer)
+            }
+        }
     }
     // Keep the persistent header mark static until voice input is active.
     // The large new-chat hero animates only while that panel is visible.
