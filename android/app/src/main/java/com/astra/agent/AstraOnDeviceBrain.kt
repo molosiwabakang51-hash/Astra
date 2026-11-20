@@ -332,6 +332,15 @@ internal class AstraOnDeviceBrain(
                     publicAnswer
                 }
                 }
+            } catch (linkage: LinkageError) {
+                // JNI symbols may be resolved only when a later native method
+                // first runs (loadModel, system prompt or token generation),
+                // not at AiChat.getInferenceEngine(). A Java LinkageError
+                // must not escape our normal Kotlin recovery boundary.
+                // Keep OOM/VM errors outside this catch by design.
+                session.invalidate()
+                loadedModelPath = null
+                throw AstraNativeBootstrap.recover(linkage)
             } catch (error: Exception) {
                 // Cancellation, JNI failures and timeouts can leave partial
                 // tokens in the model's native KV-cache. A later request must
