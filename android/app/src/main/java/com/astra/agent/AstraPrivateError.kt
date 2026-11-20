@@ -32,9 +32,14 @@ internal object AstraPrivateError {
         FOLDER_REVOKE
     }
 
-    private enum class Cause { STORAGE, ACCESS, UNSUPPORTED, MEMORY, MODEL, NETWORK, UNKNOWN }
+    private enum class Cause { STORAGE, ACCESS, UNSUPPORTED, MEMORY, STARTUP, MODEL, NETWORK, UNKNOWN }
 
     private fun category(error: Exception): Cause {
+        // Only this audited, fixed engine-deadline message is a startup
+        // timeout. A general "Qwen3" string is not evidence of corrupt weights.
+        if (error is IllegalStateException &&
+            error.message == AstraNativeStartupWait.TIMEOUT_ADVICE
+        ) return Cause.STARTUP
         // Read up to three causes, with a short bound; never return or store
         // the diagnostic text. A provider can include a path or signed URL.
         val description = generateSequence(error as Throwable?) { it.cause }
@@ -86,16 +91,23 @@ internal object AstraPrivateError {
             Operation.FOLDER_IMPORT -> "Folder import did not finish."
             Operation.FOLDER_REVOKE -> "Could not revoke linked-folder access."
         }
-        val reason = when (category(failure)) {
+        val cause = category(failure)
+        val reason = when (cause) {
             Cause.STORAGE -> "Internal phone storage may be full."
             Cause.ACCESS -> "Android did not grant the required file access."
             Cause.UNSUPPORTED -> "The selected material may be unsupported or damaged."
             Cause.MEMORY -> "Android may not have enough available RAM."
+            Cause.STARTUP -> "The offline AI engine did not finish starting in time."
             Cause.MODEL -> "The verified Qwen3 1.7B model may be unavailable or invalid."
             Cause.NETWORK -> "The connection may have timed out or been rejected."
             Cause.UNKNOWN -> "The cause could not be identified safely."
         }
-        val advice = when (operation) {
+        val advice = if (operation == Operation.MODEL_CHAT &&
+            cause == Cause.STARTUP
+        ) {
+            "Close other apps and retry, or restart Astra. " +
+                "Your model, chats, notes and tasks stay on your phone."
+        } else when (operation) {
             Operation.MODEL_CHAT ->
                 "Retry from Chat or verify the 1.7B model in Settings. " +
                     "Tasks and notes remain available."
