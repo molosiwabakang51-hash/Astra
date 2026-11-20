@@ -129,14 +129,6 @@ internal object AstraModelImportCoordinator {
                 throw cancel
             } catch (failure: Exception) {
                 publish(app, Snapshot(true, "failed", failureMessage(failure)))
-            } finally {
-                if (heldGrant) {
-                    runCatching {
-                        app.contentResolver.releasePersistableUriPermission(
-                            selected, Intent.FLAG_GRANT_READ_URI_PERMISSION
-                        )
-                    }
-                }
             }
         }
         importJob = job
@@ -145,6 +137,13 @@ internal object AstraModelImportCoordinator {
         // would otherwise leave the single-flight gate locked forever.
         job.invokeOnCompletion { outcome ->
             try {
+                if (heldGrant) {
+                    runCatching {
+                        app.contentResolver.releasePersistableUriPermission(
+                            selected, Intent.FLAG_GRANT_READ_URI_PERMISSION
+                        )
+                    }
+                }
                 if (outcome is CancellationException &&
                     current.value.stage == "copying"
                 ) {
