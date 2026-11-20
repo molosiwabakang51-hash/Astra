@@ -31,27 +31,35 @@ class AstraNativeStartupWaitTest {
         assertFalse(error?.message.orEmpty().contains("user cancelled"))
     }
 
-    @Test fun explicitOwnerCancellationStillPropagatesCancellationException() = runBlocking {
-        val started = CompletableDeferred<Unit>()
-        val blocked = CompletableDeferred<String>()
-        val job = async {
-            AstraNativeStartupWait.awaitReady(timeoutMs = 5000L) {
-                started.complete(Unit)
-                blocked.await()
+    @Test fun explicitOwnerCancellationStillPropagatesCancellationException() {
+        // Catch at the test boundary as well: runBlocking can propagate
+        // cancellation when its child job is deliberately stopped.
+        val error = runCatching {
+            runBlocking {
+                val started = CompletableDeferred<Unit>()
+                val blocked = CompletableDeferred<String>()
+                val job = async {
+                    AstraNativeStartupWait.awaitReady(timeoutMs = 5000L) {
+                        started.complete(Unit)
+                        blocked.await()
+                    }
+                }
+                started.await()
+                job.cancel(CancellationException("owner switched conversations"))
+                job.await()
             }
-        }
-        started.await()
-        job.cancel(CancellationException("owner switched conversations"))
-        val error = runCatching { job.await() }.exceptionOrNull()
+        }.exceptionOrNull()
         assertTrue(error is CancellationException)
         assertFalse(error is IllegalStateException)
     }
 
-    @Test fun outerCallerDeadlineIsNotMisreportedAsNativeStartupFailure() = runBlocking {
+    @Test fun outerCallerDeadlineIsNotMisreportedAsNativeStartupFailure() {
         val error = runCatching {
-            withTimeout(30L) {
-                AstraNativeStartupWait.awaitReady(timeoutMs = 5000L) {
-                    CompletableDeferred<Unit>().await()
+            runBlocking {
+                withTimeout(30L) {
+                    AstraNativeStartupWait.awaitReady(timeoutMs = 5000L) {
+                        CompletableDeferred<Unit>().await()
+                    }
                 }
             }
         }.exceptionOrNull()
@@ -66,11 +74,13 @@ class AstraNativeStartupWaitTest {
         assertEquals(null, ready)
     }
 
-    @Test fun nativeEngineErrorStateOrOtherExceptionPropagatesUntouched() = runBlocking {
+    @Test fun nativeEngineErrorStateOrOtherExceptionPropagatesUntouched() {
         val original = IllegalArgumentException("engine rejected native state")
         val error = runCatching {
-            AstraNativeStartupWait.awaitReady<String>(timeoutMs = 1000L) {
-                throw original
+            runBlocking {
+                AstraNativeStartupWait.awaitReady<String>(timeoutMs = 1000L) {
+                    throw original
+                }
             }
         }.exceptionOrNull()
         assertTrue(error === original)
