@@ -21,6 +21,8 @@ class DownloadReadyStatusSourceTests(unittest.TestCase):
         self.assertIn("sha256(target) == AstraModelImport.ADVANCED_SHA256", DOWNLOAD)
         self.assertIn("sha256(partial) != AstraModelImport.ADVANCED_SHA256", DOWNLOAD)
         self.assertIn("QWEN3 1.7B FILE VERIFIED", IMPORT)
+        self.assertIn('true, "verified",', IMPORT)
+        self.assertNotIn('true, "ready",', IMPORT)
         self.assertIn("Run Settings → Test on-device AI", IMPORT)
         self.assertIn("AstraOfflineSelfTest.evaluate(", MAIN)
         self.assertIn("OFFLINE TEST VERIFIED", SELFTEST)
