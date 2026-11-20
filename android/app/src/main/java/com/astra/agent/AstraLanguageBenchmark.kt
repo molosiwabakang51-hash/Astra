@@ -118,7 +118,14 @@ internal object AstraLanguageBenchmark {
                 .trim().take(140))
 
     fun render(outcomes: List<Outcome>, actualModel: String?): String {
-        require(outcomes.size <= Probe.entries.size)
+        // A retry or UI callback can accidentally submit the same probe twice.
+        // Never present duplicate results as independent evidence of ability.
+        require(outcomes.size <= Probe.entries.size) {
+            "Too many benchmark outcomes"
+        }
+        require(outcomes.map { it.probe }.distinct().size == outcomes.size) {
+            "Duplicate benchmark probe results"
+        }
         val passed = outcomes.count { it.passed }
         return buildString {
             appendLine("ON-DEVICE LANGUAGE SPOT CHECKS")
