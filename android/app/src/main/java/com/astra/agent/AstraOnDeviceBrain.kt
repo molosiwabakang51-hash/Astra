@@ -77,6 +77,7 @@ internal class AstraOnDeviceBrain(
         turns: List<Turn>,
         conversationGeneration: Int,
         diagnosticMaxTokens: Int? = null,
+        diagnosticIsolated: Boolean = false,
         onPartial: suspend (String) -> Unit = {}
     ): String = mutex.withLock {
             // Durable but content-free checkpoint survives a fatal JNI signal.
@@ -88,9 +89,12 @@ internal class AstraOnDeviceBrain(
                 )
                 require(finalMessage.isNotEmpty()) { "Message cannot be empty." }
                 val carefulReasoning = AstraReasoningMode.enabled(finalMessage)
-                val selectedReplyLanguageId = context.getSharedPreferences(
-                    "astra", Context.MODE_PRIVATE
-                ).getString("astra_ai_reply_language", "auto") ?: "auto"
+                val selectedReplyLanguageId = AstraDiagnosticContext.replyLanguage(
+                    context.getSharedPreferences(
+                        "astra", Context.MODE_PRIVATE
+                    ).getString("astra_ai_reply_language", "auto") ?: "auto",
+                    diagnosticIsolated
+                )
                 if (previousReplyLanguageId != null &&
                     previousReplyLanguageId != selectedReplyLanguageId
                 ) {
@@ -99,11 +103,17 @@ internal class AstraOnDeviceBrain(
                     session.invalidate()
                 }
                 previousReplyLanguageId = selectedReplyLanguageId
-                val explicitBookQuery = AstraBookQuery.extract(finalMessage)
+                // Fixed benchmark prompts must not invoke user-library retrieval,
+                // even when their wording happens to resemble a book query.
+                val explicitBookQuery = if (diagnosticIsolated) null else
+                    AstraBookQuery.extract(finalMessage)
                 val question = explicitBookQuery ?: finalMessage
-                val permittedBooks = explicitBookQuery != null ||
+                val permittedBooks = AstraDiagnosticContext.allowPrivateBooks(
+                    explicitBookQuery != null,
                     context.getSharedPreferences("astra", Context.MODE_PRIVATE)
-                        .getBoolean("astra_use_books_in_chat", false)
+                        .getBoolean("astra_use_books_in_chat", false),
+                    diagnosticIsolated
+                )
                 if (previousBookContextAllowed != null &&
                     previousBookContextAllowed != permittedBooks
                 ) {
@@ -208,7 +218,7 @@ internal class AstraOnDeviceBrain(
 
                 val answer = StringBuilder()
                 var lastUiUpdate = 0L
-                val openReferences = runCatching {
+                val openReferences = if (diagnosticIsolated) emptyList() else runCatching {
                     val bundled = context.assets.open(AstraOpenLibrary.BUNDLED_ASSET)
                         .use(AstraOpenLibrary::load)
                     val synced = java.io.File(

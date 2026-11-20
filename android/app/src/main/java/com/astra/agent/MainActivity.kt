@@ -2988,6 +2988,8 @@ class MainActivity :
                 var offlineModelTestRunning by remember { mutableStateOf(false) }
                 var languageBenchmarkRunning by remember { mutableStateOf(false) }
                 var languageBenchmarkStatus by remember { mutableStateOf("") }
+                var reasoningBenchmarkRunning by remember { mutableStateOf(false) }
+                var reasoningBenchmarkStatus by remember { mutableStateOf("") }
                 var benchmarkHistory by remember {
                     mutableStateOf(storage.getString("astra_private_benchmark_trends", ""))
                 }
@@ -6388,7 +6390,8 @@ class MainActivity :
                                                                     ),
                                                                     generation,
                                                                     diagnosticMaxTokens =
-                                                                        AstraGenerationPolicy.DIAGNOSTIC_TOKEN_LIMIT
+                                                                        AstraGenerationPolicy.DIAGNOSTIC_TOKEN_LIMIT,
+                                                                diagnosticIsolated = true
                                                                 )
                                                                 val elapsed =
                                                                     (System.nanoTime() -
@@ -6424,7 +6427,8 @@ class MainActivity :
                                                                 ),
                                                                 memoryGeneration,
                                                                 diagnosticMaxTokens =
-                                                                    AstraGenerationPolicy.DIAGNOSTIC_TOKEN_LIMIT
+                                                                    AstraGenerationPolicy.DIAGNOSTIC_TOKEN_LIMIT,
+                                                            diagnosticIsolated = true
                                                             )
                                                             val remembered = onDeviceBrain.reply(
                                                                 listOf(
@@ -6442,7 +6446,8 @@ class MainActivity :
                                                                 ),
                                                                 memoryGeneration,
                                                                 diagnosticMaxTokens =
-                                                                    AstraGenerationPolicy.DIAGNOSTIC_TOKEN_LIMIT
+                                                                    AstraGenerationPolicy.DIAGNOSTIC_TOKEN_LIMIT,
+                                                            diagnosticIsolated = true
                                                             )
                                                             outcomes.add(
                                                                 AstraLanguageBenchmark.outcome(
@@ -6524,7 +6529,9 @@ class MainActivity :
                                             ) {
                                                 Text("Run language checks")
                                             }
-                                            if (languageBenchmarkRunning) {
+                                            if (languageBenchmarkRunning &&
+                                                !reasoningBenchmarkRunning
+                                            ) {
                                                 TextButton(
                                                     onClick = {
                                                         languageBenchmarkJob?.cancel()
@@ -6559,6 +6566,100 @@ class MainActivity :
                                                 AstraBenchmarkTrends.render(benchmarkHistory),
                                                 style = MaterialTheme.typography.bodySmall
                                             )
+                                        }
+                                        HorizontalDivider()
+                                        Text(
+                                            "Reasoning depth checks · Qwen3 1.7B",
+                                            style = MaterialTheme.typography.titleSmall
+                                        )
+                                        Text(
+                                            "Eight optional offline checks cover weighted return, " +
+                                                "compound growth, bond pricing, NPV, probability, " +
+                                                "algebra, deduction and currency risk. These are " +
+                                                "narrow final-answer diagnostics, not an AI rating. " +
+                                                "They may take time and drain battery; stop at any point. " +
+                                                "No personal notes or files enter these questions.",
+                                            style = MaterialTheme.typography.bodySmall
+                                        )
+                                        OutlinedButton(
+                                            enabled = !languageBenchmarkRunning &&
+                                                !offlineModelTestRunning &&
+                                                !modelImportRunning &&
+                                                offlineJob?.isActive != true &&
+                                                onDeviceBrain.hasLocalModel(),
+                                            onClick = {
+                                                languageBenchmarkRunning = true
+                                                reasoningBenchmarkRunning = true
+                                                reasoningBenchmarkStatus =
+                                                    "Starting eight private offline reasoning checks..."
+                                                languageBenchmarkJob = researchScope.launch {
+                                                    val results = mutableListOf<
+                                                        AstraReasoningBenchmark.Outcome
+                                                    >()
+                                                    try {
+                                                        val probes = AstraReasoningBenchmark.Probe.entries
+                                                        for ((index, probe) in probes.withIndex()) {
+                                                            reasoningBenchmarkStatus =
+                                                                "Reasoning check ${index + 1}/${probes.size}: " +
+                                                                    probe.title + "..."
+                                                            val started = System.nanoTime()
+                                                            val answer = onDeviceBrain.reply(
+                                                                listOf(
+                                                                    AstraOnDeviceBrain.Turn(
+                                                                        "user", probe.prompt
+                                                                    )
+                                                                ),
+                                                                Int.MIN_VALUE + 320 + index,
+                                                                diagnosticMaxTokens = 160,
+                                                                diagnosticIsolated = true
+                                                            )
+                                                            results.add(
+                                                                AstraReasoningBenchmark.outcome(
+                                                                    probe, answer,
+                                                                    (System.nanoTime() - started) /
+                                                                        1_000_000L
+                                                                )
+                                                            )
+                                                        }
+                                                        reasoningBenchmarkStatus =
+                                                            AstraReasoningBenchmark.render(
+                                                                results, onDeviceBrain.loadedModelLabel()
+                                                            )
+                                                    } catch (cancel: CancellationException) {
+                                                        reasoningBenchmarkStatus =
+                                                            "Reasoning checks cancelled. " +
+                                                                "Partial results are not scored."
+                                                        throw cancel
+                                                    } catch (error: Exception) {
+                                                        reasoningBenchmarkStatus =
+                                                            "Reasoning checks interrupted: " +
+                                                                "the offline engine did not finish. " +
+                                                                "See Model setup and diagnostics for details."
+                                                    } finally {
+                                                        reasoningBenchmarkRunning = false
+                                                        languageBenchmarkRunning = false
+                                                        languageBenchmarkJob = null
+                                                    }
+                                                }
+                                            }
+                                        ) {
+                                            Text("Run reasoning checks")
+                                        }
+                                        if (reasoningBenchmarkRunning) {
+                                            TextButton(onClick = {
+                                                languageBenchmarkJob?.cancel()
+                                            }) { Text("Stop reasoning checks") }
+                                        }
+                                        if (reasoningBenchmarkStatus.isNotBlank()) {
+                                            Text(
+                                                reasoningBenchmarkStatus,
+                                                style = MaterialTheme.typography.bodySmall
+                                            )
+                                            if (!reasoningBenchmarkRunning) {
+                                                TextButton(onClick = {
+                                                    copyText(reasoningBenchmarkStatus)
+                                                }) { Text("Copy reasoning results") }
+                                            }
                                         }
                                         Text(
                                             "Device diagnostics",
