@@ -38,9 +38,9 @@ internal fun AstraBrand(
             )
             Text(
                 AstraAurora.statusLabel(listening, thinking),
-                fontSize = 10.sp,
-                fontWeight = FontWeight.SemiBold,
-                letterSpacing = 0.5.sp,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 0.35.sp,
                 color = when {
                     listening -> AstraAurora.mint
                     thinking -> AstraAurora.violet
