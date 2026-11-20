@@ -1406,13 +1406,19 @@ private object UtilityEngine {
  * Requests that merely discuss an action are left to the conversation model.
  * No model-generated text is executed as a tool or interpreted as permission.
  */
-private object AstraNaturalLanguage {
+internal object AstraNaturalLanguage {
     fun canonical(raw: String): String {
         val text = raw.trim().replace(Regex("""\s+"""), " ")
         val clean = text.trimEnd('?', '!', '.').trim()
         val prefix = """(?:please\s+)?(?:can you\s+|could you\s+|would you\s+|will you\s+|i want you to\s+|i'd like you to\s+)?"""
         fun match(action: String): MatchResult? =
             Regex("^$prefix$action$", RegexOption.IGNORE_CASE).matchEntire(clean)
+
+        // Explicit help requests are safe, read-only questions. Check these
+        // before the broad guard that blocks question-shaped write commands.
+        match("""(?:what can you do|how can you help me|show me what you can do|can you help me)""")?.let {
+            return "help"
+        }
 
         // Never turn a quoted example or a question *about* a command into a write.
         if (clean.startsWith("why ", true) || clean.startsWith("how ", true) ||
@@ -1443,9 +1449,6 @@ private object AstraNaturalLanguage {
         }
         match("""(?:show|open|go to|take me to)\s+(?:my\s+)?(?:previous\s+)?conversations""")?.let {
             return "open conversations"
-        }
-        match("""(?:what can you do|how can you help me|show me what you can do)""")?.let {
-            return "help"
         }
         // Specific, explicit writes only. The original command processor
         // retains its own validation and persistence semantics.
