@@ -24,6 +24,10 @@ internal class AstraProgressInputStream(input: InputStream) : FilterInputStream(
     private var consecutiveEmptyReads = 0
 
     override fun read(buffer: ByteArray, offset: Int, length: Int): Int {
+        // Preserve Java InputStream's bounds contract even for an empty read.
+        if (offset < 0 || length < 0 || offset > buffer.size - length) {
+            throw IndexOutOfBoundsException("Invalid document read buffer range.")
+        }
         // The InputStream API requires a zero-length read to return zero,
         // even when there are no bytes left. It is not a provider stall.
         if (length == 0) return 0
