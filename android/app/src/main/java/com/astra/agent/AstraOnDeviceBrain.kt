@@ -86,6 +86,7 @@ internal class AstraOnDeviceBrain(
                     turns.lastOrNull { it.role == "user" }?.content
                 )
                 require(finalMessage.isNotEmpty()) { "Message cannot be empty." }
+                val carefulReasoning = AstraReasoningMode.enabled(finalMessage)
                 val selectedReplyLanguageId = context.getSharedPreferences(
                     "astra", Context.MODE_PRIVATE
                 ).getString("astra_ai_reply_language", "auto") ?: "auto"
@@ -236,7 +237,8 @@ internal class AstraOnDeviceBrain(
                         turns.dropLast(1).map {
                             AstraConversationContext.Turn(it.role, it.content)
                         },
-                        restoringConversation
+                        restoringConversation,
+                        thinkingRequested = carefulReasoning
                     ),
                     AstraReplyLanguage.fromId(selectedReplyLanguageId)
                 )
@@ -256,7 +258,8 @@ internal class AstraOnDeviceBrain(
                     AstraGenerationPolicy.maxAnswerTokens(
                         finalMessage,
                         advancedModel = modelPath.name == AstraModelImport.ADVANCED_NAME,
-                        hasReferences = citedBooks.isNotEmpty() || citedOpenCourse.isNotEmpty()
+                        hasReferences = citedBooks.isNotEmpty() || citedOpenCourse.isNotEmpty(),
+                        thinkingRequested = carefulReasoning
                     ),
                     diagnosticMaxTokens
                 )
