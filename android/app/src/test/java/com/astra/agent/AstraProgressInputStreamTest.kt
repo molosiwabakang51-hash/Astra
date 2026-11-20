@@ -16,8 +16,8 @@ class AstraProgressInputStreamTest {
     }
 
     @Test fun permanentlyStalledSafProviderFailsWithoutUnboundedLoop() {
-        val protected = AstraProgressInputStream(stalledProvider())
-        val failure = runCatching { protected.read(ByteArray(128)) }.exceptionOrNull()
+        val guarded = AstraProgressInputStream(stalledProvider())
+        val failure = runCatching { guarded.read(ByteArray(128)) }.exceptionOrNull()
         assertTrue(failure is IOException)
         assertTrue(failure?.message.orEmpty().contains("stopped returning data"))
         assertTrue(failure?.message.orEmpty().contains("Downloads"))
@@ -40,11 +40,11 @@ class AstraProgressInputStreamTest {
                 return n
             }
         }
-        val protected = AstraProgressInputStream(source)
+        val guarded = AstraProgressInputStream(source)
         val result = ByteArray(512)
-        assertEquals(data.size, protected.read(result))
+        assertEquals(data.size, guarded.read(result))
         assertArrayEquals(data, result.copyOf(data.size))
-        assertEquals(-1, protected.read(result))
+        assertEquals(-1, guarded.read(result))
     }
 
     @Test fun emptyBulkRequestIsNotMisclassifiedAsProviderHang() {
@@ -55,11 +55,11 @@ class AstraProgressInputStreamTest {
     }
 
     @Test fun invalidBufferOffsetsStillRejectWithoutTouchingProvider() {
-        val protected = AstraProgressInputStream(ByteArrayInputStream(byteArrayOf(1, 2)))
-        assertTrue(runCatching { protected.read(ByteArray(2), -1, 0) }.isFailure)
-        assertTrue(runCatching { protected.read(ByteArray(2), 3, 0) }.isFailure)
-        assertTrue(runCatching { protected.read(ByteArray(2), 1, 2) }.isFailure)
-        assertEquals(1, protected.read())
+        val guarded = AstraProgressInputStream(ByteArrayInputStream(byteArrayOf(1, 2)))
+        assertTrue(runCatching { guarded.read(ByteArray(2), -1, 0) }.isFailure)
+        assertTrue(runCatching { guarded.read(ByteArray(2), 3, 0) }.isFailure)
+        assertTrue(runCatching { guarded.read(ByteArray(2), 1, 2) }.isFailure)
+        assertEquals(1, guarded.read())
     }
 
     @Test fun realTextImportFailsSafelyWithoutCreatingFalseKnowledge() {
