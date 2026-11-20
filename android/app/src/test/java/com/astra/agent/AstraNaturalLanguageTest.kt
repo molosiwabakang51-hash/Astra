@@ -63,6 +63,44 @@ class AstraNaturalLanguageTest {
             AstraNaturalLanguage.canonical("Could you mark task 2 as completed?"))
     }
 
+    @Test fun politenessCanAppearAfterModalVerbs() {
+        assertEquals("show tasks",
+            AstraNaturalLanguage.canonical("Can you please show me my tasks?"))
+        assertEquals("open study",
+            AstraNaturalLanguage.canonical("Would you please take me to the Study Hub?"))
+        assertEquals("open notes",
+            AstraNaturalLanguage.canonical("Could you please go to my notes page?"))
+    }
+
+    @Test fun explicitListLanguageMakesOfflineActionsAccessible() {
+        assertEquals("add task revise bond convexity",
+            AstraNaturalLanguage.canonical("Could you please put revise bond convexity on my task list?"))
+        assertEquals("add task study French",
+            AstraNaturalLanguage.canonical("Add study French to my to-do list"))
+        assertEquals("remember that inflation affects nominal returns",
+            AstraNaturalLanguage.canonical("Please jot down: inflation affects nominal returns"))
+        assertEquals("remember that bonds have duration",
+            AstraNaturalLanguage.canonical("Can you please note down bonds have duration?"))
+        assertEquals("done 3",
+            AstraNaturalLanguage.canonical("Please complete task 3"))
+        assertEquals("open conversations",
+            AstraNaturalLanguage.canonical("Could you please show my old chats?"))
+    }
+
+    @Test fun quotedExplanationsNegationsAndStatementsAreNotExecuted() {
+        listOf(
+            "Can you please explain how to add items to my task list?",
+            "Could you please not put finance on my to-do list",
+            "Don't jot down this example",
+            "I need to finish task 3",
+            "What happens if you put something on my task list?",
+            "Tell me whether I should jot down this idea",
+            "Can you please discuss the value of task lists?"
+        ).forEach { input ->
+            assertEquals(input, AstraNaturalLanguage.canonical(input))
+        }
+    }
+
     @Test fun naturalHelpQuestionsRemainReadOnly() {
         assertEquals("help",
             AstraNaturalLanguage.canonical("How can you help me?"))
