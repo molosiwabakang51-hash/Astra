@@ -105,6 +105,27 @@ class AstraPrivateErrorTest {
         ).contains("Do not clear app data"))
     }
 
+    @Test fun nativeEngineDeadlineIsNotReportedAsCorruptModelOrNetworkFailure() {
+        val timeout = IllegalStateException(AstraNativeStartupWait.TIMEOUT_ADVICE)
+        val message = AstraPrivateError.forOwner(
+            AstraPrivateError.Operation.MODEL_CHAT, timeout
+        )
+        assertTrue(message.contains("engine did not finish starting in time"))
+        assertTrue(message.contains("Close other apps and retry"))
+        assertTrue(message.contains("restart Astra"))
+        assertTrue(message.contains("model, chats, notes and tasks"))
+        assertFalse(message.contains("invalid"))
+        assertFalse(message.contains("connection"))
+        assertFalse(message.contains("content://"))
+        assertFalse(message.contains("/data/user/"))
+        val otherFailure = AstraPrivateError.forOwner(
+            AstraPrivateError.Operation.MODEL_CHAT,
+            IllegalStateException("Qwen3 1.7B native model loading failed")
+        )
+        assertTrue(otherFailure.contains("may be unavailable or invalid"))
+        assertFalse(otherFailure.contains("Close other apps"))
+    }
+
     @Test fun lowMemoryAndPublicNetworkFailuresAreRecognizedWithoutExposingUrl() {
         val memory = AstraPrivateError.forOwner(
             AstraPrivateError.Operation.MODEL_SELF_TEST,
