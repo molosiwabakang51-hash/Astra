@@ -1412,7 +1412,7 @@ internal object AstraNaturalLanguage {
     fun canonical(raw: String): String {
         val text = raw.trim().replace(Regex("""\s+"""), " ")
         val clean = text.trimEnd('?', '!', '.').trim()
-        val prefix = """(?:please\s+)?(?:can you\s+|could you\s+|would you\s+|will you\s+|i want you to\s+|i'd like you to\s+)?"""
+        val prefix = """(?:please\s+)?(?:can you\s+|could you\s+|would you\s+|will you\s+|i want you to\s+|i'd like you to\s+)?(?:please\s+)?"""
         fun match(action: String): MatchResult? =
             Regex("^$prefix$action$", RegexOption.IGNORE_CASE).matchEntire(clean)
 
@@ -1460,15 +1460,29 @@ internal object AstraNaturalLanguage {
         match("""(?:show|open|go to|take me to)\s+(?:my\s+)?(?:previous\s+)?conversations""")?.let {
             return "open conversations"
         }
+        match("""(?:show|open|go to|take me to|switch to)\s+(?:my\s+)?(?:old chats|past chats|chat history)""")?.let {
+            return "open conversations"
+        }
         // Specific, explicit writes only. The original command processor
         // retains its own validation and persistence semantics.
         match("""(?:add|create|make)\s+(?:a\s+|new\s+)?task\s+(?:to\s+|for\s+|called\s+)?(.+)""")?.let {
             return "add task " + it.groupValues[1]
         }
+        // Adding an item to a named list is an explicit task-write request,
+        // unlike a general statement such as "I need to study tonight".
+        match("""(?:add|put|place)\s+(.+?)\s+(?:to|on|onto)\s+(?:my\s+|the\s+)?(?:tasks|task list|to-do list|todo list)""")?.let {
+            return "add task " + it.groupValues[1].trim()
+        }
         match("""(?:please\s+)?(?:remember|make a note of|write down|save a note that)\s+(?:that\s+)?(.+)""")?.let {
             return "remember that " + it.groupValues[1]
         }
+        match("""(?:jot down|note down|write this down)\s*[:\-]?\s*(.+)""")?.let {
+            return "remember that " + it.groupValues[1]
+        }
         match("""(?:mark|set)\s+task\s+(\d+)\s+(?:as\s+)?(?:done|complete|completed)""")?.let {
+            return "done " + it.groupValues[1]
+        }
+        match("""(?:finish|complete)\s+task\s+(\d+)""")?.let {
             return "done " + it.groupValues[1]
         }
         return raw
