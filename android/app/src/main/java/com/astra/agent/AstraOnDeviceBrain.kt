@@ -348,21 +348,32 @@ internal class AstraOnDeviceBrain(
         val temporary = File(directory, "$name.partial")
         temporary.delete()
         try {
-            context.assets.open(name).use { source ->
+            // FULL APK asset reads can be short or transiently return zero.
+            // Reuse the bounded, cancellable GGUF stream copier used for Files
+            // imports instead of risking an infinite 0-byte read loop here.
+            // Hash while copying to avoid rereading ~1.3 GB from phone storage.
+            val assetDigest = MessageDigest.getInstance("SHA-256")
+            val copiedBytes = context.assets.open(name).use { source ->
                 FileOutputStream(temporary).use { sink ->
-                    val buffer = ByteArray(1024 * 1024)
-                    while (true) {
+                    val copied = AstraModelImport.copyBounded(
+                        source, sink, assetDigest
+                    ) {
                         workContext.ensureActive()
-                        val count = source.read(buffer)
-                        if (count < 0) break
-                        sink.write(buffer, 0, count)
+                        require(StatFs(directory.absolutePath).availableBytes >=
+                            DISK_HEADROOM_BYTES
+                        ) { "Insufficient phone storage while preparing bundled model." }
                     }
                     workContext.ensureActive()
                     sink.fd.sync()
+                    copied
                 }
             }
-            require(temporary.length() >= minimumBytes &&
-                sha256(temporary).equals(expectedSha256, ignoreCase = true)
+            val assetSha256 = assetDigest.digest().joinToString("") {
+                "%02x".format(it)
+            }
+            require(copiedBytes >= minimumBytes &&
+                temporary.length() == copiedBytes &&
+                assetSha256.equals(expectedSha256, ignoreCase = true)
             ) { "Bundled language model failed SHA-256 integrity verification." }
             AstraModelStorage.installVerified(temporary, target)
             verifiedModels.rememberVerified(target, expectedSha256)
