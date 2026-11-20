@@ -149,12 +149,19 @@ internal object AstraConversationReview {
             }
             if (falseAttribution != null) {
                 val chicagoClaim = earlierReplies.any { entry ->
-                    val claim = entry.value.text.lowercase(Locale.ROOT)
+                    val claim = entry.value.text.replace(Regex("""\\s+"""), " ")
+                        .lowercase(Locale.ROOT)
+                    // Mentioning Chicago to *deny* a false affiliation
+                    // is not proof that Astra assigned that affiliation.
                     (claim.contains("robert j. shiller") ||
                         claim.contains("robert j shiller")) &&
-                        claim.contains("chicago") &&
-                        !claim.contains("not the university of chicago") &&
-                        !claim.contains("not at the university of chicago")
+                        listOf(
+                            "shiller is an economist at chicago",
+                            "shiller is an economist at the university of chicago",
+                            "shiller works at the university of chicago",
+                            "shiller teaches at the university of chicago",
+                            "shiller is from the university of chicago"
+                        ).any(claim::contains)
                 }
                 return buildString {
                     append("Yes. In my earlier message #")
