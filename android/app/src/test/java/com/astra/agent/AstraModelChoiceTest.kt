@@ -4,6 +4,12 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class AstraModelChoiceTest {
+    @Test fun legacyMetadataAliasesPointOnlyToPinnedQwen3OnePointSevenB() {
+        assertEquals(AstraModelImport.ADVANCED_NAME, AstraOnDeviceBrain.ASSET_NAME)
+        assertEquals(AstraModelImport.ADVANCED_SHA256, AstraOnDeviceBrain.MODEL_SHA256)
+        assertEquals("Qwen3 1.7B · Q4_K_M · offline", AstraOnDeviceBrain.MODEL_LABEL)
+    }
+
     @Test fun advancedModelIsTheOnlySupportedConversationEngine() {
         assertEquals(AstraModelChoice.Variant.ADVANCED,
             AstraModelChoice.choose(advancedAvailable = true))
