@@ -46,7 +46,7 @@ class BackgroundSpeechPrivacySourceTest(unittest.TestCase):
         self.assertIn("displayInteractive && deviceUnlocked && windowFocused", PRIVACY)
 
     def test_tts_checks_actual_device_state_immediately_before_queuing(self):
-        speak = block_after("    private fun speak(text: String, offlineOnly: Boolean) {",
+        speak = block_after("    private fun speak(\n",
                             "    private fun initializeRecognizer() {")
         self.assertIn("if (!ttsReady || !canPlaySpeechNow()) return", speak)
         self.assertIn("if (!canPlaySpeechNow()) {", speak)
