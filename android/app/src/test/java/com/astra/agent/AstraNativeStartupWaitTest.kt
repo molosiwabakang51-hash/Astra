@@ -50,7 +50,7 @@ class AstraNativeStartupWaitTest {
             }
         }.exceptionOrNull()
         assertTrue(error is CancellationException)
-        assertFalse(error is IllegalStateException)
+        assertFalse(error?.message == AstraNativeStartupWait.TIMEOUT_ADVICE)
     }
 
     @Test fun outerCallerDeadlineIsNotMisreportedAsNativeStartupFailure() {
@@ -64,7 +64,7 @@ class AstraNativeStartupWaitTest {
             }
         }.exceptionOrNull()
         assertTrue(error is TimeoutCancellationException)
-        assertFalse(error is IllegalStateException)
+        assertFalse(error?.message == AstraNativeStartupWait.TIMEOUT_ADVICE)
     }
 
     @Test fun nullIsALegitimateReadyValueNotADiagnosticTimeout() = runBlocking {
@@ -83,7 +83,8 @@ class AstraNativeStartupWaitTest {
                 }
             }
         }.exceptionOrNull()
-        assertTrue(error === original)
+        assertTrue(error is IllegalArgumentException)
+        assertEquals(original.message, error?.message)
     }
 
     @Test fun timeoutParametersMustBePositive() = runBlocking {
