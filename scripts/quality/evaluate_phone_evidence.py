@@ -24,6 +24,15 @@ def evaluate(record, manifest=None):
     if not isinstance(runs, list) or len(runs) != 2:
         return {"status": "INCOMPLETE", "errors": ["Two independent phone runs required"], "rating": None}
     scores = []
+    # The 8.5/10 campaign requires two runs on the SAME build, model and
+    # Android configuration. A better result after changing the model/build
+    # cannot silently replace a repeatability check.
+    first_meta = runs[0].get("evidence", {}) if isinstance(runs[0], dict) else {}
+    second_meta = runs[1].get("evidence", {}) if isinstance(runs[1], dict) else {}
+    if isinstance(first_meta, dict) and isinstance(second_meta, dict):
+        for field in ("commit", "android_version", "model_sha256"):
+            if first_meta.get(field) != second_meta.get(field):
+                errors.append(f"Run configuration mismatch: {field} differs between runs")
     for n, run in enumerate(runs, 1):
         if not isinstance(run, dict):
             errors.append(f"Run {n}: expected an object")
