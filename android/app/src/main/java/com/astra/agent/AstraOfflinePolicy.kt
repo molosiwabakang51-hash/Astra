@@ -39,10 +39,10 @@ internal object AstraOfflinePolicy {
         return head + OMITTED_MARKER + tail
     }
 
-    // Qwen3's documented soft switch makes the small phone model answer
-    // directly rather than spend its output budget generating <think> tokens.
-    fun modelPrompt(userText: String): String =
-        boundedInput(userText) + "\n/no_think"
+    // Ordinary requests answer directly. Explicit, current-owner requests
+    // may opt into bounded private reasoning; quoted history cannot enable it.
+    fun modelPrompt(userText: String, thinkingRequested: Boolean = false): String =
+        boundedInput(userText) + if (thinkingRequested) "\n/think" else "\n/no_think"
 
     // A killed Android process can leave its last saved reply as 'thinking'.
     // Recover these placeholders without changing valid saved conversations.
