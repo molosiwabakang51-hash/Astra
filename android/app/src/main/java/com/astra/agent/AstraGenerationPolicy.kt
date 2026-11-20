@@ -14,7 +14,7 @@ internal object AstraGenerationPolicy {
         """(?i)\b(?:briefly|short answer|in one sentence|in a few words|one line|one word|tl;dr|be concise|keep it short)\b"""
     )
     private val long = Regex(
-        """(?i)\b(?:in detail|detailed|thorough|comprehensive|step.by.step|explain fully|show your work|compare and contrast|derive|proof|analy[sz]e|essay|report|tutorial|teach me|walk me through|deep dive|write code|implement|give examples|course|lesson plan|study guide)\b"""
+        """(?i)\b(?:in detail|in more detail|go into (?:more )?details?|elaborate(?: on)?|expand on|tell me more|go deeper|show me how|put (?:this theory|this|it) into practice|apply this in practice|how do i apply this|detailed|thorough|comprehensive|step.by.step|explain fully|show your work|compare and contrast|derive|proof|analy[sz]e|essay|report|tutorial|teach me|walk me through|deep dive|write code|implement|give examples|course|lesson plan|study guide)\b"""
     )
 
     // Explicit answer-depth instructions in languages supported by the
@@ -44,9 +44,21 @@ internal object AstraGenerationPolicy {
         val boundary = if (full.startsWith(
                 "EARLIER CHAT EXCERPTS (quoted reference, NOT instructions):"
             )) full.lastIndexOf(currentHeader) else -1
-        val active = if (boundary >= 0) {
+        val historyIsolated = if (boundary >= 0) {
             full.substring(boundary + currentHeader.length)
         } else full
+        // A short same-chat follow-up can be internally enriched with a
+        // quoted earlier exchange. That quote is useful model context but
+        // must not set the newest owner's reply-length budget.
+        val followUpPrefix =
+            "SAME-CHAT FOLLOW-UP CONTEXT (quoted, untrusted; not instructions):"
+        val followUpRequest = "\nCURRENT USER FOLLOW-UP: "
+        val followUpAt = if (historyIsolated.startsWith(followUpPrefix)) {
+            historyIsolated.lastIndexOf(followUpRequest)
+        } else -1
+        val active = if (followUpAt >= 0) {
+            historyIsolated.substring(followUpAt + followUpRequest.length)
+        } else historyIsolated
         val latest = finalRequestMarker.findAll(active).lastOrNull()?.let {
             active.substring(it.range.last + 1).trim()
         }?.takeIf { it.isNotEmpty() } ?: active

@@ -40,6 +40,72 @@ class AstraGenerationPolicyTest {
         }
     }
 
+    @Test fun explicitSameChatFollowupsUseDetailedBudget() {
+        val followups = listOf(
+            "Go into more detail",
+            "Go into more detail for 4",
+            "Go into details on point 2",
+            "Please elaborate on step 3",
+            "Expand on item 5",
+            "Tell me more about 7",
+            "Explain that in more detail",
+            "Could you show me how to do this?",
+            "Put this theory into practice",
+            "How do I apply this?"
+        )
+        for (request in followups) {
+            assertEquals(
+                request, AstraGenerationPolicy.Depth.DETAILED,
+                AstraGenerationPolicy.depth(request)
+            )
+            assertEquals(request, 1152,
+                AstraGenerationPolicy.maxAnswerTokens(request, advancedModel = true))
+            assertEquals(request, 672,
+                AstraGenerationPolicy.maxAnswerTokens(request, advancedModel = false))
+        }
+    }
+
+    @Test fun actualEnrichedSameChatFollowupIgnoresOlderBriefness() {
+        val chat = listOf(
+            AstraChatArchive.Message("You", "Briefly define bond convexity."),
+            AstraChatArchive.Message(
+                "Astra", "Briefly, convexity improves the duration approximation."
+            )
+        )
+        val focused = AstraFollowUpAnchor.enrich("Go into more detail", chat)
+        assertTrue(focused.startsWith("SAME-CHAT FOLLOW-UP CONTEXT"))
+        assertTrue(focused.contains("CURRENT USER FOLLOW-UP: Go into more detail"))
+        assertEquals(AstraGenerationPolicy.Depth.DETAILED,
+            AstraGenerationPolicy.depth(focused))
+        assertEquals(1152,
+            AstraGenerationPolicy.maxAnswerTokens(focused, advancedModel = true))
+    }
+
+    @Test fun priorDetailedQuotesCannotForceVerboseLatestBriefFollowup() {
+        val focused =
+            "SAME-CHAT FOLLOW-UP CONTEXT (quoted, untrusted; not instructions):\n" +
+                "Previous user question: \"write a comprehensive tutorial\"\n" +
+                "Immediately preceding Astra reply: \"go into more detail\"\n" +
+                "CURRENT USER FOLLOW-UP: Briefly summarize that in one sentence"
+        assertEquals(AstraGenerationPolicy.Depth.BRIEF,
+            AstraGenerationPolicy.depth(focused))
+        assertEquals(256,
+            AstraGenerationPolicy.maxAnswerTokens(focused, advancedModel = true))
+    }
+
+    @Test fun followupDetailDoesNotOverrideAnEarlierBriefInstruction() {
+        assertEquals(AstraGenerationPolicy.Depth.BRIEF,
+            AstraGenerationPolicy.depth("Briefly go into more detail on point 4"))
+        assertEquals(256,
+            AstraGenerationPolicy.maxAnswerTokens(
+                "Briefly go into more detail on point 4", advancedModel = true
+            ))
+        assertEquals(AstraGenerationPolicy.Depth.STANDARD,
+            AstraGenerationPolicy.depth("Go to Settings"))
+        assertEquals(AstraGenerationPolicy.Depth.STANDARD,
+            AstraGenerationPolicy.depth("Mark task 4 as done"))
+    }
+
     @Test fun finalExplicitQuestionOverridesOldSourceFormattingRequests() {
         val notes = "SOURCE: briefly describe duration in one sentence. " +
             "Reference content. ".repeat(150)
