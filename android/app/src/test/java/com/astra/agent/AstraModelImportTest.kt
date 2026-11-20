@@ -48,7 +48,8 @@ class AstraModelImportTest {
         assertTrue(!stale.exists())
         assertTrue(backup.isFile)
         assertEquals("working backup", backup.readText())
-        assertTrue(stale.writeText("fresh attempt").let { stale.length() > 0 })
+        stale.writeText("fresh attempt")
+        assertEquals("fresh attempt", stale.readText())
     }
 
     @Test fun unexpectedDirectoryAtTempPathFailsClosedWithoutDeletingContents() {
