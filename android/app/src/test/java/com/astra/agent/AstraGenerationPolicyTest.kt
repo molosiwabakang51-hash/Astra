@@ -40,6 +40,44 @@ class AstraGenerationPolicyTest {
         }
     }
 
+    @Test fun explicitSameChatFollowupsUseDetailedBudget() {
+        val followups = listOf(
+            "Go into more detail",
+            "Go into more detail for 4",
+            "Go into details on point 2",
+            "Please elaborate on step 3",
+            "Expand on item 5",
+            "Tell me more about 7",
+            "Explain that in more detail",
+            "Could you show me how to do this?",
+            "Put this theory into practice",
+            "How do I apply this?"
+        )
+        for (request in followups) {
+            assertEquals(
+                request, AstraGenerationPolicy.Depth.DETAILED,
+                AstraGenerationPolicy.depth(request)
+            )
+            assertEquals(request, 1152,
+                AstraGenerationPolicy.maxAnswerTokens(request, advancedModel = true))
+            assertEquals(request, 672,
+                AstraGenerationPolicy.maxAnswerTokens(request, advancedModel = false))
+        }
+    }
+
+    @Test fun followupDetailDoesNotOverrideAnEarlierBriefInstruction() {
+        assertEquals(AstraGenerationPolicy.Depth.BRIEF,
+            AstraGenerationPolicy.depth("Briefly go into more detail on point 4"))
+        assertEquals(256,
+            AstraGenerationPolicy.maxAnswerTokens(
+                "Briefly go into more detail on point 4", advancedModel = true
+            ))
+        assertEquals(AstraGenerationPolicy.Depth.STANDARD,
+            AstraGenerationPolicy.depth("Go to Settings"))
+        assertEquals(AstraGenerationPolicy.Depth.STANDARD,
+            AstraGenerationPolicy.depth("Mark task 4 as done"))
+    }
+
     @Test fun finalExplicitQuestionOverridesOldSourceFormattingRequests() {
         val notes = "SOURCE: briefly describe duration in one sentence. " +
             "Reference content. ".repeat(150)
