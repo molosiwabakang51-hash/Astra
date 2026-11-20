@@ -169,9 +169,13 @@ internal class AstraOnDeviceBrain(
                 AstraInferenceCheckpoint.mark(
                     context, AstraInferenceCheckpoint.ENGINE_SETUP
                 )
-                val current = engine ?: AiChat.getInferenceEngine(
-                    context.applicationContext
-                ).also { engine = it }
+                val current = engine ?: AstraNativeBootstrap.acquire {
+                    // The JNI library can fail to link synchronously on a
+                    // mismatched APK or incompatible arm64 Android device.
+                    // Convert only LinkageError to a recoverable Exception,
+                    // rather than allowing an uncaught process-level close.
+                    AiChat.getInferenceEngine(context.applicationContext)
+                }.also { engine = it }
                 // Upstream initializes JNI asynchronously. Wait for the engine
                 // to be ready instead of racing model loading against init.
                 val initialized = withTimeout(30_000L) {
@@ -328,6 +332,15 @@ internal class AstraOnDeviceBrain(
                     publicAnswer
                 }
                 }
+            } catch (linkage: LinkageError) {
+                // JNI symbols may be resolved only when a later native method
+                // first runs (loadModel, system prompt or token generation),
+                // not at AiChat.getInferenceEngine(). A Java LinkageError
+                // must not escape our normal Kotlin recovery boundary.
+                // Keep OOM/VM errors outside this catch by design.
+                session.invalidate()
+                loadedModelPath = null
+                throw AstraNativeBootstrap.recover(linkage)
             } catch (error: Exception) {
                 // Cancellation, JNI failures and timeouts can leave partial
                 // tokens in the model's native KV-cache. A later request must
