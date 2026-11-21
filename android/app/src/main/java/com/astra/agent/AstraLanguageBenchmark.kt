@@ -134,6 +134,10 @@ internal object AstraLanguageBenchmark {
             appendLine("ON-DEVICE LANGUAGE SPOT CHECKS")
             appendLine("Model loaded: " + (actualModel ?: "unverified"))
             appendLine(passed.toString() + "/" + outcomes.size + " checks passed.")
+            appendLine("Coverage: " + outcomes.size + "/" + Probe.entries.size +
+                " distinct probes attempted" +
+                (if (outcomes.size == Probe.entries.size) " (complete)." else
+                    " (partial; not a full ten-probe assessment)."))
             outcomes.forEach { x ->
                 appendLine((if (x.passed) "PASS" else "UNVERIFIED") +
                     " — " + x.probe.title + " (" + x.milliseconds + " ms)")
