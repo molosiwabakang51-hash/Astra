@@ -61,19 +61,22 @@ internal object AstraLanguageBenchmark {
         val sample: String
     )
 
+    // The on-device benchmark must never treat appended reference excerpts as
+    // generated answers OR include them in diagnostic samples. These excerpts
+    // may originate in private books imported by the owner.
+    private val sourceFooter = Regex(
+        """(?im)^\s*(?:Open-course references:|Retrieved local book passages)\s*$"""
+    )
+
+    private fun answerOnly(output: String): String {
+        val visible = AstraOfflinePolicy.publicReply(output)
+        return visible.substring(0, sourceFooter.find(visible)?.range?.first
+            ?: visible.length).trim()
+    }
+
     fun score(probe: Probe, answer: String): Boolean {
-        // Attribution footers are not part of the generated answer. A wrong
-        // response should never pass just because a cited excerpt contains
-        // the expected word or number.
-        val visible = AstraOfflinePolicy.publicReply(answer)
-        // Generated answers and appended local-source citations are different
-        // evidence. Source footers may use CRLF, mixed case or extra spaces.
-        // Score only the answer before the first complete footer heading.
-        val footer = Regex(
-            """(?im)^\s*(?:Open-course references:|Retrieved local book passages)\s*$"""
-        )
-        val text = visible.substring(0, footer.find(visible)?.range?.first
-            ?: visible.length).trim().lowercase(Locale.ROOT)
+        // Score only the model answer, not retrieved local source passages.
+        val text = answerOnly(answer).lowercase(Locale.ROOT)
         if (text.isBlank() ||
             text.startsWith("the offline model did not produce") ||
             text.startsWith("offline model unavailable")
@@ -114,7 +117,7 @@ internal object AstraLanguageBenchmark {
 
     fun outcome(probe: Probe, answer: String, elapsedMs: Long): Outcome =
         Outcome(probe, score(probe, answer), elapsedMs.coerceAtLeast(0),
-            AstraOfflinePolicy.publicReply(answer).replace(Regex("""\s+"""), " ")
+            answerOnly(answer).replace(Regex("""\s+"""), " ")
                 .trim().take(140))
 
     fun render(outcomes: List<Outcome>, actualModel: String?): String {

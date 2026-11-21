@@ -56,6 +56,39 @@ class AstraLanguageBenchmarkTest {
         }
     }
 
+    @Test fun diagnosticSamplesNeverEchoRetrievedPrivateBookPassages() {
+        val answer = "I cannot calculate that.\n\nRetrieved Local Book Passages\n" +
+            "[K1] PRIVATE_OWNER_BOOK_EXCERPT 42"
+        val result = AstraLanguageBenchmark.outcome(
+            AstraLanguageBenchmark.Probe.ARITHMETIC, answer, 50L
+        )
+        assertFalse(result.passed)
+        assertEquals("I cannot calculate that.", result.sample)
+        val report = AstraLanguageBenchmark.render(listOf(result), "Qwen3 1.7B")
+        assertFalse(report.contains("PRIVATE_OWNER_BOOK_EXCERPT"))
+        assertFalse(report.contains("[K1]"))
+    }
+
+    @Test fun mixedCaseCrLfFootersAreExcludedFromPassedAndFailedSamples() {
+        for (answer in listOf(
+            "42\r\n\r\nOPEN-COURSE REFERENCES:\r\n[K1] PRIVATE_DATA",
+            "42\n  retrieved local book passages  \n[K1] PRIVATE_DATA"
+        )) {
+            val result = AstraLanguageBenchmark.outcome(
+                AstraLanguageBenchmark.Probe.ARITHMETIC, answer, 1L
+            )
+            assertTrue(result.passed)
+            assertEquals("42", result.sample)
+            assertFalse(result.sample.contains("PRIVATE_DATA"))
+        }
+        val failure = AstraLanguageBenchmark.outcome(
+            AstraLanguageBenchmark.Probe.ARITHMETIC,
+            "43\r\nOpen-Course References:\r\nPRIVATE_DATA", 1L
+        )
+        assertFalse(failure.passed)
+        assertEquals("43", failure.sample)
+    }
+
     @Test fun RussianTranslationSupportsCommonEnglishExpressions() {
         assertTrue(AstraLanguageBenchmark.score(
             AstraLanguageBenchmark.Probe.RUSSIAN, "Thank you!"))
