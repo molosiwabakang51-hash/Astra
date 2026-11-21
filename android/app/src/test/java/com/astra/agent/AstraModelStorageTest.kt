@@ -70,6 +70,56 @@ class AstraModelStorageTest {
         assertArrayEquals("working".toByteArray(), target.readBytes())
     }
 
+    @Test fun refusesToInstallRecoveryBackupOverCurrentModel() {
+        val dir = folder.newFolder("backup-alias")
+        val target = File(dir, name)
+        val backup = File(dir, "$name.before-import")
+        write(target, "working-current-model")
+        write(backup, "recoverable-previous-model")
+
+        val error = runCatching {
+            AstraModelStorage.installVerified(backup, target)
+        }.exceptionOrNull()
+
+        assertTrue(error is IllegalArgumentException)
+        assertArrayEquals("working-current-model".toByteArray(), target.readBytes())
+        assertArrayEquals("recoverable-previous-model".toByteArray(), backup.readBytes())
+    }
+
+    @Test fun canonicalPathAliasesCannotReplaceInstalledModelWithItself() {
+        val dir = folder.newFolder("canonical-alias")
+        val target = File(dir, name)
+        write(target, "working-current-model")
+        val alias = File(dir, "nested/../$name")
+        File(dir, "nested").mkdir()
+
+        val error = runCatching {
+            AstraModelStorage.installVerified(alias, target)
+        }.exceptionOrNull()
+
+        assertTrue(error is IllegalArgumentException)
+        assertArrayEquals("working-current-model".toByteArray(), target.readBytes())
+        assertFalse(File(dir, "$name.before-import").exists())
+    }
+
+    @Test fun canonicalPathAliasesCannotConsumeRecoveryBackup() {
+        val dir = folder.newFolder("backup-path-alias")
+        val target = File(dir, name)
+        val backup = File(dir, "$name.before-import")
+        write(target, "working-current-model")
+        write(backup, "recoverable-previous-model")
+        File(dir, "nested").mkdir()
+        val alias = File(dir, "nested/../$name.before-import")
+
+        val error = runCatching {
+            AstraModelStorage.installVerified(alias, target)
+        }.exceptionOrNull()
+
+        assertTrue(error is IllegalArgumentException)
+        assertArrayEquals("working-current-model".toByteArray(), target.readBytes())
+        assertArrayEquals("recoverable-previous-model".toByteArray(), backup.readBytes())
+    }
+
     @Test fun refusesToOverwriteTheModelWithItself() {
         val dir = folder.newFolder("same")
         val target = File(dir, name)
