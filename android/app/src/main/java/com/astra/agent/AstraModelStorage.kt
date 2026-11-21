@@ -29,10 +29,19 @@ internal object AstraModelStorage {
         require(verifiedTemporary.isFile) {
             "Verified model file is not available for installation."
         }
-        require(verifiedTemporary.absolutePath != target.absolutePath) {
+        val backup = backupFor(target)
+        // The backup is the only recoverable copy after a crash between
+        // renames. Never accept it as an import source: renaming the current
+        // target over that same file could destroy both the backup and the
+        // supposed verified replacement. Canonical paths also reject aliases
+        // such as ".." and symlinks within private storage.
+        val sourcePath = verifiedTemporary.canonicalPath
+        require(sourcePath != target.canonicalPath) {
             "Cannot install a model over itself."
         }
-        val backup = backupFor(target)
+        require(sourcePath != backup.canonicalPath) {
+            "Cannot use the model recovery backup as an import source."
+        }
         // Any backup left by a previous successful import is superseded by
         // the currently installed target, not by an unverified temporary file.
         if (target.isFile && backup.exists()) {
