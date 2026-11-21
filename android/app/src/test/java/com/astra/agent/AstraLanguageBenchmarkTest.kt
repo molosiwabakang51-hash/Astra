@@ -263,4 +263,26 @@ class AstraLanguageBenchmarkTest {
                 "Offline model unavailable: import a GGUF file."))
         }
     }
+    @Test fun partialReportExplicitlyDisclosesMissingCoverage() {
+        val partial = AstraLanguageBenchmark.render(
+            listOf(AstraLanguageBenchmark.outcome(
+                AstraLanguageBenchmark.Probe.ARITHMETIC, "42", 12L
+            )), "Qwen3 1.7B"
+        )
+        assertTrue(partial.contains("1/1 checks passed"))
+        assertTrue(partial.contains("Coverage: 1/10 distinct probes attempted"))
+        assertTrue(partial.contains("partial; not a full ten-probe assessment"))
+        assertFalse(partial.contains("Coverage: 10/10"))
+    }
+
+    @Test fun fullReportIdentifiesCompleteCoverageEvenWhenAnswersFail() {
+        val all = AstraLanguageBenchmark.Probe.entries.map {
+            AstraLanguageBenchmark.outcome(it, "", 1L)
+        }
+        val report = AstraLanguageBenchmark.render(all, "Qwen3 1.7B")
+        assertTrue(report.contains("0/10 checks passed"))
+        assertTrue(report.contains("Coverage: 10/10 distinct probes attempted (complete)."))
+        assertFalse(report.contains("partial; not a full ten-probe assessment"))
+    }
+
 }
