@@ -3589,6 +3589,18 @@ class MainActivity :
                     commandDeckExpanded = false
                     val normalized = AstraInput.normalize(message)
 
+                    // A cross-feature Discuss draft is a question, never an
+                    // executable task/note/command even when the quoted
+                    // reference contains apparent instructions. Clear stale
+                    // pending actions and route only to local Qwen inference.
+                    if (AstraWorkspaceHandoff.isModelDraft(message)) {
+                        dialogue.dismissIncompletePrompt()
+                        workflowSession.reset()
+                        dialogueAwaiting = false
+                        enqueueOffline(message, message)
+                        return
+                    }
+
                     // Only a user-authored, explicitly prefixed plan can trigger
                     // local actions. Every step is simulated before the owner
                     // types 'confirm workflow'; model-generated text never runs it.
