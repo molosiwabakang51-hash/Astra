@@ -24,6 +24,29 @@ internal object AstraWorkspaceHandoff {
 
     private const val MAX_REFERENCE_CHARS = 700
 
+    private const val MAX_SAVED_CHAT_NOTE_CHARS = 1_800
+
+    /**
+     * An explicitly saved Chat excerpt is marked by provenance. Astra's
+     * generated words must not silently become an owner-stated memory.
+     */
+    fun noteFromChat(role: String, text: String): String? {
+        val source = when (role) {
+            "You" -> "My chat message"
+            "Astra" -> "Astra reply (unverified; check important facts)"
+            else -> return null
+        }
+        val cleaned = text.trim()
+        if (cleaned.isBlank()) return null
+        val abbreviated = cleaned.length > MAX_SAVED_CHAT_NOTE_CHARS
+        var excerpt = cleaned.take(MAX_SAVED_CHAT_NOTE_CHARS)
+        if (excerpt.isNotEmpty() && Character.isHighSurrogate(excerpt.last())) {
+            excerpt = excerpt.dropLast(1)
+        }
+        return "$source:\n" + excerpt +
+            if (abbreviated) "\n[Message shortened when saved to Notes]" else ""
+    }
+
     /**
      * Null means no handoff: a blank source or an already-written Chat draft
      * must never be silently replaced. Input data is always labelled as quoted
