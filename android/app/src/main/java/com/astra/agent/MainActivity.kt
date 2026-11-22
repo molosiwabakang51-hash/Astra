@@ -3041,6 +3041,11 @@ class MainActivity :
                 }
                 // Re-open the subject catalog instead of retaining an old topic.
                 var studyOpenToken by remember { mutableIntStateOf(0) }
+                // Keep the current course selected while a lesson opens in Chat.
+                // This is UI state only; do not copy lesson or private content.
+                var studySelectedId by rememberSaveable {
+                    mutableStateOf<String?>(null)
+                }
 
                 var showFindInChat by remember { mutableStateOf(false) }
                 var findInChatQuery by remember { mutableStateOf("") }
@@ -3200,6 +3205,7 @@ class MainActivity :
                 var toolOutput by remember {
                     mutableStateOf("")
                 }
+                var toolOutputShareable by remember { mutableStateOf(false) }
 
                 val keyboard =
                     LocalSoftwareKeyboardController.current
@@ -3994,6 +4000,7 @@ class MainActivity :
                         }
 
                         AssistantAction.OPEN_STUDY -> {
+                            studySelectedId = null
                             studyOpenToken++
                             tab = 5
                         }
@@ -4062,6 +4069,23 @@ class MainActivity :
                     input = ""
 
                     keyboard?.hide()
+                }
+
+                // Feature-to-Chat handoffs are deliberate drafts, not commands.
+                // No note, task or tool result is sent or saved until Send.
+                fun discussFrom(source: AstraWorkspaceHandoff.Source, reference: String) {
+                    val draft = AstraWorkspaceHandoff.draft(source, reference, input)
+                    if (draft == null) {
+                        Toast.makeText(
+                            this@MainActivity,
+                            "Finish or clear your current Chat draft before discussing this item.",
+                            Toast.LENGTH_LONG
+                        ).show()
+                        return
+                    }
+                    input = draft
+                    commandDeckExpanded = false
+                    tab = 0
                 }
 
                 val systemSpeech =
@@ -5370,7 +5394,12 @@ class MainActivity :
                                     missionControlExpanded = commandDeckExpanded,
                                     onDismiss = { navigationPopupOpen = false },
                                     onNavigate = { index ->
-                                        if (index == 5) studyOpenToken++
+                                        if (index == 5) {
+                                            // Explicit Study navigation starts at the catalog;
+                                            // the Continue Study shortcut keeps a course.
+                                            studySelectedId = null
+                                            studyOpenToken++
+                                        }
                                         tab = index
                                         navigationPopupOpen = false
                                     },
@@ -5543,6 +5572,7 @@ class MainActivity :
                                                     navigationPopupOpen = true
                                                 },
                                                 onOpenStudy = {
+                                                    studySelectedId = null
                                                     studyOpenToken++
                                                     tab = 5
                                                 },
@@ -5643,6 +5673,21 @@ class MainActivity :
                                     }
                                 }
 
+                                // Return directly to the subject that launched a lesson.
+                                // No synthetic chat turn or duplicate lesson is generated.
+                                val continuingSubject = AstraStudyCatalog.find(studySelectedId)
+                                if (continuingSubject != null) {
+                                    TextButton(
+                                        onClick = { tab = 5 },
+                                        modifier = Modifier.semantics {
+                                            contentDescription =
+                                                "Continue studying " + continuingSubject.title
+                                        }
+                                    ) {
+                                        Text("↶ Continue " + continuingSubject.title)
+                                    }
+                                }
+
                                 Row(
                                     modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp),
                                     verticalAlignment = Alignment.CenterVertically,
@@ -5737,37 +5782,37 @@ class MainActivity :
                                                     )
                                         ) {
 
-                                            Row(
-                                                modifier =
-                                                    Modifier.padding(12.dp),
-                                                verticalAlignment =
-                                                    Alignment.CenterVertically
+                                            Column(
+                                                modifier = Modifier.fillMaxWidth().padding(12.dp)
                                             ) {
-
-                                                Text(
-                                                    task,
-                                                    modifier =
-                                                        Modifier.weight(1f)
-                                                )
-
-                                                TextButton(
-                                                    onClick = {
-
-                                                        if (
-                                                            index in tasks.indices
-                                                        ) {
-
-                                                            completed.add(
-                                                                tasks.removeAt(
-                                                                    index
-                                                                )
-                                                            )
-
-                                                            persist()
-                                                        }
-                                                    }
+                                                Text(task)
+                                                Row(
+                                                    modifier = Modifier.fillMaxWidth(),
+                                                    horizontalArrangement = Arrangement.End
                                                 ) {
-                                                    Text("Done")
+                                                    TextButton(
+                                                        onClick = {
+                                                            discussFrom(
+                                                                AstraWorkspaceHandoff.Source.TASK,
+                                                                task
+                                                            )
+                                                        },
+                                                        modifier = Modifier.semantics {
+                                                            contentDescription = "Discuss task in Chat"
+                                                        }
+                                                    ) {
+                                                        Text("Discuss")
+                                                    }
+                                                    TextButton(
+                                                        onClick = {
+                                                            if (index in tasks.indices) {
+                                                                completed.add(tasks.removeAt(index))
+                                                                persist()
+                                                            }
+                                                        }
+                                                    ) {
+                                                        Text("Done")
+                                                    }
                                                 }
                                             }
                                         }
@@ -5871,6 +5916,20 @@ class MainActivity :
 
                                                     TextButton(
                                                         onClick = {
+                                                            discussFrom(
+                                                                AstraWorkspaceHandoff.Source.NOTE,
+                                                                note
+                                                            )
+                                                        },
+                                                        modifier = Modifier.semantics {
+                                                            contentDescription = "Discuss note in Chat"
+                                                        }
+                                                    ) {
+                                                        Text("Discuss")
+                                                    }
+
+                                                    TextButton(
+                                                        onClick = {
 
                                                             editingNoteIndex =
                                                                 index
@@ -5930,6 +5989,7 @@ class MainActivity :
                                     value = toolInput,
                                     onValueChange = {
                                         toolInput = it
+                                        toolOutputShareable = false
                                     },
                                     label = {
                                         Text("Tool command")
@@ -5953,15 +6013,14 @@ class MainActivity :
                                                 completed
                                             )
 
+                                        toolOutputShareable = !result.sensitive &&
+                                            result.action == AssistantAction.NONE &&
+                                            result.text.isNotBlank()
                                         toolOutput =
                                             if (result.sensitive) {
-
                                                 copyText(result.text)
-
                                                 "Sensitive result copied to clipboard."
-
                                             } else {
-
                                                 result.text
                                             }
 
@@ -5976,6 +6035,18 @@ class MainActivity :
                                 )
 
                                 Text(toolOutput)
+                                if (toolOutputShareable) {
+                                    TextButton(
+                                        onClick = {
+                                            discussFrom(
+                                                AstraWorkspaceHandoff.Source.TOOL_RESULT,
+                                                toolOutput
+                                            )
+                                        }
+                                    ) {
+                                        Text("Discuss result in Chat")
+                                    }
+                                }
                             }
 
                             // ========================================
@@ -5987,10 +6058,13 @@ class MainActivity :
                                     AstraStudyHub(
                                         onBackToChat = { tab = 0 },
                                         onLesson = { topic ->
-                                            // Show the resulting offline lesson in Chat.
+                                            // Show the resulting offline lesson in Chat, while
+                                            // keeping its subject for one-tap continuation.
                                             tab = 0
                                             submit(topic.command)
-                                        }
+                                        },
+                                        selectedSubjectId = studySelectedId,
+                                        onSubjectChange = { studySelectedId = it }
                                     )
                                 }
                             }
