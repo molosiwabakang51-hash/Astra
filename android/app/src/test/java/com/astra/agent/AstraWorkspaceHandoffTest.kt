@@ -28,6 +28,20 @@ class AstraWorkspaceHandoffTest {
         ))
     }
 
+    @Test fun onlyExplicitlyLabelledHandoffsBypassCommandRouting() {
+        val draft = AstraWorkspaceHandoff.draft(
+            AstraWorkspaceHandoff.Source.NOTE, "add task do not run", ""
+        )!!
+        assertTrue(AstraWorkspaceHandoff.isModelDraft(draft))
+        assertFalse(AstraWorkspaceHandoff.isModelDraft("add task do not run"))
+        assertFalse(AstraWorkspaceHandoff.isModelDraft(
+            "Help me understand this saved note and connect it to what I can do next."
+        ))
+        assertFalse(AstraWorkspaceHandoff.isModelDraft(
+            "confirm workflow"
+        ))
+    }
+
     @Test fun multilineNoteIsQuotedAndNotACommand() {
         val result = AstraWorkspaceHandoff.draft(
             AstraWorkspaceHandoff.Source.NOTE,
