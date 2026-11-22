@@ -49,6 +49,29 @@ class AstraWorkspaceHandoffTest {
         assertTrue(result.length < 1050)
     }
 
+    @Test fun savedChatNoteKeepsSourceAndRequiresValidMessageRole() {
+        val saved = AstraWorkspaceHandoff.noteFromChat(
+            "Astra", "Bond duration measures price sensitivity."
+        )!!
+        assertTrue(saved.startsWith("Astra reply (unverified"))
+        assertTrue(saved.contains("Bond duration measures price sensitivity"))
+        assertEquals(
+            "My chat message:\nA question",
+            AstraWorkspaceHandoff.noteFromChat("You", "A question")
+        )
+        assertNull(AstraWorkspaceHandoff.noteFromChat("System", "Secret"))
+        assertNull(AstraWorkspaceHandoff.noteFromChat("Astra", " "))
+    }
+
+    @Test fun longChatNoteAnnouncesTruncationAndPreservesUnicode() {
+        val saved = AstraWorkspaceHandoff.noteFromChat(
+            "You", "z".repeat(1799) + "😀" + "more"
+        )!!
+        assertTrue(saved.contains("Message shortened when saved to Notes"))
+        assertFalse(saved.contains("more"))
+        assertFalse(saved.any { Character.isSurrogate(it) })
+    }
+
     @Test fun toolResultReceivesAssumptionAwarePrompt() {
         val result = AstraWorkspaceHandoff.draft(
             AstraWorkspaceHandoff.Source.TOOL_RESULT, "Compound: P1,331", ""
