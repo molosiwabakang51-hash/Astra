@@ -138,6 +138,14 @@ internal object AstraReplyLanguage {
         }
         val tailLength = minOf(1_800, maximum - OMITTED_MIDDLE.length - 100)
         val headLength = maximum - OMITTED_MIDDLE.length - tailLength
-        return prompt.take(headLength) + OMITTED_MIDDLE + prompt.takeLast(tailLength)
+        // Kotlin string offsets are UTF-16 code units. Never split a
+        // supplementary character (emoji or rare CJK letter) at either cut.
+        val head = prompt.take(headLength).let {
+            if (it.lastOrNull()?.isHighSurrogate() == true) it.dropLast(1) else it
+        }
+        val tail = prompt.takeLast(tailLength).let {
+            if (it.firstOrNull()?.isLowSurrogate() == true) it.drop(1) else it
+        }
+        return head + OMITTED_MIDDLE + tail
     }
 }

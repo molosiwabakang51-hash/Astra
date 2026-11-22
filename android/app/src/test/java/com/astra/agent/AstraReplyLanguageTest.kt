@@ -127,4 +127,26 @@ class AstraReplyLanguageTest {
         assertTrue(text.contains("explicitly asks for another"))
         assertTrue(text.endsWith("Answer in English instead."))
     }
+
+    @Test fun longMultilingualPromptsNeverSplitSupplementaryCharacters() {
+        // Shift the repeated supplementary characters across both clipping cuts.
+        for (offset in 0..3) {
+            val prompt = "x".repeat(offset) + "𠮷😀".repeat(1000) +
+                "\nExplain this in Mandarin.\n/no_think"
+            val result = AstraReplyLanguage.prepare(
+                prompt, AstraReplyLanguage.Choice.MANDARIN
+            )
+            assertTrue(result.length <= 3000)
+            assertTrue(result.endsWith("Explain this in Mandarin.\n/no_think"))
+            assertTrue(result.contains("Middle of source omitted"))
+            for (i in result.indices) {
+                if (result[i].isHighSurrogate()) {
+                    assertTrue(i + 1 < result.length && result[i + 1].isLowSurrogate())
+                }
+                if (result[i].isLowSurrogate()) {
+                    assertTrue(i > 0 && result[i - 1].isHighSurrogate())
+                }
+            }
+        }
+    }
 }
