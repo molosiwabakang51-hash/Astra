@@ -3125,6 +3125,9 @@ class MainActivity :
                 var selectedMessage by remember {
                     mutableStateOf<ChatMessage?>(null)
                 }
+                var messageToSaveAsNote by remember {
+                    mutableStateOf<ChatMessage?>(null)
+                }
 
                 var editingNoteIndex by remember {
                     mutableIntStateOf(-1)
@@ -5134,7 +5137,22 @@ class MainActivity :
                             Text("Message options")
                         },
                         text = {
-                            Text(message.text)
+                            Column {
+                                Text(
+                                    message.text,
+                                    maxLines = 7,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                Spacer(Modifier.height(8.dp))
+                                TextButton(
+                                    onClick = {
+                                        messageToSaveAsNote = message
+                                        selectedMessage = null
+                                    }
+                                ) {
+                                    Text("Save message to Notes")
+                                }
+                            }
                         },
                         confirmButton = {
 
@@ -5160,6 +5178,47 @@ class MainActivity :
                                 }
                             ) {
                                 Text("Share")
+                            }
+                        }
+                    )
+                }
+
+                // Saving a chat message requires a second explicit action.
+                // Generated model text is marked as unverified in the saved note.
+                val noteSource = messageToSaveAsNote
+                if (noteSource != null) {
+                    val candidate = AstraWorkspaceHandoff.noteFromChat(
+                        noteSource.role, noteSource.text
+                    )
+                    AlertDialog(
+                        onDismissRequest = { messageToSaveAsNote = null },
+                        title = { Text("Save this message as a note?") },
+                        text = {
+                            Text(
+                                "This creates a private local note; it will not change " +
+                                    "the conversation or send anything online.\n\n" +
+                                    (candidate?.take(260) ?: "This message cannot be saved.") +
+                                    if (candidate != null && candidate.length > 260) "…" else ""
+                            )
+                        },
+                        confirmButton = {
+                            TextButton(
+                                enabled = candidate != null,
+                                onClick = {
+                                    if (candidate != null) {
+                                        notes.add(candidate)
+                                        persist()
+                                        tab = 2
+                                    }
+                                    messageToSaveAsNote = null
+                                }
+                            ) {
+                                Text("Save to Notes")
+                            }
+                        },
+                        dismissButton = {
+                            TextButton(onClick = { messageToSaveAsNote = null }) {
+                                Text("Cancel")
                             }
                         }
                     )
@@ -6058,10 +6117,12 @@ class MainActivity :
                                     AstraStudyHub(
                                         onBackToChat = { tab = 0 },
                                         onLesson = { topic ->
-                                            // Show the resulting offline lesson in Chat, while
-                                            // keeping its subject for one-tap continuation.
+                                            // Keep any unsent Chat draft intact while a
+                                            // Study lesson is opened explicitly.
+                                            val priorDraft = input
                                             tab = 0
                                             submit(topic.command)
+                                            input = priorDraft
                                         },
                                         selectedSubjectId = studySelectedId,
                                         onSubjectChange = { studySelectedId = it }
