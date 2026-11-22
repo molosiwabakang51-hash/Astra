@@ -35,7 +35,7 @@ class StudySubjectDiscoverySourceTest(unittest.TestCase):
         self.assertIn('-> "MODEL NEEDED"', SOURCE)
         self.assertIn('-> "OFFLINE"', SOURCE)
         self.assertIn("AstraStudyAccess.label(subject)", SOURCE)
-        self.assertIn("selectedId = subject.id", SOURCE)
+        self.assertIn("onSubjectChange(subject.id)", SOURCE)
         self.assertIn("onLesson(topic)", SOURCE)
 
 if __name__ == "__main__":
