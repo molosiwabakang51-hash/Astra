@@ -3,10 +3,14 @@ package com.astra.agent
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.io.InputStream
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
+import org.junit.Assert.assertFalse
 import org.junit.Test
 
 class AstraModelDownloadTest {
@@ -72,6 +76,52 @@ class AstraModelDownloadTest {
         }.exceptionOrNull()
         assertTrue(failure is IllegalArgumentException)
         assertEquals(0, output.size())
+    }
+
+    @Test fun cancelledBeforeFirstReadDoesNotConsumeNetworkOrTouchPartial() = runBlocking {
+        val existing = "already-downloaded".toByteArray()
+        val output = ByteArrayOutputStream().apply { write(existing) }
+        var reads = 0
+        val source = object : InputStream() {
+            override fun read(): Int = error("bulk reads only")
+            override fun read(dest: ByteArray, off: Int, len: Int): Int {
+                reads++
+                return -1
+            }
+        }
+        val cancelled = Job().apply { cancel(CancellationException("owner stopped")) }
+        val failure = runCatching {
+            withContext(cancelled) {
+                AstraModelDownload.copyResponse(
+                    source, output, existing.size.toLong(), 200L
+                ) { _, _ -> }
+            }
+        }.exceptionOrNull()
+        assertTrue(failure is CancellationException)
+        assertEquals(0, reads)
+        assertArrayEquals(existing, output.toByteArray())
+    }
+
+    @Test fun cancellationFromProgressCallbackPreservesDownloadedBytes() = runBlocking {
+        val original = "saved-partial".toByteArray()
+        val body = ByteArray(16 * 1024 * 1024) { 0x47.toByte() }
+        val output = ByteArrayOutputStream().apply { write(original) }
+        var progressCalls = 0
+        val failure = runCatching {
+            AstraModelDownload.copyResponse(
+                ByteArrayInputStream(body + byteArrayOf(0x55)),
+                output, original.size.toLong(),
+                (original.size + body.size + 1L)
+            ) { _, _ ->
+                progressCalls++
+                throw CancellationException("owner stopped during progress")
+            }
+        }.exceptionOrNull()
+        assertTrue(failure is CancellationException)
+        assertEquals(1, progressCalls)
+        assertEquals(original.size + body.size, output.size())
+        assertArrayEquals(original, output.toByteArray().copyOfRange(0, original.size))
+        assertFalse(output.toByteArray().last() == 0x55.toByte())
     }
 
     @Test fun invalidRangeCannotStartCopy() = runBlocking {
