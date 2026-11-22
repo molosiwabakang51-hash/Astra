@@ -57,7 +57,12 @@ def evaluate(record, manifest=None):
             continue
         if set(results) != ids:
             errors.append(f"Run {n}: missing or unexpected case IDs")
-        for key, value in results.items():
+        # Iterate the trusted manifest, not untrusted JSON keys. A malformed
+        # case ID may contain private text and must never enter diagnostics.
+        for key in sorted(ids):
+            if key not in results:
+                continue
+            value = results[key]
             if not isinstance(value, dict) or value.get("status") not in STATES:
                 errors.append(f"Run {n}: invalid outcome for {key}")
             elif value["status"] in {"pass", "fail"} and (
