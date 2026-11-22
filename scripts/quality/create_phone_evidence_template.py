@@ -4,6 +4,7 @@ The output is intentionally unverified. Never commit a completed owner record.
 """
 import argparse
 import json
+import os
 from pathlib import Path
 
 MANIFEST = Path(__file__).with_name("scorecard_cases.json")
@@ -39,7 +40,11 @@ def main():
         parser.error("Refusing to overwrite an existing evidence record")
     manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
     payload = json.dumps(blank_record(manifest), indent=2) + "\n"
-    args.output.open("x", encoding="utf-8").write(payload)
+    # A phone evidence record may later contain sensitive test references.
+    # Do not let a permissive process umask create a world-readable file.
+    fd = os.open(args.output, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    with os.fdopen(fd, "w", encoding="utf-8") as stream:
+        stream.write(payload)
     print("Created unverified local template. No quality score awarded.")
     return 0
 
