@@ -1,6 +1,9 @@
 """CI checks for the private handset evidence template, not handset scores."""
 import importlib.util
 import json
+import os
+import sys
+from unittest import mock
 import tempfile
 import unittest
 from pathlib import Path
@@ -30,6 +33,23 @@ class PhoneTemplateTests(unittest.TestCase):
         invalid = {"cases": self.manifest["cases"][:-1]}
         with self.assertRaises(ValueError):
             module.blank_record(invalid)
+
+    @unittest.skipUnless(os.name == "posix", "POSIX file permissions required")
+    def test_private_file_even_with_permissive_umask(self):
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / "private-evidence.json"
+            old_umask = os.umask(0)
+            try:
+                with mock.patch.object(sys, "argv", ["create_phone_evidence_template.py", str(output)]):
+                    self.assertEqual(module.main(), 0)
+            finally:
+                os.umask(old_umask)
+            self.assertEqual(output.stat().st_mode & 0o777, 0o600)
+            self.assertTrue(all(
+                case["status"] == "unverified"
+                for run in json.loads(output.read_text(encoding="utf-8"))["runs"]
+                for case in run["cases"].values()
+            ))
 
     def test_independent_runs_do_not_share_mutable_cases(self):
         record = module.blank_record(self.manifest)
