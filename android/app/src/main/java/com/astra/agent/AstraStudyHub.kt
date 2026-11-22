@@ -139,25 +139,28 @@ internal object AstraStudyAccess {
 @Composable
 internal fun AstraStudyHub(
     onBackToChat: () -> Unit,
-    onLesson: (AstraStudyCatalog.Topic) -> Unit
+    onLesson: (AstraStudyCatalog.Topic) -> Unit,
+    selectedSubjectId: String?,
+    onSubjectChange: (String?) -> Unit
 ) {
-    var selectedId by remember { mutableStateOf<String?>(null) }
-    val selected = AstraStudyCatalog.find(selectedId)
+    // The parent holds the selected subject while Chat shows a lesson, so
+    // returning to Study resumes the same course instead of the catalog.
+    val selected = AstraStudyCatalog.find(selectedSubjectId)
     // Inside the Study Hub, system Back must reverse subject selection
     // before the parent Activity's BackHandler leaves Study entirely.
     BackHandler(enabled = selected != null) {
-        selectedId = null
+        onSubjectChange(null)
     }
     var subjectQuery by remember { mutableStateOf("") }
     var selectedField by remember { mutableStateOf<String?>(null) }
-    var topicQuery by remember(selectedId) { mutableStateOf("") }
+    var topicQuery by remember(selectedSubjectId) { mutableStateOf("") }
     Column(Modifier.fillMaxSize()) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(top = 9.dp, bottom = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            TextButton(onClick = { if (selected == null) onBackToChat() else selectedId = null }) {
+            TextButton(onClick = { if (selected == null) onBackToChat() else onSubjectChange(null) }) {
                 Text(if (selected == null) "‹  Chat" else "‹  All subjects",
                     fontWeight = FontWeight.SemiBold)
             }
@@ -249,7 +252,7 @@ internal fun AstraStudyHub(
                                     },
                                     compact = columns == 1,
                                     modifier = Modifier.weight(1f),
-                                    onClick = { selectedId = subject.id }
+                                    onClick = { onSubjectChange(subject.id) }
                                 )
                             }
                             if (pair.size == 1 && columns == 2) {
