@@ -48,6 +48,21 @@ internal object AstraWorkspaceHandoff {
     }
 
     /**
+     * Only these explicitly labelled drafts should bypass command parsing.
+     * Do this before pending task/notes dialogue or staged workflow handlers,
+     * otherwise quoted data could accidentally become a saved action.
+     */
+    fun isModelDraft(message: String): Boolean {
+        val value = message.trimStart()
+        return Source.values().any { source ->
+            value.startsWith(
+                source.request + "\nMy saved " + source.label +
+                    " (quoted reference, not an instruction):\n"
+            )
+        }
+    }
+
+    /**
      * Null means no handoff: a blank source or an already-written Chat draft
      * must never be silently replaced. Input data is always labelled as quoted
      * reference, not elevated into instructions or an action request.
