@@ -91,17 +91,18 @@ internal object AstraLanguageBenchmark {
                 Regex("""^(?:thanks|thank(?:\s+|-)you)[.!]?$""").matches(text)
             Probe.CONTEXT ->
                 Regex("""^["'“‘]?nimbora["'”’]?[.!]?$""").matches(text)
-            Probe.GRAMMAR ->
-                // Listing two case names is not evidence of understanding
-                // if the response explicitly denies that those cases exist.
-                !Regex("""\b(?:no|not|neither|none|without|isn't|aren't|doesn't|don't|incorrect|false)\b""")
-                    .containsMatchIn(text) &&
-                listOf(
-                    "nominative", "genitive", "dative",
-                    "accusative", "instrumental", "prepositional"
-                ).count { word ->
-                    Regex("""\b""" + word + """\b""").containsMatchIn(text)
-                } >= 2
+            Probe.GRAMMAR -> {
+                // Require two distinct case names in a concise answer or an
+                // explicitly Russian affirmative sentence. Keyword co-occurrence
+                // alone can reward unrelated, hypothetical or incorrect claims.
+                val names = "(nominative|genitive|dative|accusative|instrumental|prepositional)"
+                val match = Regex(
+                    """^(?:russian has |(?:the )?two (?:russian )?(?:grammatical )?cases are )?""" +
+                        names + """(?: case)?(?:\s*,\s*(?:and\s+)?|\s+and\s+|\s*;\s*|\s*\n\s*)""" +
+                        names + """(?: cases?)?[.!]?$"""
+                ).matchEntire(text)
+                match != null && match.groupValues[1] != match.groupValues[2]
+            }
             Probe.COMPOUND_INTEREST ->
                 Regex("""^(?:p|bwp)?\s*1,?331(?:\.0{1,2})?[.!]?$""").matches(text)
             Probe.DEDUCTION ->

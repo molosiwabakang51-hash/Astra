@@ -285,4 +285,34 @@ class AstraLanguageBenchmarkTest {
         assertFalse(report.contains("partial; not a full ten-probe assessment"))
     }
 
+    @Test fun grammarProbeRejectsUnrelatedHypotheticalAndDuplicateCases() {
+        for (wrong in listOf(
+            "German has nominative and genitive cases.",
+            "Are nominative and genitive Russian cases?",
+            "If Russian had nominative and genitive cases.",
+            "Nominative and genitive are examples of languages.",
+            "Nominative and nominative.",
+            "Nominative, genitive, ablative.",
+            "I am unsure whether nominative and genitive exist."
+        )) {
+            assertFalse("Incorrect grammar answer: $wrong",
+                AstraLanguageBenchmark.score(AstraLanguageBenchmark.Probe.GRAMMAR, wrong))
+        }
+    }
+
+    @Test fun grammarProbeAcceptsConciseDistinctCaseNames() {
+        for (answer in listOf(
+            "Nominative, genitive.",
+            "Dative and accusative",
+            "Instrumental; prepositional.",
+            "Russian has nominative and genitive cases.",
+            "The two Russian grammatical cases are dative and genitive.",
+            "Nominative case and genitive case.",
+            "Nominative\nGenitive"
+        )) {
+            assertTrue("Correct grammar answer: $answer",
+                AstraLanguageBenchmark.score(AstraLanguageBenchmark.Probe.GRAMMAR, answer))
+        }
+    }
+
 }
