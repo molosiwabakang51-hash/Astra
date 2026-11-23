@@ -20,6 +20,21 @@ class AstraTabBackPolicyTest {
         }
     }
 
+    @Test fun explicitReturnLinkUsesGroundedDestinationLabels() {
+        val labels = listOf("Chat", "Tasks", "Notes", "Tools",
+            "Settings", "Study")
+        labels.forEachIndexed { index, expected ->
+            assertEquals(expected,
+                AstraTabBackPolicy.destinationLabel(index))
+        }
+        assertNull(AstraTabBackPolicy.destinationLabel(-1))
+        assertNull(AstraTabBackPolicy.destinationLabel(6))
+        val origin = AstraTabBackPolicy.previous(0, listOf(0, 2))
+        assertEquals("Notes",
+            AstraTabBackPolicy.destinationLabel(origin!!.tab))
+        assertEquals(1, origin.remainingHistory)
+    }
+
     @Test fun AndroidBackAtChatRootHasNoFakePreviousScreen() {
         assertNull(AstraTabBackPolicy.previous(0, emptyList()))
         assertNull(AstraTabBackPolicy.previous(0, listOf(0)))
