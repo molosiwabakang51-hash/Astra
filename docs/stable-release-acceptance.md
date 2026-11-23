@@ -132,6 +132,11 @@ APK. GitHub Actions debug builds may use different signing certificates.
     `What do my books say about that?`: Astra must retrieve **fresh**
     relevant excerpts and cite only what actually reached the Qwen prompt,
     without pretending its previous generated answer is source evidence.
+    Ask a second book-grounded follow-up after the first successful one,
+    without restating the original topic; confirm the original source question
+    remains available only within a short uninterrupted series of completed,
+    citation-backed messages. Insert an unrelated question and verify the
+    chain breaks rather than borrowing the old book query.
     Begin a different unrelated conversation and try the same follow-up;
     Astra must ask for a new explicit book question instead of reading
     earlier chat material. Repeat after a cancelled or interrupted book reply:
