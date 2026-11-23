@@ -92,6 +92,7 @@ internal object AstraGroundedMemory {
     ): Brief {
         val tokens = tokenize(request.question).distinct().take(12)
         if (tokens.isEmpty()) return Brief(request.question, emptyList())
+        val queryTerms = tokens.toSet()
 
         val best = mutableListOf<Evidence>()
         var sequence = 0
@@ -146,8 +147,8 @@ internal object AstraGroundedMemory {
                     if (entry.role != "You" || isMemoryCommand(entry.text)) {
                         return@forEachIndexed
                     }
-                    val hits = tokenize(entry.text).toSet().intersect(tokens.toSet())
-                    val corrected = if (hits.isNotEmpty()) {
+                    val onTopic = tokenize(entry.text).any(queryTerms::contains)
+                    val corrected = if (onTopic) {
                         AstraGroundedCorrections.annotated(
                             messages, index, excerpt(entry.text, tokens)
                         )
