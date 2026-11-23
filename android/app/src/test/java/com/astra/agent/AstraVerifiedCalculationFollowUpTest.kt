@@ -63,6 +63,96 @@ class AstraVerifiedCalculationFollowUpTest {
         ))
     }
 
+    @Test fun chainedFollowupsContinueTheSameExactMultiplicationProof() {
+        val originalProof = AstraVerifiedCalculationFollowUp.explain(
+            "How did you calculate that?", verified
+        )!!
+        val history = verified + listOf(
+            msg("You", "How did you calculate that?"),
+            msg("Astra", originalProof)
+        )
+        assertEquals(
+            originalProof,
+            AstraVerifiedCalculationFollowUp.explain("Show the steps", history)
+        )
+        val next = history + listOf(
+            msg("You", "Show the steps"),
+            msg("Astra", originalProof)
+        )
+        assertEquals(
+            originalProof,
+            AstraVerifiedCalculationFollowUp.explain("Explain it more simply", next)
+        )
+    }
+
+    @Test fun multiStepProofCarriesAcrossSuccessiveNaturalQuestions() {
+        val original = listOf(
+            msg("You", "What is (17 times 19 minus 5) divided by 2?"),
+            msg("Astra", "159")
+        )
+        val proof = AstraVerifiedCalculationFollowUp.explain("Show the steps", original)!!
+        val next = original + listOf(
+            msg("You", "Show the steps"), msg("Astra", proof)
+        )
+        assertEquals(proof,
+            AstraVerifiedCalculationFollowUp.explain("Explain that result", next))
+    }
+
+    @Test fun chainsStopAfterUnrelatedTurnsIncorrectProofsAndInterruptions() {
+        val proof = AstraVerifiedCalculationFollowUp.explain(
+            "How did you calculate that?", verified
+        )!!
+        val good = verified + listOf(
+            msg("You", "How did you calculate that?"), msg("Astra", proof)
+        )
+        assertNull(AstraVerifiedCalculationFollowUp.explain(
+            "Show the steps",
+            verified + listOf(msg("You", "How did you calculate that?"),
+                msg("Astra", proof + " AI GUESS"))
+        ))
+        assertNull(AstraVerifiedCalculationFollowUp.explain(
+            "Show the steps",
+            verified + listOf(msg("You", "How did you calculate that?"),
+                msg("Astra", "Offline response interrupted."))
+        ))
+        assertNull(AstraVerifiedCalculationFollowUp.explain(
+            "Show the steps",
+            good + listOf(msg("You", "Teach me French"),
+                msg("Astra", "Bonjour means hello."))
+        ))
+        // Only one root and up to three consecutive verified follow-up
+        // exchanges may support a subsequent explanation.
+        var chain = verified
+        repeat(3) {
+            chain = chain + listOf(msg("You", "Show the steps"),
+                msg("Astra", proof))
+        }
+        assertEquals(proof,
+            AstraVerifiedCalculationFollowUp.explain("Show the steps", chain))
+        chain = chain + listOf(msg("You", "Show the steps"),
+            msg("Astra", proof))
+        assertNull(AstraVerifiedCalculationFollowUp.explain("Show the steps", chain))
+    }
+
+    @Test fun aPlausibleButUnverifiedPreviousModelReplyCannotExtendAChain() {
+        val guessed = verified + listOf(
+            msg("You", "Show the steps"),
+            msg("Astra", "Verified calculation:\n17 × 19 = 323 but I guessed.")
+        )
+        assertNull(AstraVerifiedCalculationFollowUp.explain(
+            "How did you calculate that?", guessed
+        ))
+        assertNull(AstraVerifiedCalculationFollowUp.explain(
+            "Show the steps",
+            listOf(
+                msg("You", "What is (17 times 19 minus 5) divided by 2?"),
+                msg("Astra", "158"),
+                msg("You", "Show the steps"),
+                msg("Astra", "Final exact result: 159")
+            )
+        ))
+    }
+
     @Test fun rejectsUnverifiedPreviousRepliesAndAmbiguousInputs() {
         assertNull(AstraVerifiedCalculationFollowUp.explain(
             "How did you calculate that?",

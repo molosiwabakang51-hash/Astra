@@ -23,12 +23,15 @@ class VerifiedMathFollowupWiringTests(unittest.TestCase):
         self.assertIn("result != observedAnswer.trim()", ARITH)
         self.assertIn("Recomputed on this device using exact decimal arithmetic", ARITH)
 
-    def test_only_last_completed_same_chat_pair_can_be_used(self):
-        self.assertIn("activeChat.takeLast(2)", FOLLOW)
-        self.assertIn('previousUser.role != "You"', FOLLOW)
-        self.assertIn('previousReply.role != "Astra"', FOLLOW)
+    def test_bounded_contiguous_verified_same_chat_pairs_only(self):
+        self.assertIn("MAX_CHAIN_PAIRS = 4", FOLLOW)
+        self.assertIn("activeChat.size - 2", FOLLOW)
+        self.assertIn('user.role != "You"', FOLLOW)
+        self.assertIn('assistant.role != "Astra"', FOLLOW)
         self.assertIn("AstraInterruptedReply.isIncomplete", FOLLOW)
-        self.assertIn("request.any", FOLLOW)
+        self.assertIn("if (!isFollowUp(user.text)) return null", FOLLOW)
+        self.assertIn("followUps.all { reply -> reply.text == verified }", FOLLOW)
+        self.assertIn("raw.any", FOLLOW)
 
     def test_no_private_memory_network_or_side_effects(self):
         self.assertNotIn("Http", FOLLOW)
