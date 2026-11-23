@@ -16,6 +16,7 @@ class OwnerBookFollowupContracts(unittest.TestCase):
         self.assertIn('"what do my books say about that"', FOLLOWUP)
         self.assertIn("currentChat.takeLast(2)", FOLLOWUP)
         self.assertIn("AstraInterruptedReply.isIncomplete", FOLLOWUP)
+        self.assertIn("Retrieved local book passages (verify originals)", FOLLOWUP)
         self.assertIn("AstraBookQuery.extract(recent[0].text)", FOLLOWUP)
         self.assertNotIn("archivedChats", FOLLOWUP)
 
