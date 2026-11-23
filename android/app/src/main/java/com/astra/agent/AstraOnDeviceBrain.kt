@@ -438,18 +438,10 @@ internal class AstraOnDeviceBrain(
         }
     }
 
-    private suspend fun sha256(file: File): String {
-        val workContext = currentCoroutineContext()
-        val digest = MessageDigest.getInstance("SHA-256")
+    // Share the downloader's cancellation-aware, bounded zero-read verifier.
+    // A broken stream must not spin indefinitely during 1.7B model startup.
+    private suspend fun sha256(file: File): String =
         file.inputStream().buffered().use { input ->
-            val block = ByteArray(1024 * 1024)
-            while (true) {
-                workContext.ensureActive()
-                val count = input.read(block)
-                if (count < 0) break
-                digest.update(block, 0, count)
-            }
+            AstraModelDownload.checksumStream(input)
         }
-        return digest.digest().joinToString("") { "%02x".format(it) }
-    }
 }
