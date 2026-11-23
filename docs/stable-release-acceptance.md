@@ -124,6 +124,28 @@ APK. GitHub Actions debug builds may use different signing certificates.
     changed task or fabricated citation. This is a manual phone gate;
     successful Kotlin tests alone are not sufficient.
 
+21. **Explicit same-chat private-book follow-ups:** In airplane mode import
+    an owner-selected, non-sensitive test document containing factual bond
+    duration explanations. Ask `ask my books how does duration work?`; verify
+    a real cited passage and a completed answer. Then ask
+    `Continue using my book` and separately
+    `What do my books say about that?`: Astra must retrieve **fresh**
+    relevant excerpts and cite only what actually reached the Qwen prompt,
+    without pretending its previous generated answer is source evidence.
+    Ask a second book-grounded follow-up after the first successful one,
+    without restating the original topic; confirm the original source question
+    remains available only within a short uninterrupted series of completed,
+    citation-backed messages. Insert an unrelated question and verify the
+    chain breaks rather than borrowing the old book query.
+    Begin a different unrelated conversation and try the same follow-up;
+    Astra must ask for a new explicit book question instead of reading
+    earlier chat material. Repeat after a cancelled or interrupted book reply:
+    no incomplete excerpt should be treated as valid evidence. A generic
+    `continue` must **not** trigger new private document access.
+    Check that no task or note is created, no network access occurs and
+    citation numbers match the actual displayed source. Recheck after
+    process restart. Passing Kotlin/CI tests does not satisfy this phone gate.
+
 ## Honest release labels
 
 - **EXPERIMENTAL:** Compiles and passes automated source/unit/APK checks,

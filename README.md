@@ -70,6 +70,25 @@ reasoning, **not** permission for automatic access to private documents
 during ordinary chat. Physical-phone multi-turn correctness still requires
 testing.
 
+## Explicit book-grounded follow-ups (experimental)
+
+When the owner first asks an imported-book question using
+`ask my books <question>` and the reply completes, a follow-up such as
+`Continue using my book`, `Go deeper using my books`, or
+`What do my books say about that?` now **re-runs a fresh local search**
+against the owner's previously imported book, for the original question and
+the current clarification. This requires the owner's **explicit reference to
+their book** and a short uninterrupted chain (maximum four completed,
+citation-backed exchanges) in the **current chat**. Astra does not silently open private files for a generic
+`continue`, reuse a model's previous answer as evidence, or search older
+conversations for missing consent. If the reference is missing, Astra asks
+for a new specific book question rather than fabricating evidence.
+
+The normal consent, excerpt-length and citation cross-checks still apply;
+source text stays quoted and cannot execute actions. Nothing is uploaded or
+used to train model weights. This is code + regression coverage only; the
+actual on-phone correctness of grounded follow-ups still requires testing.
+
 ## Connected workspace handoffs (experimental)
 
 Astra's **Study**, **Chat**, **Tasks**, **Notes**, and **Local tools** now
