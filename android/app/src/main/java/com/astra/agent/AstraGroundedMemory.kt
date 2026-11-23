@@ -147,10 +147,13 @@ internal object AstraGroundedMemory {
                     if (entry.role != "You" || isMemoryCommand(entry.text)) {
                         return@forEachIndexed
                     }
-                    val onTopic = tokenize(entry.text).any(queryTerms::contains)
+                    // Match only the same bounded text considered by the
+                    // evidence ranker. Never scan unlimited archived bodies.
+                    val candidateText = entry.text.take(2_000)
+                    val onTopic = tokenize(candidateText).any(queryTerms::contains)
                     val corrected = if (onTopic) {
                         AstraGroundedCorrections.annotated(
-                            messages, index, excerpt(entry.text, tokens)
+                            messages, index, excerpt(candidateText, tokens)
                         )
                     } else null
                     consider(
