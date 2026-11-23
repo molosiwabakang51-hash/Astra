@@ -124,6 +124,63 @@ class AstraModelDownloadTest {
         assertFalse(output.toByteArray().last() == 0x55.toByte())
     }
 
+    @Test fun stalledChecksumSourceStopsWithoutInventingVerifiedWeights() = runBlocking {
+        var reads = 0
+        val stalled = object : InputStream() {
+            override fun read(): Int = error("bulk reads only")
+            override fun read(dest: ByteArray, off: Int, len: Int): Int {
+                reads++
+                return 0
+            }
+        }
+        val failure = runCatching {
+            AstraModelDownload.checksumStream(stalled)
+        }.exceptionOrNull()
+        assertTrue(failure is IllegalStateException)
+        assertTrue(failure?.message.orEmpty().contains("stopped providing data"))
+        assertEquals(17, reads)
+    }
+
+    @Test fun checksumTransientEmptyReadsStillProduceExactSha256() = runBlocking {
+        val bytes = "GGUF-local-weights".toByteArray()
+        val source = object : InputStream() {
+            var index = 0
+            var zeros = 0
+            override fun read(): Int = error("bulk reads only")
+            override fun read(dest: ByteArray, off: Int, len: Int): Int {
+                if (zeros < 8) {
+                    zeros++
+                    return 0
+                }
+                if (index == bytes.size) return -1
+                val size = minOf(len, 3, bytes.size - index)
+                bytes.copyInto(dest, off, index, index + size)
+                index += size
+                return size
+            }
+        }
+        val expected = java.security.MessageDigest.getInstance("SHA-256")
+            .digest(bytes).joinToString("") { "%02x".format(it) }
+        assertEquals(expected, AstraModelDownload.checksumStream(source))
+    }
+
+    @Test fun cancelledChecksumDoesNotReadOrCertifyFile() = runBlocking {
+        var reads = 0
+        val source = object : InputStream() {
+            override fun read(): Int = error("bulk reads only")
+            override fun read(dest: ByteArray, off: Int, len: Int): Int {
+                reads++
+                return -1
+            }
+        }
+        val cancelled = Job().apply { cancel(CancellationException("owner cancelled")) }
+        val failure = runCatching {
+            withContext(cancelled) { AstraModelDownload.checksumStream(source) }
+        }.exceptionOrNull()
+        assertTrue(failure is CancellationException)
+        assertEquals(0, reads)
+    }
+
     @Test fun invalidRangeCannotStartCopy() = runBlocking {
         val out = ByteArrayOutputStream()
         for ((offset, expected) in listOf(-1L to 10L, 20L to 10L,
