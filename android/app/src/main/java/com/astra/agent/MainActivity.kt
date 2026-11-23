@@ -3655,6 +3655,20 @@ class MainActivity :
                         AstraBookFollowUp.Result.NotRequested -> Unit
                     }
 
+                    // Natural requests that explicitly refer to the
+                    // owner's own books must go directly through the
+                    // established offline retrieval / citation checks, before
+                    // any state-changing workflow or keyword-based commands.
+                    // Ordinary questions and mere book mentions stay in
+                    // their existing routes; no silent document access.
+                    if (AstraBookQuery.extract(message) != null) {
+                        dialogue.dismissIncompletePrompt()
+                        workflowSession.reset()
+                        dialogueAwaiting = false
+                        enqueueOffline(message, message)
+                        return
+                    }
+
                     // A natural explanation request may follow an exact local
                     // calculator result. Recompute the original operands from
                     // the most recent completed same-chat user/assistant pair.
