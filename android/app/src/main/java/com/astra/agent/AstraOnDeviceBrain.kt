@@ -341,12 +341,29 @@ internal class AstraOnDeviceBrain(
                     answer.append(part)
                     val now = System.nanoTime()
                     if (now - lastUiUpdate >= 200_000_000L) {
-                        val partial = AstraOfflinePolicy.publicReply(answer.snapshot())
+                        // Streaming bubbles also receive only guarded
+                        // citation markers; do not wait for a completed
+                        // model response to label unsupported references.
+                        val partial = AstraSourceCitationGuard.protect(
+                            AstraOfflinePolicy.publicReply(answer.snapshot()),
+                            verifiedPrivatePassages = citedBooks.size,
+                            verifiedOpenPassages = citedOpenCourse.size
+                        )
                         if (partial.isNotBlank()) onPartial(partial)
                         lastUiUpdate = now
                     }
                 }
                 val publicAnswer = AstraOfflinePolicy.publicReply(answer.finish())
+                // The model can invent [B#]/[K#] markers and even a
+                // citation-footer heading. Allow only IDs whose complete
+                // evidence blocks actually reached the native model prompt.
+                // Strip forged headings before appending app-owned sources;
+                // an AI claim must never authorize book follow-up access.
+                val attributedAnswer = AstraSourceCitationGuard.protect(
+                    publicAnswer,
+                    verifiedPrivatePassages = citedBooks.size,
+                    verifiedOpenPassages = citedOpenCourse.size
+                )
                 if (publicAnswer.isNotBlank()) {
                     // A cancelled, failed or think-only reply cannot establish
                     // successful generation. Store only numeric timing.
@@ -361,13 +378,13 @@ internal class AstraOnDeviceBrain(
                     session.invalidate()
                     "The offline model did not produce a usable answer. Please try again."
                 } else if (citedBooks.isNotEmpty()) {
-                    publicAnswer + "\n\nRetrieved local book passages (verify originals):\n" +
+                    attributedAnswer + "\n\nRetrieved local book passages (verify originals):\n" +
                         (books?.citations(citedBooks) ?: "")
                 } else if (citedOpenCourse.isNotEmpty()) {
-                    publicAnswer + "\n\nOpen-course references:\n" +
+                    attributedAnswer + "\n\nOpen-course references:\n" +
                         AstraOpenLibrary.citations(citedOpenCourse)
                 } else {
-                    publicAnswer
+                    attributedAnswer
                 }
                 }
             } catch (linkage: LinkageError) {
