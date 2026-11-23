@@ -3108,10 +3108,12 @@ class MainActivity :
                 // whenever a genuine previous destination exists, even when
                 // Chat is the current tab; otherwise Android would exit.
                 val previousScreen = AstraTabBackPolicy.previous(tab, tabBackStack)
+                val chatRootBackOpensNavigation =
+                    AstraTabBackPolicy.rootOpensNavigation(tab, tabBackStack)
                 BackHandler(
                     enabled = navigationPopupOpen || showChatSwitcher ||
                         commandDeckExpanded || showFindInChat || showMemorySearch ||
-                        previousScreen != null
+                        previousScreen != null || chatRootBackOpensNavigation
                 ) {
                     when {
                         navigationPopupOpen -> navigationPopupOpen = false
@@ -3127,6 +3129,13 @@ class MainActivity :
                             }
                             restoringTabFromBack = true
                             tab = previousScreen.tab
+                        }
+                        chatRootBackOpensNavigation -> {
+                            // Android Back at Chat root opens the existing
+                            // navigation tray instead of finishing the app.
+                            // Back again dismisses that tray and leaves the
+                            // active chat, local model and drafts untouched.
+                            navigationPopupOpen = true
                         }
                     }
                 }
