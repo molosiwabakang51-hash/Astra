@@ -28,7 +28,7 @@ class AstraBookFollowUpTest {
             assertTrue(prompt.contains("newly retrieved book excerpts"))
             assertFalse(prompt.contains("[B1] Local text"))
             assertEquals(
-                "How does modified bond duration work?. Follow-up request: " +
+                "How does modified bond duration work. Follow-up request: " +
                     request + ". Use newly retrieved book excerpts as evidence; " +
                     "if they are insufficient, say so. " +
                     "Do not rely on the earlier model response as a source.",
