@@ -78,8 +78,8 @@ When the owner first asks an imported-book question using
 `What do my books say about that?` now **re-runs a fresh local search**
 against the owner's previously imported book, for the original question and
 the current clarification. This requires the owner's **explicit reference to
-their book** and the most recent completed question/answer in the **current
-chat**. Astra does not silently open private files for a generic
+their book** and a short uninterrupted chain (maximum four completed,
+citation-backed exchanges) in the **current chat**. Astra does not silently open private files for a generic
 `continue`, reuse a model's previous answer as evidence, or search older
 conversations for missing consent. If the reference is missing, Astra asks
 for a new specific book question rather than fabricating evidence.
