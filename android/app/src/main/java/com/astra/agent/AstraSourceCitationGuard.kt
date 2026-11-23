@@ -8,11 +8,14 @@ package com.astra.agent
  */
 internal object AstraSourceCitationGuard {
     private val sourceMarker = Regex("""(?i)\[(B|K)([0-9]+)\]""")
+    // A forged app footer can occur in the middle of model prose, not only
+    // at the start of a line. Strip the exact authority-bearing header
+    // wherever the model generates it; only the app may append it later.
     private val forgedFooter = Regex(
-        """(?im)^[ \t]*Retrieved local book passages \(verify originals\):[ \t]*\r?$"""
+        """(?i)Retrieved local book passages \(verify originals\):"""
     )
     private val forgedOpenFooter = Regex(
-        """(?im)^[ \t]*Open-course references:[ \t]*\r?$"""
+        """(?i)Open-course references:"""
     )
 
     fun protect(
