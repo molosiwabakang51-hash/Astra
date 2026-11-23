@@ -27,6 +27,29 @@ is required, and no remote service is called. It is a **narrow calculator
 verification improvement**, not a general reasoning benchmark or evidence
 that Qwen3's weights learned arithmetic.
 
+## Verified bounded multi-step arithmetic (experimental)
+
+Astra now has a **read-only local arithmetic parser** for strictly bounded
+multi-operation expressions, including usual operator precedence, word-form
+operators and parentheses. For example,
+`What is 10 plus 2 times 3?` produces `16`,
+`Calculate (10 plus 2) times 3` produces `36`, and
+`What is (17 times 19 minus 5) divided by 2?` produces `159`.
+When the owner subsequently asks `Show the steps`, Astra independently
+recomputes and displays the evaluation-order arithmetic, instead of
+allowing Qwen3 to invent a calculation narrative.
+
+Only a complete owner-authored `calculate`, `compute` or `what is`
+expression is accepted. Unknown symbols, external instructions, excessive
+precision and resource-heavy inputs are rejected. Divisions that cannot
+produce an **exact decimal** are not silently rounded or certified.
+No action, note/task update, cloud service, extra permission or model file
+is needed. Complex prompts outside this narrow syntax still use the
+ordinary assistant path and are **not** automatically verified.
+
+This is improved local **tool correctness**, not an upgrade to Qwen's
+pretrained intelligence or an earned physical-device AI score.
+
 ## Verified arithmetic and adaptive reasoning (experimental)
 
 **Natural-language arithmetic verification:** Requests such as
