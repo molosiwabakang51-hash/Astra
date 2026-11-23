@@ -65,7 +65,7 @@ internal object AstraLanguageBenchmark {
     // generated answers OR include them in diagnostic samples. These excerpts
     // may originate in private books imported by the owner.
     private val sourceFooter = Regex(
-        """(?im)^\s*(?:Open-course references:|Retrieved local book passages)\s*$"""
+        """(?im)^\s*(?:Open-course references:|Retrieved local book passages:?)\s*$"""
     )
 
     private fun answerOnly(output: String): String {
