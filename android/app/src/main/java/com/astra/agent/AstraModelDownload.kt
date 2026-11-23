@@ -194,18 +194,35 @@ internal object AstraModelDownload {
         return total
     }
 
-    private suspend fun sha256(file: File): String {
+    private suspend fun sha256(file: File): String =
+        file.inputStream().buffered().use { checksumStream(it) }
+
+    /**
+     * Fail safely if a broken file provider repeatedly returns zero bytes.
+     * Without this guard SHA verification could loop forever at 100% CPU,
+     * leaving a downloaded model unverified and draining the handset.
+     * The caller only installs weights after this digest matches the official
+     * SHA-256; failures leave the installed GGUF unchanged.
+     */
+    internal suspend fun checksumStream(input: InputStream): String {
         val digest = MessageDigest.getInstance("SHA-256")
         val scope = currentCoroutineContext()
-        file.inputStream().buffered().use { input ->
-            val block = ByteArray(1024 * 1024)
-            while (true) {
-                scope.ensureActive()
-                val read = input.read(block)
-                if (read < 0) break
-                digest.update(block, 0, read)
+        val block = ByteArray(1024 * 1024)
+        var emptyReads = 0
+        while (true) {
+            scope.ensureActive()
+            val read = input.read(block)
+            if (read < 0) break
+            if (read == 0) {
+                check(++emptyReads <= 16) {
+                    "Model checksum source stopped providing data. Retry the verification."
+                }
+                continue
             }
+            emptyReads = 0
+            digest.update(block, 0, read)
         }
+        scope.ensureActive()
         return digest.digest().joinToString("") { "%02x".format(it) }
     }
 }
