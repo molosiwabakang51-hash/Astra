@@ -3648,6 +3648,28 @@ class MainActivity :
                         AstraBookFollowUp.Result.NotRequested -> Unit
                     }
 
+                    // A natural explanation request may follow an exact local
+                    // calculator result. Recompute the original operands from
+                    // the most recent completed same-chat user/assistant pair.
+                    // Do not trust unverified model prose, interrupted output
+                    // or a result copied from a different conversation.
+                    AstraVerifiedCalculationFollowUp.explain(
+                        message, history.map {
+                            AstraChatArchive.Message(it.role, it.text)
+                        }
+                    )?.let { verifiedExplanation ->
+                        dialogue.dismissIncompletePrompt()
+                        workflowSession.reset()
+                        dialogueAwaiting = false
+                        history.add(ChatMessage("You", message))
+                        history.add(ChatMessage("Astra", verifiedExplanation))
+                        while (history.size > MAX_HISTORY) history.removeAt(0)
+                        input = ""
+                        persist()
+                        keyboard?.hide()
+                        return
+                    }
+
                     // Only a user-authored, explicitly prefixed plan can trigger
                     // local actions. Every step is simulated before the owner
                     // types 'confirm workflow'; model-generated text never runs it.

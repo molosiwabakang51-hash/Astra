@@ -9,6 +9,24 @@ Astra is a **local-first Android/Kotlin Jetpack Compose assistant** with a futur
 Passing GitHub CI does not earn phone-only intelligence points.
 
 
+## Verified multi-turn calculation explanations (experimental)
+
+When the owner asks a simple exact arithmetic question, Astra can now
+**independently recompute** the latest same-chat calculator answer on a
+follow-up such as `How did you calculate that?`, `Show the working`,
+`Explain that result`, or `What assumptions did you use?`. It shows the
+verified equation and, for small integer multiplication, an exact distributive
+step instead of relying on Qwen3 to invent its workings. An incorrect,
+unparseable, repeating-decimal, zero-division, interrupted or unrelated prior
+answer is **not** certified: the ordinary conversational route remains
+available without mislabelling AI output as verified.
+
+This reads only the last completed user/Astra pair in the active chat. No
+private records are opened, no actions are executed, no new inference model
+is required, and no remote service is called. It is a **narrow calculator
+verification improvement**, not a general reasoning benchmark or evidence
+that Qwen3's weights learned arithmetic.
+
 ## Verified arithmetic and adaptive reasoning (experimental)
 
 **Natural-language arithmetic verification:** Requests such as
