@@ -175,6 +175,21 @@ APK. GitHub Actions debug builds may use different signing certificates.
     they do not count as neural Qwen3 reasoning scores or as release proof
     without actual handset evidence.
 
+24. **Sustained exact calculation explanation across same-chat turns:**
+    In airplane mode, ask `What is 17 multiplied by 19? Reply only with the
+    number.` (expect `323`). Ask `How did you calculate that?`,
+    `Show the steps`, then `Explain it more simply`. Each completed reply
+    must present the same independently recomputed proof, never change the
+    operands or invent reasoning. Repeat with a grouped expression
+    `(17 times 19 minus 5) divided by 2` and verify the original exact
+    intermediate steps remain available. Interrupt a follow-up or ask
+    an unrelated question: the chain must break rather than trust older
+    assistant prose. The fifth consecutive explanation request must not
+    silently search arbitrarily old chat turns. Restart the app and repeat,
+    and verify no private files are opened, no local actions are executed,
+    and no model network calls occur. Passing CI is insufficient for
+    real-device acceptance or intelligence scoring.
+
 ## Honest release labels
 
 - **EXPERIMENTAL:** Compiles and passes automated source/unit/APK checks,
