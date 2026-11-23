@@ -39,8 +39,8 @@ class AstraBookFollowUpTest {
     }
 
     @Test fun severalExplicitFollowupsCanReuseOriginalQuestionWithinSameChat() {
-        val cited = "An explanation.\\n\\n" +
-            "Retrieved local book passages (verify originals):\\n" +
+        val cited = "An explanation.\n\n" +
+            "Retrieved local book passages (verify originals):\n" +
             "[B1] Public test excerpt."
         val thread = listOf(
             msg("You", "ask my books Explain a bond's duration"),
@@ -60,8 +60,8 @@ class AstraBookFollowUpTest {
     }
 
     @Test fun boundedChainCannotSkipAnUnrelatedOrUncitedInterveningReply() {
-        val cited = "Evidence.\\n\\n" +
-            "Retrieved local book passages (verify originals):\\n[B1] Mock."
+        val cited = "Evidence.\n\n" +
+            "Retrieved local book passages (verify originals):\n[B1] Mock."
         val unrelated = listOf(
             msg("You", "ask my books Bond duration"), msg("Astra", cited),
             msg("You", "Teach me finance"), msg("Astra", cited)
