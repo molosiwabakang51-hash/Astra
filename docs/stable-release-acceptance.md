@@ -108,6 +108,22 @@ APK. GitHub Actions debug builds may use different signing certificates.
     and OFF using identical prompts and the same 1.7B weights. Only phone
     observations, not JVM timing mocks, can satisfy the performance gate.
 
+20. **Owner-correction evidence across sessions:** In a fresh offline
+    conversation state a fictional bond maturity of seven years, then say
+    "Actually, make it three years." Ask `ask my memory about bond maturity`
+    and confirm the retrieved sources show **both values in chronological
+    order** with the later correction, rather than returning seven years
+    alone. Repeat after a process restart and in an archived conversation.
+    Insert an unrelated user message before a correction and confirm it is
+    **not** attached to the older bond claim. Try a correction in a separate
+    conversation: cross-chat messages must not be joined as if they were one.
+    Save an Astra-generated reply to Notes and ask an owner-memory question;
+    the saved model reply must not be treated as owner-authored evidence.
+    Only an explicit notes-only request may show it, clearly labelled
+    **unverified**. Verify no automatically opened private file, remote call,
+    changed task or fabricated citation. This is a manual phone gate;
+    successful Kotlin tests alone are not sufficient.
+
 ## Honest release labels
 
 - **EXPERIMENTAL:** Compiles and passes automated source/unit/APK checks,
