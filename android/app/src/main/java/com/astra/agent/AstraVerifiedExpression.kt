@@ -71,6 +71,13 @@ internal object AstraVerifiedExpression {
         for ((word, symbol) in wordOperators) {
             expression = expression.replace(word, " " + symbol + " ")
         }
+        // User keyboards and copied mathematics commonly produce the
+        // typographic operators ×, ÷ and U+2212 (minus). Normalize only
+        // those exact arithmetic glyphs; never evaluate arbitrary Unicode
+        // text, implicit multiplication or unsupported mathematical syntax.
+        expression = expression.replace('×', '*')
+            .replace('÷', '/')
+            .replace('−', '-')
         if (expression.length > MAX_INPUT) return null
         val tokens = tokenize(expression) ?: return null
         // Simple two-number arithmetic remains with AstraVerifiedArithmetic.
