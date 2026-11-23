@@ -27,14 +27,16 @@ internal object AstraBookQuery {
     )
 
     fun extract(raw: String): String? {
+        // Reject multiline source/instruction mixtures BEFORE trimming;
+        // trim() removes trailing newlines and could otherwise let an
+        // injected second line authorize an unintended private read.
+        if (raw.contains('\n') || raw.contains('\r')) return null
         val message = raw.trim()
         // Oversized explicit questions still enter the existing retrieval
         // router so its 1,800-character evidence-fit gate can explain the
         // limit. Never turn an explicitly private-book request into normal
         // model chat merely because the question is lengthy.
-        if (message.isBlank() ||
-            message.contains('\n') || message.contains('\r')
-        ) return null
+        if (message.isBlank()) return null
 
         command.matchEntire(message)?.let { match ->
             return match.groupValues[1].trim().takeIf(String::isNotEmpty)
