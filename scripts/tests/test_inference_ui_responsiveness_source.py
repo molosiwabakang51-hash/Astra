@@ -29,6 +29,24 @@ class OfflineUiResponsivenessContracts(unittest.TestCase):
         self.assertIn("onPartial(partial)", BRAIN)
         self.assertIn("lastPublishedText = partial", BRAIN)
 
+    def test_blank_native_fragments_do_not_delay_first_visible_text(self):
+        # The throttle timestamp advances only when text reaches the UI.
+        # Otherwise an initial hidden reasoning fragment delays the first
+        # useful response by 550 ms even though nothing was displayed.
+        start = BRAIN.index("if (AstraStreamingUiPolicy.intervalElapsed")
+        end = BRAIN.index("val publicAnswer =", start)
+        streaming = BRAIN[start:end]
+        self.assertEqual(1, streaming.count("lastUiUpdate = now"))
+        self.assertIn(
+            "lastPublishedText = partial\\n                            " +
+            "// A hidden/blank native fragment must not delay",
+            streaming,
+        )
+        self.assertLess(
+            streaming.index("lastPublishedText = partial"),
+            streaming.index("lastUiUpdate = now"),
+        )
+
     def test_transient_native_errors_have_existing_retry_surface(self):
         self.assertIn('response.startsWith("Offline model unavailable.")', RETRY)
         self.assertIn("AstraResponseRetry.eligibleQuestion(", MAIN)
