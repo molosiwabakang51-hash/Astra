@@ -12,7 +12,8 @@ class AstraBookFollowUpTest {
     @Test fun explicitlyApprovedFollowupRequeriesSameBookTopicWithFreshSources() {
         val thread = listOf(
             msg("You", "ask my books How does modified bond duration work?"),
-            msg("Astra", "A bond's duration estimates rate sensitivity.\n[B1] Local text.")
+            msg("Astra", "A bond's duration estimates rate sensitivity.\n\n" +
+                "Retrieved local book passages (verify originals):\n[B1] Local text.")
         )
         for (request in listOf(
             "Continue using my book",
@@ -35,6 +36,25 @@ class AstraBookFollowUpTest {
                 AstraBookQuery.extract(prompt)
             )
         }
+    }
+
+    @Test fun anUncitedOrFailedPreviousBookAnswerDoesNotAuthorizeContinuation() {
+        val noSource = listOf(
+            msg("You", "ask my books Explain bond duration"),
+            msg("Astra", "A plausible explanation without any retrieved citations.")
+        )
+        assertEquals(
+            AstraBookFollowUp.Result.MissingAnchor,
+            AstraBookFollowUp.resolve("Continue from my book", noSource)
+        )
+        val wrongSource = listOf(
+            msg("You", "ask my books Explain bond duration"),
+            msg("Astra", "Open-course references:\\n[K1] A public book.")
+        )
+        assertEquals(
+            AstraBookFollowUp.Result.MissingAnchor,
+            AstraBookFollowUp.resolve("Continue using my books", wrongSource)
+        )
     }
 
     @Test fun ordinaryChatDoesNotReadPrivateBooksImplicitly() {
