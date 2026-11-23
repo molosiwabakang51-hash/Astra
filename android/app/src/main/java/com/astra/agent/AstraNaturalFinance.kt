@@ -36,6 +36,16 @@ internal object AstraNaturalFinance {
         """(?<![\d.])(\d+(?:\.\d+)?)\s*(?:years?|yrs?)\b""",
         RegexOption.IGNORE_CASE
     )
+    private val spelledPeriodPattern = Regex(
+        """\b(one|two|three|four|five|six|seven|eight|nine|ten)\s+years?\b""",
+        RegexOption.IGNORE_CASE
+    )
+    private val spelledPeriodYears = mapOf(
+        "one" to 1.0, "two" to 2.0, "three" to 3.0,
+        "four" to 4.0, "five" to 5.0, "six" to 6.0,
+        "seven" to 7.0, "eight" to 8.0, "nine" to 9.0,
+        "ten" to 10.0
+    )
     private val doublingIntent = Regex(
         """\b(?:how long\b.{0,70}\bdouble\b|time to double\b|years to double\b|""" +
             """when (?:will|would|does)\b.{0,70}\bdouble\b)""",
@@ -103,9 +113,15 @@ internal object AstraNaturalFinance {
                     amount < 0 || amount > 1_000_000_000_000_000.0)) return null
 
         val periodMatches = annualPeriodPattern.findAll(clean).toList()
-        if (!doubling && periodMatches.size != 1) return null
-        if (doubling && periodMatches.isNotEmpty()) return null
-        val years = periodMatches.singleOrNull()?.groupValues?.get(1)?.toDoubleOrNull()
+        val spelledPeriods = spelledPeriodPattern.findAll(clean).toList()
+        // "received in one year" is a complete, unambiguous cash-flow
+        // period. Never guess among conflicting numeric/verbal periods.
+        if (!doubling && periodMatches.size + spelledPeriods.size != 1) return null
+        if (doubling && (periodMatches.isNotEmpty() || spelledPeriods.isNotEmpty())) return null
+        val years = if (spelledPeriods.isNotEmpty()) {
+            spelledPeriodYears[spelledPeriods.single().groupValues[1]
+                .lowercase(Locale.ROOT)]
+        } else periodMatches.singleOrNull()?.groupValues?.get(1)?.toDoubleOrNull()
         if (!doubling && (years == null || !years.isFinite() || years < 0 || years > 150)) return null
 
         val lower = clean.lowercase(Locale.ROOT)
