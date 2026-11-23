@@ -64,7 +64,7 @@ class AstraConversationContextTest {
         assertFalse(prompt.contains("90 percent"))
         assertFalse(prompt.contains("Previous Astra:"))
         assertFalse(prompt.contains("We talked about lunch"))
-        assertTrue(prompt.endsWith("What was my bond allocation?\\n/no_think"))
+        assertTrue(prompt.endsWith("What was my bond allocation?\n/no_think"))
     }
 
     @Test fun vagueFirstPersonRecallPreservesUserWordsButNeverAstraGuess() {
@@ -119,7 +119,7 @@ class AstraConversationContextTest {
             }
         }
         assertFalse(prompt.contains("following private words"))
-        assertTrue(prompt.endsWith("What does that mean?\\n/no_think"))
+        assertTrue(prompt.endsWith("What does that mean?\n/no_think"))
     }
 
     @Test fun normalFollowupDoesNotDuplicateOldTurns() {
