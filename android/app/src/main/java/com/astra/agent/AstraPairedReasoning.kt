@@ -19,6 +19,14 @@ internal object AstraPairedReasoning {
         AstraReasoningBenchmark.Probe.FOREIGN_EXCHANGE_RISK
     )
 
+    fun allowsModeOverride(
+        currentQuestion: String,
+        diagnosticIsolated: Boolean,
+        override: Boolean?
+    ): Boolean = override == null || (
+        diagnosticIsolated && probes.any { it.prompt == currentQuestion }
+    )
+
     data class Comparison(
         val probe: AstraReasoningBenchmark.Probe,
         val fast: AstraReasoningBenchmark.Outcome,
