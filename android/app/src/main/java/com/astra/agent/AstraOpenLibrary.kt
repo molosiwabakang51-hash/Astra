@@ -25,7 +25,9 @@ internal object AstraOpenLibrary {
     private val languageLearning = Regex(
         """(?i)\b(?:teach|learn|study|practice|lesson|translate|translation|""" +
             """vocabulary|words?|phrases?|greetings?|alphabet|grammar|""" +
-            """pronunciation|speak|write|quiz|declension|say in|how to say)\b"""
+            """pronunciation|speak|write|quiz|declension|cases?|""" +
+            """genitive|accusative|dative|nominative|instrumental|""" +
+            """prepositional|say in|how to say)\b"""
     )
     private val unrelatedFinanceTopic = Regex(
         """(?i)\b(?:bond|bonds|interest|inflation|finance|financial|""" +
