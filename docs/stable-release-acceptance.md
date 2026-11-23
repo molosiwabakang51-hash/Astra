@@ -96,6 +96,18 @@ APK. GitHub Actions debug builds may use different signing certificates.
     independent device A/B evidence exists. App remains functional in airplane
     mode; no new permissions, network services or required model download.
 
+19. **Private native inference latency sample:** After successfully generating
+    a genuinely open-ended offline answer, open Settings → Offline AI models
+    and record the displayed first-native-output and full-request milliseconds,
+    including a cold start and at least three warm trials on the same handset.
+    The chunk count is **not** a token count; Qwen hidden thinking can produce
+    native chunks before any visible text. Confirm no prompt, model path,
+    conversation ID, token or private-book excerpt appears in the timing
+    report. Stop a generation and verify a cancelled or empty answer cannot
+    overwrite a previous successful timing. Compare adaptive reasoning ON
+    and OFF using identical prompts and the same 1.7B weights. Only phone
+    observations, not JVM timing mocks, can satisfy the performance gate.
+
 ## Honest release labels
 
 - **EXPERIMENTAL:** Compiles and passes automated source/unit/APK checks,
