@@ -347,6 +347,16 @@ internal class AstraOnDeviceBrain(
                     }
                 }
                 val publicAnswer = AstraOfflinePolicy.publicReply(answer.finish())
+                // The model can invent [B#]/[K#] markers and even a
+                // citation-footer heading. Allow only IDs whose complete
+                // evidence blocks actually reached the native model prompt.
+                // Strip forged headings before appending app-owned sources;
+                // an AI claim must never authorize book follow-up access.
+                val attributedAnswer = AstraSourceCitationGuard.protect(
+                    publicAnswer,
+                    verifiedPrivatePassages = citedBooks.size,
+                    verifiedOpenPassages = citedOpenCourse.size
+                )
                 if (publicAnswer.isNotBlank()) {
                     // A cancelled, failed or think-only reply cannot establish
                     // successful generation. Store only numeric timing.
@@ -361,13 +371,13 @@ internal class AstraOnDeviceBrain(
                     session.invalidate()
                     "The offline model did not produce a usable answer. Please try again."
                 } else if (citedBooks.isNotEmpty()) {
-                    publicAnswer + "\n\nRetrieved local book passages (verify originals):\n" +
+                    attributedAnswer + "\n\nRetrieved local book passages (verify originals):\n" +
                         (books?.citations(citedBooks) ?: "")
                 } else if (citedOpenCourse.isNotEmpty()) {
-                    publicAnswer + "\n\nOpen-course references:\n" +
+                    attributedAnswer + "\n\nOpen-course references:\n" +
                         AstraOpenLibrary.citations(citedOpenCourse)
                 } else {
-                    publicAnswer
+                    attributedAnswer
                 }
                 }
             } catch (linkage: LinkageError) {
