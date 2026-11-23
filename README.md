@@ -27,6 +27,26 @@ is required, and no remote service is called. It is a **narrow calculator
 verification improvement**, not a general reasoning benchmark or evidence
 that Qwen3's weights learned arithmetic.
 
+## Continued verified calculations in conversation (experimental)
+
+After an exact local calculation, the owner can ask a sequence of short
+questions such as `How did you calculate that?`, `Show the steps`,
+`Explain that result` and `Explain it more simply` **without restating
+the original operands**. Astra uses only the immediately preceding completed
+exchanges in the active chat and **recomputes the original mathematical proof
+from the owner's initial question**. It does not use Qwen-generated narrative
+as evidence of mathematical correctness.
+
+The chain is strictly bounded: one verified original calculation and at most
+three consecutive verified explanation exchanges. Every intervening reply
+must match the *entire* deterministic proof; incorrect, stopped or unverified
+answers break the chain. An unrelated topic or separate chat also breaks it.
+No notes, tasks, private documents, cloud requests, local model weights or
+persistent arithmetic caches are accessed or modified.
+
+This is a correctness and continuity improvement for deterministic tools,
+**not** a measured improvement in Qwen3 1.7B reasoning intelligence.
+
 ## Verified bounded multi-step arithmetic (experimental)
 
 Astra now has a **read-only local arithmetic parser** for strictly bounded
