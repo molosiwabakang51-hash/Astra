@@ -9,6 +9,25 @@ Astra is a **local-first Android/Kotlin Jetpack Compose assistant** with a futur
 Passing GitHub CI does not earn phone-only intelligence points.
 
 
+## Connected workspace handoffs (experimental)
+
+Astra's **Study**, **Chat**, **Tasks**, **Notes**, and **Local tools** now
+offer explicit ways to work together instead of behaving like isolated pages.
+Opening a Study lesson in Chat retains its subject so **Continue [subject]**
+returns to the same course; opening Study from the main navigation still shows
+the full subject catalog. An existing unsent Chat draft is preserved when a
+lesson opens.
+
+A task or note's **Discuss** action, or **Discuss result in Chat** after a
+non-sensitive local tool result, creates a **quoted, editable Chat draft**.
+It never sends a prompt, performs an operation, or saves data automatically.
+A pre-existing Chat draft is not replaced. Long-pressing a Chat message offers
+**Save message to Notes** with a separate confirmation; saved AI replies are
+labelled *unverified*, not silently treated as the owner's facts. Long excerpts
+are clearly marked when shortened. These are local UI/data-flow improvements,
+not model fine-tuning or an earned quality-score increase. Physical-device,
+accessibility, Back navigation and large-font checks are still outstanding.
+
 ## One-time private library folder authorization (experimental)
 
 In **Settings → Your private book library**, choose **Authorize library folder once**

@@ -32,8 +32,8 @@ class BackFromChatHistorySourceTest(unittest.TestCase):
     def test_study_subject_back_returns_to_catalog_before_parent_activity(self):
         self.assertIn("import androidx.activity.compose.BackHandler", STUDY)
         self.assertIn("BackHandler(enabled = selected != null)", STUDY)
-        self.assertIn("selectedId = null", STUDY)
-        self.assertIn("if (selected == null) onBackToChat() else selectedId = null", STUDY)
+        self.assertIn("onSubjectChange(null)", STUDY)
+        self.assertIn("if (selected == null) onBackToChat() else onSubjectChange(null)", STUDY)
         self.assertIn("AstraStudyHub(", MAIN)
 
     def test_dialogs_and_search_take_priority_over_back_history(self):

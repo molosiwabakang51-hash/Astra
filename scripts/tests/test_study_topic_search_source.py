@@ -21,13 +21,13 @@ class StudyTopicSearchSourceTest(unittest.TestCase):
         self.assertNotIn("onLesson(topicQuery)", HUB)
 
     def test_query_is_ephemeral_and_leaves_course_navigation_intact(self):
-        self.assertIn("var topicQuery by remember(selectedId) { mutableStateOf(\"\") }", HUB)
+        self.assertIn("var topicQuery by remember(selectedSubjectId) { mutableStateOf(\"\") }", HUB)
         self.assertIn("onValueChange = { topicQuery = it.take(80) }", HUB)
         self.assertIn("No matching lessons", HUB)
         self.assertIn('onClick = { topicQuery = "" }', HUB)
         self.assertIn("onBackToChat()", HUB)
-        self.assertIn("selectedId = null", HUB)
-        self.assertIn("selectedId = subject.id", HUB)
+        self.assertIn("onSubjectChange(null)", HUB)
+        self.assertIn("onSubjectChange(subject.id)", HUB)
         self.assertIn("visibleTopics.size", HUB)
 
 if __name__ == "__main__":

@@ -65,6 +65,21 @@ APK. GitHub Actions debug builds may use different signing certificates.
 15. **1.7B picker return regression (mandatory for LITE):** With a valid, fully downloaded `Qwen3-1.7B-Q4_K_M.gguf` in Downloads, use Settings → Import offline model once. Choose the file using Android Files. Verify Astra returns to **Settings → Model setup**, not a blank new chat, shows copied MiB during the import and a SHA-256-verified READY result. Repeat with app lock enabled and its delay set to immediately: unlocking must reveal the same progress/result, and an interrupted import must display a recoverable message without deleting the source file. Attempt with insufficient free storage and with a wrong GGUF variant; neither may silently return to Chat or claim success. Verify no new network usage and no 0.6B fallback. If a build is signed with a different key, use a separate test installation after backing up data—never uninstall a working copy just to test.
 16. **Astra-core navigation tray:** Tap the Astra icon on Chat, Study and Settings. Verify the edge-aligned tray opens from the left, can be dismissed by tapping outside or using Close, and presents six fully labelled destinations with a single clear active indicator. In Chat verify New conversation, Conversations, Search, Copy, Share, Rename, Mission Control, Speak last response and Clear; Clear must still ask for confirmation. Test large Android font scaling, TalkBack, a narrow screen, landscape and system gesture navigation: controls must not overlap the status/navigation bars or require horizontal scrolling.
 
+17. **Cross-feature continuity (experimental):** Open a Finance or Russian
+    lesson from Study, then use the Chat **Continue [subject]** control and
+    verify the same course is selected. Verify that returning via the Astra
+    navigation tray intentionally opens the catalog. Write an unsent Chat draft
+    before launching a Study lesson and confirm it survives. In Tasks and Notes,
+    tap **Discuss** and inspect the quoted draft without sending it; confirm
+    the source item is unchanged and a pre-existing unsent draft is never
+    overwritten. After a non-sensitive Local tools calculation, use
+    **Discuss result in Chat**; sensitive tools (including password generation)
+    must not show this action. Long-press an Astra reply and use **Save message
+    to Notes**; verify the separate confirmation and the *unverified* provenance
+    label survive a restart. Test Android Back, landscape, small screens,
+    TalkBack and large text. None of these flows may require network access,
+    cross private conversations without consent, or silently execute a task.
+
 ## Honest release labels
 
 - **EXPERIMENTAL:** Compiles and passes automated source/unit/APK checks,
