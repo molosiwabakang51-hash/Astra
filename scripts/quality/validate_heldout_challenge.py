@@ -16,7 +16,7 @@ def validate(text: str) -> list[str]:
         errors.append(f"Expected exactly {EXPECTED}, found {rows}")
     if "0, 1 or 2" not in text or "maximum **24**" not in text:
         errors.append("Missing explicitly bounded 0–2 rubric / 24-point total")
-    for phrase in ("model-only", "tool-assisted", "retrieval-grounded", "airplane mode", "two"):
+    for phrase in ("model-only", "tool-assisted", "retrieval-grounded", "airplane mode", "Run twice"):
         if phrase.casefold() not in text.casefold():
             errors.append(f"Missing protocol safeguard: {phrase}")
     if "not a replacement score" not in text:
