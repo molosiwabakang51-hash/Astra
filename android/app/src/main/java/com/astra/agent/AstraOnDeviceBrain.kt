@@ -341,7 +341,14 @@ internal class AstraOnDeviceBrain(
                     answer.append(part)
                     val now = System.nanoTime()
                     if (now - lastUiUpdate >= 200_000_000L) {
-                        val partial = AstraOfflinePolicy.publicReply(answer.snapshot())
+                        // Streaming bubbles also receive only guarded
+                        // citation markers; do not wait for a completed
+                        // model response to label unsupported references.
+                        val partial = AstraSourceCitationGuard.protect(
+                            AstraOfflinePolicy.publicReply(answer.snapshot()),
+                            verifiedPrivatePassages = citedBooks.size,
+                            verifiedOpenPassages = citedOpenCourse.size
+                        )
                         if (partial.isNotBlank()) onPartial(partial)
                         lastUiUpdate = now
                     }
