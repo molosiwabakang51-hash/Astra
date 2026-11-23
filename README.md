@@ -34,6 +34,22 @@ using identical Qwen3 1.7B questions before claiming better accuracy. Neither
 option adds an internet dependency, changes the signing key or bundles
 additional GGUF weights.
 
+## Content-free offline model timing (experimental)
+
+After a successful native Qwen3 response, Settings → Offline AI models displays
+the last request's **time to first native output**, **total request elapsed
+time**, and **native output chunk count**. The start-to-first interval includes
+model verification and loading when needed. A native output chunk is **not**
+necessarily a token or user-visible text (Qwen may generate private thinking
+first), so these measurements must not be called tokens/second or first visible
+token latency. No prompt, response, owner note, model path, device identifier
+or source excerpt is recorded; only the most recent successful sample is held
+in memory. Cancellation and empty answers do not create a success sample.
+
+This is an instrument for real-device A/B comparisons, **not** evidence of
+lower latency or an intelligence-rating increase. Measure warm/cold requests
+repeatedly on the same phone and model. Nothing is uploaded.
+
 ## Connected workspace handoffs (experimental)
 
 Astra's **Study**, **Chat**, **Tasks**, **Notes**, and **Local tools** now

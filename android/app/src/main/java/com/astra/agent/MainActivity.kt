@@ -6444,6 +6444,25 @@ class MainActivity :
                                             "Astra does not transmit these messages to a server.",
                                             style = MaterialTheme.typography.bodySmall
                                         )
+                                        Text(
+                                            "Last offline generation timing · local only",
+                                            style = MaterialTheme.typography.titleSmall
+                                        )
+                                        Text(
+                                            onDeviceBrain.lastInferenceTiming(),
+                                            style = MaterialTheme.typography.bodySmall
+                                        )
+                                        TextButton(
+                                            onClick = {
+                                                copyText(onDeviceBrain.lastInferenceTiming())
+                                            },
+                                            modifier = Modifier.semantics {
+                                                contentDescription =
+                                                    "Copy content-free offline model timing"
+                                            }
+                                        ) {
+                                            Text("Copy offline timing")
+                                        }
                                         Row(
                                             modifier = Modifier.fillMaxWidth(),
                                             verticalAlignment = Alignment.CenterVertically,

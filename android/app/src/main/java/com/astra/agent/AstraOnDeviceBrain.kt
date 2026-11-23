@@ -49,6 +49,12 @@ internal class AstraOnDeviceBrain(
     private val modelHealth = AstraModelHealth()
     @Volatile
     private var loadedModelPath: String? = null
+    @Volatile
+    private var lastNativeTiming: AstraInferenceTiming.Sample? = null
+
+    /** Timing only; no prompts, user notes or model-file paths. */
+    fun lastInferenceTiming(): String =
+        AstraInferenceTiming.describe(lastNativeTiming)
     // A change of consent must not leave old book snippets in native KV-cache.
     private var previousBookContextAllowed: Boolean? = null
     private var previousReplyLanguageId: String? = null
@@ -86,6 +92,7 @@ internal class AstraOnDeviceBrain(
             AstraInferenceCheckpoint.begin(context)
             try {
                 withContext(Dispatchers.IO) {
+                val requestStartedNs = System.nanoTime()
                 val finalMessage = AstraConversationContext.currentUserMessage(
                     turns.lastOrNull { it.role == "user" }?.content
                 )
@@ -253,6 +260,8 @@ internal class AstraOnDeviceBrain(
 
                 val answer = AstraStreamUnicode.StreamingBuffer(16_000)
                 var lastUiUpdate = 0L
+                var firstNativeChunkNs: Long? = null
+                var nativeChunkCount = 0
                 val openReferences = if (diagnosticIsolated) emptyList() else runCatching {
                     val bundled = context.assets.open(AstraOpenLibrary.BUNDLED_ASSET)
                         .use(AstraOpenLibrary::load)
@@ -313,6 +322,10 @@ internal class AstraOnDeviceBrain(
                     context, AstraInferenceCheckpoint.TOKEN_GENERATION
                 )
                 current.sendUserPrompt(requestPrompt, answerBudget).collect { part ->
+                    if (part.isNotEmpty()) {
+                        if (firstNativeChunkNs == null) firstNativeChunkNs = System.nanoTime()
+                        nativeChunkCount++
+                    }
                     // JNI can split a supplementary character between two
                     // token chunks. Hold an incomplete high surrogate until
                     // the next chunk, rather than showing or persisting it.
@@ -325,6 +338,16 @@ internal class AstraOnDeviceBrain(
                     }
                 }
                 val publicAnswer = AstraOfflinePolicy.publicReply(answer.finish())
+                if (publicAnswer.isNotBlank()) {
+                    // A cancelled, failed or think-only reply cannot establish
+                    // successful generation. Store only numeric timing.
+                    lastNativeTiming = AstraInferenceTiming.sample(
+                        requestStartedNs,
+                        firstNativeChunkNs,
+                        System.nanoTime(),
+                        nativeChunkCount
+                    )
+                }
                 if (publicAnswer.isBlank()) {
                     session.invalidate()
                     "The offline model did not produce a usable answer. Please try again."
