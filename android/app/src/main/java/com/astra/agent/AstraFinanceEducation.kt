@@ -49,6 +49,19 @@ internal object AstraFinanceEducation {
             .lowercase(Locale.ROOT)
             .trimEnd('.', '?', '!', ' ')
         if (query.length > 180 || privateContext.containsMatchIn(query)) return null
+        // A direct book-author question needs a direct verified answer;
+        // never imply the owner proposed a different or misspelled author.
+        // Keep this narrow rather than building a speculative author database.
+        if (Regex(
+                """^who (?:wrote|authored) (?:the book )?["']?irrational exuberance["']?$"""
+            ).matches(query) ||
+            Regex(
+                """^who is the author of (?:the book )?["']?irrational exuberance["']?$"""
+            ).matches(query)
+        ) {
+            return "Robert J. Shiller wrote Irrational Exuberance (2000). " +
+                "This is a known book-author fact; I did not check the internet."
+        }
         // The owner reported that Qwen invented "Niall Shiller" when asked
         // about Irrational Exuberance. Answer only this narrow, independently
         // documented identity/book fact deterministically, even for a short
