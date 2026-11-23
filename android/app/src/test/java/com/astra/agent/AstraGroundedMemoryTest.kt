@@ -113,6 +113,78 @@ class AstraGroundedMemoryTest {
         assertTrue(brief.evidence.first().excerpt.contains("selected bonds"))
     }
 
+    @Test fun explicitMemoryRetrievalIncludesLaterOwnerCorrectionFromCurrentChat() {
+        val brief = AstraGroundedMemory.retrieve(
+            AstraGroundedMemory.parse("ask my memory about bond maturity")!!,
+            notes = emptyList(), tasks = emptyList(),
+            current = listOf(
+                msg("You", "My hypothetical bond maturity is seven years."),
+                msg("Astra", "My guess is 40 years."),
+                msg("You", "Actually, make it three years.")
+            ),
+            archived = emptyList()
+        )
+        assertEquals(1, brief.evidence.size)
+        assertTrue(brief.evidence.single().excerpt.contains("seven years"))
+        assertTrue(brief.evidence.single().excerpt.contains("three years"))
+        assertFalse(brief.modelPrompt().contains("40 years"))
+        assertTrue(brief.modelPrompt().contains("latest value"))
+    }
+
+    @Test fun archivedChatCorrectionsAreScopedToTheirOwnConversation() {
+        val brief = AstraGroundedMemory.retrieve(
+            AstraGroundedMemory.parse("ask memory about portfolio bonds")!!,
+            notes = emptyList(), tasks = emptyList(),
+            current = emptyList(),
+            archived = listOf(
+                AstraChatArchive.Chat("first", "Bonds",
+                    listOf(msg("You", "My portfolio bonds target is 60 percent."))),
+                AstraChatArchive.Chat("second", "Food",
+                    listOf(msg("You", "Actually, make the dinner spicy.")))
+            )
+        )
+        assertTrue(brief.evidence.any {
+            it.excerpt.contains("60 percent")
+        })
+        assertFalse(brief.sourceFooter().contains("dinner spicy"))
+    }
+
+    @Test fun savedGeneratedModelTextIsNotEvidenceOfOwnersPersonalChoice() {
+        val assistantNote = AstraWorkspaceHandoff.noteFromChat(
+            "Astra", "You chose high-yield bonds because I guessed so."
+        )!!
+        val personal = AstraGroundedMemory.retrieve(
+            AstraGroundedMemory.parse("ask my memory why did I choose bonds")!!,
+            notes = listOf(assistantNote), tasks = emptyList(),
+            current = emptyList(), archived = emptyList()
+        )
+        assertTrue(personal.evidence.isEmpty())
+
+        val noteReview = AstraGroundedMemory.retrieve(
+            AstraGroundedMemory.parse("analyse my notes about bonds")!!,
+            notes = listOf(assistantNote), tasks = emptyList(),
+            current = emptyList(), archived = emptyList()
+        )
+        assertTrue(noteReview.evidence.isNotEmpty())
+        assertTrue(noteReview.evidence.single().source.contains("UNVERIFIED"))
+        assertTrue(noteReview.modelPrompt().contains("not an owner statement"))
+    }
+
+    @Test fun noCorrectionIsInventedAcrossAnUnrelatedOwnerMessage() {
+        val brief = AstraGroundedMemory.retrieve(
+            AstraGroundedMemory.parse("ask memory about bond maturity")!!,
+            notes = emptyList(), tasks = emptyList(),
+            current = listOf(
+                msg("You", "My bond maturity is seven years."),
+                msg("You", "Let's change the dinner recipe."),
+                msg("You", "Actually, make it spicy noodles.")
+            ),
+            archived = emptyList()
+        )
+        assertTrue(brief.evidence.any { it.excerpt.contains("seven years") })
+        assertFalse(brief.sourceFooter().contains("spicy noodles"))
+    }
+
     @Test fun pluralNormalizationHelpsBondAndDividendQuestions() {
         val brief = AstraGroundedMemory.retrieve(
             AstraGroundedMemory.parse("ask memory bonds and dividends")!!,
