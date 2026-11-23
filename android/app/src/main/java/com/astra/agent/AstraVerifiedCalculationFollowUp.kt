@@ -54,7 +54,6 @@ internal object AstraVerifiedCalculationFollowUp {
         // A root calculation plus at most three consecutive follow-up pairs
         // can support another request. Never search arbitrarily far back
         // through unrelated history or carry context across conversations.
-        val maxRows = MAX_CHAIN_PAIRS * 2
         var cursor = activeChat.size - 2
         var traversed = 0
         val followUps = mutableListOf<AstraChatArchive.Message>()
