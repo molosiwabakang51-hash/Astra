@@ -15,6 +15,17 @@ internal object AstraTabBackPolicy {
 
     data class Target(val tab: Int, val remainingHistory: Int)
 
+    /** Safe destination names for explicit Chat-to-origin return links. */
+    fun destinationLabel(tab: Int): String? = when (tab) {
+        0 -> "Chat"
+        1 -> "Tasks"
+        2 -> "Notes"
+        3 -> "Tools"
+        4 -> "Settings"
+        5 -> "Study"
+        else -> null
+    }
+
     /**
      * Android Back at the genuine Chat root must not finish the Activity:
      * show the existing Astra navigation surface instead. That surface has
