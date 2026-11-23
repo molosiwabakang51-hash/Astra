@@ -1654,6 +1654,13 @@ private class AstraProcessor(
             dialogue.dismissIncompletePrompt()
             return AssistantResult(it)
         }
+        // Explicit arithmetic questions are read-only, even if a previous
+        // task or note prompt is waiting for a response. Never store them as
+        // a pending task answer or ask the model to invent a numeric result.
+        AstraVerifiedArithmetic.answer(clean)?.let {
+            dialogue.dismissIncompletePrompt()
+            return AssistantResult(it)
+        }
         dialogue.respond(clean, tasks, notes, completed)?.let {
             return AssistantResult(it)
         }
@@ -1881,13 +1888,6 @@ private class AstraProcessor(
                     results.joinToString("\n")
                 }
             )
-        }
-
-        // Exact two-operand questions in natural English are independently
-        // verified on the phone. Quoted instructions, compound problems and
-        // uncertain inputs must not be treated as calculator commands.
-        AstraVerifiedArithmetic.answer(clean)?.let {
-            return AssistantResult(it)
         }
 
         // Numeric projections are deterministic; never ask Qwen3 to
