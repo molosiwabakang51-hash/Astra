@@ -3691,6 +3691,27 @@ class MainActivity :
                         return
                     }
 
+                    // Explicit questions about a fictional bond's original
+                    // and corrected maturity use only this chat's owner-written
+                    // numerical premises. Never trust a model-generated
+                    // maturity, invert the risk implication, or open archives.
+                    AstraBondMaturityContext.respond(
+                        message, history.map {
+                            AstraChatArchive.Message(it.role, it.text)
+                        }
+                    )?.let { verifiedBondAnswer ->
+                        dialogue.dismissIncompletePrompt()
+                        workflowSession.reset()
+                        dialogueAwaiting = false
+                        history.add(ChatMessage("You", message))
+                        history.add(ChatMessage("Astra", verifiedBondAnswer))
+                        while (history.size > MAX_HISTORY) history.removeAt(0)
+                        input = ""
+                        persist()
+                        keyboard?.hide()
+                        return
+                    }
+
                     // Only a user-authored, explicitly prefixed plan can trigger
                     // local actions. Every step is simulated before the owner
                     // types 'confirm workflow'; model-generated text never runs it.
