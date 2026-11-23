@@ -7,7 +7,7 @@ package com.astra.agent
  * describes which actual passages survived into the native prompt.
  */
 internal object AstraSourceCitationGuard {
-    private val sourceMarker = Regex("""(?i)\[(B|K)([0-9]{1,6})\]""")
+    private val sourceMarker = Regex("""(?i)\[(B|K)([0-9]+)\]""")
     private val forgedFooter = Regex(
         """(?im)^[ \t]*Retrieved local book passages \(verify originals\):[ \t]*\r?$"""
     )
