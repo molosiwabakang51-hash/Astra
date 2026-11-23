@@ -31,7 +31,7 @@ class VerifiedMathFollowupWiringTests(unittest.TestCase):
         self.assertIn("AstraInterruptedReply.isIncomplete", FOLLOW)
         self.assertIn("if (!isFollowUp(user.text)) return null", FOLLOW)
         self.assertIn("followUps.all { reply -> reply.text == verified }", FOLLOW)
-        self.assertIn("request.any", FOLLOW)
+        self.assertIn("raw.any", FOLLOW)
 
     def test_no_private_memory_network_or_side_effects(self):
         self.assertNotIn("Http", FOLLOW)
