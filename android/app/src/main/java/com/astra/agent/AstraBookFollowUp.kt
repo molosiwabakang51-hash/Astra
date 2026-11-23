@@ -72,6 +72,7 @@ internal object AstraBookFollowUp {
             .replace(Regex("""[\r\n\t\u0000-\u001f]+"""), " ")
             .replace(Regex("""\s+"""), " ")
             .trim()
+            .trimEnd('.', '?', '!')
 
         // Keep the explicit book command so the normal book search, consent,
         // excerpt-fit and citation verification safeguards still apply.
