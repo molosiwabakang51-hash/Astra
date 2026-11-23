@@ -100,9 +100,20 @@ internal object AstraOpenLibrary {
         if (!isLanguageStudyQuestion(question)) return emptyList()
         val q = tokenize(question).filterNot { it in stop }.toSet()
         if (q.isEmpty()) return emptyList()
+        // A generic "Russian" match is not sufficient evidence for a
+        // specific requested lesson (for example, punctuation or finance).
+        // Only the default Russian-learning request can use an intro card
+        // without a second matching, topic-specific term.
+        val generic = setOf("russian", "russki", "language", "study", "learn",
+            "teach", "practice", "practise", "lesson", "lessons", "say", "words",
+            "word", "translate", "translation", "basic", "beginner")
+        val topics = q - generic
         return entries.mapNotNull { item ->
             val keywordSet = tokenize(item.keywords).toSet()
             val words = tokenize(item.title + " " + item.text).toSet()
+            if (topics.isNotEmpty() &&
+                topics.none { it in keywordSet || it in words }
+            ) return@mapNotNull null
             val score = q.sumOf { word ->
                 (if (word in keywordSet) 5 else 0) +
                     (if (word in words) 2 else 0)
