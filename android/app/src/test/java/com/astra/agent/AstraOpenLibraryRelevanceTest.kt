@@ -38,6 +38,7 @@ class AstraOpenLibraryRelevanceTest {
     @Test fun actualLanguageLessonsStillUseRelevantLicensedExcerpts() {
         val questions = listOf(
             "Teach me Russian greetings",
+            "Explain Russian genitive cases",
             "Learn Russian alphabet and phrases",
             "How to say hello in Russian?",
             "Practise Russian vocabulary",
