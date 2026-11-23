@@ -38,7 +38,7 @@ class OfflineUiResponsivenessContracts(unittest.TestCase):
         streaming = BRAIN[start:end]
         self.assertEqual(1, streaming.count("lastUiUpdate = now"))
         self.assertIn(
-            "lastPublishedText = partial\\n                            " +
+            "lastPublishedText = partial\n                            " +
             "// A hidden/blank native fragment must not delay",
             streaming,
         )
