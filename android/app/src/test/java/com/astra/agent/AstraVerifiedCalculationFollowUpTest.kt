@@ -47,6 +47,22 @@ class AstraVerifiedCalculationFollowUpTest {
         assertTrue(division.contains("3 ÷ 8 = 0.375"))
     }
 
+    @Test fun verifiedComplexArithmeticFlowsThroughNaturalFollowups() {
+        val original = "What is (17 times 19 minus 5) divided by 2?"
+        val history = listOf(msg("You", original), msg("Astra", "159"))
+        val verified = AstraVerifiedCalculationFollowUp.explain(
+            "Show the steps", history
+        )!!
+        assertTrue(verified.contains("17 × 19 = 323"))
+        assertTrue(verified.contains("323 − 5 = 318"))
+        assertTrue(verified.contains("318 ÷ 2 = 159"))
+        assertTrue(verified.contains("Final exact result: 159"))
+        assertNull(AstraVerifiedCalculationFollowUp.explain(
+            "Show the steps",
+            listOf(msg("You", original), msg("Astra", "160"))
+        ))
+    }
+
     @Test fun rejectsUnverifiedPreviousRepliesAndAmbiguousInputs() {
         assertNull(AstraVerifiedCalculationFollowUp.explain(
             "How did you calculate that?",

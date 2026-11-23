@@ -1661,6 +1661,13 @@ private class AstraProcessor(
             dialogue.dismissIncompletePrompt()
             return AssistantResult(it)
         }
+        // Read-only exact arithmetic with precedence, parentheses and
+        // bounded multi-operation expressions. Never treat untrusted
+        // text, a task instruction or model-generated content as math.
+        AstraVerifiedExpression.answer(clean)?.let {
+            dialogue.dismissIncompletePrompt()
+            return AssistantResult(it)
+        }
         dialogue.respond(clean, tasks, notes, completed)?.let {
             return AssistantResult(it)
         }

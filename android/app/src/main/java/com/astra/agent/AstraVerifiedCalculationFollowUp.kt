@@ -51,6 +51,8 @@ internal object AstraVerifiedCalculationFollowUp {
         // a plausible but mistaken previous AI answer is not authoritative.
         return AstraVerifiedArithmetic.verifiedWorking(
             previousUser.text, previousReply.text
+        ) ?: AstraVerifiedExpression.verifiedWorking(
+            previousUser.text, previousReply.text
         )
     }
 }
