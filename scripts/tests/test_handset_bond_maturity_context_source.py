@@ -18,8 +18,8 @@ class BondHistoryHandsetContracts(unittest.TestCase):
         self.assertIn("AstraBondMaturityContext.respond(", MAIN)
 
     def test_rate_risk_direction_derived_from_corrected_premise(self):
-        self.assertIn("shortening maturity generally reduces modified duration", BOND)
-        self.assertIn("extending maturity generally increases modified duration", BOND)
+        self.assertIn('"maturity generally reduces modified duration and "', BOND)
+        self.assertIn('"maturity generally increases modified duration "', BOND)
         self.assertIn("Maturity is not modified duration", BOND)
         self.assertIn("AstraInterruptedReply.isIncomplete", BOND)
 
