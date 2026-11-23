@@ -62,6 +62,13 @@ internal object AstraBookFollowUp {
         // Do not promote a failed/blocked previous request to an evidence
         // source. The next reply must retrieve fresh, matching local passages.
         val previousAnswer = recent[1].text.trim()
+        // The last answer must carry the engine's verified local-book
+        // citation footer. A question merely *about* a book or an engine
+        // failure does not establish that retrieved evidence was available.
+        if (!previousAnswer.contains(
+                "Retrieved local book passages (verify originals):\n"
+            )
+        ) return Result.MissingAnchor
         if (previousAnswer.startsWith("Offline model unavailable:", true) ||
             previousAnswer.startsWith("Your book excerpts could not fit", true) ||
             previousAnswer.startsWith("Your book question is too long", true) ||
