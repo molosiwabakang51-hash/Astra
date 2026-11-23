@@ -17,6 +17,10 @@ class AstraResponseRetryTest {
             "Part of the answer\n\n[Response stopped]",
             "Part\n\n[Response stopped]\n\nSources: local notes",
             "Offline model unavailable: model missing.",
+            "Offline model unavailable. Android may not have enough available RAM. " +
+                "Retry from Chat or verify the 1.7B model in Settings.",
+            "Offline model unavailable. The offline AI engine did not finish starting in time.",
+            "Offline response interrupted.",
             "The offline model did not produce a usable answer. Please try again."
         )) {
             assertEquals("Explain bond convexity",
