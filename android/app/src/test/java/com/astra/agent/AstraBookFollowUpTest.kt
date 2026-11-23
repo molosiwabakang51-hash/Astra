@@ -38,6 +38,24 @@ class AstraBookFollowUpTest {
         }
     }
 
+    @Test fun naturalBookQuestionCanStartAnExplicitCitedFollowupChain() {
+        val answer = "A real local excerpt explains duration.\n\n" +
+            "Retrieved local book passages (verify originals):\n" +
+            "[B1] Synthetic test-source attribution."
+        val dialogue = listOf(
+            msg("You", "According to my books, how does duration work?"),
+            msg("Astra", answer)
+        )
+        val continuation = AstraBookFollowUp.resolve(
+            "Continue using my book", dialogue
+        )
+        assertTrue(continuation is AstraBookFollowUp.Result.Ready)
+        val query = (continuation as AstraBookFollowUp.Result.Ready).modelPrompt
+        assertTrue(query.startsWith("ask my books how does duration work."))
+        assertTrue(query.contains("Follow-up request: Continue using my book"))
+        assertFalse(query.contains("Synthetic test-source attribution"))
+    }
+
     @Test fun severalExplicitFollowupsCanReuseOriginalQuestionWithinSameChat() {
         val cited = "An explanation.\n\n" +
             "Retrieved local book passages (verify originals):\n" +
