@@ -80,6 +80,22 @@ APK. GitHub Actions debug builds may use different signing certificates.
     TalkBack and large text. None of these flows may require network access,
     cross private conversations without consent, or silently execute a task.
 
+18. **Adaptive reasoning and verified calculations (experimental):** Without
+    importing any private notes, ask `What is 17 multiplied by 19? Reply only
+    with the number.` and verify the local calculator returns `323`; separately
+    ask a complex multi-step calculation and confirm the system does **not**
+    misinterpret it as an exact two-number expression. With the Qwen3 1.7B
+    model installed, leave **Adaptive reasoning** off and record two identical
+    complex prompts and their time-to-first-token, final accuracy and blank
+    response rate. Then enable the option in Settings and repeat the *same*
+    prompts, model and device configuration, including after restart. Verify
+    ordinary chat and explicit short-answer prompts remain fast, quoted
+    instructions cannot select thinking mode, and diagnostic benchmarks are
+    isolated from the owner toggle. Record both successes and failures.
+    These source/JVM features are **not** a verified AI quality gain until
+    independent device A/B evidence exists. App remains functional in airplane
+    mode; no new permissions, network services or required model download.
+
 ## Honest release labels
 
 - **EXPERIMENTAL:** Compiles and passes automated source/unit/APK checks,

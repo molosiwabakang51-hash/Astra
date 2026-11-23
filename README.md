@@ -9,6 +9,31 @@ Astra is a **local-first Android/Kotlin Jetpack Compose assistant** with a futur
 Passing GitHub CI does not earn phone-only intelligence points.
 
 
+## Verified arithmetic and adaptive reasoning (experimental)
+
+**Natural-language arithmetic verification:** Requests such as
+`What is 17 multiplied by 19? Reply only with the number.` use a bounded
+**deterministic local calculator**, so Astra returns the exact result rather
+than trusting Qwen3 to guess. This deliberately supports only unambiguous
+two-number addition, subtraction, multiplication and exact division. Complex,
+quoted, multi-operation or repeating-decimal questions follow the existing
+AI/tool routes. A correct calculator answer is **not evidence of model reasoning
+quality**.
+
+**Optional adaptive thinking:** Settings → **Adaptive reasoning · experimental**
+is **off by default**. If explicitly enabled, Astra selects Qwen3's bounded
+`/think` mode for a small set of recognizable multi-constraint, planning
+and conditional reasoning questions. Ordinary requests, brief answer-only
+requests, quoted source text and isolated benchmarks remain in `/no_think`.
+The owner's explicit `Think carefully:` instruction still opts into the
+existing thinking mode regardless of the toggle.
+
+Turning this on can increase latency, battery usage and empty-answer risk on
+a 1.7B model. It is not neural weight training and requires A/B evaluation
+using identical Qwen3 1.7B questions before claiming better accuracy. Neither
+option adds an internet dependency, changes the signing key or bundles
+additional GGUF weights.
+
 ## Connected workspace handoffs (experimental)
 
 Astra's **Study**, **Chat**, **Tasks**, **Notes**, and **Local tools** now
