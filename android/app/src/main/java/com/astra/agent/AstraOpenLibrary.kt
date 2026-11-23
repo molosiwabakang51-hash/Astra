@@ -16,9 +16,36 @@ internal object AstraOpenLibrary {
     private const val MAX_LINE_CHARS = 5_000
     private const val MAX_QUERY_CONTEXT = 1_250
     private val tokens = Regex("""[\p{L}\p{N}]+""")
-    private val russian = Regex(
-        """(?i)russian|russki|cyrillic|\p{IsCyrillic}|slavic|pronunciation|grammar|declension"""
+    // A Cyrillic financial question is NOT a request to study Russian
+    // greetings. Previous broad language detection attached an unrelated
+    // [K1] Russian greetings citation to "Объясни ... облигации".
+    private val russianCourseName = Regex(
+        """(?i)\b(?:russian|russki|cyrillic)\b"""
     )
+    private val languageLearning = Regex(
+        """(?i)\b(?:teach|learn|study|practice|lesson|translate|translation|""" +
+            """vocabulary|words?|phrases?|greetings?|alphabet|grammar|""" +
+            """pronunciation|speak|write|quiz|declension|cases?|""" +
+            """genitive|accusative|dative|nominative|instrumental|""" +
+            """prepositional|say in|how to say)\b"""
+    )
+    private val unrelatedFinanceTopic = Regex(
+        """(?i)\b(?:bond|bonds|interest|inflation|finance|financial|""" +
+            """stocks?|portfolio|investments?|yields?|coupon|dividends?)\b|""" +
+            """облигац|финанс|инфляц|инвестиц|процент"""
+    )
+
+    internal fun isLanguageStudyQuestion(question: String): Boolean {
+        if (unrelatedFinanceTopic.containsMatchIn(question)) return false
+        val lower = question.lowercase(Locale.ROOT)
+        val english = russianCourseName.containsMatchIn(question) &&
+            languageLearning.containsMatchIn(question)
+        val russian = "русск" in lower &&
+            listOf("язык", "граммат", "привет", "словар",
+                "перевод", "урок", "учить", "изуч",
+                "произн", "алфавит", "говорить").any { it in lower }
+        return english || russian
+    }
     private val stop = setOf(
         "what", "how", "why", "can", "you", "explain", "teach", "me", "please",
         "a", "an", "the", "is", "are", "of", "and", "for", "with", "in", "to",
@@ -69,12 +96,26 @@ internal object AstraOpenLibrary {
         neuralRussianHint: Boolean = false,
         maxHits: Int = 3
     ): List<Entry> {
-        if (!russian.containsMatchIn(question) && !neuralRussianHint) return emptyList()
+        // A neural topic hint alone never authorizes irrelevant sources.
+        // The owner must be asking to study Russian as a language; simply
+        // writing a question in Russian is not sufficient.
+        if (!isLanguageStudyQuestion(question)) return emptyList()
         val q = tokenize(question).filterNot { it in stop }.toSet()
         if (q.isEmpty()) return emptyList()
+        // A generic "Russian" match is not sufficient evidence for a
+        // specific requested lesson (for example, punctuation or finance).
+        // Only the default Russian-learning request can use an intro card
+        // without a second matching, topic-specific term.
+        val generic = setOf("russian", "russki", "language", "study", "learn",
+            "teach", "practice", "practise", "lesson", "lessons", "say", "words",
+            "word", "translate", "translation", "basic", "beginner")
+        val topics = q - generic
         return entries.mapNotNull { item ->
             val keywordSet = tokenize(item.keywords).toSet()
             val words = tokenize(item.title + " " + item.text).toSet()
+            if (topics.isNotEmpty() &&
+                topics.none { it in keywordSet || it in words }
+            ) return@mapNotNull null
             val score = q.sumOf { word ->
                 (if (word in keywordSet) 5 else 0) +
                     (if (word in words) 2 else 0)
