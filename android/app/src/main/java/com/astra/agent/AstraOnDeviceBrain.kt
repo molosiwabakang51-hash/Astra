@@ -5,6 +5,7 @@ import android.os.StatFs
 import com.arm.aichat.AiChat
 import com.arm.aichat.InferenceEngine
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.collect
@@ -89,9 +90,14 @@ internal class AstraOnDeviceBrain(
         diagnosticReasoningOverride: Boolean? = null,
         onPartial: suspend (String) -> Unit = {}
     ): String = mutex.withLock {
-            // Durable but content-free checkpoint survives a fatal JNI signal.
-            AstraInferenceCheckpoint.begin(context)
             try {
+                // Preference commit() can block on flash and other queued
+                // writes, particularly while a 1.7B model strains memory.
+                // Do not execute these synchronous checkpoints on Android's
+                // main thread before the first native token.
+                withContext(Dispatchers.IO) {
+                    AstraInferenceCheckpoint.begin(context)
+                }
                 withContext(Dispatchers.IO) {
                 val requestStartedNs = System.nanoTime()
                 val finalMessage = AstraConversationContext.currentUserMessage(
@@ -269,6 +275,7 @@ internal class AstraOnDeviceBrain(
 
                 val answer = AstraStreamUnicode.StreamingBuffer(16_000)
                 var lastUiUpdate = 0L
+                var lastPublishedText = ""
                 var firstNativeChunkNs: Long? = null
                 var nativeChunkCount = 0
                 val openReferences = if (diagnosticIsolated) emptyList() else runCatching {
@@ -340,17 +347,26 @@ internal class AstraOnDeviceBrain(
                     // the next chunk, rather than showing or persisting it.
                     answer.append(part)
                     val now = System.nanoTime()
-                    if (now - lastUiUpdate >= 200_000_000L) {
-                        // Streaming bubbles also receive only guarded
-                        // citation markers; do not wait for a completed
-                        // model response to label unsupported references.
+                    if (AstraStreamingUiPolicy.intervalElapsed(now, lastUiUpdate)) {
+                        // Updating a full Markdown chat bubble and scrolling
+                        // several times each second can overwhelm a low-RAM
+                        // Android main thread while native Qwen3 is generating.
+                        // Bound these expensive UI updates without changing
+                        // the token stream, native output or persisted answer.
                         val partial = AstraSourceCitationGuard.protect(
                             AstraOfflinePolicy.publicReply(answer.snapshot()),
                             verifiedPrivatePassages = citedBooks.size,
                             verifiedOpenPassages = citedOpenCourse.size
                         )
-                        if (partial.isNotBlank()) onPartial(partial)
-                        lastUiUpdate = now
+                        if (AstraStreamingUiPolicy.hasNewVisibleText(
+                                partial, lastPublishedText
+                            )) {
+                            onPartial(partial)
+                            lastPublishedText = partial
+                            // A hidden/blank native fragment must not delay
+                            // the first real text by a full throttle window.
+                            lastUiUpdate = now
+                        }
                     }
                 }
                 val publicAnswer = AstraOfflinePolicy.publicReply(answer.finish())
@@ -404,9 +420,13 @@ internal class AstraOnDeviceBrain(
                 loadedModelPath = null
                 throw error
             } finally {
-                // Does not run on fatal native process death. Cancelled and
-                // recoverable requests clear the checkpoint normally.
-                AstraInferenceCheckpoint.clear(context)
+                // This is a synchronous disk checkpoint. It must never
+                // block the UI thread, and cancellation must not leave a
+                // false persistent 'active inference' flag behind.
+                // Fatal native process death cannot execute this finally.
+                withContext(NonCancellable + Dispatchers.IO) {
+                    AstraInferenceCheckpoint.clear(context)
+                }
             }
         }
 

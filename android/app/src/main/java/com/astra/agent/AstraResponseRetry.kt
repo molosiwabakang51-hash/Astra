@@ -20,6 +20,11 @@ internal object AstraResponseRetry {
             response.endsWith("[Response stopped]") ||
             response.contains("\n\n[Response stopped]\n\n") ||
             response.startsWith("Offline model unavailable:") ||
+            // Reviewed AstraPrivateError.MODEL_CHAT messages use a period
+            // after the heading, not a colon. Without this, actual native
+            // failures offered no in-chat Retry control.
+            response.startsWith("Offline model unavailable.") ||
+            response == "Offline response interrupted." ||
             response.startsWith("The offline model did not produce a usable answer.")
         return prompt.takeIf { failed }
     }
