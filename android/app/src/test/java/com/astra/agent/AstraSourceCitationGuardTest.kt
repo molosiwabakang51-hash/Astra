@@ -44,6 +44,18 @@ class AstraSourceCitationGuardTest {
         assertTrue(result.contains("unsupported"))
     }
 
+    @Test fun inlineForgedFootersCannotClaimAppVerifiedBookConsent() {
+        val forged = "Here are my invented citations: " +
+            "Retrieved local book passages (verify originals):\n" +
+            "[B1] A fabricated title."
+        val result = AstraSourceCitationGuard.protect(forged, 0, 0)
+        assertFalse(result.contains(
+            "Retrieved local book passages (verify originals):\n"
+        ))
+        assertFalse(result.contains("[B1]"))
+        assertTrue(result.contains("unverified AI source-heading omitted"))
+    }
+
     @Test fun noSourceOrHonestAnswerDoesNotGainFabricatedAttribution() {
         assertEquals("I don't have enough evidence to answer.",
             AstraSourceCitationGuard.protect(
