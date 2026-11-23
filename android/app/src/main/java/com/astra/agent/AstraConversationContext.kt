@@ -122,22 +122,30 @@ internal object AstraConversationContext {
         val retrieved = if (ownerRecall) ranked.flatMap { anchor ->
             relatedCorrections(anchor, valid).asReversed() + anchor
         } else ranked
-        // If a first-person recall query already has lexical matches,
-        // do not fill the prompt with unrelated older owner messages.
-        // Otherwise preserve limited recency fallback for vague questions.
-        val fallback = if (ownerRecall && ranked.isNotEmpty()) emptyList()
-            else candidates.asReversed()
-        // When the owner asks what THEY said, relevant owner statements and
-        // their corrections outrank unrelated recent assistant chatter.
-        // Otherwise retain the existing recency-first behavior.
+        // Questions about what the owner said must never treat an earlier
+        // Astra answer as owner testimony, even when keyword matching finds
+        // no relevant owner turn. When a specific topic is requested, do not
+        // fill gaps with unrelated recent chatter; let the model express
+        // uncertainty instead of inventing a remembered fact.
+        val recentOwners = recent.asReversed().filter { it.value.role == "user" }
+        val relevantRecentOwners = if (keywords.isEmpty()) recentOwners else
+            recentOwners.filter { turn ->
+                significantWords(turn.value.content.take(MAX_TURN_CHARS))
+                    .any(keywords::contains)
+            }.flatMap { anchor ->
+                // Retain topic-free corrections such as "Actually, make it
+                // three" beside the matched owner statement, in time order
+                // when serializing the selected excerpts.
+                relatedCorrections(anchor, valid).asReversed() + anchor
+            }
         val priority = (
-            if (ownerRecall && ranked.isNotEmpty()) {
-                // First-person recall is evidence about the owner's words.
-                // Recent assistant guesses are not such evidence and must
-                // not compete for the limited 1,150-character history window.
-                retrieved + recent.asReversed().filter { it.value.role == "user" }
-            } else {
-                recent.asReversed() + retrieved + fallback
+            when {
+                ownerRecall && ranked.isNotEmpty() ->
+                    retrieved + relevantRecentOwners
+                ownerRecall && keywords.isNotEmpty() ->
+                    relevantRecentOwners
+                ownerRecall -> recentOwners + candidates.asReversed()
+                else -> recent.asReversed() + retrieved + candidates.asReversed()
             }
         ).distinctBy { it.index }
         val selected = mutableListOf<Pair<Int, String>>()
@@ -156,7 +164,13 @@ internal object AstraConversationContext {
             if (availableText < 10) break
             // Do not cut immediately after an escaped backslash: otherwise
             // the following closing quote could become escaped too.
-            val bounded = source.take(availableText).removeSuffix("\\")
+            var bounded = source.take(availableText)
+            // A model-recovery excerpt must never end with half of an
+            // emoji or another supplementary Unicode character.
+            if (bounded.isNotEmpty() && Character.isHighSurrogate(bounded.last())) {
+                bounded = bounded.dropLast(1)
+            }
+            bounded = bounded.removeSuffix("\\")
             if (bounded.length < 10) continue
             selected.add(item.index to (prefix + bounded + suffix))
             remaining -= selected.last().second.length
