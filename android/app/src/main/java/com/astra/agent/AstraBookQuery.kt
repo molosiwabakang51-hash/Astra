@@ -28,7 +28,11 @@ internal object AstraBookQuery {
 
     fun extract(raw: String): String? {
         val message = raw.trim()
-        if (message.isBlank() || message.length > 2_500 ||
+        // Oversized explicit questions still enter the existing retrieval
+        // router so its 1,800-character evidence-fit gate can explain the
+        // limit. Never turn an explicitly private-book request into normal
+        // model chat merely because the question is lengthy.
+        if (message.isBlank() ||
             message.contains('\n') || message.contains('\r')
         ) return null
 
