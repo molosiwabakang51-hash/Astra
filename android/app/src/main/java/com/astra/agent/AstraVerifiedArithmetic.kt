@@ -45,7 +45,7 @@ internal object AstraVerifiedArithmetic {
             else -> return null
         }
 
-        val steps = StringBuilder("Verified calculation:\\n")
+        val steps = StringBuilder("Verified calculation:\n")
             .append(left).append(" ").append(symbol).append(" ")
             .append(right).append(" = ").append(result)
         // For a small positive integer multiplier, explicitly display the
@@ -60,14 +60,14 @@ internal object AstraVerifiedArithmetic {
                 val units = y % 10
                 val first = x * tens
                 val second = x * units
-                steps.append("\\n").append(x)
+                steps.append("\n").append(x)
                     .append(" × (").append(tens).append(" + ").append(units)
                     .append(") = ").append(first).append(" + ").append(second)
                     .append(" = ").append(result)
             }
         }
         return steps.append(
-            "\\nRecomputed on this device using exact decimal arithmetic; " +
+            "\nRecomputed on this device using exact decimal arithmetic; " +
                 "not an unverified AI explanation."
         ).toString()
     }
