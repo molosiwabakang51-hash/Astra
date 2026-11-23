@@ -38,18 +38,18 @@ internal object AstraBookFollowUp {
     private fun isExplicitFollowUp(raw: String): Boolean {
         val request = raw.trim()
         if (request.length > MAX_FOLLOW_UP ||
-            request.contains('\\n') || request.contains('\\r')
+            request.contains('\n') || request.contains('\r')
         ) return false
         return request.lowercase(Locale.ROOT)
-            .replace(Regex("""\\s+"""), " ")
+            .replace(Regex("""\s+"""), " ")
             .trimEnd('?', '.', '!', ' ') in prompts
     }
 
     private fun hasVerifiedBookSource(reply: String): Boolean =
         reply.isNotBlank() &&
             !AstraInterruptedReply.isIncomplete(reply) &&
-            reply.contains("Retrieved local book passages (verify originals):\\n") &&
-            reply.contains("\\n[B1] ")
+            reply.contains("Retrieved local book passages (verify originals):\n") &&
+            reply.contains("\n[B1] ")
 
     fun resolve(
         raw: String,
