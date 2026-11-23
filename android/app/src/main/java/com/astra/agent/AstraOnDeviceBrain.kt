@@ -86,6 +86,7 @@ internal class AstraOnDeviceBrain(
         conversationGeneration: Int,
         diagnosticMaxTokens: Int? = null,
         diagnosticIsolated: Boolean = false,
+        diagnosticReasoningOverride: Boolean? = null,
         onPartial: suspend (String) -> Unit = {}
     ): String = mutex.withLock {
             // Durable but content-free checkpoint survives a fatal JNI signal.
@@ -97,14 +98,22 @@ internal class AstraOnDeviceBrain(
                     turns.lastOrNull { it.role == "user" }?.content
                 )
                 require(finalMessage.isNotEmpty()) { "Message cannot be empty." }
+                // Benchmark switches may ONLY alter Qwen's mode for one of
+                // the fixed, owner-approved synthetic questions. They cannot
+                // enable deep reasoning on chats, private files or older
+                // assistant replies. Ordinary diagnostic runs remain fast.
+                require(AstraPairedReasoning.allowsModeOverride(
+                    finalMessage, diagnosticIsolated, diagnosticReasoningOverride
+                )) { "Diagnostic reasoning mode is restricted to fixed offline checks." }
                 val adaptiveEnabled = context.getSharedPreferences(
                     "astra", Context.MODE_PRIVATE
                 ).getBoolean("astra_adaptive_reasoning", false)
-                val carefulReasoning = AstraAdaptiveReasoning.select(
-                    finalMessage,
-                    automaticEnabled = adaptiveEnabled,
-                    diagnosticIsolated = diagnosticIsolated
-                )
+                val carefulReasoning = diagnosticReasoningOverride ?:
+                    AstraAdaptiveReasoning.select(
+                        finalMessage,
+                        automaticEnabled = adaptiveEnabled,
+                        diagnosticIsolated = diagnosticIsolated
+                    )
                 val selectedReplyLanguageId = AstraDiagnosticContext.replyLanguage(
                     context.getSharedPreferences(
                         "astra", Context.MODE_PRIVATE
