@@ -363,8 +363,10 @@ internal class AstraOnDeviceBrain(
                             )) {
                             onPartial(partial)
                             lastPublishedText = partial
+                            // A hidden/blank native fragment must not delay
+                            // the first real text by a full throttle window.
+                            lastUiUpdate = now
                         }
-                        lastUiUpdate = now
                     }
                 }
                 val publicAnswer = AstraOfflinePolicy.publicReply(answer.finish())
