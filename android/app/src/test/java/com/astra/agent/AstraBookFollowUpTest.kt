@@ -38,6 +38,48 @@ class AstraBookFollowUpTest {
         }
     }
 
+    @Test fun severalExplicitFollowupsCanReuseOriginalQuestionWithinSameChat() {
+        val cited = "An explanation.\\n\\n" +
+            "Retrieved local book passages (verify originals):\\n" +
+            "[B1] Public test excerpt."
+        val thread = listOf(
+            msg("You", "ask my books Explain a bond's duration"),
+            msg("Astra", cited),
+            msg("You", "Continue from my book"),
+            msg("Astra", cited),
+            msg("You", "Go deeper using my books"),
+            msg("Astra", cited)
+        )
+        val next = AstraBookFollowUp.resolve(
+            "What do my books say about that?", thread
+        )
+        assertTrue(next is AstraBookFollowUp.Result.Ready)
+        val query = (next as AstraBookFollowUp.Result.Ready).modelPrompt
+        assertTrue(query.startsWith("ask my books Explain a bond's duration."))
+        assertFalse(query.contains("[B1] Public test excerpt"))
+    }
+
+    @Test fun boundedChainCannotSkipAnUnrelatedOrUncitedInterveningReply() {
+        val cited = "Evidence.\\n\\n" +
+            "Retrieved local book passages (verify originals):\\n[B1] Mock."
+        val unrelated = listOf(
+            msg("You", "ask my books Bond duration"), msg("Astra", cited),
+            msg("You", "Teach me finance"), msg("Astra", cited)
+        )
+        assertEquals(
+            AstraBookFollowUp.Result.MissingAnchor,
+            AstraBookFollowUp.resolve("Continue using my book", unrelated)
+        )
+        val blocked = listOf(
+            msg("You", "ask my books Bond duration"), msg("Astra", cited),
+            msg("You", "Continue using my book"), msg("Astra", "No citations")
+        )
+        assertEquals(
+            AstraBookFollowUp.Result.MissingAnchor,
+            AstraBookFollowUp.resolve("Continue using my book", blocked)
+        )
+    }
+
     @Test fun anUncitedOrFailedPreviousBookAnswerDoesNotAuthorizeContinuation() {
         val noSource = listOf(
             msg("You", "ask my books Explain bond duration"),
