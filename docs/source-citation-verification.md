@@ -27,7 +27,7 @@ before appending attribution footers that it creates itself.
 - If two private passages were supplied, `[B1]` and `[B2]` may remain.
   Open-course `[K#]` passage identifiers are checked separately against
   the actual attached open-course passages.
-- A Qwen-generated line impersonating the app-only headings
+- Qwen-generated text impersonating the app-only headings, even inline,
   `Retrieved local book passages (verify originals):` or
   `Open-course references:` is stripped and marked unverified.
 - The app-owned footer is appended **after sanitization** using only source
