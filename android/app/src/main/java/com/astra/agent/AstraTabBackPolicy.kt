@@ -15,6 +15,15 @@ internal object AstraTabBackPolicy {
 
     data class Target(val tab: Int, val remainingHistory: Int)
 
+    /**
+     * Android Back at the genuine Chat root must not finish the Activity:
+     * show the existing Astra navigation surface instead. That surface has
+     * a Back dismissal, so the owner can explore all six destinations and
+     * return without losing the current conversation or model session.
+     */
+    fun rootOpensNavigation(currentTab: Int, history: List<Int>): Boolean =
+        currentTab == CHAT && previous(currentTab, history) == null
+
     fun previous(currentTab: Int, history: List<Int>): Target? {
         // Skip duplicate/stale entries instead of getting stuck on a Back
         // action that selects the same screen again.
