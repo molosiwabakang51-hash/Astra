@@ -52,6 +52,76 @@ class AstraConversationContextTest {
         )
     }
 
+    @Test fun ownerRecallWithoutMatchingFactsDoesNotPromoteAstraGuess() {
+        val earlier = listOf(
+            turn("user", "We talked about lunch."),
+            turn("assistant", "I guessed that your bond allocation was 90 percent."),
+            turn("assistant", "Your supposed pension weight is 90 percent bonds.")
+        )
+        val prompt = AstraConversationContext.userPrompt(
+            "What was my bond allocation?", earlier, true
+        )
+        assertFalse(prompt.contains("90 percent"))
+        assertFalse(prompt.contains("Previous Astra:"))
+        assertFalse(prompt.contains("We talked about lunch"))
+        assertTrue(prompt.endsWith("What was my bond allocation?\\n/no_think"))
+    }
+
+    @Test fun vagueFirstPersonRecallPreservesUserWordsButNeverAstraGuess() {
+        val earlier = listOf(
+            turn("user", "I prefer to review my studies in the evening."),
+            turn("assistant", "I guessed you study before breakfast."),
+            turn("user", "I am also learning Setswana.")
+        )
+        val prompt = AstraConversationContext.userPrompt(
+            "What did I say?", earlier, true
+        )
+        assertTrue(prompt.contains("learning Setswana"))
+        assertTrue(prompt.contains("review my studies"))
+        assertFalse(prompt.contains("guessed you study before breakfast"))
+        assertFalse(prompt.contains("Previous Astra:"))
+    }
+
+    @Test fun topicFreeRecentOwnerCorrectionIsRestoredWithItsRelevantClaim() {
+        val earlier = listOf(
+            turn("user", "My hypothetical bond maturity is seven years."),
+            turn("assistant", "Noted."),
+            turn("user", "Actually, make it three years.")
+        )
+        val prompt = AstraConversationContext.userPrompt(
+            "What was my bond maturity?", earlier, true
+        )
+        assertTrue(prompt.contains("maturity is seven years"))
+        assertTrue(prompt.contains("Actually, make it three years"))
+        assertTrue(prompt.indexOf("seven years") < prompt.indexOf("three years"))
+        assertFalse(prompt.contains("Previous Astra:"))
+    }
+
+    @Test fun unicodeAtExcerptBoundaryCannotLeaveHalfSurrogate() {
+        val earlier = listOf(
+            turn("user", "z".repeat(249) + "😀" + " following private words"),
+            turn("assistant", "Acknowledged.")
+        )
+        val prompt = AstraConversationContext.userPrompt(
+            "What does that mean?", earlier, true
+        )
+        // Emoji is intentionally split at the 250 UTF-16-code-unit limit.
+        // The builder must omit it intact rather than emit a dangling high
+        // surrogate into Qwen's recovered context.
+        for (i in prompt.indices) {
+            val ch = prompt[i]
+            if (Character.isHighSurrogate(ch)) {
+                assertTrue(i + 1 < prompt.length &&
+                    Character.isLowSurrogate(prompt[i + 1]))
+            }
+            if (Character.isLowSurrogate(ch)) {
+                assertTrue(i > 0 && Character.isHighSurrogate(prompt[i - 1]))
+            }
+        }
+        assertFalse(prompt.contains("following private words"))
+        assertTrue(prompt.endsWith("What does that mean?\\n/no_think"))
+    }
+
     @Test fun normalFollowupDoesNotDuplicateOldTurns() {
         val question = "What about duration?"
         val previous = listOf(turn("user", "My private bond strategy"),
