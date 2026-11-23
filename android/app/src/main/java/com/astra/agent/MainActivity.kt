@@ -3611,6 +3611,43 @@ class MainActivity :
                         return
                     }
 
+                    // The owner may explicitly ask to continue an immediately
+                    // preceding book-grounded reply. Re-run source retrieval
+                    // with that prior question, without carrying its generated
+                    // answer as evidence. Never access the book implicitly
+                    // on a generic "continue" or across separate chats.
+                    when (val bookFollowUp = AstraBookFollowUp.resolve(
+                        message,
+                        history.map {
+                            AstraChatArchive.Message(it.role, it.text)
+                        }
+                    )) {
+                        is AstraBookFollowUp.Result.Ready -> {
+                            dialogue.dismissIncompletePrompt()
+                            workflowSession.reset()
+                            dialogueAwaiting = false
+                            enqueueOffline(message, bookFollowUp.modelPrompt)
+                            return
+                        }
+                        AstraBookFollowUp.Result.MissingAnchor -> {
+                            history.add(ChatMessage("You", message))
+                            history.add(ChatMessage(
+                                "Astra",
+                                "I cannot identify a completed book-grounded " +
+                                    "reply immediately before this request. " +
+                                    "Ask your book a specific question first " +
+                                    "(for example, 'ask my books bond duration'). " +
+                                    "I will not guess or silently open private files."
+                            ))
+                            while (history.size > MAX_HISTORY) history.removeAt(0)
+                            input = ""
+                            persist()
+                            keyboard?.hide()
+                            return
+                        }
+                        AstraBookFollowUp.Result.NotRequested -> Unit
+                    }
+
                     // Only a user-authored, explicitly prefixed plan can trigger
                     // local actions. Every step is simulated before the owner
                     // types 'confirm workflow'; model-generated text never runs it.
