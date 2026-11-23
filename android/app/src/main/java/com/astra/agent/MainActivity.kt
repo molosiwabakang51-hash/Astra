@@ -1883,6 +1883,13 @@ private class AstraProcessor(
             )
         }
 
+        // Exact two-operand questions in natural English are independently
+        // verified on the phone. Quoted instructions, compound problems and
+        // uncertain inputs must not be treated as calculator commands.
+        AstraVerifiedArithmetic.answer(clean)?.let {
+            return AssistantResult(it)
+        }
+
         // Numeric projections are deterministic; never ask Qwen3 to
         // hallucinate an investment calculation.
         AstraNaturalFinance.respond(clean)?.let {
@@ -3200,6 +3207,9 @@ class MainActivity :
                     ))
                 }
                 var aiReplyLanguageMenuOpen by remember { mutableStateOf(false) }
+                var adaptiveReasoningEnabled by remember {
+                    mutableStateOf(storage.getBoolean("astra_adaptive_reasoning", false))
+                }
 
                 var toolInput by remember {
                     mutableStateOf("")
@@ -6768,6 +6778,40 @@ class MainActivity :
                                             Text(
                                                 AstraBenchmarkTrends.render(benchmarkHistory),
                                                 style = MaterialTheme.typography.bodySmall
+                                            )
+                                        }
+                                        HorizontalDivider()
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Column(modifier = Modifier.weight(1f)) {
+                                                Text(
+                                                    "Adaptive reasoning · experimental",
+                                                    style = MaterialTheme.typography.titleSmall
+                                                )
+                                                Text(
+                                                    "Optional: use Qwen3 thinking mode for " +
+                                                        "recognizable multi-step problems. " +
+                                                        "Default off until handset tests establish " +
+                                                        "a benefit. Can be slower and consume more " +
+                                                        "battery; ordinary chat remains fast. " +
+                                                        "No cloud processing or weight training.",
+                                                    style = MaterialTheme.typography.bodySmall
+                                                )
+                                            }
+                                            Switch(
+                                                checked = adaptiveReasoningEnabled,
+                                                onCheckedChange = { checked ->
+                                                    adaptiveReasoningEnabled = checked
+                                                    storage.setBoolean(
+                                                        "astra_adaptive_reasoning", checked
+                                                    )
+                                                },
+                                                modifier = Modifier.semantics {
+                                                    contentDescription =
+                                                        "Adaptive reasoning, experimental"
+                                                }
                                             )
                                         }
                                         HorizontalDivider()
