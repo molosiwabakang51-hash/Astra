@@ -270,7 +270,7 @@ class AstraFollowUpAnchorTest {
         )) {
             val anchored = AstraFollowUpAnchor.enrich(request, history)
             assertTrue(request, anchored.contains("17 multiplied by 19"))
-            assertTrue(request, anchored.contains("Immediately preceding Astra reply: \\"323\\""))
+            assertTrue(request, anchored.contains("Immediately preceding Astra reply: \"323\""))
             assertTrue(request, anchored.contains("CURRENT USER FOLLOW-UP: " + request))
         }
         assertEquals(
