@@ -383,7 +383,7 @@ internal class AstraOnDeviceBrain(
                 if (attributedAnswer.isNotBlank()) {
                     // A cancelled, failed, think-only or citation-filtered-empty
                     // reply cannot establish successful visible generation.
-                    // successful generation. Store only numeric timing.
+                    // Store only numeric timing, never prompt or response text.
                     lastNativeTiming = AstraInferenceTiming.sample(
                         requestStartedNs,
                         firstNativeChunkNs,
