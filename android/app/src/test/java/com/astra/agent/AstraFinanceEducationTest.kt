@@ -18,6 +18,19 @@ class AstraFinanceEducationTest {
         assertFalse(response.contains("University of Chicago"))
     }
 
+    @Test fun handsetDirectAuthorQuestionNeverInventsOwnerCorrection() {
+        for (prompt in listOf(
+            "Who wrote Irrational Exuberance",
+            "Who wrote Irrational Exuberance?",
+            "Who is the author of the book Irrational Exuberance?"
+        )) {
+            val answer = AstraFinanceEducation.respond(prompt)!!
+            assertTrue(answer.contains("Robert J. Shiller wrote Irrational Exuberance"))
+            assertFalse(answer.contains("Niall Shiller"))
+            assertFalse(answer.startsWith("Correct."))
+        }
+    }
+
     @Test fun shortOwnerCorrectionDoesNotInventNiallShiller() {
         val response = AstraFinanceEducation.respond("Robert Stiller?")!!
         assertTrue(response.contains("Robert J. Shiller"))
