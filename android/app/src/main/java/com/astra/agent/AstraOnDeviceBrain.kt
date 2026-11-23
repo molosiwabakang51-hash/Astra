@@ -90,7 +90,14 @@ internal class AstraOnDeviceBrain(
                     turns.lastOrNull { it.role == "user" }?.content
                 )
                 require(finalMessage.isNotEmpty()) { "Message cannot be empty." }
-                val carefulReasoning = AstraReasoningMode.enabled(finalMessage)
+                val adaptiveEnabled = context.getSharedPreferences(
+                    "astra", Context.MODE_PRIVATE
+                ).getBoolean("astra_adaptive_reasoning", false)
+                val carefulReasoning = AstraAdaptiveReasoning.select(
+                    finalMessage,
+                    automaticEnabled = adaptiveEnabled,
+                    diagnosticIsolated = diagnosticIsolated
+                )
                 val selectedReplyLanguageId = AstraDiagnosticContext.replyLanguage(
                     context.getSharedPreferences(
                         "astra", Context.MODE_PRIVATE
