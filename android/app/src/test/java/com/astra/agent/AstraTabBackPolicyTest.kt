@@ -5,6 +5,21 @@ import org.junit.Assert.assertNull
 import org.junit.Test
 
 class AstraTabBackPolicyTest {
+    @Test fun rootChatBackOpensNavigationRatherThanFinishingApp() {
+        assertEquals(true,
+            AstraTabBackPolicy.rootOpensNavigation(0, emptyList()))
+        assertEquals(true,
+            AstraTabBackPolicy.rootOpensNavigation(0, listOf(0, 0, -1)))
+        assertEquals(false,
+            AstraTabBackPolicy.rootOpensNavigation(0, listOf(0, 4)))
+        // A saved non-chat tab still has Chat as an available Back target,
+        // so it must never open the root navigation overlay.
+        for (screen in 1..5) {
+            assertEquals(false,
+                AstraTabBackPolicy.rootOpensNavigation(screen, emptyList()))
+        }
+    }
+
     @Test fun AndroidBackAtChatRootHasNoFakePreviousScreen() {
         assertNull(AstraTabBackPolicy.previous(0, emptyList()))
         assertNull(AstraTabBackPolicy.previous(0, listOf(0)))
