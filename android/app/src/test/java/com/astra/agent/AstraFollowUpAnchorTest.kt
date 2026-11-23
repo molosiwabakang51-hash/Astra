@@ -263,6 +263,7 @@ class AstraFollowUpAnchorTest {
         for (request in listOf(
             "How did you calculate that?",
             "Show the working.",
+            "Show the steps.",
             "Explain that result",
             "Where did that number come from?",
             "What assumptions did you use?",
@@ -277,6 +278,12 @@ class AstraFollowUpAnchorTest {
             AstraGenerationPolicy.Depth.DETAILED,
             AstraGenerationPolicy.depth(
                 AstraFollowUpAnchor.enrich("How did you calculate that?", history)
+            )
+        )
+        assertEquals(
+            AstraGenerationPolicy.Depth.DETAILED,
+            AstraGenerationPolicy.depth(
+                AstraFollowUpAnchor.enrich("Show the steps", history)
             )
         )
         assertEquals(
