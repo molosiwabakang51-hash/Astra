@@ -33,7 +33,6 @@ class PairedReasoningWiringTests(unittest.TestCase):
         self.assertIn("require(comparisons.size == probes.size", PAIR)
         self.assertNotIn("trial.fast.sample", PAIR)
         self.assertNotIn("trial.think.sample", PAIR)
-        self.assertNotIn("100-point AI score", "")  # no synthetic points awarded
         self.assertIn("a 100-point AI score", PAIR)
         self.assertNotIn("HttpURLConnection", PAIR)
 
