@@ -34,6 +34,24 @@ internal object AstraFollowUpAnchor {
         "how does that work",
         "why is that",
         "what do you mean by that",
+        // A deterministic tool result is still part of the same conversation.
+        // The owner should be able to ask how Astra calculated a number
+        // without repeating the calculation or starting another command.
+        "how did you calculate that",
+        "how did you get that",
+        "how did you get that number",
+        "how was that calculated",
+        "show the calculation",
+        "show me the calculation",
+        "show the working",
+        "show the steps",
+        "walk me through the calculation",
+        "explain that calculation",
+        "explain the result",
+        "explain that result",
+        "where did that number come from",
+        "what assumptions did you use",
+        "why",
         "please continue",
         "continue"
     )
