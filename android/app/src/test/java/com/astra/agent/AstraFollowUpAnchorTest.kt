@@ -255,6 +255,40 @@ class AstraFollowUpAnchorTest {
         assertFalse(result.contains("Leverage magnifies"))
     }
 
+    @Test fun naturalCalculationExplanationsCarryPriorVerifiedToolResult() {
+        val history = listOf(
+            msg("You", "What is 17 multiplied by 19? Reply only with the number."),
+            msg("Astra", "323")
+        )
+        for (request in listOf(
+            "How did you calculate that?",
+            "Show the working.",
+            "Explain that result",
+            "Where did that number come from?",
+            "What assumptions did you use?",
+            "Why?"
+        )) {
+            val anchored = AstraFollowUpAnchor.enrich(request, history)
+            assertTrue(request, anchored.contains("17 multiplied by 19"))
+            assertTrue(request, anchored.contains("Immediately preceding Astra reply: \\"323\\""))
+            assertTrue(request, anchored.contains("CURRENT USER FOLLOW-UP: " + request))
+        }
+        assertEquals(
+            AstraGenerationPolicy.Depth.DETAILED,
+            AstraGenerationPolicy.depth(
+                AstraFollowUpAnchor.enrich("How did you calculate that?", history)
+            )
+        )
+        assertEquals(
+            "How did you calculate that?",
+            AstraFollowUpAnchor.enrich(
+                "How did you calculate that?",
+                listOf(msg("You", "What is 17 times 19?"),
+                    msg("Astra", "Offline response stopped."))
+            )
+        )
+    }
+
     @Test fun ordinaryQuestionsWithNumbersRemainUnmodified() {
         val history = listOf(
             msg("You", "Bond duration"),
