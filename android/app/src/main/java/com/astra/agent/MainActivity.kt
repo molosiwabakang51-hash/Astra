@@ -7121,6 +7121,7 @@ class MainActivity :
                                                                 910 + caseIndex
                                                             val started = System.nanoTime()
                                                             var answer = ""
+                                                            var followedEarlyInstructions = 0
                                                             for ((turnIndex, question) in
                                                                 scenario.prompts.withIndex()
                                                             ) {
@@ -7142,6 +7143,11 @@ class MainActivity :
                                                                 if (answer.isBlank()) {
                                                                     error("No usable offline answer.")
                                                                 }
+                                                                if (turnIndex < 2 &&
+                                                                    AstraMultiTurnReasoningBenchmark.interimMatches(
+                                                                        scenario, turnIndex, answer
+                                                                    )
+                                                                ) followedEarlyInstructions++
                                                                 turns.add(AstraOnDeviceBrain.Turn(
                                                                     "assistant", answer
                                                                 ))
@@ -7153,7 +7159,8 @@ class MainActivity :
                                                                         scenario, answer
                                                                     ),
                                                                     (System.nanoTime() - started) /
-                                                                        1_000_000L
+                                                                        1_000_000L,
+                                                                    followedEarlyInstructions
                                                                 )
                                                             )
                                                         }
