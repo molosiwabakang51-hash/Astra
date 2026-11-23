@@ -24,8 +24,12 @@ Each scenario is a **new isolated native generation**. Within each scenario,
 the three requests share the same generation identifier and the same
 model-session context, so this tests actual Qwen3 conversation continuity
 rather than the deterministic note/task or calculator handlers. Each turn
-has a 128-token output limit. Only final-answer accuracy and total elapsed
-milliseconds per synthetic scenario are reported; the user's chats, notes,
+has a 128-token output limit. Both final-answer accuracy and **earlier-turn instruction adherence** are
+reported separately, together with total elapsed milliseconds per scenario.
+The earlier two replies must match their explicitly requested concise ACK/OK
+or location answer. This prevents a correct final answer from concealing
+previous failures to follow user instructions; it does not imply a score for
+unmeasured real-world dialogue.  the user's chats, notes,
 books, private facts and passwords do not enter the prompts. The report
 does not export model responses or private user data.
 

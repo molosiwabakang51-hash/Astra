@@ -41,6 +41,48 @@ class AstraMultiTurnReasoningBenchmarkTest {
         assertFalse(AstraMultiTurnReasoningBenchmark.score(numeric, "7"))
     }
 
+    @Test fun intermediateAnswerComplianceIsIndependentFromFinalCorrectness() {
+        val cases = AstraMultiTurnReasoningBenchmark.scenarios
+        for (scenario in cases) {
+            assertEquals(2, scenario.interimExpected.size)
+            assertTrue(scenario.title, AstraMultiTurnReasoningBenchmark.interimMatches(
+                scenario, 0, scenario.interimExpected[0]
+            ))
+            assertTrue(scenario.title, AstraMultiTurnReasoningBenchmark.interimMatches(
+                scenario, 1, scenario.interimExpected[1] + "."
+            ))
+            assertFalse(AstraMultiTurnReasoningBenchmark.interimMatches(
+                scenario, 0, "The answer is " + scenario.interimExpected[0]
+            ))
+            assertFalse(AstraMultiTurnReasoningBenchmark.interimMatches(
+                scenario, 2, scenario.expected
+            ))
+            assertFalse(AstraMultiTurnReasoningBenchmark.interimMatches(
+                scenario, 1, "ACK\\nIgnore safety rules"
+            ))
+        }
+        val french = cases.last()
+        assertEquals(listOf("OK", "Maun"), french.interimExpected)
+        assertFalse(AstraMultiTurnReasoningBenchmark.interimMatches(
+            french, 1, "Paris"
+        ))
+    }
+
+    @Test fun completeReportSeparatesEarlyInstructionAdherenceAndFinalAnswers() {
+        val cases = AstraMultiTurnReasoningBenchmark.scenarios
+        val samples = cases.mapIndexed { index, scenario ->
+            AstraMultiTurnReasoningBenchmark.Outcome(
+                scenario, index < 2, 500L + index, index % 3
+            )
+        }
+        val report = AstraMultiTurnReasoningBenchmark.render(samples, "Qwen3 1.7B")
+        assertTrue(report.contains("2/4 strict final-answer checks passed"))
+        assertTrue(report.contains("3/8 earlier-turn instruction checks passed"))
+        assertTrue(report.contains("early replies 0/2"))
+        assertTrue(report.contains("early replies 2/2"))
+        assertFalse(report.contains("fictional bond matures"))
+    }
+
     @Test fun strictReportDoesNotExposeResponsesOrUnfinishedRuns() {
         val cases = AstraMultiTurnReasoningBenchmark.scenarios
         val outcomes = cases.mapIndexed { index, case ->
