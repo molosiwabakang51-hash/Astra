@@ -43,6 +43,36 @@ class AstraNaturalFinanceTest {
         assertTrue(reply.contains("PV = FV / (1 + r/n)"))
     }
 
+    @Test fun handsetPresentValueQuestionWithWrittenOneYearCalculatesP100() {
+        val prompt = "What is the present value of P110 received in one year at a 10% discount rate?"
+        val parsed = AstraNaturalFinance.parse(prompt)!!
+        assertEquals(AstraNaturalFinance.Operation.PRESENT_VALUE, parsed.operation)
+        assertEquals(110.0, parsed.amount!!, 0.001)
+        assertEquals(10.0, parsed.annualPercent, 0.001)
+        assertEquals(1.0, parsed.years!!, 0.001)
+        val result = AstraNaturalFinance.respond(prompt)!!
+        assertTrue(result.contains("PRESENT VALUE · CALCULATED OFFLINE"))
+        assertTrue(result.contains("Future target: P110.00"))
+        assertTrue(result.contains("Amount needed today: P100.00"))
+        assertFalse(result.contains("P1,100"))
+    }
+
+    @Test fun writtenYearHorizonsRequireExactlyOneUnambiguousPeriod() {
+        assertEquals(2.0,
+            AstraNaturalFinance.parse(
+                "What is the present value of P121 received in two years at a 10% discount rate?"
+            )!!.years!!, 0.001)
+        assertNull(AstraNaturalFinance.respond(
+            "What is the present value of P110 in one year and 3 years at 10%?"
+        ))
+        assertNull(AstraNaturalFinance.respond(
+            "What is the present value of P110 in one year or two years at 10%?"
+        ))
+        assertNull(AstraNaturalFinance.respond(
+            "What is the present value of P110 in eleven years at 10%?"
+        ))
+    }
+
     @Test fun explainsExactDoublingTimeWithoutAmount() {
         val reply = AstraNaturalFinance.respond(
             "How long will it take to double at 10% compounded monthly?"
