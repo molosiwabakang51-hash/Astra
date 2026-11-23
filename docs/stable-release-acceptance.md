@@ -160,6 +160,21 @@ APK. GitHub Actions debug builds may use different signing certificates.
     recorded separately from Kotlin/JVM tests; these checks do not earn
     model-intelligence points.
 
+23. **Exact bounded multi-step arithmetic and conversation follow-ups:**
+    In airplane mode ask `What is 10 plus 2 times 3?` (expect `16`),
+    `Calculate (10 plus 2) times 3` (expect `36`), and
+    `What is (17 times 19 minus 5) divided by 2?` (expect `159`).
+    Follow with `Show the steps` to verify the arithmetic sequence:
+    `17 × 19 = 323`, `323 − 5 = 318`, `318 ÷ 2 = 159`. Test
+    exact decimals (`1 divided by 8 plus 0.25` → `0.375`).
+    Division by zero must be rejected, non-terminating decimals must not
+    be presented as exact, and appended instructions or excessive
+    parentheses/operands must never execute arbitrary actions or freeze
+    Astra. A wrong or interrupted earlier reply must not be certified as
+    verified in a follow-up. These are calculator/tool acceptance checks;
+    they do not count as neural Qwen3 reasoning scores or as release proof
+    without actual handset evidence.
+
 ## Honest release labels
 
 - **EXPERIMENTAL:** Compiles and passes automated source/unit/APK checks,
