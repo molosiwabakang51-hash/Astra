@@ -50,6 +50,26 @@ This is an instrument for real-device A/B comparisons, **not** evidence of
 lower latency or an intelligence-rating increase. Measure warm/cold requests
 repeatedly on the same phone and model. Nothing is uploaded.
 
+## Grounded cross-feature context and owner corrections (experimental)
+
+Explicit questions such as `ask my memory about bond maturity` search only the
+owner-selected local notes, tasks and user-authored conversation messages.
+When an on-topic chat statement is immediately followed by an owner correction
+(e.g. seven years → three years), the retrieved excerpt now **includes that
+later correction**, even when the correction never repeats the topic. The
+search never borrows corrections from another conversation or past an
+unrelated owner message. Prior Astra replies are not accepted as owner
+testimony; AI replies previously saved to Notes remain explicitly
+**unverified**. They can be inspected through an explicit notes-only request
+but cannot by themselves establish what the owner said or decided.
+
+Retrieved snippets remain short, source-labelled, quoted and untrusted. They
+cannot execute local commands, retrain Qwen weights, or trigger internet
+requests. This is a targeted improvement to explicit personal-memory
+reasoning, **not** permission for automatic access to private documents
+during ordinary chat. Physical-phone multi-turn correctness still requires
+testing.
+
 ## Connected workspace handoffs (experimental)
 
 Astra's **Study**, **Chat**, **Tasks**, **Notes**, and **Local tools** now
