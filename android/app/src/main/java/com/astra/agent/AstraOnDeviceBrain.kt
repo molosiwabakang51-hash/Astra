@@ -347,7 +347,7 @@ internal class AstraOnDeviceBrain(
                     // the next chunk, rather than showing or persisting it.
                     answer.append(part)
                     val now = System.nanoTime()
-                    if (now - lastUiUpdate >= 550_000_000L) {
+                    if (AstraStreamingUiPolicy.intervalElapsed(now, lastUiUpdate)) {
                         // Updating a full Markdown chat bubble and scrolling
                         // several times each second can overwhelm a low-RAM
                         // Android main thread while native Qwen3 is generating.
@@ -358,7 +358,9 @@ internal class AstraOnDeviceBrain(
                             verifiedPrivatePassages = citedBooks.size,
                             verifiedOpenPassages = citedOpenCourse.size
                         )
-                        if (partial.isNotBlank() && partial != lastPublishedText) {
+                        if (AstraStreamingUiPolicy.hasNewVisibleText(
+                                partial, lastPublishedText
+                            )) {
                             onPartial(partial)
                             lastPublishedText = partial
                         }
