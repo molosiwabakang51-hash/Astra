@@ -21,7 +21,9 @@ class ChatRootNavigationTests(unittest.TestCase):
 
     def test_history_still_uses_actual_previous_screen(self):
         self.assertIn("AstraTabBackPolicy.previous(tab, tabBackStack)", MAIN)
-        self.assertIn("tab = previousScreen.tab", MAIN)
+        self.assertIn("tab = target.tab", MAIN)
+        self.assertIn("returnToPreviousDestination(previousScreen)", MAIN)
+        self.assertIn("Return from Chat to ", MAIN)
         self.assertIn("restoringTabFromBack = true", MAIN)
         self.assertNotIn("finishAffinity()", POLICY)
 
