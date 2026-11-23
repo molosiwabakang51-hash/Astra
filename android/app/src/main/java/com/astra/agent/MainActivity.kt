@@ -7088,6 +7088,100 @@ class MainActivity :
                                         ) {
                                             Text("Compare fast and thinking modes")
                                         }
+                                        Text(
+                                            "Multi-turn reasoning: four fixed offline three-question " +
+                                                "dialogues test user corrections, topic switches, " +
+                                                "financial assumptions and cross-language recall. " +
+                                                "Runs on the actual installed 1.7B model. " +
+                                                "All conversations are synthetic and isolated; " +
+                                                "may take substantial time and battery. " +
+                                                "No general intelligence rating is awarded.",
+                                            style = MaterialTheme.typography.bodySmall
+                                        )
+                                        OutlinedButton(
+                                            enabled = !languageBenchmarkRunning &&
+                                                !offlineModelTestRunning &&
+                                                !modelImportRunning &&
+                                                offlineJob?.isActive != true &&
+                                                onDeviceBrain.hasLocalModel(),
+                                            onClick = {
+                                                languageBenchmarkRunning = true
+                                                reasoningBenchmarkRunning = true
+                                                reasoningBenchmarkStatus =
+                                                    "Starting four synthetic multi-turn Qwen checks..."
+                                                languageBenchmarkJob = researchScope.launch {
+                                                    val results = mutableListOf<
+                                                        AstraMultiTurnReasoningBenchmark.Outcome
+                                                    >()
+                                                    try {
+                                                        val cases = AstraMultiTurnReasoningBenchmark.scenarios
+                                                        for ((caseIndex, scenario) in cases.withIndex()) {
+                                                            val turns = mutableListOf<AstraOnDeviceBrain.Turn>()
+                                                            val generation = Int.MIN_VALUE +
+                                                                910 + caseIndex
+                                                            val started = System.nanoTime()
+                                                            var answer = ""
+                                                            for ((turnIndex, question) in
+                                                                scenario.prompts.withIndex()
+                                                            ) {
+                                                                reasoningBenchmarkStatus =
+                                                                    "Multi-turn case " +
+                                                                        (caseIndex + 1) + "/" +
+                                                                        cases.size + ": " +
+                                                                        scenario.title + " — turn " +
+                                                                        (turnIndex + 1) + "/3"
+                                                                turns.add(AstraOnDeviceBrain.Turn(
+                                                                    "user", question
+                                                                ))
+                                                                answer = onDeviceBrain.reply(
+                                                                    turns.toList(),
+                                                                    generation,
+                                                                    diagnosticMaxTokens = 128,
+                                                                    diagnosticIsolated = true
+                                                                )
+                                                                if (answer.isBlank()) {
+                                                                    error("No usable offline answer.")
+                                                                }
+                                                                turns.add(AstraOnDeviceBrain.Turn(
+                                                                    "assistant", answer
+                                                                ))
+                                                            }
+                                                            results.add(
+                                                                AstraMultiTurnReasoningBenchmark.Outcome(
+                                                                    scenario,
+                                                                    AstraMultiTurnReasoningBenchmark.score(
+                                                                        scenario, answer
+                                                                    ),
+                                                                    (System.nanoTime() - started) /
+                                                                        1_000_000L
+                                                                )
+                                                            )
+                                                        }
+                                                        reasoningBenchmarkStatus =
+                                                            AstraMultiTurnReasoningBenchmark.render(
+                                                                results,
+                                                                onDeviceBrain.loadedModelLabel()
+                                                            )
+                                                    } catch (cancel: CancellationException) {
+                                                        reasoningBenchmarkStatus =
+                                                            "Multi-turn test cancelled. " +
+                                                                "Incomplete trials are not scored."
+                                                        throw cancel
+                                                    } catch (error: Exception) {
+                                                        reasoningBenchmarkStatus =
+                                                            "Multi-turn test interrupted. " +
+                                                                "No score is awarded for incomplete runs. " +
+                                                                "Check local model diagnostics."
+                                                    } finally {
+                                                        reasoningBenchmarkRunning = false
+                                                        languageBenchmarkRunning = false
+                                                        languageBenchmarkJob = null
+                                                    }
+                                                }
+                                            }
+                                        ) {
+                                            Text("Test multi-turn Qwen reasoning")
+                                        }
                                         if (reasoningBenchmarkRunning) {
                                             TextButton(onClick = {
                                                 languageBenchmarkJob?.cancel()
