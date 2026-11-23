@@ -380,9 +380,10 @@ internal class AstraOnDeviceBrain(
                     verifiedPrivatePassages = citedBooks.size,
                     verifiedOpenPassages = citedOpenCourse.size
                 )
-                if (publicAnswer.isNotBlank()) {
-                    // A cancelled, failed or think-only reply cannot establish
-                    // successful generation. Store only numeric timing.
+                if (attributedAnswer.isNotBlank()) {
+                    // A cancelled, failed, think-only or citation-filtered-empty
+                    // reply cannot establish successful visible generation.
+                    // Store only numeric timing, never prompt or response text.
                     lastNativeTiming = AstraInferenceTiming.sample(
                         requestStartedNs,
                         firstNativeChunkNs,
@@ -390,7 +391,9 @@ internal class AstraOnDeviceBrain(
                         nativeChunkCount
                     )
                 }
-                if (publicAnswer.isBlank()) {
+                if (attributedAnswer.isBlank()) {
+                    // Source/citation filtering can remove every visible token.
+                    // Never return a blank bubble or preserve that native session.
                     session.invalidate()
                     "The offline model did not produce a usable answer. Please try again."
                 } else if (citedBooks.isNotEmpty()) {

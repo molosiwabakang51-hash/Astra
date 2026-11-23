@@ -14,7 +14,7 @@ class InferenceTimingWiringTests(unittest.TestCase):
     def test_captures_only_native_generation_success(self):
         self.assertIn("val requestStartedNs = System.nanoTime()", BRAIN)
         self.assertIn("if (firstNativeChunkNs == null)", BRAIN)
-        self.assertIn("if (publicAnswer.isNotBlank())", BRAIN)
+        self.assertIn("if (attributedAnswer.isNotBlank())", BRAIN)
         self.assertIn("lastNativeTiming = AstraInferenceTiming.sample(", BRAIN)
         self.assertIn("AstraInferenceTiming.describe(lastNativeTiming)", BRAIN)
 
