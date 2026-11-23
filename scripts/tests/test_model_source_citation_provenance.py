@@ -12,6 +12,8 @@ GUARD = (JAVA / "AstraSourceCitationGuard.kt").read_text(encoding="utf-8")
 class ModelCitationProvenanceSourceTests(unittest.TestCase):
     def test_sanitize_model_output_before_app_owned_footer(self):
         self.assertIn("AstraSourceCitationGuard.protect(", BRAIN)
+        self.assertGreaterEqual(BRAIN.count("AstraSourceCitationGuard.protect("), 2)
+        self.assertIn("AstraOfflinePolicy.publicReply(answer.snapshot())", BRAIN)
         self.assertIn("verifiedPrivatePassages = citedBooks.size", BRAIN)
         self.assertIn("verifiedOpenPassages = citedOpenCourse.size", BRAIN)
         self.assertLess(
