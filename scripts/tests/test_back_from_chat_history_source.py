@@ -20,10 +20,11 @@ class BackFromChatHistorySourceTest(unittest.TestCase):
             "commandDeckExpanded || showFindInChat || showMemorySearch ||\n"
             "                        tab != 0", MAIN
         )
-        self.assertIn("tab = previousScreen.tab", MAIN)
+        self.assertIn("returnToPreviousDestination(previousScreen)", MAIN)
+        self.assertIn("tab = target.tab", MAIN)
 
     def test_back_consumes_previous_entry_without_recording_new_forward_navigation(self):
-        self.assertIn("while (tabBackStack.size > previousScreen.remainingHistory)", MAIN)
+        self.assertIn("while (tabBackStack.size > target.remainingHistory)", MAIN)
         self.assertIn("restoringTabFromBack = true", MAIN)
         self.assertIn("if (restoringTabFromBack)", MAIN)
         self.assertIn("if (tabBackStack.size > 20)", MAIN)
