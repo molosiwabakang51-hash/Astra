@@ -6911,6 +6911,103 @@ class MainActivity :
                                         ) {
                                             Text("Run reasoning checks")
                                         }
+                                        Text(
+                                            "Paired reasoning comparison: four identical offline " +
+                                                "questions, each run once in fast mode and once " +
+                                                "in thinking mode. Synthetic questions only. " +
+                                                "512 tokens per trial; alternating test order. " +
+                                                "May require multiple native reloads, consume " +
+                                                "battery and take considerable time. " +
+                                                "This is NOT a general intelligence rating.",
+                                            style = MaterialTheme.typography.bodySmall
+                                        )
+                                        OutlinedButton(
+                                            enabled = !languageBenchmarkRunning &&
+                                                !offlineModelTestRunning &&
+                                                !modelImportRunning &&
+                                                offlineJob?.isActive != true &&
+                                                onDeviceBrain.hasLocalModel(),
+                                            onClick = {
+                                                languageBenchmarkRunning = true
+                                                reasoningBenchmarkRunning = true
+                                                reasoningBenchmarkStatus =
+                                                    "Starting paired private reasoning evaluation..."
+                                                languageBenchmarkJob = researchScope.launch {
+                                                    val comparisons = mutableListOf<
+                                                        AstraPairedReasoning.Comparison
+                                                    >()
+                                                    try {
+                                                        val probes = AstraPairedReasoning.probes
+                                                        for ((index, probe) in probes.withIndex()) {
+                                                            var fast: AstraReasoningBenchmark.Outcome? = null
+                                                            var deep: AstraReasoningBenchmark.Outcome? = null
+                                                            for ((modeIndex, mode) in
+                                                                AstraPairedReasoning.order(index)
+                                                                    .withIndex()
+                                                            ) {
+                                                                reasoningBenchmarkStatus =
+                                                                    "Comparison " + (index + 1) +
+                                                                        "/" + probes.size + ": " +
+                                                                        probe.title + " — " +
+                                                                        mode.name.lowercase() + "..."
+                                                                val started = System.nanoTime()
+                                                                val answer = onDeviceBrain.reply(
+                                                                    listOf(
+                                                                        AstraOnDeviceBrain.Turn(
+                                                                            "user", probe.prompt
+                                                                        )
+                                                                    ),
+                                                                    Int.MIN_VALUE + 600 +
+                                                                        index * 2 + modeIndex,
+                                                                    diagnosticMaxTokens = 512,
+                                                                    diagnosticIsolated = true,
+                                                                    diagnosticReasoningOverride =
+                                                                        mode == AstraPairedReasoning.Mode.THINK
+                                                                )
+                                                                val outcome = AstraReasoningBenchmark.outcome(
+                                                                    probe, answer,
+                                                                    (System.nanoTime() - started) /
+                                                                        1_000_000L
+                                                                )
+                                                                if (mode == AstraPairedReasoning.Mode.FAST) {
+                                                                    fast = outcome
+                                                                } else {
+                                                                    deep = outcome
+                                                                }
+                                                            }
+                                                            comparisons.add(
+                                                                AstraPairedReasoning.compare(
+                                                                    probe,
+                                                                    requireNotNull(fast),
+                                                                    requireNotNull(deep)
+                                                                )
+                                                            )
+                                                        }
+                                                        reasoningBenchmarkStatus =
+                                                            AstraPairedReasoning.render(
+                                                                comparisons,
+                                                                onDeviceBrain.loadedModelLabel()
+                                                            )
+                                                    } catch (cancel: CancellationException) {
+                                                        reasoningBenchmarkStatus =
+                                                            "Paired evaluation cancelled. " +
+                                                                "Incomplete trials are not scored."
+                                                        throw cancel
+                                                    } catch (error: Exception) {
+                                                        reasoningBenchmarkStatus =
+                                                            "Paired evaluation interrupted. " +
+                                                                "No comparison score was recorded. " +
+                                                                "Review the local model diagnostics."
+                                                    } finally {
+                                                        reasoningBenchmarkRunning = false
+                                                        languageBenchmarkRunning = false
+                                                        languageBenchmarkJob = null
+                                                    }
+                                                }
+                                            }
+                                        ) {
+                                            Text("Compare fast and thinking modes")
+                                        }
                                         if (reasoningBenchmarkRunning) {
                                             TextButton(onClick = {
                                                 languageBenchmarkJob?.cancel()
