@@ -146,6 +146,20 @@ APK. GitHub Actions debug builds may use different signing certificates.
     citation numbers match the actual displayed source. Recheck after
     process restart. Passing Kotlin/CI tests does not satisfy this phone gate.
 
+22. **Independently verified calculation follow-ups:** In airplane mode,
+    ask `What is 17 multiplied by 19? Reply only with the number.` and verify
+    the deterministic result `323`. Ask `How did you calculate that?`
+    and verify Astra recomputes the exact expression and shows
+    `17 × (10 + 9) = 170 + 153 = 323`. Test exact division
+    (`3 divided by 8` → `0.375`) and decimal multiplication
+    (`2.1 times 2.5` → `5.25`). An interrupted answer, incorrect AI
+    answer, compound arithmetic request, or unrelated latest chat exchange
+    must **not** be certified as verified. Check no task/note is silently
+    changed and no private book is accessed. Physical-device behavior,
+    correct native Qwen fallback and conversation continuity must be
+    recorded separately from Kotlin/JVM tests; these checks do not earn
+    model-intelligence points.
+
 ## Honest release labels
 
 - **EXPERIMENTAL:** Compiles and passes automated source/unit/APK checks,
