@@ -31,6 +31,22 @@ class AstraVerifiedExpressionTest {
         ))
     }
 
+    @Test fun ownerHandsetUnicodeOperatorsProduceVerifiedResultAndSteps() {
+        val ownerQuestion = "What is (17 × 19 − 5) ÷ 2?"
+        assertEquals("159", AstraVerifiedExpression.answer(ownerQuestion))
+        val proof = AstraVerifiedExpression.verifiedWorking(ownerQuestion, "159")!!
+        assertTrue(proof.contains("17 × 19 = 323"))
+        assertTrue(proof.contains("323 − 5 = 318"))
+        assertTrue(proof.contains("318 ÷ 2 = 159"))
+        assertNull(AstraVerifiedExpression.verifiedWorking(ownerQuestion, "158"))
+
+        assertEquals("16", AstraVerifiedExpression.answer("What is 10 + 2 × 3?"))
+        assertEquals("36", AstraVerifiedExpression.answer("Compute (10 + 2) × 3"))
+        assertEquals("-13", AstraVerifiedExpression.answer("Calculate 2 − 5 × 3"))
+        assertNull(AstraVerifiedExpression.answer("What is 2 ∙ 3 + 4?"))
+        assertNull(AstraVerifiedExpression.answer("Calculate 4² + 1"))
+    }
+
     @Test fun reportsZeroDivisionButNeverInventsRepeatingDecimalPrecision() {
         assertEquals("Division by zero is undefined.",
             AstraVerifiedExpression.answer("Calculate (12 divided by 0) plus 1"))
