@@ -315,4 +315,29 @@ class AstraLanguageBenchmarkTest {
         }
     }
 
+    @Test fun colonTerminatedRetrievedBookFooterCannotLeakOrSupplyAnswer() {
+        for (heading in listOf(
+            "Retrieved local book passages:",
+            "RETRIEVED LOCAL BOOK PASSAGES:  ",
+            "  retrieved local book passages: "
+        )) {
+            val failed = AstraLanguageBenchmark.outcome(
+                AstraLanguageBenchmark.Probe.ARITHMETIC,
+                "Unknown.\r\n$heading\r\n[K1] PRIVATE_OWNER_PASSAGE 42", 10L
+            )
+            assertFalse(failed.passed)
+            assertEquals("Unknown.", failed.sample)
+            val report = AstraLanguageBenchmark.render(listOf(failed), "Qwen3 1.7B")
+            assertFalse(report.contains("PRIVATE_OWNER_PASSAGE"))
+            assertFalse(report.contains("[K1]"))
+            val passed = AstraLanguageBenchmark.outcome(
+                AstraLanguageBenchmark.Probe.ARITHMETIC,
+                "42\n$heading\n[K1] PRIVATE_OWNER_PASSAGE", 10L
+            )
+            assertTrue(passed.passed)
+            assertEquals("42", passed.sample)
+        }
+    }
+
+
 }
