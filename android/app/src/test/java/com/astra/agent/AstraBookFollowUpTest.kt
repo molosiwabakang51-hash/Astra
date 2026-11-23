@@ -24,7 +24,7 @@ class AstraBookFollowUpTest {
             val resolved = AstraBookFollowUp.resolve(request, thread)
             assertTrue(request, resolved is AstraBookFollowUp.Result.Ready)
             val prompt = (resolved as AstraBookFollowUp.Result.Ready).modelPrompt
-            assertTrue(prompt.startsWith("ask my books How does modified bond duration work?"))
+            assertTrue(prompt.startsWith("ask my books How does modified bond duration work."))
             assertTrue(prompt.contains("Follow-up request: " + request))
             assertTrue(prompt.contains("newly retrieved book excerpts"))
             assertFalse(prompt.contains("[B1] Local text"))
