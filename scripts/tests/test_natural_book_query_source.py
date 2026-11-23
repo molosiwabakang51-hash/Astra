@@ -16,7 +16,7 @@ class NaturalOwnerBookQuestions(unittest.TestCase):
         self.assertIn("according to|using", BOOK)
         self.assertIn("do\\s+my\\s+books", BOOK)
         self.assertIn("search|check|look in", BOOK)
-        self.assertIn("message.contains", BOOK)
+        self.assertIn("raw.contains", BOOK)
         self.assertIn("return null", BOOK)
         self.assertNotIn("Http", BOOK)
 
