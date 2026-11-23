@@ -14,10 +14,12 @@ class OwnerBookFollowupContracts(unittest.TestCase):
     def test_explicit_only_same_chat_completed_evidence(self):
         self.assertIn('"continue using my book"', FOLLOWUP)
         self.assertIn('"what do my books say about that"', FOLLOWUP)
-        self.assertIn("currentChat.takeLast(2)", FOLLOWUP)
+        self.assertIn("currentChat.size - 2", FOLLOWUP)
         self.assertIn("AstraInterruptedReply.isIncomplete", FOLLOWUP)
         self.assertIn("Retrieved local book passages (verify originals)", FOLLOWUP)
-        self.assertIn("AstraBookQuery.extract(recent[0].text)", FOLLOWUP)
+        self.assertIn("MAX_CONTIGUOUS_PAIRS = 4", FOLLOWUP)
+        self.assertIn("if (!isExplicitFollowUp(user.text))", FOLLOWUP)
+        self.assertIn("AstraBookQuery.extract(user.text)", FOLLOWUP)
         self.assertNotIn("archivedChats", FOLLOWUP)
 
     def test_always_reretrieves_source_and_never_uses_prior_model_reply(self):
