@@ -90,18 +90,20 @@ KT_RULES = (
                     }""",
     ),
     (
-        """                _nativeModelPrepared = true
-                Log.i(TAG, "Model loaded!")""",
-        """                _nativeModelPrepared = true
+        """                Log.i(TAG, "Model loaded!")
+                _readyForSystemPrompt = true""",
+        """                Log.i(TAG, "Model loaded!")
                 // A model can finish loading just before the progress callback
                 // observes Stop. Free its fully prepared native resources
                 // rather than exposing a cancelled model as ModelReady.
+                // Preserve the exact pinned prompt-error cleanup marker,
+                // which the privacy/native verification pipeline rechecks.
                 if (_cancelGeneration) {
                     unload()
                     _nativeModelPrepared = false
                     throw CancellationException("Offline model load cancelled by owner.")
                 }
-                Log.i(TAG, "Model loaded!")""",
+                _readyForSystemPrompt = true""",
     ),
     (
         """                _readyForSystemPrompt = true
