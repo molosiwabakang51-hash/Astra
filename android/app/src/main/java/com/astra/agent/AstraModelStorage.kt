@@ -24,6 +24,7 @@ internal object AstraModelStorage {
             check(backup.renameTo(target)) {
                 "Cannot restore the previous offline model after an interrupted import."
             }
+            AstraProcessVerifiedModelCache.cache.invalidate()
         }
         return target
     }
@@ -46,6 +47,10 @@ internal object AstraModelStorage {
         require(sourcePath != backup.canonicalPath) {
             "Cannot use the model recovery backup as an import source."
         }
+        // This operation can change the installed inode even if Android
+        // later restores the backup. No brain may keep trusting the previous
+        // process-wide SHA cache after an attempted verified promotion.
+        AstraProcessVerifiedModelCache.cache.invalidate()
         // Any backup left by a previous successful import is superseded by
         // the currently installed target, not by an unverified temporary file.
         if (target.isFile && backup.exists()) {
