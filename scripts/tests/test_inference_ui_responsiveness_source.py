@@ -37,15 +37,24 @@ class OfflineUiResponsivenessContracts(unittest.TestCase):
         end = BRAIN.index("val publicAnswer =", start)
         streaming = BRAIN[start:end]
         self.assertEqual(1, streaming.count("lastUiUpdate = now"))
-        self.assertIn(
-            "lastPublishedText = partial\n                            " +
-            "// A hidden/blank native fragment must not delay",
+        self.assertRegex(
             streaming,
+            r"lastPublishedText = partial\n[ \t]+// A hidden/blank native fragment must not delay",
         )
         self.assertLess(
             streaming.index("lastPublishedText = partial"),
             streaming.index("lastUiUpdate = now"),
         )
+
+    def test_cooperative_deadline_wraps_collection_and_rejects_timeout(self):
+        start = BRAIN.index("val completed = kotlinx.coroutines.withTimeoutOrNull(")
+        end = BRAIN.index("val publicAnswer =", start)
+        bounded = BRAIN[start:end]
+        self.assertIn("if (carefulReasoning) 600_000L else 300_000L", bounded)
+        self.assertIn("current.sendUserPrompt(requestPrompt, answerBudget).collect", bounded)
+        self.assertIn("currentCoroutineContext().ensureActive()", bounded)
+        self.assertRegex(bounded, r"\}\s*\?: false\s*check\(completed\)")
+        self.assertIn("session.invalidate()", BRAIN[end:])
 
     def test_transient_native_errors_have_existing_retry_surface(self):
         self.assertIn('response.startsWith("Offline model unavailable.")', RETRY)
