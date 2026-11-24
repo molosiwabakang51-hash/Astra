@@ -43,7 +43,10 @@ class AstraObservatorySourceTest(unittest.TestCase):
         self.assertIn('listening -> "LISTENING"', AURORA)
         self.assertIn('thinking -> "GENERATING"', AURORA)
         self.assertIn('else -> "LOCAL ASSISTANT"', AURORA)
-        self.assertIn('thinking = offlineJob?.isActive == true', MAIN)
+        # Keep the busy indicator visible while cancelled native work drains.
+        self.assertIn('thinking = offlineJob != null', MAIN)
+        self.assertIn('if (offlineJob === runningJob)', MAIN)
+        self.assertNotIn('thinking = offlineJob?.isActive == true', MAIN)
         self.assertIn('AstraAurora.statusLabel(listening, thinking)', VISUALS)
 
     def test_vector_identity_uses_no_network_or_raster_download(self):
