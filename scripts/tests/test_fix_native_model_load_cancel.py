@@ -56,8 +56,8 @@ class NativeModelLoadCancellationTest(unittest.TestCase):
         start = brain.index("fun requestGenerationStop()")
         end = brain.index("/** Timing only", start)
         stop = brain[start:end]
-        self.assertIn("state !is InferenceEngine.State.LoadingModel", stop)
-        self.assertIn("state !is InferenceEngine.State.ProcessingSystemPrompt", stop)
+        self.assertIn("state is InferenceEngine.State.LoadingModel", stop)
+        self.assertIn("state is InferenceEngine.State.ProcessingSystemPrompt", stop)
         self.assertIn("current.requestAbort()", stop)
         self.assertIn("catch (_: LinkageError)", stop)
 

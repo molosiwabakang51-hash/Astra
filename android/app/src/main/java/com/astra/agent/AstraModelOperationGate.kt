@@ -28,6 +28,31 @@ internal object AstraModelOperationGate {
     // KV-cache belongs to its own conversation.
     private val nextOwnerId = AtomicLong()
     private var lastNativeOwnerId: Long? = null
+    // Only an active invocation may abort the shared JNI engine. Last owner
+    // is continuity metadata; it is NOT permission for a stale Activity's
+    // Stop button to cancel another Activity's native generation.
+    @Volatile private var activeNativeOwnerId: Long? = null
+    private val nativeStopMonitor = Any()
+
+    /**
+     * Perform the *nonblocking atomic JNI stop signal* while the active
+     * owner cannot change. A separate owner check followed by an eventual
+     * JNI call is unsafe: the old Activity could pass the check, get paused,
+     * then cancel a new Activity's session after its owner has changed.
+     *
+     * The supplied action MUST only set the JNI abort flag and must not load
+     * a model, wait on a coroutine, or free native resources.
+     */
+    fun signalStopIfCurrentOwner(ownerId: Long, signal: () -> Unit): Boolean {
+        if (ownerId <= 0L) return false
+        return synchronized(nativeStopMonitor) {
+            if (activeNativeOwnerId != ownerId) false
+            else {
+                signal()
+                true
+            }
+        }
+    }
 
     fun newOwnerId(): Long = nextOwnerId.incrementAndGet()
 
@@ -42,15 +67,33 @@ internal object AstraModelOperationGate {
         }
         val changed = lastNativeOwnerId != ownerId
         lastNativeOwnerId = ownerId
+        synchronized(nativeStopMonitor) {
+            activeNativeOwnerId = ownerId
+        }
         return changed
     }
 
     suspend fun <T> withNativeSession(action: suspend () -> T): T =
-        nativeOrPromotion.withLock { action() }
+        nativeOrPromotion.withLock {
+            try {
+                action()
+            } finally {
+                // Clear before giving another caller exclusive JNI ownership.
+                // Keep lastNativeOwnerId separately for KV-cache continuity.
+                synchronized(nativeStopMonitor) {
+                    activeNativeOwnerId = null
+                }
+            }
+        }
 
     /** Only call this from import/download, never inside withNativeSession. */
     suspend fun <T> withPromotion(action: suspend () -> T): T =
         nativeOrPromotion.withLock {
+            // Promotion is never an inference invocation; do not let a stale
+            // Activity cancel the next prepared model through the JNI flag.
+            synchronized(nativeStopMonitor) {
+                activeNativeOwnerId = null
+            }
             try {
                 action()
             } finally {

@@ -74,8 +74,8 @@ class NativeDecodeDeadlineTest(unittest.TestCase):
         self.assertIn("requestNativeDecodeAbort()", impl)
         self.assertIn("fun requestGenerationStop()", brain)
         self.assertIn("current.requestAbort()", brain)
-        self.assertIn("state !is InferenceEngine.State.Generating", brain)
-        self.assertIn("state !is InferenceEngine.State.ProcessingUserPrompt", brain)
+        self.assertIn("state is InferenceEngine.State.Generating", brain)
+        self.assertIn("state is InferenceEngine.State.ProcessingUserPrompt", brain)
         self.assertEqual(4, ui.count("onDeviceBrain.requestGenerationStop()"))
         self.assertEqual(4, ui.count("offlineJob?.cancel()"))
 
