@@ -274,7 +274,7 @@ internal class AstraOnDeviceBrain(
                 }
 
                 val answer = AstraStreamUnicode.StreamingBuffer(16_000)
-                var lastUiUpdate = 0L
+                var lastPreviewAttempt = 0L
                 var lastPublishedText = ""
                 var firstNativeChunkNs: Long? = null
                 var nativeChunkCount = 0
@@ -349,7 +349,10 @@ internal class AstraOnDeviceBrain(
                     // the next chunk, rather than showing or persisting it.
                     answer.append(part)
                     val now = System.nanoTime()
-                    if (AstraStreamingUiPolicy.intervalElapsed(now, lastUiUpdate)) {
+                    if (part.isNotEmpty() &&
+                        AstraStreamingUiPolicy.intervalElapsed(now, lastPreviewAttempt)) {
+                        // Bound preview parsing even when hidden thinking produces no visible text.
+                        lastPreviewAttempt = now
                         // Updating a full Markdown chat bubble and scrolling
                         // several times each second can overwhelm a low-RAM
                         // Android main thread while native Qwen3 is generating.
@@ -365,9 +368,6 @@ internal class AstraOnDeviceBrain(
                             )) {
                             onPartial(partial)
                             lastPublishedText = partial
-                            // A hidden/blank native fragment must not delay
-                            // the first real text by a full throttle window.
-                            lastUiUpdate = now
                         }
                     }
                 }
