@@ -1,5 +1,6 @@
 package com.astra.agent
 
+import kotlinx.coroutines.launch
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Assert.assertEquals
@@ -10,6 +11,24 @@ import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 
 class AstraModelImportCoordinatorTest {
+    @Test fun importJobPublicationPrecedesExecutionAndEarlyCancellationReleasesGate() =
+        kotlinx.coroutines.runBlocking {
+            val gate = AstraModelImportGate()
+            assertTrue(gate.acquire())
+            var entered = false
+            val job = launch(start = kotlinx.coroutines.CoroutineStart.LAZY) {
+                entered = true
+            }
+            job.invokeOnCompletion { gate.release() }
+            assertFalse(entered)
+            job.cancel()
+            job.join()
+            assertFalse(entered)
+            assertFalse(gate.isRunning())
+            assertTrue(gate.acquire())
+            gate.release()
+        }
+
     @Test fun onlyOneOwnerSelectedImportCanRunAtATime() {
         val gate = AstraModelImportGate()
         assertFalse(gate.isRunning())

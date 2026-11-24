@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -50,7 +51,7 @@ internal object AstraModelImportCoordinator {
     /** Stop only the current model copy, never an installed or backup GGUF. */
     fun cancel(): Boolean {
         val job = importJob ?: return false
-        if (!gate.isRunning() || !job.isActive) return false
+        if (!gate.isRunning() || job.isCompleted || job.isCancelled) return false
         ownerRequestedCancel = true
         job.cancel(CancellationException("Owner cancelled model import"))
         return true
@@ -101,7 +102,8 @@ internal object AstraModelImportCoordinator {
             )
             true
         }.getOrDefault(false)
-        val job = scope.launch {
+        // Publish the job and register cleanup before any import work can run.
+        val job = scope.launch(start = CoroutineStart.LAZY) {
             try {
                 val bytes = AstraModelImport.importDocument(app, selected) { copied ->
                     publish(
@@ -172,6 +174,7 @@ internal object AstraModelImportCoordinator {
                 gate.release()
             }
         }
+        job.start()
         return true
     }
 
