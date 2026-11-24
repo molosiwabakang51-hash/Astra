@@ -1,0 +1,37 @@
+name: Astra 10-minute health checks
+
+on:
+  schedule:
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: astra-scheduled-health
+  cancel-in-progress: false
+
+jobs:
+  regression:
+    name: Offline regression and repository health
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - name: Configure Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Validate Python syntax
+        run: python -m compileall -q scripts
+      - name: Run Python regression tests
+        run: python -m unittest discover -s scripts/tests -p 'test_*.py' -v
+      - name: Report checked revision
+        if: always()
+        run: |
+          echo '### Astra scheduled health check' >> "$GITHUB_STEP_SUMMARY"
+          git rev-parse --short HEAD >> "$GITHUB_STEP_SUMMARY"
