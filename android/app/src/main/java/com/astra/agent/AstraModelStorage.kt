@@ -14,6 +14,9 @@ internal object AstraModelStorage {
     private fun backupFor(target: File): File =
         File(target.parentFile, target.name + ".before-import")
 
+    // Atomically coordinate backup recovery with the two-step rename below.
+    // The coroutine gate separately excludes active JNI while promoting.
+    @Synchronized
     fun activeModel(directory: File, fileName: String): File {
         val target = File(directory, fileName)
         val backup = backupFor(target)
@@ -25,6 +28,7 @@ internal object AstraModelStorage {
         return target
     }
 
+    @Synchronized
     fun installVerified(verifiedTemporary: File, target: File) {
         require(verifiedTemporary.isFile) {
             "Verified model file is not available for installation."
