@@ -2,10 +2,12 @@ package com.astra.agent
 
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.async
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -85,6 +87,57 @@ class AstraModelOperationGateTest {
         inference.join()
         next.await()
         assertEquals(listOf("native", "valid promotion"), events)
+    }
+
+    @Test fun separateBrainInstancesCannotRunNativeGenerationTogether() = runBlocking {
+        val release = CompletableDeferred<Unit>()
+        val events = mutableListOf<String>()
+        val firstBrain = launch(start = CoroutineStart.UNDISPATCHED) {
+            AstraModelOperationGate.withNativeSession {
+                events.add("first brain running")
+                release.await()
+                events.add("first brain finished")
+            }
+        }
+        val secondBrain = async(start = CoroutineStart.UNDISPATCHED) {
+            AstraModelOperationGate.withNativeSession {
+                events.add("second brain running")
+            }
+        }
+        assertEquals(listOf("first brain running"), events)
+        assertFalse(secondBrain.isCompleted)
+        release.complete(Unit)
+        firstBrain.join()
+        secondBrain.await()
+        assertEquals(listOf(
+            "first brain running", "first brain finished", "second brain running"
+        ), events)
+    }
+
+    @Test fun cancelledNativeOwnerRetainsGateThroughNonCancellableCleanup() = runBlocking {
+        val enteredCleanup = CompletableDeferred<Unit>()
+        val finishCleanup = CompletableDeferred<Unit>()
+        val first = launch(start = CoroutineStart.UNDISPATCHED) {
+            AstraModelOperationGate.withNativeSession {
+                try {
+                    CompletableDeferred<Unit>().await()
+                } finally {
+                    withContext(NonCancellable) {
+                        enteredCleanup.complete(Unit)
+                        finishCleanup.await()
+                    }
+                }
+            }
+        }
+        first.cancel()
+        enteredCleanup.await()
+        val next = async(start = CoroutineStart.UNDISPATCHED) {
+            AstraModelOperationGate.withNativeSession { "exclusive" }
+        }
+        assertFalse(next.isCompleted)
+        finishCleanup.complete(Unit)
+        first.join()
+        assertEquals("exclusive", next.await())
     }
 
     @Test fun duplicateSafImportsFailFastAndLockRecoversAfterFailure() = runBlocking {
