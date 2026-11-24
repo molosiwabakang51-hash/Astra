@@ -25,7 +25,10 @@ internal object AstraResponseRetry {
             // failures offered no in-chat Retry control.
             response.startsWith("Offline model unavailable.") ||
             response == "Offline response interrupted." ||
-            response.startsWith("The offline model did not produce a usable answer.")
+            response.startsWith("The offline model did not produce a usable answer.") ||
+            // Cooperative generation deadlines surface this exact failure.
+            // Offer the same guarded retry after native cleanup completes.
+            response.startsWith("Offline model unavailable. Offline generation exceeded its time budget.")
         return prompt.takeIf { failed }
     }
 }
