@@ -42,6 +42,7 @@ internal class AstraOnDeviceBrain(
     }
 
     private val mutex = Mutex()
+    @Volatile
     private var engine: InferenceEngine? = null
     private val session = AstraInferenceSession()
     private val verifiedModels = AstraVerifiedModelCache()
@@ -52,6 +53,26 @@ internal class AstraOnDeviceBrain(
     private var loadedModelPath: String? = null
     @Volatile
     private var lastNativeTiming: AstraInferenceTiming.Sample? = null
+
+    /**
+     * Called synchronously by the owner Stop control before cancelling the
+     * coroutine. The JNI operation only sets an atomic flag; it never calls
+     * llama decode, unload or a blocking single-thread dispatcher method.
+     * A session after cancellation is always invalidated by reply().
+     */
+    fun requestGenerationStop() {
+        val current = engine ?: return
+        val state = current.state.value
+        if (state !is InferenceEngine.State.Generating &&
+            state !is InferenceEngine.State.ProcessingUserPrompt
+        ) return
+        try {
+            current.requestAbort()
+        } catch (_: LinkageError) {
+            // A mismatched JNI binary must not crash the main thread when
+            // the owner taps Stop. The coroutine cancellation still runs.
+        }
+    }
 
     /** Timing only; no prompts, user notes or model-file paths. */
     fun lastInferenceTiming(): String =
