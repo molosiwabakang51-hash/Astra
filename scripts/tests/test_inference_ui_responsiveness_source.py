@@ -29,6 +29,15 @@ class OfflineUiResponsivenessContracts(unittest.TestCase):
         self.assertIn("onPartial(partial)", BRAIN)
         self.assertIn("lastPublishedText = partial", BRAIN)
 
+    def test_empty_emissions_skip_preview_work_after_cancellation_check(self):
+        start = BRAIN.index("current.sendUserPrompt(requestPrompt, answerBudget).collect")
+        end = BRAIN.index("val publicAnswer =", start)
+        streaming = BRAIN[start:end]
+        guard = streaming.index("if (part.isEmpty()) return@collect")
+        self.assertLess(streaming.index("currentCoroutineContext().ensureActive()"), guard)
+        self.assertLess(guard, streaming.index("answer.append(part)"))
+        self.assertLess(guard, streaming.index("answer.snapshot()"))
+
     def test_blank_native_fragments_do_not_delay_first_visible_text(self):
         # The throttle timestamp advances only when text reaches the UI.
         # Otherwise an initial hidden reasoning fragment delays the first

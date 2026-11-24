@@ -352,6 +352,9 @@ internal class AstraOnDeviceBrain(
                         // JNI can split a supplementary character between two
                         // token chunks. Hold an incomplete high surrogate until
                         // the next chunk, rather than showing or persisting it.
+                        // Empty emissions cannot change the accumulated answer.
+                        // Avoid redundant snapshots and citation parsing without delaying visible text.
+                        if (part.isEmpty()) return@collect
                         answer.append(part)
                         val now = System.nanoTime()
                         if (AstraStreamingUiPolicy.intervalElapsed(now, lastUiUpdate)) {
