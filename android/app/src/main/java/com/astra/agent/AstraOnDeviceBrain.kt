@@ -337,39 +337,49 @@ internal class AstraOnDeviceBrain(
                 AstraInferenceCheckpoint.mark(
                     context, AstraInferenceCheckpoint.TOKEN_GENERATION
                 )
-                current.sendUserPrompt(requestPrompt, answerBudget).collect { part ->
-                    // Check cancellation even if upstream emits buffered chunks without suspending.
-                    currentCoroutineContext().ensureActive()
-                    if (part.isNotEmpty()) {
-                        if (firstNativeChunkNs == null) firstNativeChunkNs = System.nanoTime()
-                        nativeChunkCount++
-                    }
-                    // JNI can split a supplementary character between two
-                    // token chunks. Hold an incomplete high surrogate until
-                    // the next chunk, rather than showing or persisting it.
-                    answer.append(part)
-                    val now = System.nanoTime()
-                    if (AstraStreamingUiPolicy.intervalElapsed(now, lastUiUpdate)) {
-                        // Updating a full Markdown chat bubble and scrolling
-                        // several times each second can overwhelm a low-RAM
-                        // Android main thread while native Qwen3 is generating.
-                        // Bound these expensive UI updates without changing
-                        // the token stream, native output or persisted answer.
-                        val partial = AstraSourceCitationGuard.protect(
-                            AstraOfflinePolicy.publicReply(answer.snapshot()),
-                            verifiedPrivatePassages = citedBooks.size,
-                            verifiedOpenPassages = citedOpenCourse.size
-                        )
-                        if (AstraStreamingUiPolicy.hasNewVisibleText(
-                                partial, lastPublishedText
-                            )) {
-                            onPartial(partial)
-                            lastPublishedText = partial
-                            // A hidden/blank native fragment must not delay
-                            // the first real text by a full throttle window.
-                            lastUiUpdate = now
+                // Cooperative deadline only: a blocked JNI call may delay cancellation.
+                // Keep the mutex held until collection actually unwinds.
+                val completed = kotlinx.coroutines.withTimeoutOrNull(
+                    if (carefulReasoning) 600_000L else 300_000L
+                ) {
+                    current.sendUserPrompt(requestPrompt, answerBudget).collect { part ->
+                        // Check cancellation even if upstream emits buffered chunks without suspending.
+                        currentCoroutineContext().ensureActive()
+                        if (part.isNotEmpty()) {
+                            if (firstNativeChunkNs == null) firstNativeChunkNs = System.nanoTime()
+                            nativeChunkCount++
+                        }
+                        // JNI can split a supplementary character between two
+                        // token chunks. Hold an incomplete high surrogate until
+                        // the next chunk, rather than showing or persisting it.
+                        answer.append(part)
+                        val now = System.nanoTime()
+                        if (AstraStreamingUiPolicy.intervalElapsed(now, lastUiUpdate)) {
+                            // Updating a full Markdown chat bubble and scrolling
+                            // several times each second can overwhelm a low-RAM
+                            // Android main thread while native Qwen3 is generating.
+                            // Bound these expensive UI updates without changing
+                            // the token stream, native output or persisted answer.
+                            val partial = AstraSourceCitationGuard.protect(
+                                AstraOfflinePolicy.publicReply(answer.snapshot()),
+                                verifiedPrivatePassages = citedBooks.size,
+                                verifiedOpenPassages = citedOpenCourse.size
+                            )
+                            if (AstraStreamingUiPolicy.hasNewVisibleText(
+                                    partial, lastPublishedText
+                                )) {
+                                onPartial(partial)
+                                lastPublishedText = partial
+                                // A hidden/blank native fragment must not delay
+                                // the first real text by a full throttle window.
+                                lastUiUpdate = now
+                            }
                         }
                     }
+                    true
+                } ?: false
+                check(completed) {
+                    "Offline generation exceeded its time budget. Retry after cleanup."
                 }
                 val publicAnswer = AstraOfflinePolicy.publicReply(answer.finish())
                 // The model can invent [B#]/[K#] markers and even a
