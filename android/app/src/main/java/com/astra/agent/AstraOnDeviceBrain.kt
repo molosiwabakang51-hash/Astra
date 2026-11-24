@@ -341,10 +341,14 @@ internal class AstraOnDeviceBrain(
                 )
                 // Cooperative deadline only: a blocked JNI call may delay cancellation.
                 // Keep the mutex held until collection actually unwinds.
-                val completed = kotlinx.coroutines.withTimeoutOrNull(
-                    if (carefulReasoning) 600_000L else 300_000L
-                ) {
-                    current.sendUserPrompt(requestPrompt, answerBudget).collect { part ->
+                // The same per-turn budget applies inside CPU decode; coroutine
+                // cancellation alone cannot interrupt a blocked llama_process().
+                // An aborted native decode is an error, never successful output.
+                val nativeDeadlineMs = if (carefulReasoning) 600_000L else 300_000L
+                val completed = kotlinx.coroutines.withTimeoutOrNull(nativeDeadlineMs) {
+                    current.sendUserPrompt(
+                        requestPrompt, answerBudget, nativeDeadlineMs
+                    ).collect { part ->
                         // Check cancellation even if upstream emits buffered chunks without suspending.
                         currentCoroutineContext().ensureActive()
                         if (part.isNotEmpty()) {
