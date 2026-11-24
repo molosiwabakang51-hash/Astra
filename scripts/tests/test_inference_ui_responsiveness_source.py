@@ -30,7 +30,7 @@ class OfflineUiResponsivenessContracts(unittest.TestCase):
         self.assertIn("lastPublishedText = partial", BRAIN)
 
     def test_empty_emissions_skip_preview_work_after_cancellation_check(self):
-        start = BRAIN.index("current.sendUserPrompt(requestPrompt, answerBudget).collect")
+        start = BRAIN.index("current.sendUserPrompt(")
         end = BRAIN.index("val publicAnswer =", start)
         streaming = BRAIN[start:end]
         guard = streaming.index("if (part.isEmpty()) return@collect")
@@ -56,11 +56,13 @@ class OfflineUiResponsivenessContracts(unittest.TestCase):
         )
 
     def test_cooperative_deadline_wraps_collection_and_rejects_timeout(self):
-        start = BRAIN.index("val completed = kotlinx.coroutines.withTimeoutOrNull(")
+        start = BRAIN.index("val nativeDeadlineMs = if (carefulReasoning) 600_000L else 300_000L")
         end = BRAIN.index("val publicAnswer =", start)
         bounded = BRAIN[start:end]
         self.assertIn("if (carefulReasoning) 600_000L else 300_000L", bounded)
-        self.assertIn("current.sendUserPrompt(requestPrompt, answerBudget).collect", bounded)
+        self.assertIn("current.sendUserPrompt(", bounded)
+        self.assertIn("requestPrompt, answerBudget, nativeDeadlineMs", bounded)
+        self.assertIn("kotlinx.coroutines.withTimeoutOrNull(nativeDeadlineMs)", bounded)
         self.assertIn("currentCoroutineContext().ensureActive()", bounded)
         self.assertRegex(bounded, r"\}\s*\?: false\s*check\(completed\)")
         self.assertIn("session.invalidate()", BRAIN[end:])
