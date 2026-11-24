@@ -59,7 +59,13 @@ class NativeExclusivityContracts(unittest.TestCase):
         recovered = (JAVA / "AstraCompletedModelDownload.kt").read_text(encoding="utf-8")
         storage = (JAVA / "AstraModelStorage.kt").read_text(encoding="utf-8")
         self.assertIn("private val nativeOrPromotion = Mutex()", gate)
-        self.assertIn("nativeOrPromotion.withLock { action() }", gate)
+        native_start = gate.index("suspend fun <T> withNativeSession")
+        native_end = gate.index("/** Only call this from import/download", native_start)
+        native = gate[native_start:native_end]
+        self.assertIn("nativeOrPromotion.withLock {", native)
+        self.assertIn("action()", native)
+        self.assertIn("finally {", native)
+        self.assertIn("activeNativeOwnerId = null", native)
         self.assertIn("withImport { withContext(Dispatchers.IO)", imported)
         self.assertIn("withDownload { withContext(Dispatchers.IO)", downloaded)
         for source in (imported, downloaded, recovered):

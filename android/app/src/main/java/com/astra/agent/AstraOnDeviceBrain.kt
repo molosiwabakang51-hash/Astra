@@ -63,14 +63,20 @@ internal class AstraOnDeviceBrain(
      */
     fun requestGenerationStop() {
         val current = engine ?: return
-        val state = current.state.value
-        if (state !is InferenceEngine.State.Generating &&
-            state !is InferenceEngine.State.ProcessingUserPrompt &&
-            state !is InferenceEngine.State.ProcessingSystemPrompt &&
-            state !is InferenceEngine.State.LoadingModel
-        ) return
         try {
-            current.requestAbort()
+            // The active owner check and the nonblocking JNI atomic signal
+            // must be one operation. A stale Activity could otherwise pass
+            // a separate check before a new Activity claims this engine.
+            AstraModelOperationGate.signalStopIfCurrentOwner(nativeOwnerId) {
+                val state = current.state.value
+                if (state is InferenceEngine.State.Generating ||
+                    state is InferenceEngine.State.ProcessingUserPrompt ||
+                    state is InferenceEngine.State.ProcessingSystemPrompt ||
+                    state is InferenceEngine.State.LoadingModel
+                ) {
+                    current.requestAbort()
+                }
+            }
         } catch (_: LinkageError) {
             // A mismatched JNI binary must not crash the main thread when
             // the owner taps Stop. The coroutine cancellation still runs.
