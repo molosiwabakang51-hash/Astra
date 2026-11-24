@@ -3108,10 +3108,22 @@ class MainActivity :
                 // whenever a genuine previous destination exists, even when
                 // Chat is the current tab; otherwise Android would exit.
                 val previousScreen = AstraTabBackPolicy.previous(tab, tabBackStack)
+                val chatRootBackOpensNavigation =
+                    AstraTabBackPolicy.rootOpensNavigation(tab, tabBackStack)
+                fun returnToPreviousDestination(target: AstraTabBackPolicy.Target) {
+                    // Consume the exact remembered route. A visible return
+                    // link and Android Back must agree on the same target,
+                    // rather than appending duplicate destinations.
+                    while (tabBackStack.size > target.remainingHistory) {
+                        tabBackStack.removeAt(tabBackStack.lastIndex)
+                    }
+                    restoringTabFromBack = true
+                    tab = target.tab
+                }
                 BackHandler(
                     enabled = navigationPopupOpen || showChatSwitcher ||
                         commandDeckExpanded || showFindInChat || showMemorySearch ||
-                        previousScreen != null
+                        previousScreen != null || chatRootBackOpensNavigation
                 ) {
                     when {
                         navigationPopupOpen -> navigationPopupOpen = false
@@ -3119,14 +3131,14 @@ class MainActivity :
                         showFindInChat -> showFindInChat = false
                         showMemorySearch -> showMemorySearch = false
                         commandDeckExpanded -> commandDeckExpanded = false
-                        previousScreen != null -> {
-                            // Drop the consumed history entry and any stale
-                            // duplicate entries beyond it.
-                            while (tabBackStack.size > previousScreen.remainingHistory) {
-                                tabBackStack.removeAt(tabBackStack.lastIndex)
-                            }
-                            restoringTabFromBack = true
-                            tab = previousScreen.tab
+                        previousScreen != null ->
+                            returnToPreviousDestination(previousScreen)
+                        chatRootBackOpensNavigation -> {
+                            // Android Back at Chat root opens the existing
+                            // navigation tray instead of finishing the app.
+                            // Back again dismisses that tray and leaves the
+                            // active chat, local model and drafts untouched.
+                            navigationPopupOpen = true
                         }
                     }
                 }
@@ -5867,6 +5879,33 @@ class MainActivity :
                                         }
                                     ) {
                                         Text("↶ Continue " + continuingSubject.title)
+                                    }
+                                }
+                                // Discussions launched from Tasks, Notes,
+                                // Tools, Settings or Study are two-way. This
+                                // lightweight link follows the same actual
+                                // history as Android Back, without copying a
+                                // note/task or duplicating a model response.
+                                val origin = previousScreen?.takeIf {
+                                    it.tab in 1..5 &&
+                                        !(it.tab == 5 && continuingSubject != null)
+                                }
+                                if (origin != null) {
+                                    val destination = AstraTabBackPolicy.destinationLabel(
+                                        origin.tab
+                                    )
+                                    if (destination != null) {
+                                        TextButton(
+                                            onClick = {
+                                                returnToPreviousDestination(origin)
+                                            },
+                                            modifier = Modifier.semantics {
+                                                contentDescription =
+                                                    "Return from Chat to " + destination
+                                            }
+                                        ) {
+                                            Text("↶ Return to " + destination)
+                                        }
                                     }
                                 }
 
