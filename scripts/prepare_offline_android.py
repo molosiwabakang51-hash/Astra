@@ -19,6 +19,7 @@ from fix_native_prompt_error import apply as patch_native_prompt_error
 from fix_native_generation_budget import apply as patch_native_generation_budget
 from fix_native_chat_continuity import apply as patch_native_chat_continuity
 from reduce_native_context_memory import apply as patch_native_memory
+from fix_native_decode_error import apply as patch_native_decode_error
 
 ROOT = Path(__file__).resolve().parent.parent
 UPSTREAM = ROOT / "third_party" / "llama.cpp"
@@ -68,6 +69,7 @@ def prepare_binding() -> None:
     patch_native_generation_budget(UPSTREAM)
     patch_native_chat_continuity(UPSTREAM)
     patch_native_memory(UPSTREAM)
+    patch_native_decode_error(UPSTREAM)
     print("Pinned native Android inference binding:", commit, flush=True)
 
 
