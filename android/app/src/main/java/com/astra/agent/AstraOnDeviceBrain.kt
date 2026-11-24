@@ -42,6 +42,7 @@ internal class AstraOnDeviceBrain(
     }
 
     private val mutex = Mutex()
+    private val nativeOwnerId = AstraModelOperationGate.newOwnerId()
     @Volatile
     private var engine: InferenceEngine? = null
     private val session = AstraInferenceSession()
@@ -112,6 +113,13 @@ internal class AstraOnDeviceBrain(
         onPartial: suspend (String) -> Unit = {}
     ): String = AstraModelOperationGate.withNativeSession {
         mutex.withLock {
+            // The JNI InferenceEngine is process-wide. Another activity or
+            // diagnostic brain may have used its KV-cache since this instance
+            // last generated; discard per-brain continuity before decoding.
+            if (AstraModelOperationGate.claimNativeSession(nativeOwnerId)) {
+                session.invalidate()
+                loadedModelPath = null
+            }
             try {
                 // Preference commit() can block on flash and other queued
                 // writes, particularly while a 1.7B model strains memory.

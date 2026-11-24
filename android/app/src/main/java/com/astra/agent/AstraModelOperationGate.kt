@@ -1,5 +1,6 @@
 package com.astra.agent
 
+import java.util.concurrent.atomic.AtomicLong
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
@@ -21,12 +22,43 @@ internal object AstraModelOperationGate {
     private val activeImport = Mutex()
     private val activeDownload = Mutex()
 
+    // llama.cpp's Android InferenceEngine is a process singleton, but each
+    // Activity recreation can construct a fresh AstraOnDeviceBrain. A local
+    // per-brain session cache must not claim that a different brain's native
+    // KV-cache belongs to its own conversation.
+    private val nextOwnerId = AtomicLong()
+    private var lastNativeOwnerId: Long? = null
+
+    fun newOwnerId(): Long = nextOwnerId.incrementAndGet()
+
+    /**
+     * Claim the singleton native KV-cache. Call only while holding
+     * withNativeSession; the caller must invalidate its cached session if the
+     * owner changed or a verified GGUF was promoted.
+     */
+    fun claimNativeSession(ownerId: Long): Boolean {
+        check(ownerId > 0L && nativeOrPromotion.isLocked) {
+            "Native session ownership requires an active serialized request."
+        }
+        val changed = lastNativeOwnerId != ownerId
+        lastNativeOwnerId = ownerId
+        return changed
+    }
+
     suspend fun <T> withNativeSession(action: suspend () -> T): T =
         nativeOrPromotion.withLock { action() }
 
     /** Only call this from import/download, never inside withNativeSession. */
     suspend fun <T> withPromotion(action: suspend () -> T): T =
-        nativeOrPromotion.withLock { action() }
+        nativeOrPromotion.withLock {
+            try {
+                action()
+            } finally {
+                // Even a failed two-step rename means the old native mapping
+                // must not be assumed to describe the installed GGUF.
+                lastNativeOwnerId = null
+            }
+        }
 
     /** Two imports use the same .importing file; reject overlapping attempts. */
     suspend fun <T> withImport(action: suspend () -> T): T {
