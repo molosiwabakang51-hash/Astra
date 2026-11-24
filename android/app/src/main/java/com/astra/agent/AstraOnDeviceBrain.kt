@@ -338,6 +338,8 @@ internal class AstraOnDeviceBrain(
                     context, AstraInferenceCheckpoint.TOKEN_GENERATION
                 )
                 current.sendUserPrompt(requestPrompt, answerBudget).collect { part ->
+                    // Check cancellation even if upstream emits buffered chunks without suspending.
+                    currentCoroutineContext().ensureActive()
                     if (part.isNotEmpty()) {
                         if (firstNativeChunkNs == null) firstNativeChunkNs = System.nanoTime()
                         nativeChunkCount++
