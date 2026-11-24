@@ -65,7 +65,9 @@ internal class AstraOnDeviceBrain(
         val current = engine ?: return
         val state = current.state.value
         if (state !is InferenceEngine.State.Generating &&
-            state !is InferenceEngine.State.ProcessingUserPrompt
+            state !is InferenceEngine.State.ProcessingUserPrompt &&
+            state !is InferenceEngine.State.ProcessingSystemPrompt &&
+            state !is InferenceEngine.State.LoadingModel
         ) return
         try {
             current.requestAbort()
