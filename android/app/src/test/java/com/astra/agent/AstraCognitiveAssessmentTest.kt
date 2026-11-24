@@ -33,14 +33,22 @@ class AstraCognitiveAssessmentTest {
         assertEquals(0.5, AstraCognitiveAssessment.summary(listOf(a, b)).accuracy!!, 0.0001)
     }
 
-    @Test fun difficultyRespondsToIndependentPerformance() {
-        val correct = AstraCognitiveAssessment.evaluate(item, AstraCognitiveAssessment.Attempt(item.id, "84"))
-        val wrong = AstraCognitiveAssessment.evaluate(item, AstraCognitiveAssessment.Attempt(item.id, "0"))
-        val hinted = AstraCognitiveAssessment.evaluate(item, AstraCognitiveAssessment.Attempt(item.id, "84", hints = 1))
-        assertEquals(3, AstraCognitiveAssessment.nextDifficulty(2, List(4) { correct }))
-        assertEquals(1, AstraCognitiveAssessment.nextDifficulty(2, List(3) { wrong }))
-        assertEquals(2, AstraCognitiveAssessment.nextDifficulty(2, List(4) { hinted }))
-        assertEquals(2, AstraCognitiveAssessment.nextDifficulty(2, listOf(correct)))
-        assertEquals(5, AstraCognitiveAssessment.nextDifficulty(5, List(4) { correct }))
+    @Test fun difficultyRequiresDistinctItemsInOneDomain() {
+        fun result(id: String, domain: AstraCognitiveAssessment.Domain, answer: String, hints: Int = 0) =
+            AstraCognitiveAssessment.evaluate(
+                item.copy(id = id, domain = domain),
+                AstraCognitiveAssessment.Attempt(id, answer, hints = hints)
+            )
+        val d = AstraCognitiveAssessment.Domain.QUANTITATIVE
+        val other = AstraCognitiveAssessment.Domain.VERBAL
+        val correct = (1..4).map { result("quant-$it", d, "84") }
+        val wrong = (1..3).map { result("wrong-$it", d, "0") }
+        assertEquals(3, AstraCognitiveAssessment.nextDifficulty(2, d, correct))
+        assertEquals(1, AstraCognitiveAssessment.nextDifficulty(2, d, wrong))
+        assertEquals(2, AstraCognitiveAssessment.nextDifficulty(2, d, List(4) { correct[0] }))
+        assertEquals(2, AstraCognitiveAssessment.nextDifficulty(2, d, correct.take(2)))
+        assertEquals(2, AstraCognitiveAssessment.nextDifficulty(2, d, correct.map { it.copy(hints = 1) }))
+        assertEquals(2, AstraCognitiveAssessment.nextDifficulty(2, d, correct.take(2) + correct.take(2).map { it.copy(itemId = "verbal-${it.itemId}", domain = other) }))
+        assertEquals(5, AstraCognitiveAssessment.nextDifficulty(5, d, correct))
     }
 }
