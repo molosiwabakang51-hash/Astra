@@ -62,9 +62,16 @@ internal object AstraCognitiveAssessment {
             if (results.isEmpty()) null else results.count { it.correct }.toDouble() / results.size)
 
     /** A bounded, transparent recommendation; not a psychological ability estimate. */
-    fun nextDifficulty(current: Int, recent: List<Result>): Int {
+    fun nextDifficulty(current: Int, recent: List<Result>): Int =
+        nextDifficulty(current, recent.lastOrNull()?.domain, recent)
+
+    /** Only distinct items in the target domain count as independent evidence. */
+    fun nextDifficulty(current: Int, domain: Domain?, recent: List<Result>): Int {
         require(current in 1..5)
-        val evidence = recent.takeLast(5)
+        val seen = mutableSetOf<String>()
+        val evidence = recent.asReversed()
+            .filter { (domain == null || it.domain == domain) && seen.add(it.itemId) }
+            .take(5).asReversed()
         if (evidence.size < 3) return current
         val independentlyCorrect = evidence.count { it.correct && it.hints == 0 }
         return when {
