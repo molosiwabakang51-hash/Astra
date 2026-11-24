@@ -43,7 +43,7 @@ class NativeModelLoadCancellationTest(unittest.TestCase):
 
     def test_finished_but_cancelled_model_is_unloaded_before_exception(self):
         kotlin = hardened_impl(original(KT_RULES))
-        start = kotlin.index("_nativeModelPrepared = true")
+        start = kotlin.index('Log.i(TAG, "Model loaded!")')
         finish = kotlin.index("_readyForSystemPrompt = true", start)
         interrupted = kotlin[start:finish]
         self.assertIn("if (_cancelGeneration)", interrupted)
