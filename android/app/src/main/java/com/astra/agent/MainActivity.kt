@@ -3431,6 +3431,21 @@ class MainActivity :
                         persist()
                         return
                     }
+                    // Explicit transcript review uses only the active chat.
+                    // Do not ask the model to invent what it said previously.
+                    val chatReview = if (grounding == null) {
+                        AstraChatReview.respond(
+                            prompt,
+                            history.map { AstraChatArchive.Message(it.role, it.text) }
+                        )
+                    } else null
+                    if (chatReview != null) {
+                        history.add(ChatMessage("You", displayMessage))
+                        history.add(ChatMessage("Astra", chatReview))
+                        while (history.size > MAX_HISTORY) history.removeAt(0)
+                        persist()
+                        return
+                    }
                     // Only explicit grounded questions capture private memories.
                     // Ordinary Qwen3 questions continue to see chat turns only.
                     val groundedNotes = if (grounding != null) notes.toList() else emptyList()
