@@ -1,19 +1,19 @@
 #!/usr/bin/env python3
-"""Discard partially allocated native resources after any model-loader error.
+"""Ensure partial JNI model loads are reclaimed without changing Error recovery.
 
-Pinned InferenceEngineImpl.cleanUp() only unloaded State.Error when
-_nativeModelPrepared == true. During a failed/cancelled GGUF load or prepare,
-g_model (and sometimes g_context) can already be non-null even while
-_nativeModelPrepared is false. The next 1.7B retry would retain that previous
-allocation and risk memory exhaustion / stale model state.
+Pinned Error-state cleanUp() deliberately unloads only when
+_nativeModelPrepared is true. A load cancelled after llama_model_load_from_file
+has begun may already hold model allocations even when prepare() has not
+completed and that flag remains false.
 
-Only after fix_native_unload_safety.py has installed null-safe C++ cleanup,
-convert Error cleanup to always call native unload(). That handler runs on
-the existing llamaDispatcher and retains Astra's global native ownership
-mutex. Unload never runs concurrently with active JNI decode or load.
+Once fix_native_unload_safety.py has installed C++ null guards, mark native
+resources as needing cleanup immediately BEFORE entering load(pathToModel).
+The original Error-state branch from fix_native_prompt_error.py remains
+intact, preserving its idempotent source-verification contract. Any failure
+from load() or prepare() now unloads even a partially initialized model.
 
-The code must not treat cancellation as a corrupt model: it preserves the
-verified GGUF file and causes Astra to reload a clean native context.
+Only the llamaDispatcher thread writes preparation state; Stop merely sets an
+atomic cancellation flag. There is no second JNI load or forced unlock.
 """
 from __future__ import annotations
 import argparse
@@ -23,33 +23,15 @@ IMPL = Path(
     "examples/llama.android/lib/src/main/java/com/arm/aichat/internal/InferenceEngineImpl.kt"
 )
 
-BEFORE = """                is InferenceEngine.State.Error -> {
-                    Log.i(TAG, "Resetting error states...")
-                    // If prompt generation failed after a successful load,
-                    // discard the native context and its corrupted KV-cache.
-                    if (_nativeModelPrepared) {
-                        unload()
-                        _nativeModelPrepared = false
-                    }
-                    _readyForSystemPrompt = false
-                    _state.value = InferenceEngine.State.Initialized
-                    Log.i(TAG, "States reset!")
-                    Unit
-                }"""
+BEFORE = """                _state.value = InferenceEngine.State.LoadingModel
+                load(pathToModel).let {"""
 
-AFTER = """                is InferenceEngine.State.Error -> {
-                    Log.i(TAG, "Resetting error states...")
-                    // Load or prepare can fail with a model or context
-                    // already allocated, before _nativeModelPrepared becomes
-                    // true. The pinned C++ null-safe unload frees every live
-                    // allocation exactly once, including partial sessions.
-                    unload()
-                    _nativeModelPrepared = false
-                    _readyForSystemPrompt = false
-                    _state.value = InferenceEngine.State.Initialized
-                    Log.i(TAG, "States reset!")
-                    Unit
-                }"""
+AFTER = """                _state.value = InferenceEngine.State.LoadingModel
+                // A JNI model allocation may exist even if load() or
+                // prepare() throws. With null-safe C++ unload installed,
+                // preserve Error cleanup eligibility from this point.
+                _nativeModelPrepared = true
+                load(pathToModel).let {"""
 
 
 def hardened(source: str) -> str:
@@ -60,11 +42,19 @@ def hardened(source: str) -> str:
         result = source
     else:
         raise RuntimeError(
-            "Pinned Error-state cleanup drift or duplicate; "
+            "Pinned partial-model-load marker drift or duplicate; "
             f"original={before_count}, patched={after_count}"
         )
-    if result.count("_nativeModelPrepared = false") < 2:
-        raise RuntimeError("Native preparation state must be invalidated on cleanup")
+    if result.count("_nativeModelPrepared = true") < 2:
+        raise RuntimeError("Native model preparation state must cover failed load and successful prepare")
+    required = (
+        'is InferenceEngine.State.Error -> {',
+        'if (_nativeModelPrepared) {',
+        'unload()',
+        '_nativeModelPrepared = false',
+    )
+    if not all(part in result for part in required):
+        raise RuntimeError("Pinned native Error-state cleanup guard missing")
     return result
 
 
@@ -78,7 +68,7 @@ def apply(upstream: Path, verify_only: bool = False) -> None:
         raise RuntimeError("Native partial load cleanup patch was not applied")
     if patched != original:
         path.write_text(patched, encoding="utf-8")
-    print("PASS: Error state frees partially allocated native model and context", flush=True)
+    print("PASS: Error cleanup includes partially allocated native model resources", flush=True)
 
 
 if __name__ == "__main__":
