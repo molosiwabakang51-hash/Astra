@@ -35,7 +35,7 @@ internal object AstraPrivateError {
 
     private enum class Cause {
         STORAGE, ACCESS, UNSUPPORTED, MEMORY, STARTUP, MODEL,
-        NETWORK, DOCUMENT_STALLED, UNKNOWN
+        NETWORK, DOCUMENT_STALLED, GENERATION, UNKNOWN
     }
 
     private fun category(error: Exception): Cause {
@@ -52,6 +52,9 @@ internal object AstraPrivateError {
         if (error is IllegalStateException &&
             error.message == AstraNativeStartupWait.TIMEOUT_ADVICE
         ) return Cause.STARTUP
+        if (error is IllegalStateException &&
+            error.message == "Offline generation exceeded its time budget. Retry after cleanup."
+        ) return Cause.GENERATION
         // Read up to three causes, with a short bound; never return or store
         // the diagnostic text. A provider can include a path or signed URL.
         val description = generateSequence(error as Throwable?) { it.cause }
@@ -110,6 +113,7 @@ internal object AstraPrivateError {
             Cause.UNSUPPORTED -> "The selected material may be unsupported or damaged."
             Cause.MEMORY -> "Android may not have enough available RAM."
             Cause.STARTUP -> "The offline AI engine did not finish starting in time."
+            Cause.GENERATION -> "Offline generation exceeded its time budget."
             Cause.MODEL -> "The verified Qwen3 1.7B model may be unavailable or invalid."
             Cause.NETWORK -> "The connection may have timed out or been rejected."
             Cause.DOCUMENT_STALLED ->
