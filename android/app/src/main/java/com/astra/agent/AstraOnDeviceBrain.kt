@@ -89,7 +89,8 @@ internal class AstraOnDeviceBrain(
         diagnosticIsolated: Boolean = false,
         diagnosticReasoningOverride: Boolean? = null,
         onPartial: suspend (String) -> Unit = {}
-    ): String = mutex.withLock {
+    ): String = AstraModelOperationGate.withNativeSession {
+        mutex.withLock {
             try {
                 // Preference commit() can block on flash and other queued
                 // writes, particularly while a 1.7B model strains memory.
@@ -450,6 +451,7 @@ internal class AstraOnDeviceBrain(
                 }
             }
         }
+    }
 
     /** Verify the requested 1.7B GGUF locally and retain it across signed upgrades. */
     private suspend fun ensureModel(
