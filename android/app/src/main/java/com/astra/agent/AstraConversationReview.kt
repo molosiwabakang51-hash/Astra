@@ -92,6 +92,12 @@ internal object AstraConversationReview {
         return null
     }
 
+    private fun isReviewQuery(raw: String): Boolean {
+        val text = raw.trim().replace(Regex("""\s+"""), " ")
+        return mentions.matches(text) || assistantRecall.matches(text) ||
+            compoundReviewPattern.matches(text)
+    }
+
     private fun earlierMentions(
         term: String,
         history: List<AstraChatArchive.Message>,
@@ -110,6 +116,9 @@ internal object AstraConversationReview {
             if (entry.value.role != "You" && entry.value.role != "Astra") {
                 false
             } else if (onlyAssistant && entry.value.role != "Astra") {
+                false
+            } else if (entry.value.role == "You" && isReviewQuery(entry.value.text)) {
+                // A search request is not evidence that the topic was discussed.
                 false
             } else if (entry.value.text.trim().startsWith("ASTRA // CHAT REVIEW")) {
                 false
