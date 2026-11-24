@@ -211,4 +211,32 @@ class AstraConversationReviewTest {
         assertTrue(noError.contains("cannot identify"))
         assertFalse(noError.contains("Niall Shiller"))
     }
+    @Test fun searchRequestsAloneAreNotEvidenceOfEarlierDiscussion() {
+        val history = listOf(
+            msg("You", "Review earlier mentions of zephyr"),
+            msg("Astra", "No earlier mentions found."),
+            msg("You", "What did you say about zephyr?"),
+            msg("You", "Recall earlier mentions of zephyr")
+        )
+        val answer = AstraConversationReview.respond(
+            "Recall earlier mentions of zephyr", history
+        )!!
+        assertTrue(answer.contains("No earlier mentions"))
+        assertFalse(answer.contains("Message #"))
+    }
+
+    @Test fun reviewQueriesDoNotCrowdOutOriginalEvidence() {
+        val history = listOf(
+            msg("You", "My example uses a copper futures contract."),
+            msg("Astra", "Copper futures have basis risk.")
+        ) + List(8) { msg("You", "Review earlier mentions of copper") }
+        val answer = AstraConversationReview.respond(
+            "Review earlier mentions of copper", history
+        )!!
+        assertTrue(answer.contains("Message #1"))
+        assertTrue(answer.contains("Message #2"))
+        assertFalse(answer.contains("Message #3"))
+        assertFalse(answer.contains("Review earlier mentions of copper"))
+    }
+
 }
