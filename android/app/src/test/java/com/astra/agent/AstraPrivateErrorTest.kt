@@ -164,6 +164,18 @@ class AstraPrivateErrorTest {
         assertFalse(otherFailure.contains("Close other apps"))
     }
 
+    @Test fun generationDeadlineHasPrivateRetryableMessage() {
+        val message = AstraPrivateError.forOwner(
+            AstraPrivateError.Operation.MODEL_CHAT,
+            IllegalStateException("Offline generation exceeded its time budget. Retry after cleanup.")
+        )
+        assertTrue(message.startsWith(
+            "Offline model unavailable. Offline generation exceeded its time budget."
+        ))
+        assertFalse(message.contains("connection"))
+        assertFalse(message.contains("invalid"))
+    }
+
     @Test fun lowMemoryAndPublicNetworkFailuresAreRecognizedWithoutExposingUrl() {
         val memory = AstraPrivateError.forOwner(
             AstraPrivateError.Operation.MODEL_SELF_TEST,
