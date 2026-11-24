@@ -32,7 +32,8 @@ internal object AstraModelDownload {
     suspend fun download(
         context: Context,
         onProgress: suspend (downloaded: Long, expected: Long) -> Unit = { _, _ -> }
-    ): Long = AstraModelOperationGate.withDownload { withContext(Dispatchers.IO) {
+    ): Long = AstraModelAcquisitionGate.singleFlight {
+        AstraModelOperationGate.withDownload { withContext(Dispatchers.IO) {
         val target = AstraModelImport.advancedFile(context)
         val folder = target.parentFile ?: error("Offline model storage unavailable.")
         require(folder.isDirectory || folder.mkdirs()) { "Cannot create offline model storage." }
@@ -150,7 +151,7 @@ internal object AstraModelDownload {
         } finally {
             connection.disconnect()
         }
-    } }
+    } } }
 
     /**
      * Copy a response body with bounded progress and cancellation. A 0-byte
