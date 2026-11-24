@@ -38,7 +38,16 @@ internal class AstraVerifiedModelCache {
         }.getOrNull()
     }
 
-    private var entry: Entry? = null
+    @Volatile private var entry: Entry? = null
+
+    /**
+     * A verified GGUF was promoted or backup-recovered. Its previous inode
+     * cache is no longer trusted, even if Android reuses a file key, length
+     * and timestamp. This never deletes installed weights.
+     */
+    fun invalidate() {
+        entry = null
+    }
 
     fun hasVerifiedFile(): Boolean = entry?.stillMatchesFile() == true
 
@@ -63,4 +72,15 @@ internal class AstraVerifiedModelCache {
             file, file.length(), file.lastModified(), identity, expectedSha256.lowercase()
         ) else null
     }
+}
+
+/**
+ * Hashing a 1.7B GGUF costs substantial phone I/O. All Activity-created
+ * brains in the SAME process may reuse a successful SHA-256 verification,
+ * but only while file identity/size/mtime still match. New processes never
+ * inherit a digest: no disk preferences or trust-on-first-use shortcuts.
+ * Every SAF/HTTPS import independently validates the official SHA-256.
+ */
+internal object AstraProcessVerifiedModelCache {
+    val cache = AstraVerifiedModelCache()
 }
