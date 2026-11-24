@@ -21,7 +21,8 @@ class AstraResponseRetryTest {
                 "Retry from Chat or verify the 1.7B model in Settings.",
             "Offline model unavailable. The offline AI engine did not finish starting in time.",
             "Offline response interrupted.",
-            "The offline model did not produce a usable answer. Please try again."
+            "The offline model did not produce a usable answer. Please try again.",
+            "Offline model unavailable. Offline generation exceeded its time budget. Retry after cleanup."
         )) {
             assertEquals("Explain bond convexity",
                 AstraResponseRetry.eligibleQuestion(tail(answer), false))
