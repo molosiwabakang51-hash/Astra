@@ -61,6 +61,8 @@ internal object AstraModelImportCoordinator {
     internal fun failureMessage(failure: Exception): String {
         val detail = failure.message.orEmpty().lowercase()
         val reason = when {
+            "import or download is already running" in detail ->
+                "Another model transfer is active. Finish or cancel it in Settings."
             "not enough" in detail || "insufficient" in detail ||
                 "no space" in detail -> "Not enough internal storage for the 1.7B model."
             "checksum" in detail || "sha-256" in detail ||
