@@ -89,7 +89,8 @@ internal object AstraModelImport {
         context: Context,
         uri: Uri,
         onProgress: suspend (Long) -> Unit = {}
-    ): Long = AstraModelOperationGate.withImport { withContext(Dispatchers.IO) {
+    ): Long = AstraModelAcquisitionGate.singleFlight {
+        AstraModelOperationGate.withImport { withContext(Dispatchers.IO) {
         val dir = advancedFile(context).parentFile ?: throw IllegalStateException("Model storage unavailable.")
         require(dir.isDirectory || dir.mkdirs()) { "Cannot create model storage." }
         val partial = File(dir, "qwen3-model.importing")
@@ -193,7 +194,7 @@ internal object AstraModelImport {
         } finally {
             if (partial.exists()) partial.delete()
         }
-    } }
+    } } }
 
     /**
      * A broken Android DocumentsProvider can return 0 for a positive-sized
