@@ -48,6 +48,37 @@ class NativeDecodeDeadlineTest(unittest.TestCase):
             source.index("auto *context = init_context(g_model);", prepare),
         )
 
+    def test_owner_stop_writes_only_atomic_flag_without_waiting_for_jni(self):
+        cpp = hardened_cpp(fixture(CPP_RULES))
+        start = cpp.index("Java_com_arm_aichat_internal_InferenceEngineImpl_requestNativeDecodeAbort(")
+        end = cpp.index("\n}", start) + 2
+        setter = cpp[start:end]
+        self.assertIn("astra_cancel_requested.store(true, std::memory_order_relaxed)", setter)
+        self.assertNotIn("llama_process(", setter)
+        self.assertNotIn("llama_free(", setter)
+        self.assertNotIn("JNIEnv::", setter)
+        self.assertIn("if (astra_cancel_requested.load(std::memory_order_relaxed)) return true;", cpp)
+        self.assertEqual(cpp.count("astra_cancel_requested.store(false,"), 1)
+        user_entry = cpp[cpp.index("Java_com_arm_aichat_internal_InferenceEngineImpl_processUserPrompt("):]
+        self.assertNotIn("astra_cancel_requested.store(false,", user_entry)
+        self.assertIn("Never clear an owner's Stop signal here", user_entry)
+
+    def test_owner_stop_is_wired_to_all_four_chat_cancel_actions(self):
+        brain = (ROOT / "android/app/src/main/java/com/astra/agent/AstraOnDeviceBrain.kt").read_text()
+        ui = (ROOT / "android/app/src/main/java/com/astra/agent/MainActivity.kt").read_text()
+        interface = hardened_interface(fixture(INTERFACE_RULES))
+        impl = hardened_impl(fixture(IMPL_RULES))
+        self.assertIn("fun requestAbort()", interface)
+        self.assertIn("override fun requestAbort()", impl)
+        self.assertIn("_cancelGeneration = true", impl)
+        self.assertIn("requestNativeDecodeAbort()", impl)
+        self.assertIn("fun requestGenerationStop()", brain)
+        self.assertIn("current.requestAbort()", brain)
+        self.assertIn("state !is InferenceEngine.State.Generating", brain)
+        self.assertIn("state !is InferenceEngine.State.ProcessingUserPrompt", brain)
+        self.assertEqual(4, ui.count("onDeviceBrain.requestGenerationStop()"))
+        self.assertEqual(4, ui.count("offlineJob?.cancel()"))
+
     def test_kotlin_api_passes_exact_owner_selected_timeout_to_jni(self):
         interface = hardened_interface(fixture(INTERFACE_RULES))
         impl = hardened_impl(fixture(IMPL_RULES))

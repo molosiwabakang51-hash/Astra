@@ -39,14 +39,28 @@ CPP_RULES = (
 // may read it on worker threads during llama_process(), so it must be atomic.
 // A zero deadline disables abort for model setup and system prompt creation.
 static std::atomic<int64_t> astra_decode_deadline_ns{0};
+static std::atomic<bool> astra_cancel_requested{false};
 
 static bool astra_abort_expired_decode(void * /*unused*/) {
+    // The owner can signal this from another thread without waiting for
+    // the single-threaded llama dispatcher to return from native decode.
+    if (astra_cancel_requested.load(std::memory_order_relaxed)) return true;
     const auto deadline = astra_decode_deadline_ns.load(std::memory_order_relaxed);
     if (deadline <= 0) return false;
     const auto now = std::chrono::duration_cast<std::chrono::nanoseconds>(
         std::chrono::steady_clock::now().time_since_epoch()
     ).count();
     return now >= deadline;
+}
+
+// A content-free native atomic setter is safe even when the JNI decoder
+// is occupying the llama dispatcher. It never calls llama APIs or frees
+// a model; only the worker-owned cleanup can do that.
+extern "C"
+JNIEXPORT void JNICALL
+Java_com_arm_aichat_internal_InferenceEngineImpl_requestNativeDecodeAbort(
+        JNIEnv * /*env*/, jobject /*unused*/) {
+    astra_cancel_requested.store(true, std::memory_order_relaxed);
 }""",
     ),
     (
@@ -65,6 +79,7 @@ static bool astra_abort_expired_decode(void * /*unused*/) {
         """Java_com_arm_aichat_internal_InferenceEngineImpl_prepare(JNIEnv * /*env*/, jobject /*unused*/) {
     // An expired earlier request must never abort a newly prepared context.
     astra_decode_deadline_ns.store(0, std::memory_order_relaxed);
+    astra_cancel_requested.store(false, std::memory_order_relaxed);
     auto *context = init_context(g_model);""",
     ),
     (
@@ -92,6 +107,9 @@ static bool astra_abort_expired_decode(void * /*unused*/) {
         now + static_cast<int64_t>(decode_timeout_ms) * 1000000LL,
         std::memory_order_relaxed
     );
+    // Never clear an owner's Stop signal here: the UI may signal abort just
+    // after ProcessingUserPrompt is published but before this JNI entry.
+    // A cancelled session is invalidated and prepare() resets the flag.
     // Includes both prompt prefill and the subsequent assistant generation.
     // Reset short-term states
     reset_short_term_states();""",
@@ -103,9 +121,17 @@ INTERFACE_RULES = (
         "fun sendUserPrompt(message: String, predictLength: Int = DEFAULT_PREDICT_LENGTH): Flow<String>",
         "fun sendUserPrompt(message: String, predictLength: Int = DEFAULT_PREDICT_LENGTH, decodeTimeoutMs: Long = 300_000L): Flow<String>",
     ),
+    (
+        "    fun cleanUp()",
+        "    /** Signal native CPU decode immediately without touching model memory. */\n    fun requestAbort()\n\n    fun cleanUp()",
+    ),
 )
 
 IMPL_RULES = (
+    (
+        "    private external fun generateNextToken(): String?",
+        "    private external fun generateNextToken(): String?\n\n    private external fun requestNativeDecodeAbort()",
+    ),
     (
         "private external fun processUserPrompt(userPrompt: String, predictLength: Int): Int",
         "private external fun processUserPrompt(userPrompt: String, predictLength: Int, decodeTimeoutMs: Long): Int",
@@ -129,6 +155,10 @@ IMPL_RULES = (
     (
         "processUserPrompt(message, predictLength).let { result ->",
         "processUserPrompt(message, predictLength, decodeTimeoutMs).let { result ->",
+    ),
+    (
+        "    override fun cleanUp() {",
+        "    override fun requestAbort() {\n        _cancelGeneration = true\n        requestNativeDecodeAbort()\n    }\n\n    override fun cleanUp() {",
     ),
 )
 
@@ -158,6 +188,12 @@ def hardened_cpp(source: str) -> str:
         raise RuntimeError("Native deadline must reset on prepare and set on user request")
     if result.count("decode_timeout_ms > 600000") != 1:
         raise RuntimeError("Native deadline safety bound is missing")
+    if result.count("astra_cancel_requested.store(false,") != 1 or (
+        result.count("astra_cancel_requested.store(true,") != 1
+    ):
+        raise RuntimeError("Native cancel flag must reset per session and request")
+    if result.count("requestNativeDecodeAbort(") != 1:
+        raise RuntimeError("Native abort signal must be exported once")
     return result
 
 
@@ -169,6 +205,8 @@ def hardened_impl(source: str) -> str:
     result = rewrite(source, IMPL_RULES, "Kotlin implementation")
     if result.count("decodeTimeoutMs in 1L..600_000L") != 1:
         raise RuntimeError("Kotlin must reject unbounded native decode requests")
+    if result.count("requestNativeDecodeAbort()") != 2:
+        raise RuntimeError("Kotlin immediate abort must call the JNI atomic setter")
     return result
 
 

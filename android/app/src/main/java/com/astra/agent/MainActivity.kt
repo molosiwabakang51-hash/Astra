@@ -3270,6 +3270,7 @@ class MainActivity :
                 // active transcript, preserving the text already generated.
                 fun interruptOfflineForTransition() {
                     if (offlineJob != null) {
+                        onDeviceBrain.requestGenerationStop()
                         offlineJob?.cancel()
                         val messageIndex = offlineAnswerMessageIndex
                         if (messageIndex in history.indices &&
@@ -4563,6 +4564,7 @@ class MainActivity :
                                 confirmClearBooks = false
                                 useBooksInChat = false
                                 storage.setBoolean("astra_use_books_in_chat", false)
+                                onDeviceBrain.requestGenerationStop()
                                 offlineJob?.cancel()
                                 researchScope.launch {
                                     try {
@@ -5965,7 +5967,10 @@ class MainActivity :
                                     )
                                     if (offlineJob != null) {
                                         FilledTonalIconButton(
-                                            onClick = { offlineJob?.cancel() },
+                                            onClick = {
+                                                onDeviceBrain.requestGenerationStop()
+                                                offlineJob?.cancel()
+                                            },
                                             modifier = Modifier.semantics {
                                                 contentDescription = "Stop offline response"
                                             }
@@ -7525,7 +7530,10 @@ class MainActivity :
                                                 onCheckedChange = { value ->
                                                     // Stop an active answer before retracting
                                                     // permission to include private books.
-                                                    if (!value) offlineJob?.cancel()
+                                                    if (!value) {
+                                                        onDeviceBrain.requestGenerationStop()
+                                                        offlineJob?.cancel()
+                                                    }
                                                     useBooksInChat = value
                                                     storage.setBoolean(
                                                         "astra_use_books_in_chat", value
