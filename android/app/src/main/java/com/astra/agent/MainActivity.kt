@@ -3269,7 +3269,7 @@ class MainActivity :
                 // Stop native generation before archiving or replacing the
                 // active transcript, preserving the text already generated.
                 fun interruptOfflineForTransition() {
-                    if (offlineJob?.isActive == true) {
+                    if (offlineJob != null) {
                         offlineJob?.cancel()
                         val messageIndex = offlineAnswerMessageIndex
                         if (messageIndex in history.indices &&
@@ -3282,7 +3282,8 @@ class MainActivity :
                             history[messageIndex] = ChatMessage("Astra", updated)
                         }
                     }
-                    offlineJob = null
+                    // Retain the job until its finally block completes. A cancelled
+                    // coroutine may still be draining a native inference call.
                     offlineAnswerMessageIndex = -1
                 }
 
@@ -3424,7 +3425,7 @@ class MainActivity :
                         persist()
                         return
                     }
-                    if (offlineJob?.isActive == true) {
+                    if (offlineJob != null) {
                         history.add(ChatMessage(
                             "Astra", "A response is already being generated. Stop it first."
                         ))
@@ -5504,7 +5505,7 @@ class MainActivity :
                             TextButton(onClick = {
                                 confirmOneTimeModelDownload = false
                                 if (!modelImportRunning &&
-                                    offlineJob?.isActive != true &&
+                                    offlineJob == null &&
                                     !offlineModelTestRunning
                                 ) {
                                     modelImportRunning = true
@@ -5593,7 +5594,7 @@ class MainActivity :
                                 ) {
                                     AstraBrand(
                                         listening = listening,
-                                        thinking = offlineJob?.isActive == true
+                                        thinking = offlineJob != null
                                     )
                                 }
                                 AstraNavigationTray(
@@ -5739,7 +5740,7 @@ class MainActivity :
 
                                 // Dashboard is on demand to maximize chat space.
                                 AnimatedVisibility(
-                                    visible = commandDeckExpanded && offlineJob?.isActive != true,
+                                    visible = commandDeckExpanded && offlineJob == null,
                                     enter = expandVertically(animationSpec = tween(240)) +
                                         androidx.compose.animation.fadeIn(animationSpec = tween(180)),
                                     exit = shrinkVertically(animationSpec = tween(190)) +
@@ -5850,7 +5851,7 @@ class MainActivity :
                                     history.takeLast(2).map {
                                         AstraResponseRetry.Message(it.role, it.text)
                                     },
-                                    offlineJob?.isActive == true || modelImportRunning ||
+                                    offlineJob != null || modelImportRunning ||
                                         offlineModelTestRunning
                                 )
                                 if (retryQuestion != null) {
@@ -5862,7 +5863,7 @@ class MainActivity :
                                                 history.takeLast(2).map {
                                                     AstraResponseRetry.Message(it.role, it.text)
                                                 },
-                                                offlineJob?.isActive == true || modelImportRunning ||
+                                                offlineJob != null || modelImportRunning ||
                                                     offlineModelTestRunning
                                             )
                                             if (stillEligible == retryQuestion &&
@@ -5959,10 +5960,10 @@ class MainActivity :
                                         ),
                                         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
                                         keyboardActions = KeyboardActions(onSend = {
-                                            if (offlineJob?.isActive != true) submit(input)
+                                            if (offlineJob == null) submit(input)
                                         })
                                     )
-                                    if (offlineJob?.isActive == true) {
+                                    if (offlineJob != null) {
                                         FilledTonalIconButton(
                                             onClick = { offlineJob?.cancel() },
                                             modifier = Modifier.semantics {
@@ -6539,7 +6540,7 @@ class MainActivity :
                                         )
                                         OutlinedButton(
                                             enabled = !modelImportRunning &&
-                                                offlineJob?.isActive != true &&
+                                                offlineJob == null &&
                                                 !offlineModelTestRunning,
                                             onClick = { confirmOneTimeModelDownload = true }
                                         ) {
@@ -6554,7 +6555,7 @@ class MainActivity :
                                         }
                                         OutlinedButton(
                                             enabled = !modelImportRunning &&
-                                                offlineJob?.isActive != true &&
+                                                offlineJob == null &&
                                                 !offlineModelTestRunning,
                                             onClick = {
                                                 selectOfflineModelFromFiles()
@@ -6627,7 +6628,7 @@ class MainActivity :
                                                 enabled = !offlineModelTestRunning &&
                                                     !languageBenchmarkRunning &&
                                                     !modelImportRunning &&
-                                                    offlineJob?.isActive != true &&
+                                                    offlineJob == null &&
                                                     onDeviceBrain.hasLocalModel(),
                                                 onClick = {
                                                     offlineModelTestRunning = true
@@ -6749,7 +6750,7 @@ class MainActivity :
                                                 enabled = !languageBenchmarkRunning &&
                                                     !offlineModelTestRunning &&
                                                     !modelImportRunning &&
-                                                    offlineJob?.isActive != true &&
+                                                    offlineJob == null &&
                                                     onDeviceBrain.hasLocalModel(),
                                                 onClick = {
                                                     languageBenchmarkRunning = true
@@ -7006,7 +7007,7 @@ class MainActivity :
                                             enabled = !languageBenchmarkRunning &&
                                                 !offlineModelTestRunning &&
                                                 !modelImportRunning &&
-                                                offlineJob?.isActive != true &&
+                                                offlineJob == null &&
                                                 onDeviceBrain.hasLocalModel(),
                                             onClick = {
                                                 languageBenchmarkRunning = true
@@ -7080,7 +7081,7 @@ class MainActivity :
                                             enabled = !languageBenchmarkRunning &&
                                                 !offlineModelTestRunning &&
                                                 !modelImportRunning &&
-                                                offlineJob?.isActive != true &&
+                                                offlineJob == null &&
                                                 onDeviceBrain.hasLocalModel(),
                                             onClick = {
                                                 languageBenchmarkRunning = true
@@ -7177,7 +7178,7 @@ class MainActivity :
                                             enabled = !languageBenchmarkRunning &&
                                                 !offlineModelTestRunning &&
                                                 !modelImportRunning &&
-                                                offlineJob?.isActive != true &&
+                                                offlineJob == null &&
                                                 onDeviceBrain.hasLocalModel(),
                                             onClick = {
                                                 languageBenchmarkRunning = true
