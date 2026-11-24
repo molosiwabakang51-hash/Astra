@@ -32,7 +32,7 @@ internal object AstraModelDownload {
     suspend fun download(
         context: Context,
         onProgress: suspend (downloaded: Long, expected: Long) -> Unit = { _, _ -> }
-    ): Long = withContext(Dispatchers.IO) {
+    ): Long = AstraModelOperationGate.withDownload { withContext(Dispatchers.IO) {
         val target = AstraModelImport.advancedFile(context)
         val folder = target.parentFile ?: error("Offline model storage unavailable.")
         require(folder.isDirectory || folder.mkdirs()) { "Cannot create offline model storage." }
@@ -78,7 +78,9 @@ internal object AstraModelDownload {
                     // download finished before a process died during rename.
                     // Never discard these bytes without first verifying SHA.
                     if (sha256(partial) == AstraModelImport.ADVANCED_SHA256) {
-                        AstraModelStorage.installVerified(partial, target)
+                        AstraModelOperationGate.withPromotion {
+                            AstraModelStorage.installVerified(partial, target)
+                        }
                         onProgress(target.length(), target.length())
                         return@withContext target.length()
                     }
@@ -138,7 +140,9 @@ internal object AstraModelDownload {
                 check(partial.delete()) { "Cannot clear corrupted model download." }
                 error("Downloaded GGUF failed SHA-256 verification. Please retry.")
             }
-            AstraModelStorage.installVerified(partial, target)
+            AstraModelOperationGate.withPromotion {
+                            AstraModelStorage.installVerified(partial, target)
+                        }
             onProgress(target.length(), target.length())
             target.length()
         } catch (cancel: CancellationException) {
@@ -146,7 +150,7 @@ internal object AstraModelDownload {
         } finally {
             connection.disconnect()
         }
-    }
+    } }
 
     /**
      * Copy a response body with bounded progress and cancellation. A 0-byte

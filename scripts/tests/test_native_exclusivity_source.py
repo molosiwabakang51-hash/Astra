@@ -18,7 +18,8 @@ class NativeExclusivityContracts(unittest.TestCase):
         start = BRAIN.index("suspend fun reply(")
         end = BRAIN.index("/** Verify the requested 1.7B GGUF", start)
         body = BRAIN[start:end]
-        self.assertRegex(body, r"\): String = mutex\.withLock\s*\{")
+        self.assertRegex(body, r"\): String = AstraModelOperationGate\.withNativeSession\s*\{\s*mutex\.withLock\s*\{")
+        self.assertLess(body.index("AstraModelOperationGate.withNativeSession"), body.index("mutex.withLock"))
         self.assertLess(body.index("mutex.withLock"), body.index("sendUserPrompt("))
         self.assertLess(body.index("sendUserPrompt("), body.index("finally {"))
         self.assertLess(body.index("finally {"), body.index("AstraInferenceCheckpoint.clear(context)"))
@@ -49,6 +50,24 @@ class NativeExclusivityContracts(unittest.TestCase):
         self.assertIn("AstraModelImport.ADVANCED_NAME", BRAIN)
         self.assertIn("Only verified Qwen3 1.7B Q4_K_M", BRAIN)
         self.assertNotIn("Qwen3 0.6B is required", BRAIN)
+
+
+    def test_global_gate_and_safe_model_promotions_are_wired(self):
+        gate = (JAVA / "AstraModelOperationGate.kt").read_text(encoding="utf-8")
+        imported = (JAVA / "AstraModelImport.kt").read_text(encoding="utf-8")
+        downloaded = (JAVA / "AstraModelDownload.kt").read_text(encoding="utf-8")
+        recovered = (JAVA / "AstraCompletedModelDownload.kt").read_text(encoding="utf-8")
+        storage = (JAVA / "AstraModelStorage.kt").read_text(encoding="utf-8")
+        self.assertIn("private val nativeOrPromotion = Mutex()", gate)
+        self.assertIn("nativeOrPromotion.withLock { action() }", gate)
+        self.assertIn("withImport { withContext(Dispatchers.IO)", imported)
+        self.assertIn("withDownload { withContext(Dispatchers.IO)", downloaded)
+        for source in (imported, downloaded, recovered):
+            self.assertIn("AstraModelOperationGate.withPromotion {", source)
+        self.assertIn("@Synchronized\n    fun activeModel", storage)
+        self.assertIn("@Synchronized\n    fun installVerified", storage)
+        self.assertNotIn("Thread.stop(", gate)
+
 
 
 if __name__ == "__main__":

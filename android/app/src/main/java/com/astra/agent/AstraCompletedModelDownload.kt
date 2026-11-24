@@ -35,7 +35,9 @@ internal object AstraCompletedModelDownload {
         }
         // installVerified preserves a previous model if the rename fails,
         // and an interrupted rename is recovered by activeModel at launch.
-        AstraModelStorage.installVerified(partial, target)
+        AstraModelOperationGate.withPromotion {
+            AstraModelStorage.installVerified(partial, target)
+        }
         return target.length()
     }
 }
