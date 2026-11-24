@@ -89,7 +89,7 @@ internal object AstraModelImport {
         context: Context,
         uri: Uri,
         onProgress: suspend (Long) -> Unit = {}
-    ): Long = withContext(Dispatchers.IO) {
+    ): Long = AstraModelOperationGate.withImport { withContext(Dispatchers.IO) {
         val dir = advancedFile(context).parentFile ?: throw IllegalStateException("Model storage unavailable.")
         require(dir.isDirectory || dir.mkdirs()) { "Cannot create model storage." }
         val partial = File(dir, "qwen3-model.importing")
@@ -186,12 +186,14 @@ internal object AstraModelImport {
             // Preserve the previously working GGUF until the fully verified
             // replacement is installed. A process death during the final
             // renames is recoverable at the next model-file lookup.
-            AstraModelStorage.installVerified(partial, target)
+            AstraModelOperationGate.withPromotion {
+                AstraModelStorage.installVerified(partial, target)
+            }
             total
         } finally {
             if (partial.exists()) partial.delete()
         }
-    }
+    } }
 
     /**
      * A broken Android DocumentsProvider can return 0 for a positive-sized
