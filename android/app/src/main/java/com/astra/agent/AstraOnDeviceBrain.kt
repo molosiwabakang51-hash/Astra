@@ -277,6 +277,7 @@ internal class AstraOnDeviceBrain(
                 var lastUiUpdate = 0L
                 var lastPublishedText = ""
                 var firstNativeChunkNs: Long? = null
+                var firstVisiblePublicationNs: Long? = null
                 var nativeChunkCount = 0
                 val openReferences = if (diagnosticIsolated) emptyList() else runCatching {
                     val bundled = context.assets.open(AstraOpenLibrary.BUNDLED_ASSET)
@@ -372,6 +373,7 @@ internal class AstraOnDeviceBrain(
                                     partial, lastPublishedText
                                 )) {
                                 onPartial(partial)
+                                if (firstVisiblePublicationNs == null) firstVisiblePublicationNs = System.nanoTime()
                                 lastPublishedText = partial
                                 // A hidden/blank native fragment must not delay
                                 // the first real text by a full throttle window.
@@ -403,7 +405,8 @@ internal class AstraOnDeviceBrain(
                         requestStartedNs,
                         firstNativeChunkNs,
                         System.nanoTime(),
-                        nativeChunkCount
+                        nativeChunkCount,
+                        firstVisiblePublicationNs
                     )
                 }
                 if (attributedAnswer.isBlank()) {

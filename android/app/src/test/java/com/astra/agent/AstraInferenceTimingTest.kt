@@ -35,6 +35,14 @@ class AstraInferenceTimingTest {
         assertTrue(AstraInferenceTiming.describe(null).contains("No successful"))
     }
 
+    @Test fun visiblePublicationIsSeparateAndOptional() {
+        val sample = AstraInferenceTiming.sample(0, 1_000_000, 9_000_000, 3, 5_000_000)!!
+        assertEquals(5L, sample.firstVisiblePublicationMs!!)
+        assertTrue(AstraInferenceTiming.describe(sample).contains("first visible publication after 5 ms"))
+        assertNull(AstraInferenceTiming.sample(0, 1_000_000, 9_000_000, 3)!!.firstVisiblePublicationMs)
+        assertNull(AstraInferenceTiming.sample(0, 1_000_000, 9_000_000, 3, 10_000_000)!!.firstVisiblePublicationMs)
+    }
+
     @Test fun doesNotInventRatesFromChunkCounts() {
         val report = AstraInferenceTiming.describe(
             AstraInferenceTiming.sample(0, 2_000_000, 10_000_000, 100)
