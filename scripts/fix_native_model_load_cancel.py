@@ -123,7 +123,10 @@ def rewrite(source: str, rules: tuple[tuple[str, str], ...], kind: str) -> str:
         a, b = result.count(before), result.count(after)
         if a == 1 and b == 0:
             result = result.replace(before, after, 1)
-        elif a == 0 and b == 1:
+        elif b == 1 and (a == 0 or (a == 1 and before in after)):
+            # The pinned callback/loader replacement deliberately embeds
+            # its original signature; count both but trust only the exact
+            # full reviewed replacement, never a loose substring match.
             pass
         else:
             raise RuntimeError(
