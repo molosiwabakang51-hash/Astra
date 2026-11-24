@@ -46,7 +46,7 @@ internal class AstraOnDeviceBrain(
     @Volatile
     private var engine: InferenceEngine? = null
     private val session = AstraInferenceSession()
-    private val verifiedModels = AstraVerifiedModelCache()
+    private val verifiedModels = AstraProcessVerifiedModelCache.cache
     // Prevent repeated native loads of the identical GGUF after a real
     // loader failure; atomic re-import with a new file identity permits retry.
     private val modelHealth = AstraModelHealth()
