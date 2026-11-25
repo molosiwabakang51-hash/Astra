@@ -157,6 +157,10 @@ Newly checked: concept-aware retrieval integration (#409, Android/Python passed)
 
 All 119 IDs reviewed; 27/119 unchanged. Artifact 15069384240 confirms hard-direct generated 168 vs 287 tokens, both 6/6 complete; compact thinking completed 4/6 vs production 6/6. Most strict failures are noncanonical/ungraded, not proven wrong conclusions. New explicit integer/yes-no format normalizer strips only unambiguous wrappers and leaves model-only, diagnostic, grounded and capped replies unchanged. No claim of improved reasoning score. ACIE-102 remains unchecked pending Android CI and broader native adherence evidence.
 
+## Latest session: integrated source attribution and token allocation
+
+All 119 ACIE IDs reviewed and preserved. #411 Android CI passed and the response-format layer merged at 688e4d3537dce92213cadab26ccbaae67c8521d0. #412 is integrated after Android/Python passes; independent 200-case protocol freeze and test evidence still pending. #413 Python and compiled arithmetic tests passed; Android validation pending at reconciliation. #414 added whole-brief attribution, streamed and final memory citation validation, and literal ID escaping; Python 703-test run had one outdated source assertion, corrected here. Reconcile both changes against merged #411, retaining the scalar contract and original model-only/diagnostic behavior; rerun combined native Android/Python CI. ACIE-010, ACIE-029, ACIE-059, ACIE-102 and ACIE-109 remain open until their actual acceptance evidence exists. No new master checkmarks; 27/119. Citation identity is not proof of entailment and token admission is not demonstrated reasoning gain.
+
 ## Acceptance
 
 90/100 independent repeated general intelligence score; separate model-only/assisted results; no model substitution, paid API or unsupported capability claims. Freeze protocol before held-out testing. Preserve offline and memory constraints. Recheck any completed engineering item if a later regression invalidates it.
