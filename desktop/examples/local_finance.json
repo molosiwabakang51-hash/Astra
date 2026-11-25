@@ -1,0 +1,8 @@
+{
+  "operation": "present_value",
+  "inputs": {
+    "amount": "121",
+    "rate": "0.10",
+    "periods": 2
+  }
+}
