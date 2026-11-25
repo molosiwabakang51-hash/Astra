@@ -12,7 +12,7 @@ import threading
 
 from astra_local_finance import file_digest
 from astra_native_subprocess import run_bounded
-from astra_resource_plan import model_file, plan, probe
+from astra_resource_plan import model_file, plan, probe, adaptive_plan
 from astra_orchestrator import MAX_PROMPT_BYTES, MAX_REPLY_BYTES
 
 CONTEXT = 4096
@@ -25,7 +25,7 @@ def stamp(path):
 
 
 class LocalAnswerRunner:
-    def __init__(self, binary, primary, critic=None, *, timeout=180, approved=False):
+    def __init__(self, binary, primary, critic=None, *, timeout=180, approved=False, context_policy="fixed"):
         if approved is not True:
             raise ValueError("Explicit local model approval required.")
         self.binary, primary = Path(binary).resolve(), Path(primary).resolve()
@@ -33,6 +33,9 @@ class LocalAnswerRunner:
             raise ValueError("Trusted local llama-cli executable required.")
         if type(timeout) is not int or not 30 <= timeout <= 300:
             raise ValueError("Timeout outside supported range.")
+        if context_policy not in ("fixed", "adaptive"):
+            raise ValueError("Unknown inference context policy.")
+        self.context_policy = context_policy
         model_file(primary)
         self.models = {"primary": primary}
         if critic is not None:
@@ -43,6 +46,7 @@ class LocalAnswerRunner:
             self.models["critic"] = critic
         self.timeout = timeout
         self.last_profile = {}
+        self._observed = {role:{} for role in self.models}
         self._stamps = {path: stamp(path) for path in (self.binary, *self.models.values())}
         self._lock = threading.Lock()
 
@@ -66,9 +70,16 @@ class LocalAnswerRunner:
             self._check_files()
             model = self.models[role]
             name, size = model_file(model)
-            admission = plan(probe(model.parent), [(name, size)], context=CONTEXT)
-            if not admission["all_admitted_individually"]:
-                raise RuntimeError("Insufficient available RAM.")
+            resources = probe(model.parent)
+            context = CONTEXT
+            if self.context_policy == "adaptive":
+                admission = adaptive_plan(resources,size,len(payload),generation_tokens=GENERATE_TOKENS,
+                                          observed=self._observed[role])
+                context = admission["context_tokens"]
+            else:
+                admission = plan(resources, [(name, size)], context=CONTEXT)
+                if not admission["all_admitted_individually"]:
+                    raise RuntimeError("Insufficient available RAM.")
             threads = str(admission["threads"])
             environment = {key: value for key, value in os.environ.items()
                            if not key.upper().startswith(("LLAMA_", "HF_", "HUGGINGFACE_", "MTMD_"))}
@@ -80,7 +91,7 @@ class LocalAnswerRunner:
                            "--single-turn", "--no-display-prompt", "--simple-io",
                            "--color", "off", "--no-show-timings", "--reasoning", "off",
                            "--cache-ram", "0", "--no-context-shift",
-                           "-c", str(CONTEXT), "-n", str(GENERATE_TOKENS),
+                           "-c", str(context), "-n", str(GENERATE_TOKENS),
                            "-ngl", "0", "-t", threads, "-tb", threads,
                            "--temp", "0", "--seed", "42"]
                 try:
@@ -90,6 +101,13 @@ class LocalAnswerRunner:
                                              telemetry=self.last_profile)
                 except subprocess.TimeoutExpired:
                     raise RuntimeError("Local answer generation timed out.") from None
+                finally:
+                    self.last_profile.update(role=role,context_policy=self.context_policy,
+                                             context_tokens=context,generation_tokens=GENERATE_TOKENS,
+                                             threads=int(threads),available_ram_mib=admission["available_ram_mib"])
+                    peak = self.last_profile.get("observed_peak_working_set_bytes")
+                    if type(peak) is int and peak>0:
+                        self._observed[role][context] = max(peak,self._observed[role].get(context,0))
                 if process.returncode or len(process.stdout) > MAX_REPLY_BYTES:
                     raise RuntimeError("Local answer generation failed.")
                 self._check_files()
