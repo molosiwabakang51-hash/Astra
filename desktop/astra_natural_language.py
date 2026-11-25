@@ -14,11 +14,19 @@ from astra_verified_finance import validated_request
 NUM = r"[+-]?[0-9]{1,12}(?:\.[0-9]{1,8})?"
 RATE = r"(" + NUM + r")\s*%"
 AMOUNT = r"(" + NUM + r")"
-PERIOD = r"([0-9]{1,3})"
+YEAR_WORDS = {"zero": 0, "one": 1, "two": 2, "three": 3, "four": 4, "five": 5,
+              "six": 6, "seven": 7, "eight": 8, "nine": 9, "ten": 10}
+PERIOD = r"([0-9]{1,3}|" + "|".join(YEAR_WORDS) + r")"
+GROUPED_NUM = r"[+-]?(?:[0-9]{1,12}|[0-9]{1,3}(?:,[0-9]{3}){1,3})(?:\.[0-9]{1,8})?"
+TIME_AMOUNT = r"(?:(P|BWP)\s*)?(" + GROUPED_NUM + r")"
+
+def years(value):
+    return YEAR_WORDS[value.lower()] if value.lower() in YEAR_WORDS else int(value)
+
 PREFIX = r"(?:please\s+)?(?:(?:calculate|compute|find|what is|what's)\s+(?:the\s+)?)?"
 SUFFIX = r"\s*[?.!]?"
 CHANGE = re.compile(PREFIX + r"percentage change from\s+" + AMOUNT + r"\s+to\s+" + AMOUNT + SUFFIX, re.I)
-TIME_VALUE = re.compile(PREFIX + r"(present value|future value|compound growth)\s+of\s+" + AMOUNT +
+TIME_VALUE = re.compile(PREFIX + r"(present value|future value|compound growth)\s+of\s+" + TIME_AMOUNT +
                         r"\s+at\s+" + RATE + r"\s+(?:annually\s+)?(?:for|over)\s+" + PERIOD +
                         r"\s+years?" + SUFFIX, re.I)
 WEIGHTED_PREFIX = re.compile(PREFIX + r"weighted (?:portfolio )?return\s*(?:of|:)\s*", re.I)
@@ -33,6 +41,7 @@ class Route:
     status: str
     request: dict | None = None
     clarification: str | None = None
+    currency: str | None = None
 
 
 def ratio(percent):
@@ -40,13 +49,13 @@ def ratio(percent):
     return format(value, "f")
 
 
-def finance(operation, inputs):
+def finance(operation, inputs, *, currency=None):
     request = {"operation": operation, "inputs": inputs}
     try:
         validated_request(request)
     except ValueError:
         return Route("clarification_required", clarification="The supplied values are outside the supported calculation domain.")
-    return Route("routed", {"kind": "finance", "calculation": request})
+    return Route("routed", {"kind": "finance", "calculation": request}, currency=currency)
 
 
 def route(text, *, review=False, use_vector=False):
@@ -61,7 +70,8 @@ def route(text, *, review=False, use_vector=False):
     match = TIME_VALUE.fullmatch(normalized)
     if match:
         op = "present_value" if match[1].lower() == "present value" else "compound_growth"
-        return finance(op, {"amount": match[2], "rate": ratio(match[3]), "periods": int(match[4])})
+        return finance(op, {"amount": match[3].replace(",", ""), "rate": ratio(match[4]), "periods": years(match[5])},
+                       currency="BWP" if match[2] else None)
     prefix = WEIGHTED_PREFIX.match(normalized)
     if prefix:
         remainder = normalized[prefix.end():].rstrip("?.!").strip()
@@ -91,4 +101,7 @@ def execute_text(orchestrator, text, *, approve_models=False, approve_embeddings
     result = orchestrator.execute(request, approve_models=approve_models,
                                   approve_embeddings=approve_embeddings, embed=embed,
                                   model_sha=model_sha)
-    return {"route": request["kind"], "result": result}
+    output = {"route": request["kind"], "result": result}
+    if routed.currency:
+        output["currency"] = routed.currency
+    return output
