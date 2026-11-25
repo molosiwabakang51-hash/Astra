@@ -5,6 +5,7 @@ Review is an attestation, not independent factual verification. Search is
 lexical, not embedding-based. No model-generated facts are automatically saved.
 """
 import hashlib
+import heapq
 import re
 import sqlite3
 import unicodedata
@@ -110,19 +111,18 @@ class Ledger:
         tokens = terms(query)
         if not tokens:
             return []
-        candidates = []
-        # Bounded record count and fields keep lexical search predictable.
-        for row in self.connection.execute(
-                "SELECT id,subject,text,source,kind,supersedes FROM evidence WHERE active=1"):
-            subject_hits = len(tokens & terms(row["subject"]))
-            text_hits = len(tokens & terms(row["text"]))
-            if not subject_hits and not text_hits:
-                continue
-            score = 3 * subject_hits + text_hits
-            candidates.append((score, row["id"], dict(row)))
-        candidates.sort(key=lambda item: (-item[0], item[1]))
+        def candidates():
+            # Stream all matching records but retain only the requested top-k
+            # during ranking, avoiding a large duplicate in-memory corpus.
+            for row in self.connection.execute(
+                    "SELECT id,subject,text,source,kind,supersedes FROM evidence WHERE active=1"):
+                subject_hits = len(tokens & terms(row["subject"]))
+                text_hits = len(tokens & terms(row["text"]))
+                if subject_hits or text_hits:
+                    yield (3 * subject_hits + text_hits, row["id"], dict(row))
+        ranked = heapq.nsmallest(limit, candidates(), key=lambda item: (-item[0], item[1]))
         return [dict(item[2], trust="owner_reviewed_not_independently_verified",
-                     lexical_score=item[0]) for item in candidates[:limit]]
+                     lexical_score=item[0]) for item in ranked]
 
     def vector_snapshot(self, limit=256):
         """Newest active records and their total count from one SQL snapshot."""
