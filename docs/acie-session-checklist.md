@@ -2,7 +2,7 @@
 
 Owner directive: maintain every item, update at the end of each engineering session using verified evidence, and keep general AI the exclusive priority until independently demonstrated >=90/100. This separate ACIE ledger preserves the original 119 parent release requirements. Engineering completion is not an intelligence score. Existing checked statuses from the owner-approved session checklist denote integrated engineering, not complete capability acceptance. No new item checked merely from a proposed change. 27/119 engineering items checked.
 
-Newly checked: concept-aware retrieval integration (#409, Android/Python passed); initial verification merge and arithmetic verification integration (#408, Android/Python passed); narrow actual-model CPU baseline (run 45712659939, artifact 15068248646). CPU baseline is exploratory only, not the independent 200-case baseline. Isolated review quality remains unchecked until actual native review outcomes. Sampling optimization is integrated, not demonstrated superior; retain that distinction. #407 workflow successfully executed but merge conflict; reconciled in this PR. Hard direct and compact system experiments pending. No verified /100 rating.
+Newly checked: concept-aware retrieval integration (#409, Android/Python passed); initial verification merge and arithmetic verification integration (#408, Android/Python passed); narrow actual-model CPU baseline (run 45712659939, artifact 15068248646). CPU baseline is exploratory only, not the independent 200-case baseline. Isolated review quality remains unchecked until actual native review outcomes. Sampling optimization is integrated, not demonstrated superior; retain that distinction. #407 workflow successfully executed but merge conflict; reconciled in this PR. Hard direct and compact system experiments completed (run 45715461508); #410 merged. Preserve production system prompt; no demonstrated broad score gain. No verified /100 rating.
 
 ## 1. Native inference engine (7/12)
 
@@ -152,6 +152,10 @@ Newly checked: concept-aware retrieval integration (#409, Android/Python passed)
 - [ ] ACIE-117 Evaluate regressions after major improvements
 - [ ] ACIE-118 Complete independent physical-device assessment
 - [ ] ACIE-119 Demonstrate repeatable intelligence score of at least 90/100
+
+## Latest engineering session
+
+All 119 ACIE IDs retained; 27/119 checked. #412 passed Python and Android CI and merged; proposed independent protocol remains pending formal freeze (ACIE-109). #411 Android passed but has a merge conflict following #412; #413 Python passed, fresh Android build pending at start of session. This PR adds typed, whole-prompt memory attribution verification, output-side S citation/forged-heading protection on both streaming and final responses, and literal source-label escaping. ACIE-059 remains unchecked pending integrated CI and actual evidence-grounding validation. Citation identity alone cannot establish factual entailment. No new intelligence rating or requirement completion claimed.
 
 ## Acceptance
 
