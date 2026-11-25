@@ -1,0 +1,185 @@
+"""Headless controller for Astra's local desktop workbench.
+
+Call from a single owner thread; the UI worker owns SQLite connections.
+Finance requires no database or model. Knowledge generation and writes
+require explicit approval; model output is never written automatically.
+"""
+from decimal import Decimal, localcontext
+from pathlib import Path
+
+from astra_evidence import Ledger
+from astra_finance_session import FinanceSession
+from astra_hybrid_evidence import HybridEvidence
+from astra_knowledge_session import KnowledgeSession
+from astra_local_answer import LocalAnswerRunner
+from astra_orchestrator import Orchestrator
+
+
+class Workbench:
+    def __init__(self):
+        self.finance = FinanceSession()
+        self.ledger = None
+        self.retrieval = None
+        self.runner = None
+        self.knowledge = None
+
+    def _reset_knowledge(self):
+        self.knowledge = (KnowledgeSession(Orchestrator(self.ledger, self.retrieval, self.runner))
+                          if self.ledger is not None and self.runner is not None else None)
+
+    def connect(self, path, *, create=False):
+        if type(create) is not bool:
+            raise ValueError("Invalid database creation setting.")
+        path = Path(path).expanduser().resolve()
+        if path.suffix.lower() not in (".sqlite", ".db", ".sqlite3"):
+            raise ValueError("Select a dedicated SQLite evidence database.")
+        if create and path.exists():
+            raise ValueError("Database already exists; open it instead.")
+        if not create and not path.is_file():
+            raise ValueError("Select an existing evidence database.")
+        # Validate existing schema without interpreting another Astra database
+        # as evidence merely because it has the same schema version.
+        if not create:
+            import sqlite3
+            with sqlite3.connect(path.as_uri()+"?mode=ro", uri=True) as inspection:
+                tables = {row[0] for row in inspection.execute(
+                    "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'")}
+                if tables != {"evidence"}:
+                    raise ValueError("Not a dedicated Astra evidence database.")
+        candidate = Ledger(path)
+        if self.ledger is not None:
+            self.ledger.close()
+        self.ledger = candidate
+        self.retrieval = HybridEvidence(candidate)
+        self._reset_knowledge()
+        return {"status": "database_connected", "name": path.name}
+
+    def configure_models(self, binary, primary, critic=None, *, approved=False, timeout=180):
+        candidate = LocalAnswerRunner(binary, primary, critic, timeout=timeout, approved=approved)
+        self.runner = candidate
+        self._reset_knowledge()
+        return {"status": "models_configured", "critic_available": "critic" in candidate.models}
+
+    def disable_models(self):
+        self.runner = None
+        self._reset_knowledge()
+        return {"status": "models_disabled"}
+
+    def ask_finance(self, question):
+        return self.finance.execute(question)
+
+    def ask_knowledge(self, question, *, generate=False, review=False):
+        if type(generate) is not bool or type(review) is not bool:
+            raise ValueError("Invalid knowledge settings.")
+        if self.ledger is None:
+            raise ValueError("Open or create a reviewed evidence database first.")
+        if not generate:
+            if review:
+                raise ValueError("Review requires approved generation.")
+            if self.knowledge is not None:
+                self.knowledge.reset()
+            return Orchestrator(self.ledger,self.retrieval).execute(
+                {"kind":"retrieve","question":question})
+        if self.knowledge is None:
+            raise ValueError("Configure explicitly approved local models first.")
+        if review and "critic" not in self.runner.models:
+            raise ValueError("Independent review requires a distinct critic model.")
+        return self.knowledge.execute(question, approve_models=True, review=review)
+
+    def add_evidence(self, subject, text, source, *, reviewed=False, supersedes=None):
+        if self.ledger is None:
+            raise ValueError("Open or create a reviewed evidence database first.")
+        identifier = self.ledger.add(subject,text,source,reviewed=reviewed,supersedes=supersedes)
+        if self.knowledge is not None:
+            self.knowledge.reset()
+        return {"status":"evidence_saved","id":identifier}
+
+    def reset(self, section):
+        if section == "finance":
+            self.finance.reset()
+        elif section == "knowledge":
+            if self.knowledge is not None:
+                self.knowledge.reset()
+        else:
+            raise ValueError("Unknown context section.")
+        return {"status":"context_cleared"}
+
+    def close(self):
+        self.finance.reset()
+        if self.knowledge is not None:
+            self.knowledge.reset()
+        if self.ledger is not None:
+            self.ledger.close()
+        self.ledger = self.retrieval = self.runner = self.knowledge = None
+
+
+def numeric_display(value, currency=None):
+    with localcontext() as ctx:
+        ctx.prec = 40
+        amount = Decimal(value["decimal_approximation"])
+        if value.get("units") == "decimal_ratio":
+            return f"{amount*100:,.4f}".rstrip("0").rstrip(".")+"%"
+        return ("P" if currency=="BWP" else "") + f"{amount:,.2f}"
+
+
+def format_result(result):
+    """Render human-readable output without promoting drafts to facts."""
+    status = result["status"]
+    if status == "calculated":
+        scenario = result["scenario"]
+        calculation = scenario["calculation"]
+        value = scenario["finance"]["result"]
+        lines = [numeric_display(value,scenario["currency"]),
+                 "Operation: "+calculation["operation"].replace("_"," "),
+                 "Assumptions:"]
+        for key, item in calculation["inputs"].items():
+            if key in ("rate",):
+                item = numeric_display({"decimal_approximation":item,"units":"decimal_ratio"})
+            elif key in ("weights","returns"):
+                item = ", ".join(numeric_display({"decimal_approximation":x,"units":"decimal_ratio"}) for x in item)
+            lines.append(f"  {key}: {item}")
+        lines.append("Exact result: "+value["numerator"]+"/"+value["denominator"])
+        lines.append(result["scope"])
+        return "\n".join(lines)
+    if status == "compared":
+        before, after = result["before"],result["after"]
+        return "\n".join([
+            "Before: "+numeric_display(before["finance"]["result"],before["currency"]),
+            "After: "+numeric_display(after["finance"]["result"],after["currency"]),
+            "Change: "+numeric_display(result["absolute_change"],after["currency"]),
+            "Relative change: "+(numeric_display(result["relative_change"]) if result["relative_change"] else "not applicable"),
+            result["explanation"],result["scope"],
+        ])
+    if status == "retrieved":
+        rows = result["retrieval"]["results"]
+        return "\n\n".join(f"[{row['id']}] {row['subject']}\n{row['text']}\nSource: {row['source']}\nOwner-reviewed; not independently verified."
+                            for row in rows) or "No matching reviewed evidence."
+    if status == "unverified_evidence_grounded_draft":
+        lines = ["Unverified draft",result["answer"],"Sources:"]
+        for row in result["citations"]:
+            lines.append(f"[{row['id']}] {row['subject']} — {row['source']}")
+        review = result["review"]
+        lines.append("Advisory review: "+review["assessment"].replace("_"," "))
+        lines.extend(review["concerns"])
+        lines.append(result["scope"])
+        return "\n\n".join(lines)
+    if status == "clarification_required":
+        return result["clarification"]
+    if status == "evidence_saved":
+        return f"Reviewed record saved. Evidence ID: {result['id']}."
+    if status == "database_connected":
+        return "Connected: "+result["name"]
+    if status == "models_configured":
+        return "Local models configured (not yet inference-tested)."
+    messages = {
+        "outside_finance_session":"Use the Knowledge workspace for explanatory questions.",
+        "insufficient_evidence":"Insufficient reviewed evidence for a draft.",
+        "model_unavailable_or_invalid":"Local model unavailable or invalid response; no draft.",
+        "evidence_changed_retry":"Supporting evidence changed. Start a new question.",
+        "context_budget_exceeded":"Context budget exceeded. Start a narrower question.",
+        "models_disabled":"Local model generation disabled.",
+        "context_cleared":"Context cleared.",
+        "finance_context_cleared":"Financial scenario cleared.",
+        "knowledge_context_cleared":"Knowledge context cleared.",
+    }
+    return messages.get(status,"No usable result.")
