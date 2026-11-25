@@ -147,8 +147,8 @@ internal object AstraFollowUpAnchor {
                 !AstraInterruptedReply.isIncomplete(it.text)
         } ?: return prompt
 
-        val question = quote(lastUser.text.take(260))
-        val answer = quote(lastAssistant.text.take(320))
+        val question = quote(AstraUnicodeBounds.prefix(lastUser.text, 260))
+        val answer = quote(AstraUnicodeBounds.prefix(lastAssistant.text, 320))
         val numberedItem = selectedIndex?.let {
             specificNumberedItem(lastAssistant.text, it)
         }
@@ -182,7 +182,7 @@ internal object AstraFollowUpAnchor {
     }
 
     private fun specificNumberedItem(reply: String, index: Int): String? {
-        val marker = Regex("""^\s*(?:#{1,6}\s*)?(?:[-*]\s+)?(?:\*\*)?(\d+)[.)](?:\*\*)?""")
+        val marker = Regex("""^\s*(?:#{1,6}\s*)?(?:[-*]\s+)?(?:\*\*)?(\d+)[.)](?:\*\*)?(?=\s|$)""")
         val lines = reply.lines()
         val start = lines.indexOfFirst { line ->
             marker.find(line)?.groupValues?.getOrNull(1)?.toIntOrNull() == index
@@ -194,11 +194,12 @@ internal object AstraFollowUpAnchor {
             if (matching.size >= 4) break
             matching.add(line)
         }
-        return matching.joinToString(" ").trim().take(420).ifBlank { null }
+        return AstraUnicodeBounds.prefix(matching.joinToString(" ").trim(), 420).ifBlank { null }
     }
 
     private fun quote(s: String): String =
         s.replace(Regex("""[\r\n\t]+"""), " ")
+            .replace("\\", "\\\\")
             .replace('"', '\'')
             .replace(Regex("""\s+"""), " ").trim()
 }

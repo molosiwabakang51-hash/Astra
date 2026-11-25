@@ -309,4 +309,52 @@ class AstraFollowUpAnchorTest {
         assertEquals("explain point 2",
             AstraFollowUpAnchor.enrich("explain point 2", emptyList()))
     }
+
+    @Test fun decimalValuesAreNotMistakenForNumberedListItems() {
+        val history = listOf(
+            msg("You", "Explain the yield assumptions."),
+            msg("Astra", "4.25% is the assumed yield.\n1. Discount cash flows.\n4. Check price sensitivity.")
+        )
+        val result = AstraFollowUpAnchor.enrich("explain point 4", history)
+        assertTrue(result.contains("Check price sensitivity"))
+        assertFalse(result.contains("25% is the assumed yield"))
+        val decimalOnly = listOf(
+            msg("You", "Explain the yield."),
+            msg("Astra", "4.25% is the assumed yield.")
+        )
+        assertTrue(AstraFollowUpAnchor.enrich("explain point 4", decimalOnly)
+            .contains("Item 4 was not located"))
+    }
+
+    @Test fun decimalContinuationDoesNotEndSelectedItem() {
+        val history = listOf(
+            msg("You", "Show the assumptions."),
+            msg("Astra", "1. Yield assumption\n4.25% is used for the estimate.\n2. Duration.")
+        )
+        val result = AstraFollowUpAnchor.enrich("explain point 1", history)
+        assertTrue(result.contains("4.25% is used for the estimate"))
+        assertFalse(result.contains("2. Duration"))
+    }
+
+    @Test fun followUpExcerptsNeverSplitSupplementaryCharacters() {
+        val history = listOf(
+            msg("You", "a".repeat(259) + "😀"),
+            msg("Astra", "b".repeat(319) + "😀")
+        )
+        val result = AstraFollowUpAnchor.enrich("go deeper", history)
+        assertFalse(result.any { it.isSurrogate() })
+        val numbered = listOf(
+            msg("You", "Show the first item."),
+            msg("Astra", "1. " + "c".repeat(416) + "😀")
+        )
+        val selected = AstraFollowUpAnchor.enrich("explain point 1", numbered)
+        assertFalse(selected.any { it.isSurrogate() })
+    }
+
+    @Test fun quotedAnchorPreservesBackslashesWithoutEscapingClosingQuote() {
+        val history = listOf(msg("You", "Explain the path C:\\"), msg("Astra", "C:\\"))
+        val result = AstraFollowUpAnchor.enrich("go deeper", history)
+        assertTrue(result.contains("Previous user question: \"Explain the path C:\\\\\""))
+        assertTrue(result.contains("Immediately preceding Astra reply: \"C:\\\\\""))
+    }
 }
