@@ -1,11 +1,13 @@
 """Test conservative natural-language routing and zero-model calculations."""
 import importlib.util
+import io
 from pathlib import Path
 import sys
 import unittest
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[2]
-for name in ("astra_evidence", "astra_quantitative_verify", "astra_verified_finance", "astra_natural_language"):
+for name in ("astra_resource_plan", "astra_evidence", "astra_vector_memory", "astra_hybrid_evidence", "astra_quantitative_verify", "astra_verified_finance", "astra_local_finance", "astra_orchestrator", "astra_local_answer", "astra_desktop", "astra_natural_language", "astra_text"):
     spec = importlib.util.spec_from_file_location(name, ROOT / "desktop" / (name + ".py"))
     module = importlib.util.module_from_spec(spec)
     sys.modules[name] = module
@@ -78,6 +80,37 @@ class NaturalLanguageTests(unittest.TestCase):
                 N.route(text)
         with self.assertRaises(ValueError):
             N.route("hello",review="yes")
+
+
+    def test_text_entry_bypasses_models_for_exact_calculations(self):
+        T = sys.modules["astra_text"]
+        with patch.object(T, "execute_request", wraps=T.execute_request) as run:
+            result = T.execute("present value of 121 at 10% for 2 years",
+                               approve_models=True, binary="not needed", primary="not needed")
+            self.assertEqual("100",result["result"]["finance"]["result"]["decimal_approximation"])
+            self.assertEqual({"kind":"finance","calculation":{"operation":"present_value",
+                             "inputs":{"amount":"121","rate":"0.1","periods":2}}},
+                             run.call_args.args[0])
+            self.assertEqual({},run.call_args.kwargs)
+
+    def test_text_entry_dispatches_or_abstains_without_implicit_model(self):
+        T = sys.modules["astra_text"]
+        with patch.object(T, "execute_request",return_value={"status":"fixture"}) as run:
+            self.assertEqual("retrieve",T.execute("Explain bonds",ledger_path="evidence.sqlite")["route"])
+            self.assertEqual("retrieve",run.call_args.args[0]["kind"])
+            run.reset_mock()
+            self.assertEqual("clarification_required",T.execute("calculate something")["status"])
+            run.assert_not_called()
+            with self.assertRaises(ValueError):
+                T.execute("Explain bonds",review=True)
+            run.assert_not_called()
+
+    def test_input_is_bounded_utf8(self):
+        T = sys.modules["astra_text"]
+        self.assertEqual("Explain bonds",T.read_text(io.BytesIO(b"Explain bonds")))
+        for data in (b"x"*(T.MAX_INPUT_BYTES+1),b"\xff"):
+            with self.assertRaises(ValueError):
+                T.read_text(io.BytesIO(data))
 
 
 if __name__ == "__main__":
