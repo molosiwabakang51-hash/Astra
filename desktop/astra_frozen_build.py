@@ -1,6 +1,7 @@
 """Build the unsigned Windows x64 onedir pilot with pinned PyInstaller."""
 import hashlib
 import json
+import platform
 import importlib.metadata
 from pathlib import Path
 import struct
@@ -59,7 +60,7 @@ def verify(folder, manifest):
 
 
 def build(destination):
-    if sys.platform != "win32" or struct.calcsize("P") != 8:
+    if sys.platform != "win32" or struct.calcsize("P") != 8 or platform.machine().lower() not in ("amd64", "x86_64"):
         raise RuntimeError("Windows x64 Python required.")
     if importlib.metadata.version("pyinstaller") != PIN:
         raise RuntimeError("Pinned PyInstaller version required.")
@@ -72,6 +73,9 @@ def build(destination):
                "--specpath", work, "--paths", str(ROOT)]
         for name in hidden_imports():
             cmd.extend(("--hidden-import", name))
+        for group, files in GROUPS.items():
+            if group not in ("analytics", "professional-report") and all((ROOT/n).is_file() for n in files):
+                cmd.extend(("--add-data",str(ROOT/files[2])+":examples"))
         cmd.append(str(ROOT/"astra_launcher.py"))
         subprocess.run(cmd, cwd=ROOT, check=True, timeout=600)
     exe = destination/"AstraDesktop"/"AstraDesktop.exe"
