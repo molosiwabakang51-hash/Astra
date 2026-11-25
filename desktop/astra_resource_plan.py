@@ -95,6 +95,50 @@ def plan(resources, sizes, context=2048):
         "warning": "Estimated only. Reprobe before each load. Never load concurrently.",
     }
 
+
+# Keep the full response allowance. Context reduction is optional and never
+# drops evidence or silently shortens the response budget.
+ADAPTIVE_CONTEXTS = (4096, 3072, 2048, 1536)
+PROMPT_OVERHEAD = 256
+
+def adaptive_plan(resources, size, prompt_bytes, *, generation_tokens=512, observed=None):
+    """Choose largest admissible context; byte-count screening is heuristic.
+
+    Observations are per-model, per-context high-water working-set counters.
+    They can raise admission requirements, never lower the static estimate.
+    Tokenizer/template overhead is not known until native inference.
+    """
+    if type(size) is not int or size <= 0 or type(prompt_bytes) is not int or prompt_bytes <= 0:
+        raise ValueError("Invalid model size or prompt byte count.")
+    if type(generation_tokens) is not int or not 1 <= generation_tokens <= 512:
+        raise ValueError("Invalid generation allowance.")
+    if observed is None:
+        observed = {}
+    if type(observed) is not dict or any(
+        key not in ADAPTIVE_CONTEXTS or type(value) is not int or value <= 0
+        for key,value in observed.items()
+    ):
+        raise ValueError("Invalid observed-memory profile.")
+    usable = max(0, resources.available_ram - 1536*MIB)
+    for context in ADAPTIVE_CONTEXTS:
+        if prompt_bytes + PROMPT_OVERHEAD + generation_tokens > context:
+            continue
+        admission = plan(resources, [("local_model",size)], context=context)
+        if not admission["all_admitted_individually"]:
+            continue
+        # Only reuse a measurement from the same or a smaller context;
+        # larger-context observations must not prevent a smaller retry.
+        peaks = [value for key,value in observed.items() if key <= context]
+        measured_floor = (max(peaks)*5+3)//4 if peaks else 0
+        if measured_floor > usable:
+            continue
+        return {"context_tokens":context,"generation_tokens":generation_tokens,
+                "threads":admission["threads"],"available_ram_mib":admission["available_ram_mib"],
+                "measured_floor_bytes":measured_floor,
+                "scope":"Conservative admission heuristic; no tokenizer or OS memory-limit guarantee."}
+    raise RuntimeError("No adaptive context fits the prompt and available memory; narrow the question or free RAM.")
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("models", nargs="+")
