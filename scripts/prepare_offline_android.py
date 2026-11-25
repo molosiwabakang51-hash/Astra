@@ -24,6 +24,7 @@ from enforce_native_decode_deadline import apply as patch_native_decode_deadline
 from fix_native_model_load_cancel import apply as patch_native_model_load_cancel
 from fix_native_unload_safety import apply as patch_native_unload_safety
 from fix_native_partial_load_cleanup import apply as patch_native_partial_cleanup
+from fix_native_context_admission import apply as patch_native_context_admission
 
 ROOT = Path(__file__).resolve().parent.parent
 UPSTREAM = ROOT / "third_party" / "llama.cpp"
@@ -78,6 +79,7 @@ def prepare_binding() -> None:
     patch_native_model_load_cancel(UPSTREAM)
     patch_native_unload_safety(UPSTREAM)
     patch_native_partial_cleanup(UPSTREAM)
+    patch_native_context_admission(UPSTREAM)
     print("Pinned native Android inference binding:", commit, flush=True)
 
 

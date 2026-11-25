@@ -35,7 +35,7 @@ internal object AstraPrivateError {
 
     private enum class Cause {
         STORAGE, ACCESS, UNSUPPORTED, MEMORY, STARTUP, MODEL,
-        NETWORK, DOCUMENT_STALLED, GENERATION, UNKNOWN
+        NETWORK, DOCUMENT_STALLED, GENERATION, CONTEXT_LIMIT, UNKNOWN
     }
 
     private fun category(error: Exception): Cause {
@@ -55,6 +55,9 @@ internal object AstraPrivateError {
         if (error is IllegalStateException &&
             error.message == "Offline generation exceeded its time budget. Retry after cleanup."
         ) return Cause.GENERATION
+        if (error is IllegalStateException &&
+            error.message == "Native prompt processing failed (code 5)"
+        ) return Cause.CONTEXT_LIMIT
         // Read up to three causes, with a short bound; never return or store
         // the diagnostic text. A provider can include a path or signed URL.
         val description = generateSequence(error as Throwable?) { it.cause }
@@ -114,6 +117,7 @@ internal object AstraPrivateError {
             Cause.MEMORY -> "Android may not have enough available RAM."
             Cause.STARTUP -> "The offline AI engine did not finish starting in time."
             Cause.GENERATION -> "Offline generation exceeded its time budget."
+            Cause.CONTEXT_LIMIT -> "The complete question and response budget do not fit the local context."
             Cause.MODEL -> "The verified Qwen3 1.7B model may be unavailable or invalid."
             Cause.NETWORK -> "The connection may have timed out or been rejected."
             Cause.DOCUMENT_STALLED ->
@@ -127,6 +131,8 @@ internal object AstraPrivateError {
         ) {
             "Close other apps and retry, or restart Astra. " +
                 "Your model, chats, notes and tasks stay on your phone."
+        } else if (operation == Operation.MODEL_CHAT && cause == Cause.CONTEXT_LIMIT) {
+            "Use a shorter question or direct-answer mode. Your model and saved data are unchanged."
         } else when (operation) {
             Operation.MODEL_CHAT ->
                 "Retry from Chat or verify the 1.7B model in Settings. " +
