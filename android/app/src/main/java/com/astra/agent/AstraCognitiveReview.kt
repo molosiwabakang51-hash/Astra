@@ -27,6 +27,7 @@ internal object AstraCognitiveReview {
         .replace(Regex("""[\r\n\t\u0000-\u001F]+"""), " ")
         .replace("\\", "\\\\")
         .replace("\"", "\\\"")
+        .replace('<', '‹').replace('>', '›')
 
     fun label(answer: String): String =
         if (answer.isBlank() || AstraInterruptedReply.isIncomplete(answer) ||
@@ -59,6 +60,27 @@ internal object AstraCognitiveReview {
                 "INDEPENDENT ARITHMETIC CHECK — " +
                     (if (equal) "correct." else "incorrect; corrected result: $expected.") +
                     "\nComputed from the original operands using exact decimal arithmetic."
+            )
+        }
+        // Only audit an unambiguous YES/NO answer against the exact
+        // owner-supplied formal argument. Never infer missing formal premises.
+        val logical = AstraPropositionalVerifier.verify(original)
+        val scalar = answer.trimEnd('.', '!').uppercase(java.util.Locale.ROOT)
+        if (logical != null && scalar in setOf("YES", "NO")) {
+            val detail = when (logical.verdict) {
+                AstraPropositionalVerifier.Verdict.INCONSISTENT_PREMISES ->
+                    "The premises are inconsistent. Classical entailment is vacuous here; " +
+                        "a substantive yes/no conclusion is not established."
+                AstraPropositionalVerifier.Verdict.ENTAILED ->
+                    (if (scalar == "YES") "correct." else "incorrect; corrected result: YES.") +
+                        " Every satisfying assignment makes the conclusion true."
+                AstraPropositionalVerifier.Verdict.COUNTEREXAMPLE ->
+                    (if (scalar == "NO") "correct." else "incorrect; corrected result: NO.") +
+                        " Counterexample: " + logical.witness + "."
+            }
+            return Result.Local(
+                "INDEPENDENT LOGICAL CHECK — " + detail +
+                    "\nExamined ${logical.assignments} possible truth assignments locally."
             )
         }
         if (original.length > MAX_QUESTION || answer.length > MAX_ANSWER) {

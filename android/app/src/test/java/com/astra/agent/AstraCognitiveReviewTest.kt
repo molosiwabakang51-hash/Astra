@@ -49,4 +49,22 @@ class AstraCognitiveReviewTest {
         val capped = AstraInterruptedReply.budgetLimited("Partial")
         assertEquals(capped, AstraCognitiveReview.label(capped))
     }
+
+    @Test fun formalLogicReviewIsIndependentAndDoesNotGuessPremises() {
+        val q = "Premises: A -> B; B. Conclusion: A. Does the conclusion follow? Reply YES or NO only."
+        val wrong = AstraCognitiveReview.resolve("Verify your answer", pair("model only: $q", "YES"))
+            as AstraCognitiveReview.Result.Local
+        assertTrue(wrong.answer.contains("corrected result: NO"))
+        assertTrue(wrong.answer.contains("A=false, B=true"))
+        val right = AstraCognitiveReview.resolve("Verify your answer", pair(q, "NO"))
+            as AstraCognitiveReview.Result.Local
+        assertTrue(right.answer.contains("correct."))
+        assertTrue(AstraCognitiveReview.resolve("Verify your answer", pair(q, "Maybe YES"))
+            is AstraCognitiveReview.Result.Native)
+        val inconsistent = AstraCognitiveReview.resolve("Verify your answer", pair(
+            "Premises: A; !A. Conclusion: B. Does the conclusion follow?", "YES"))
+            as AstraCognitiveReview.Result.Local
+        assertTrue(inconsistent.answer.contains("premises are inconsistent"))
+        assertTrue(inconsistent.answer.contains("vacuous"))
+    }
 }
