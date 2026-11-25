@@ -75,6 +75,7 @@ internal object AstraLanguageBenchmark {
     }
 
     fun score(probe: Probe, answer: String): Boolean {
+        if (AstraInterruptedReply.isIncomplete(answer)) return false
         // Score only the model answer, not retrieved local source passages.
         val text = answerOnly(answer).lowercase(Locale.ROOT)
         if (text.isBlank() ||

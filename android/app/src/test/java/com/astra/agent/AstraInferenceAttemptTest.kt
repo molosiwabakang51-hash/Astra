@@ -44,4 +44,16 @@ class AstraInferenceAttemptTest {
         assertTrue(AstraInferenceAttempt.describe(limit).contains("incomplete response"))
         assertFalse(AstraInferenceAttempt.describe(limit).contains("visible reply produced"))
     }
+
+    @Test fun noBenchmarkCreditsCorrectButIncompleteNativeReplies() {
+        fun capped(answer: String) = AstraInterruptedReply.budgetLimited(answer)
+        assertFalse(AstraLanguageBenchmark.score(AstraLanguageBenchmark.Probe.ARITHMETIC, capped("42")))
+        assertFalse(AstraReasoningBenchmark.score(AstraReasoningBenchmark.Probe.LOGICAL_DEDUCTION, capped("NO")))
+        val scenario = AstraMultiTurnReasoningBenchmark.scenarios.first()
+        assertFalse(AstraMultiTurnReasoningBenchmark.interimMatches(scenario, 0, capped("ACK")))
+        assertFalse(AstraMultiTurnReasoningBenchmark.score(scenario, capped("3")))
+        // A source footer must never conceal an incomplete-generation marker.
+        assertFalse(AstraReasoningBenchmark.score(AstraReasoningBenchmark.Probe.LOGICAL_DEDUCTION,
+            capped("NO\n\nOpen-course references:\nexample")))
+    }
 }

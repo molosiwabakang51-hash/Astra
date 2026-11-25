@@ -11,7 +11,7 @@ class GuardedReplyContracts(unittest.TestCase):
     def test_visible_final_answer_controls_success_and_recovery(self):
         # The source guard may remove a model-invented citation-only answer.
         self.assertIn("val attributedAnswer = AstraSourceCitationGuard.protect(", BRAIN)
-        self.assertIn("if (attributedAnswer.isNotBlank()) {", BRAIN)
+        self.assertIn("if (attributedAnswer.isNotBlank() && !budgetExhausted) {", BRAIN)
         self.assertIn("if (attributedAnswer.isBlank()) {", BRAIN)
         self.assertNotIn("if (publicAnswer.isBlank()) {", BRAIN)
         self.assertNotIn("if (publicAnswer.isNotBlank()) {", BRAIN)

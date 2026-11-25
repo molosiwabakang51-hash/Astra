@@ -74,7 +74,7 @@ internal object AstraMultiTurnReasoningBenchmark {
      * the already narrow final-answer correctness score.
      */
     fun interimMatches(scenario: Scenario, turnIndex: Int, raw: String): Boolean {
-        if (turnIndex !in 0..1) return false
+        if (turnIndex !in 0..1 || AstraInterruptedReply.isIncomplete(raw)) return false
         val clean = AstraOfflinePolicy.publicReply(raw).trim()
             .trimEnd('.', '!', ' ')
         if (clean.isEmpty() || clean.length > 30 ||
@@ -84,6 +84,7 @@ internal object AstraMultiTurnReasoningBenchmark {
     }
 
     fun score(scenario: Scenario, raw: String): Boolean {
+        if (AstraInterruptedReply.isIncomplete(raw)) return false
         val reply = AstraOfflinePolicy.publicReply(raw).trim()
         if (reply.isBlank() || reply.length > 40 ||
             reply.contains('\n') || reply.contains('\r')
