@@ -10,7 +10,9 @@ from astra_finance_session import FinanceSession
 from astra_evidence import Ledger
 
 
-def smoke_test():
+def smoke_test(*, require_complete=False):
+    if type(require_complete) is not bool:
+        raise ValueError("Invalid completeness setting.")
     checks={}
     def check(name,fn):
         try:
@@ -29,7 +31,12 @@ def smoke_test():
     check("finance_session_import",lambda: FinanceSession() is not None)
     check("assistant_gui_import",lambda:importlib.import_module("astra_desktop_gui").AstraApp is not None)
     check("tkinter_import",lambda:importlib.import_module("tkinter").TkVersion>=8.6)
-    if importlib.util.find_spec("astra_analytics") is not None:
+    analytics=importlib.util.find_spec("astra_analytics") is not None
+    professional=importlib.util.find_spec("astra_professional_report") is not None
+    if require_complete:
+        checks["analytics_present"]=analytics
+        checks["professional_present"]=professional
+    if analytics:
         from astra_analytics import available,run_analysis,from_files,export_content
         check("analytics_gui_import",lambda:importlib.import_module("astra_analytics_gui").AnalyticsWindow is not None)
         def portfolio():
@@ -43,17 +50,17 @@ def smoke_test():
         from astra_desktop_distribution import GROUPS
         modes=available()
         for mode,files in GROUPS.items():
-            if mode not in modes:
+            if mode in ("analytics","professional-report"):
                 continue
             path=Path(__file__).resolve().parent/files[2]
-            ready=modes[mode]
-            if not ready and not path.is_file():
+            ready=modes.get(mode,False)
+            if not require_complete and not ready and not path.is_file():
                 continue
             def example(m=mode,p=path,installed=ready):
                 if not installed or not p.is_file():
                     return False
                 envelope,md=from_files(m,p)
-                if importlib.util.find_spec("astra_professional_report") is not None:
+                if professional:
                     html=export_content(envelope,md,"html")
                     return "<table>" in html and "Canonical request SHA-256" in html
                 return bool(envelope["result"]) and bool(md.strip())
@@ -64,4 +71,5 @@ def smoke_test():
                 "# Synthetic\n\n| A | B |\n|---|---|\n| 1 | 2 |","unknown",{}))
     return {"passed":all(checks.values()),"checks":checks,
             "frozen":bool(getattr(sys,"frozen",False)),
+            "require_complete":require_complete,
             "scope":"Synthetic headless checks only; no model loading, GUI display, or physical hardware validation."}
