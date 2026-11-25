@@ -83,7 +83,7 @@ def rebalance(holdings, weights, fee):
         raise ArithmeticError("Transaction-cost reconciliation failed.")
     target=[post*w for w in weights]
     # Decimal rounding of repeating weights must not create material cash.
-    target[-1]+=post-sum(target)
+    target[max(range(len(target)),key=target.__getitem__)]+=post-sum(target)
     if min(target)<0:
         raise ArithmeticError("Invalid post-trade allocation.")
     return target,cost,traded
@@ -105,9 +105,9 @@ def momentum_weights(rows, t, lookback, count, n):
 def run_strategy(rows, factors, strategy, initial, fee):
     n=len(rows[0])
     target=[dec(w) for w in strategy["initial_weights"]]
-    target[-1]+=1-sum(target)
+    target[max(range(n),key=target.__getitem__)]+=1-sum(target)
     holdings=[initial*w for w in target]
-    holdings[-1]+=initial-sum(holdings)
+    holdings[max(range(n),key=holdings.__getitem__)]+=initial-sum(holdings)
     peak=initial
     worst=Decimal(0)
     total_cost=Decimal(0)
@@ -122,10 +122,10 @@ def run_strategy(rows, factors, strategy, initial, fee):
             if strategy["kind"]=="lagged_momentum":
                 if t>=strategy["lookback"]:
                     target=[dec(w) for w in momentum_weights(rows,t,strategy["lookback"],strategy["top_k"],n)]
-                    target[-1]+=1-sum(target)
+                    target[max(range(n),key=target.__getitem__)]+=1-sum(target)
                 else:
                     target=[dec(w) for w in strategy["initial_weights"]]
-                    target[-1]+=1-sum(target)
+                    target[max(range(n),key=target.__getitem__)]+=1-sum(target)
             holdings,cost,volume=rebalance(holdings,target,fee)
             if volume:
                 trades+=1
@@ -147,6 +147,8 @@ def run_strategy(rows, factors, strategy, initial, fee):
                        "drawdown":str(drawdown)})
     ending=sum(holdings,Decimal(0))
     return {"name":strategy["name"],"kind":strategy["kind"],
+            "parameters":{key:([str(w) for w in value] if key=="initial_weights" else value)
+                          for key,value in strategy.items() if key not in ("name","kind")},
             "terminal_wealth":str(ending),"cumulative_net_return":str(ending/initial-1),
             "maximum_drawdown_loss":str(worst),"total_transaction_cost":str(total_cost),
             "cumulative_one_way_turnover":str(turnover),"rebalance_trade_count":trades,
