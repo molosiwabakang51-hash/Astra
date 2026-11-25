@@ -4,6 +4,9 @@ on:
     paths:
       - 'desktop/**'
       - 'scripts/tests/test_desktop_distribution.py'
+      - 'scripts/tests/test_desktop_frozen.py'
+      - 'scripts/tests/test_desktop_bounded_output.py'
+      - 'scripts/tests/test_desktop_native_subprocess.py'
       - '.github/workflows/desktop-source.yml'
       - 'scripts/tests/test_workflow_runtime_policy.py'
   push:
@@ -12,6 +15,9 @@ on:
     paths:
       - 'desktop/**'
       - 'scripts/tests/test_desktop_distribution.py'
+      - 'scripts/tests/test_desktop_frozen.py'
+      - 'scripts/tests/test_desktop_bounded_output.py'
+      - 'scripts/tests/test_desktop_native_subprocess.py'
       - 'scripts/tests/test_workflow_runtime_policy.py'
       - '.github/workflows/desktop-source.yml'
   workflow_dispatch:
@@ -62,6 +68,13 @@ jobs:
         run: python -m pip install --disable-pip-version-check --only-binary=:all: pyinstaller==6.22.3
       - name: Run frozen packaging regression tests
         run: python -m unittest discover -s scripts/tests -p 'test_desktop_frozen.py' -v
+      - name: Test bounded capture and native process profiling on Windows
+        shell: pwsh
+        run: |
+          python -m unittest discover -s scripts/tests -p 'test_desktop_native_subprocess.py' -v
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python -m unittest discover -s scripts/tests -p 'test_desktop_bounded_output.py' -v
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Build unsigned executable and run functional smoke checks
         run: python desktop/astra_frozen_build.py frozen-dist
       - name: Verify bundle and repeat executable smoke checks
