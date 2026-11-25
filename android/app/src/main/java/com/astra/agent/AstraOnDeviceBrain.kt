@@ -138,9 +138,11 @@ internal class AstraOnDeviceBrain(
                 }
                 withContext(Dispatchers.IO) {
                 val requestStartedNs = System.nanoTime()
-                val finalMessage = AstraConversationContext.currentUserMessage(
-                    turns.lastOrNull { it.role == "user" }?.content
-                )
+                require(turns.lastOrNull()?.role == "user") { "A current user turn is required." }
+                val earlierTurns = turns.dropLast(1)
+                val transcriptTail = earlierTurns.takeLast(6).map { it.role to it.content }
+                session.checkTranscript(earlierTurns.size, transcriptTail)
+                val finalMessage = AstraConversationContext.currentUserMessage(turns.last().content)
                 require(finalMessage.isNotEmpty()) { "Message cannot be empty." }
                 // Benchmark switches may ONLY alter Qwen's mode for one of
                 // the fixed, owner-approved synthetic questions. They cannot
@@ -344,7 +346,7 @@ internal class AstraOnDeviceBrain(
                 val requestPrompt = AstraReplyLanguage.prepare(
                     AstraConversationContext.userPrompt(
                         augmentedQuestion,
-                        turns.dropLast(1).map {
+                        earlierTurns.map {
                             AstraConversationContext.Turn(it.role, it.content)
                         },
                         restoringConversation,
@@ -451,11 +453,12 @@ internal class AstraOnDeviceBrain(
                         firstVisiblePublicationNs
                     )
                 }
-                if (attributedAnswer.isBlank()) {
+                val visibleReply = if (attributedAnswer.isBlank()) {
                     // Source/citation filtering can remove every visible token.
                     // Never return a blank bubble or preserve that native session.
                     session.invalidate()
-                    "The offline model did not produce a usable answer. Please try again."
+                    loadedModelPath = null
+                    AstraInterruptedReply.EMPTY_MODEL_REPLY
                 } else if (citedBooks.isNotEmpty()) {
                     attributedAnswer + "\n\nRetrieved local book passages (verify originals):\n" +
                         (books?.citations(citedBooks) ?: "")
@@ -465,6 +468,10 @@ internal class AstraOnDeviceBrain(
                 } else {
                     attributedAnswer
                 }
+                if (attributedAnswer.isNotBlank()) {
+                    session.recordCompletedTurn(earlierTurns.size, transcriptTail, visibleReply)
+                }
+                visibleReply
                 }
             } catch (linkage: LinkageError) {
                 // JNI symbols may be resolved only when a later native method
