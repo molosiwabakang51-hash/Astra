@@ -64,7 +64,19 @@ class OfflineUiResponsivenessContracts(unittest.TestCase):
         self.assertIn("requestPrompt, answerBudget, nativeDeadlineMs", bounded)
         self.assertIn("kotlinx.coroutines.withTimeoutOrNull(nativeDeadlineMs)", bounded)
         self.assertIn("currentCoroutineContext().ensureActive()", bounded)
-        self.assertRegex(bounded, r"\}\s*\?: false\s*check\(completed\)")
+        # Record the failed attempt before the existing hard timeout guard.
+        # Require the guard itself: a diagnostic alone must not permit a
+        # partial answer to be treated as successful generation.
+        self.assertRegex(
+            bounded,
+            r"\}\s*\?: false\s*"
+            r"if \(!completed\) finish\(AstraInferenceAttempt\.Outcome\.TIMEOUT\)\s*"
+            r"check\(completed\)\s*\{\s*"
+            r'"Offline generation exceeded its time budget\. Retry after cleanup\."'
+            r"\s*\}",
+        )
+        self.assertLess(bounded.index("check(completed)"),
+                        bounded.index("phase(AstraInferenceAttempt.Phase.RESPONSE_FILTERING)"))
         self.assertIn("session.invalidate()", BRAIN[end:])
 
     def test_transient_native_errors_have_existing_retry_surface(self):

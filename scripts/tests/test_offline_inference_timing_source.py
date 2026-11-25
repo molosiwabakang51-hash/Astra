@@ -18,6 +18,12 @@ class InferenceTimingWiringTests(unittest.TestCase):
         self.assertIn("lastNativeTiming = AstraInferenceTiming.sample(", BRAIN)
         self.assertIn("AstraInferenceTiming.describe(lastNativeTiming)", BRAIN)
 
+    def test_new_attempt_invalidates_stale_timing_before_inference(self):
+        self.assertLess(BRAIN.index("lastNativeTiming = null"),
+                        BRAIN.index("val requestStartedNs = System.nanoTime()"))
+        self.assertLess(BRAIN.index("val requestStartedNs = System.nanoTime()"),
+                        BRAIN.index("lastNativeTiming = AstraInferenceTiming.sample("))
+
     def test_owner_can_read_without_private_debug_exports(self):
         self.assertIn("onDeviceBrain.lastInferenceTiming()", MAIN)
         self.assertIn("Copy offline timing", MAIN)

@@ -54,6 +54,8 @@ internal class AstraOnDeviceBrain(
     private var loadedModelPath: String? = null
     @Volatile
     private var lastNativeTiming: AstraInferenceTiming.Sample? = null
+    @Volatile
+    private var lastAttempt: AstraInferenceAttempt? = null
 
     /**
      * Called synchronously by the owner Stop control before cancelling the
@@ -85,7 +87,8 @@ internal class AstraOnDeviceBrain(
 
     /** Timing only; no prompts, user notes or model-file paths. */
     fun lastInferenceTiming(): String =
-        AstraInferenceTiming.describe(lastNativeTiming)
+        AstraInferenceTiming.describe(lastNativeTiming) + "\n" +
+            AstraInferenceAttempt.describe(lastAttempt)
     // A change of consent must not leave old book snippets in native KV-cache.
     private var previousBookContextAllowed: Boolean? = null
     private var previousReplyLanguageId: String? = null
@@ -128,6 +131,15 @@ internal class AstraOnDeviceBrain(
             if (AstraModelOperationGate.claimNativeSession(nativeOwnerId)) {
                 session.invalidate()
                 loadedModelPath = null
+            }
+            val attemptStartedNs = System.nanoTime()
+            lastNativeTiming = null
+            lastAttempt = AstraInferenceAttempt.start()
+            fun phase(value: AstraInferenceAttempt.Phase) {
+                lastAttempt = lastAttempt?.advance(value)
+            }
+            fun finish(value: AstraInferenceAttempt.Outcome) {
+                lastAttempt = lastAttempt?.finish(value, attemptStartedNs, System.nanoTime())
             }
             try {
                 // Preference commit() can block on flash and other queued
@@ -235,6 +247,7 @@ internal class AstraOnDeviceBrain(
                         failure
                     )
                 }
+                phase(AstraInferenceAttempt.Phase.ENGINE_SETUP)
                 AstraInferenceCheckpoint.mark(
                     context, AstraInferenceCheckpoint.ENGINE_SETUP
                 )
@@ -266,11 +279,20 @@ internal class AstraOnDeviceBrain(
                         current.state.value is InferenceEngine.State.ModelReady
                     ) || loadedModelPath != modelPath.absolutePath
                 ) {
+                    phase(AstraInferenceAttempt.Phase.MODEL_LOADING)
                     onPartial("Loading the language model on this phone...")
                     suspend fun loadPreparedModel(path: File) {
                         // Android's own low-memory signal takes precedence over
                         // starting a large new JNI model allocation. This does
                         // not interfere with an already-running model session.
+                        // Release the obsolete native allocation first: otherwise
+                        // the RAM check counts memory owned by the model we intend
+                        // to replace. The process-wide native session is locked.
+                        if (current.state.value is InferenceEngine.State.ModelReady) {
+                            current.cleanUp()
+                        }
+                        session.invalidate()
+                        loadedModelPath = null
                         AstraNativeLoadGuard.requireCapacity(context)
                         // This is only a native-load backoff. Do not quarantine
                         // a healthy file for temporary Android low-RAM pressure,
@@ -283,11 +305,6 @@ internal class AstraOnDeviceBrain(
                         AstraInferenceCheckpoint.mark(
                             context, AstraInferenceCheckpoint.MODEL_LOADING
                         )
-                        // Unload stale native KV-cache when changing conversations
-                        // or switching model weights. No network call is involved.
-                        if (current.state.value is InferenceEngine.State.ModelReady) {
-                            current.cleanUp()
-                        }
                         try {
                             current.loadModel(path.absolutePath)
                         } catch (cancel: kotlinx.coroutines.CancellationException) {
@@ -314,6 +331,7 @@ internal class AstraOnDeviceBrain(
                     loadPreparedModel(modelPath)
                 }
 
+                phase(AstraInferenceAttempt.Phase.PROMPT_PREPARATION)
                 val answer = AstraStreamUnicode.StreamingBuffer(16_000)
                 var lastUiUpdate = 0L
                 var lastPublishedText = ""
@@ -376,6 +394,7 @@ internal class AstraOnDeviceBrain(
                     ),
                     diagnosticMaxTokens
                 )
+                phase(AstraInferenceAttempt.Phase.TOKEN_GENERATION)
                 AstraInferenceCheckpoint.mark(
                     context, AstraInferenceCheckpoint.TOKEN_GENERATION
                 )
@@ -428,9 +447,11 @@ internal class AstraOnDeviceBrain(
                     }
                     true
                 } ?: false
+                if (!completed) finish(AstraInferenceAttempt.Outcome.TIMEOUT)
                 check(completed) {
                     "Offline generation exceeded its time budget. Retry after cleanup."
                 }
+                phase(AstraInferenceAttempt.Phase.RESPONSE_FILTERING)
                 val publicAnswer = AstraOfflinePolicy.publicReply(answer.finish())
                 // The model can invent [B#]/[K#] markers and even a
                 // citation-footer heading. Allow only IDs whose complete
@@ -475,6 +496,8 @@ internal class AstraOnDeviceBrain(
                         visibleUserMessage ?: turns.last().content, visibleReply
                     )
                 }
+                finish(if (attributedAnswer.isBlank()) AstraInferenceAttempt.Outcome.EMPTY_REPLY
+                    else AstraInferenceAttempt.Outcome.VISIBLE_REPLY)
                 visibleReply
                 }
             } catch (linkage: LinkageError) {
@@ -485,6 +508,7 @@ internal class AstraOnDeviceBrain(
                 // Keep OOM/VM errors outside this catch by design.
                 session.invalidate()
                 loadedModelPath = null
+                finish(AstraInferenceAttempt.Outcome.LINKAGE_FAILURE)
                 throw AstraNativeBootstrap.recover(linkage)
             } catch (error: Exception) {
                 // Cancellation, JNI failures and timeouts can leave partial
@@ -492,8 +516,14 @@ internal class AstraOnDeviceBrain(
                 // not inherit that incomplete assistant response.
                 session.invalidate()
                 loadedModelPath = null
+                finish(when (error) {
+                    is kotlinx.coroutines.CancellationException -> AstraInferenceAttempt.Outcome.CANCELLED
+                    is AstraNativeLowMemoryException -> AstraInferenceAttempt.Outcome.LOW_MEMORY
+                    else -> AstraInferenceAttempt.Outcome.FAILED
+                })
                 throw error
             } finally {
+                finish(AstraInferenceAttempt.Outcome.NO_GENERATION)
                 // This is a synchronous disk checkpoint. It must never
                 // block the UI thread, and cancellation must not leave a
                 // false persistent 'active inference' flag behind.
