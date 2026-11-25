@@ -181,8 +181,14 @@ internal object AstraConversationContext {
             if (bounded.isNotEmpty() && Character.isHighSurrogate(bounded.last())) {
                 bounded = bounded.dropLast(1)
             }
-            bounded = bounded.removeSuffix("\\")
-            if (bounded.length < 10) continue
+            // Only an odd trailing escape run would escape the closing quote.
+            // Preserve complete escaped backslash pairs, including paths.
+            if (bounded.takeLastWhile { it == '\\' }.length % 2 != 0) {
+                bounded = bounded.dropLast(1)
+            }
+            // Short owner corrections ("No, 3."), answers ("Yes") and
+            // numeric tool results can carry the entire referent.
+            if (bounded.isBlank()) continue
             selected.add(item.index to (prefix + bounded + suffix))
             remaining -= selected.last().second.length
         }
