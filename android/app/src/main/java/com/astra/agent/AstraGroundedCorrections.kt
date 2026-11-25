@@ -14,6 +14,11 @@ internal object AstraGroundedCorrections {
     private fun isCorrection(raw: String): Boolean {
         val value = raw.trim().lowercase(Locale.ROOT)
         if (value.length !in 4..160) return false
+        // Match compact numeric corrections without treating ordinary "no" as a new fact.
+        if (value.startsWith("no") && value.getOrNull(2)?.let { !it.isLetterOrDigit() } == true) {
+            val rest = value.drop(2).trimStart(' ', ',', ';', ':')
+            if (rest.firstOrNull()?.isDigit() == true) return true
+        }
         return listOf(
             "actually", "correction:", "correction ", "i meant",
             "instead", "rather", "sorry,", "no, make", "no make",
