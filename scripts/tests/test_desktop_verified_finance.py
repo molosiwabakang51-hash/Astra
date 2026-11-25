@@ -75,5 +75,31 @@ class VerifiedFinanceTests(unittest.TestCase):
             path.write_text(json.dumps(request()), encoding="utf-8")
             self.assertEqual("0.065", F.adjudicate(F.read_request(path))["result"]["decimal_approximation"])
 
+
+    def test_opt_in_proposals_are_independent_and_do_not_see_answer(self):
+        calls = []
+        def propose(role, prompt):
+            calls.append((role, prompt))
+            return "0.06" if role == "primary" else "0.065"
+        with self.assertRaises(ValueError):
+            F.cooperative_adjudicate(request(), propose)
+        self.assertEqual([], calls)
+        result = F.cooperative_adjudicate(request(), propose, allow_model=True)
+        self.assertEqual(["primary", "critic"], [x[0] for x in calls])
+        self.assertEqual(calls[0][1], calls[1][1])
+        self.assertNotIn("0.065", calls[0][1])
+        self.assertEqual({"primary": "mismatch", "critic": "matches"}, result["proposal_assessment"])
+
+    def test_unavailable_model_does_not_prevent_exact_calculation(self):
+        def propose(role, prompt):
+            if role == "critic":
+                raise TimeoutError("private diagnostic detail")
+            return "0.065"
+        result = F.cooperative_adjudicate(request(), propose, allow_model=True)
+        self.assertEqual({"primary":"matches","critic":"unavailable"}, result["proposal_assessment"])
+        self.assertEqual("incomplete_model_comparison", result["proposal_agreement"])
+        self.assertNotIn("private diagnostic detail", json.dumps(result))
+        self.assertEqual("0.065", result["result"]["decimal_approximation"])
+
 if __name__ == "__main__":
     unittest.main()
