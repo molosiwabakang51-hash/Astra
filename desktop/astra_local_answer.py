@@ -11,7 +11,7 @@ import tempfile
 import threading
 
 from astra_local_finance import file_digest
-from astra_native_subprocess import run_external
+from astra_native_subprocess import run_bounded
 from astra_resource_plan import model_file, plan, probe
 from astra_orchestrator import MAX_PROMPT_BYTES, MAX_REPLY_BYTES
 
@@ -82,10 +82,9 @@ class LocalAnswerRunner:
                            "-ngl", "0", "-t", threads, "-tb", threads,
                            "--temp", "0", "--seed", "42"]
                 try:
-                    process = run_external(command, runner=subprocess.run, stdin=subprocess.DEVNULL,
-                                             stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
-                                             timeout=effective_timeout, shell=False, check=False,
-                                             env=environment, cwd=directory)
+                    process = run_bounded(command, timeout=effective_timeout,
+                                             env=environment, cwd=directory,
+                                             max_stdout_bytes=MAX_REPLY_BYTES)
                 except subprocess.TimeoutExpired:
                     raise RuntimeError("Local answer generation timed out.") from None
                 if process.returncode or len(process.stdout) > MAX_REPLY_BYTES:
