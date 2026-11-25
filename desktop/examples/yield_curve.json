@@ -1,0 +1,79 @@
+{
+  "currency": "BWP",
+  "curve": {
+    "kind": "continuous_spot",
+    "nodes": [
+      {
+        "months": 12,
+        "value": "0.05"
+      },
+      {
+        "months": 24,
+        "value": "0.055"
+      },
+      {
+        "months": 36,
+        "value": "0.06"
+      },
+      {
+        "months": 60,
+        "value": "0.065"
+      }
+    ]
+  },
+  "queries": [
+    6,
+    12,
+    18,
+    24,
+    36,
+    48,
+    60
+  ],
+  "forwards": [
+    [
+      0,
+      12
+    ],
+    [
+      12,
+      24
+    ],
+    [
+      24,
+      36
+    ],
+    [
+      36,
+      60
+    ]
+  ],
+  "cashflows": [
+    {
+      "months": 12,
+      "amount": "60"
+    },
+    {
+      "months": 24,
+      "amount": "60"
+    },
+    {
+      "months": 36,
+      "amount": "60"
+    },
+    {
+      "months": 48,
+      "amount": "60"
+    },
+    {
+      "months": 60,
+      "amount": "1060"
+    }
+  ],
+  "parallel_shocks_bps": [
+    -100,
+    -50,
+    50,
+    100
+  ]
+}
