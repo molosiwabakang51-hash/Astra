@@ -27,9 +27,12 @@ class GroundedCorrectionContextContracts(unittest.TestCase):
 
     def test_bounded_safe_explicit_retrieval_without_cloud(self):
         self.assertIn('candidateText = AstraUnicodeBounds.prefix(entry.text, 2_000)', GROUND)
-        self.assertIn('AstraUnicodeBounds.slice(raw, start, start + 220)', GROUND)
+        self.assertIn('AstraUnicodeBounds.slice(raw, start, start + limit)', GROUND)
         self.assertIn('val visible = tokenize(excerpt).toSet()', GROUND)
         self.assertIn('val hits = tokens.count { it in visible }', GROUND)
+        self.assertIn('limit: Int = 220', GROUND)
+        self.assertIn('excerpt(candidateText, tokens, limit)', GROUND)
+        self.assertIn('focusWithin?.invoke(limit - 2)', CORRECTIONS)
         self.assertIn('corrections.size == 2', CORRECTIONS)
         self.assertIn('Character.isHighSurrogate', CORRECTIONS)
         self.assertNotIn('HttpURLConnection', GROUND)

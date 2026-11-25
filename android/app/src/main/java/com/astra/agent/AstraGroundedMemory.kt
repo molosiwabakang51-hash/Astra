@@ -159,7 +159,7 @@ internal object AstraGroundedMemory {
                     val corrected = if (onTopic) {
                         AstraGroundedCorrections.annotated(
                             messages, index, excerpt(candidateText, tokens)
-                        )
+                        ) { limit -> excerpt(candidateText, tokens, limit) }
                     } else null
                     consider(
                         source(index),
@@ -201,8 +201,8 @@ internal object AstraGroundedMemory {
             !word.endsWith("is")) word.dropLast(1) else word
     }
 
-    private fun excerpt(raw: String, tokens: List<String>): String {
-        if (raw.length <= 220) return raw
+    private fun excerpt(raw: String, tokens: List<String>, limit: Int = 220): String {
+        if (raw.length <= limit) return raw
         // Match normalized whole words using offsets in the original text.
         // Lowercasing the whole document can change UTF-16 indices, and a
         // substring match can select a different word or miss inflections.
@@ -211,9 +211,9 @@ internal object AstraGroundedMemory {
             val term = stem(match.value.lowercase(Locale.ROOT))
             if (term in query) match.range to term else null
         }.toList()
-        val maxStart = raw.length - 220
+        val maxStart = raw.length - limit
         val candidates = (listOf(0) + matches.flatMap { (range, _) ->
-            listOf((range.first - 50).coerceIn(0, maxStart),
+            listOf((range.first - minOf(50, limit / 4)).coerceIn(0, maxStart),
                 range.first.coerceIn(0, maxStart))
         }).distinct()
         // Select the window with the greatest distinct visible query coverage.
@@ -222,12 +222,12 @@ internal object AstraGroundedMemory {
             compareBy<Int> { candidate ->
                 matches.asSequence()
                     .filter { (range, _) ->
-                        range.first >= candidate && range.last < candidate + 220
+                        range.first >= candidate && range.last < candidate + limit
                     }.map { it.second }.distinct().count()
             }.thenBy { -it }
         ) ?: 0
         return (if (start > 0) "…" else "") +
-            AstraUnicodeBounds.slice(raw, start, start + 220) +
-            (if (start + 220 < raw.length) "…" else "")
+            AstraUnicodeBounds.slice(raw, start, start + limit) +
+            (if (start + limit < raw.length) "…" else "")
     }
 }
