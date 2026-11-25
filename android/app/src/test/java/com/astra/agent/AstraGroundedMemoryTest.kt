@@ -248,4 +248,45 @@ class AstraGroundedMemoryTest {
         assertFalse(brief.sourceFooter().contains("use rice"))
         assertFalse(brief.sourceFooter().contains("cook dinner"))
     }
+
+    @Test fun groundedExcerptSelectsDensestRelevantWindowInsteadOfFirstHit() {
+        val note = "Bond overview. " + "unrelated ".repeat(35) +
+            "The bond duration and convexity estimates are six years and 42."
+        val brief = AstraGroundedMemory.retrieve(
+            AstraGroundedMemory.parse("ask memory bond duration convexity")!!,
+            listOf(note), emptyList(), emptyList(), emptyList()
+        )
+        assertTrue(brief.evidence.single().excerpt.contains("duration and convexity"))
+        assertTrue(brief.evidence.single().excerpt.contains("six years and 42"))
+    }
+
+    @Test fun dispersedInvisibleMatchesCannotOutrankCompleteVisibleEvidence() {
+        val dispersed = "Bond. " + "irrelevant ".repeat(30) +
+            "Duration. " + "irrelevant ".repeat(30) + "Convexity."
+        val complete = "Bond duration and convexity: my estimates are five and 30."
+        val brief = AstraGroundedMemory.retrieve(
+            AstraGroundedMemory.parse("ask memory bond duration convexity")!!,
+            listOf(complete, dispersed), emptyList(), emptyList(), emptyList()
+        )
+        assertEquals(complete, brief.evidence.first().excerpt)
+        assertTrue(brief.evidence.first().score > brief.evidence.last().score)
+    }
+
+    @Test fun inflectedWordOffsetsLocateOriginalEvidenceInLongNotes() {
+        val note = "unrelated ".repeat(40) + "I chose copper for its diversification potential."
+        val brief = AstraGroundedMemory.retrieve(
+            AstraGroundedMemory.parse("ask memory why did I choose")!!,
+            listOf(note), emptyList(), emptyList(), emptyList()
+        )
+        assertTrue(brief.evidence.single().excerpt.contains("I chose copper"))
+    }
+
+    @Test fun memoryExcerptDoesNotSplitUnicodeAtTheWindowBoundary() {
+        val note = "bond " + "x".repeat(214) + "😀" + "y".repeat(100)
+        val brief = AstraGroundedMemory.retrieve(
+            AstraGroundedMemory.parse("ask memory bond")!!,
+            listOf(note), emptyList(), emptyList(), emptyList()
+        )
+        assertFalse(brief.evidence.single().excerpt.any { it.isSurrogate() })
+    }
 }
