@@ -61,10 +61,12 @@ class LocalProposer:
             raise ValueError("Distinct model files required.")
         self.models = {"primary": primary, "critic": critic}
         self.timeout = timeout
+        self.last_profile = {}
 
     def __call__(self, role, prompt):
         if role not in self.models or not isinstance(prompt, str):
             raise ValueError("Invalid proposal request.")
+        self.last_profile.clear()
         model = self.models[role]
         payload = (prompt + FORMAT).encode("utf-8")
         if len(payload) > MAX_PROMPT_BYTES:
@@ -91,7 +93,8 @@ class LocalProposer:
             try:
                 result = run_bounded(command, timeout=self.timeout,
                                              env=environment, cwd=directory,
-                                             max_stdout_bytes=MAX_OUTPUT_BYTES)
+                                             max_stdout_bytes=MAX_OUTPUT_BYTES,
+                                             telemetry=self.last_profile)
             except subprocess.TimeoutExpired:
                 raise RuntimeError("Local model timed out.") from None
             if result.returncode != 0:
