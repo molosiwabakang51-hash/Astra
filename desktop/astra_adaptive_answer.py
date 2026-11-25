@@ -1,7 +1,7 @@
 """Budgeted local evidence-grounded question answering.
 
 Fast mode permits only the primary model; balanced mode permits one optional
-critic. Repeated questions share only a session-local latency profile.
+critic; deep mode adds bounded revision and comparison. Repeated questions share only a session-local latency profile.
 This interface deliberately does not imply measured quality improvement.
 """
 import argparse
@@ -14,15 +14,17 @@ from astra_evidence import Ledger
 from astra_hybrid_evidence import HybridEvidence
 from astra_local_answer import LocalAnswerRunner
 from astra_orchestrator import Orchestrator
+from astra_recursive_revision import revise
 
 
 def answer(question, ledger, retrieval, runner, policy, profile, *, approved=False):
-    if policy.mode not in ("fast", "balanced"):
-        raise ValueError("Deep mode is reserved for the separate revision pipeline.")
     wrapped = BudgetedRunner(runner, policy, profile, approved=approved)
-    result = Orchestrator(ledger, retrieval, wrapped).execute(
-        {"kind": "answer", "question": question, "review": policy.mode == "balanced"},
-        approve_models=approved)
+    if policy.mode == "deep":
+        result = revise(question, ledger, retrieval, wrapped, approved=approved)
+    else:
+        result = Orchestrator(ledger, retrieval, wrapped).execute(
+            {"kind": "answer", "question": question, "review": policy.mode == "balanced"},
+            approve_models=approved)
     result["compute"] = wrapped.report()
     return result
 
@@ -33,13 +35,13 @@ def main(argv=None):
     parser.add_argument("--binary", required=True)
     parser.add_argument("--primary", required=True)
     parser.add_argument("--critic")
-    parser.add_argument("--mode", choices=("fast", "balanced"), default="fast")
+    parser.add_argument("--mode", choices=("fast", "balanced", "deep"), default="fast")
     parser.add_argument("--budget", type=int, default=180)
     parser.add_argument("--timeout", type=int, default=180)
     parser.add_argument("--approve-models", action="store_true")
     args = parser.parse_args(argv)
-    if not args.approve_models or (args.mode == "balanced" and not args.critic):
-        parser.error("Explicit approval required; balanced mode also requires a distinct critic.")
+    if not args.approve_models or (args.mode in ("balanced", "deep") and not args.critic):
+        parser.error("Explicit approval required; balanced and deep modes require a distinct critic.")
     try:
         policy = Policy(args.mode, args.budget)
         if not Path(args.ledger).is_file():
