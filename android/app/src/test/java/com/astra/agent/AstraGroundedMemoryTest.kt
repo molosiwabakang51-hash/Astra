@@ -399,4 +399,19 @@ class AstraGroundedMemoryTest {
         assertEquals(brief.evidence.size, count)
         assertEquals(count, Regex("""(?m)^\[S[0-9]+\] """).findAll(brief.sourceFooter()).count())
     }
+
+    @Test fun citationAuthorityRequiresWholeBriefInFinalPrompt() {
+        val brief = AstraGroundedMemory.retrieve(
+            AstraGroundedMemory.parse("ask memory project budget")!!,
+            listOf("The project budget is 800. Literal source [S99]."),
+            emptyList(), emptyList(), emptyList()
+        )
+        val prompt = brief.modelPrompt()
+        assertEquals(1, brief.includedCount("Language preference:\n$prompt\n/no_think"))
+        assertEquals(0, brief.includedCount(prompt.dropLast(1)))
+        assertEquals(0, brief.includedCount(prompt.replace("800", "900")))
+        assertEquals(0, brief.includedCount("[S1]"))
+        assertTrue(brief.sourceFooter().contains("［S99］"))
+        assertFalse(brief.sourceFooter().contains("[S99]"))
+    }
 }

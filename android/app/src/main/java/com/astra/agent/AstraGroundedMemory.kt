@@ -32,10 +32,22 @@ internal object AstraGroundedMemory {
         .replace('<', '‹').replace('>', '›')
         .replace('[', '［').replace(']', '］')
 
+    // Keep the visible excerpt readable but make any embedded source IDs
+    // distinguishable from the app's actual attribution labels.
+    private fun displayLiteral(value: String): String = value
+        .replace(Regex("""[\r\n\t\u0000-\u001F]+"""), " ")
+        .replace('[', '［').replace(']', '］')
+        .replace('<', '‹').replace('>', '›')
+
     data class Brief(val question: String, val evidence: List<Evidence>) {
         fun modelPrompt(): String = renderPrompt(question, evidence).also {
             check(it.length <= PROMPT_LIMIT)
         }
+
+        // Verify the entire serialized brief survived the final prompt path.
+        // No substring match on an isolated marker can authorize a citation.
+        fun includedCount(finalPrompt: String): Int =
+            if (finalPrompt.contains(modelPrompt())) evidence.size else 0
 
         fun sourceFooter(): String = renderFooter(evidence).also {
             check(it.length <= FOOTER_LIMIT)
@@ -63,8 +75,8 @@ internal object AstraGroundedMemory {
     private fun renderFooter(evidence: List<Evidence>): String = buildString {
         appendLine("LOCAL SOURCE EXCERPTS · check against the original")
         evidence.forEachIndexed { index, hit ->
-            appendLine("[S${index + 1}] ${hit.source}")
-            appendLine("  ${hit.excerpt}")
+            appendLine("[S${index + 1}] ${displayLiteral(hit.source)}")
+            appendLine("  ${displayLiteral(hit.excerpt)}")
         }
     }.trimEnd()
 

@@ -3513,6 +3513,7 @@ class MainActivity :
                                 history[target].text == displayed
 
                         var groundedFooter = ""
+                        var groundedBrief: AstraGroundedMemory.Brief? = null
                         try {
                             var effectiveTurns = turns
                             var effectiveGeneration = generation
@@ -3543,6 +3544,7 @@ class MainActivity :
                                     persist()
                                     return@launch
                                 }
+                                groundedBrief = brief
                                 groundedFooter = brief.sourceFooter()
                                 if (!onDeviceBrain.hasLocalModel()) {
                                     history[target] = ChatMessage(
@@ -3569,7 +3571,8 @@ class MainActivity :
                                     effectiveTurns, effectiveGeneration,
                                     visibleUserMessage = displayMessage,
                                     memoryGrounded = grounding != null,
-                                    modelOnly = modelOnly
+                                    modelOnly = modelOnly,
+                                    memoryBrief = groundedBrief
                                 ) { partial ->
                                     // Compose state and conversation history are
                                     // mutated on the UI thread, not the model thread.
