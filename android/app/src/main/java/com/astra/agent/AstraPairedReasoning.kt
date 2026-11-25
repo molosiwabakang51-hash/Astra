@@ -50,8 +50,10 @@ internal object AstraPairedReasoning {
 
     fun render(comparisons: List<Comparison>, model: String?): String {
         require(comparisons.size == probes.size &&
-            comparisons.map { it.probe }.toSet() == probes.toSet()
+            comparisons.map { it.probe }.toSet() == probes.toSet() &&
+            comparisons.all { it.fast.probe == it.probe && it.think.probe == it.probe }
         ) { "All paired synthetic checks must finish before reporting." }
+        if (!AstraReasoningBenchmark.verifiedModel(model)) return AstraReasoningBenchmark.UNSCORED
         val fastPass = comparisons.count { it.fast.passed }
         val thinkPass = comparisons.count { it.think.passed }
         return buildString {
