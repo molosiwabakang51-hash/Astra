@@ -74,6 +74,7 @@ class AstraApp:
         self.primary = tk.StringVar()
         self.critic = tk.StringVar()
         self.timeout = tk.StringVar(value="180")
+        self.request_budget = tk.StringVar(value="180")
         self.adaptive_context = tk.BooleanVar(value=False)
         self.setup_style()
         self.layout()
@@ -198,13 +199,37 @@ class AstraApp:
         options = ttk.Frame(frame)
         options.pack(fill="x", pady=8)
         ttk.Checkbutton(options, text="Generate local draft", variable=self.generate).pack(side="left")
-        ttk.Checkbutton(options, text="Independent review", variable=self.review).pack(side="left", padx=18)
+        ttk.Checkbutton(options, text="Independent review if affordable", variable=self.review).pack(side="left", padx=12)
+        ttk.Label(options,text="Request budget (s)").pack(side="left",padx=(8,3))
+        ttk.Entry(options,textvariable=self.request_budget,width=6).pack(side="left")
         composer = self.text_widget(frame, height=3)
         actions = ttk.Frame(frame)
         actions.pack(fill="x", pady=(8, 0))
-        self.button(actions, "Ask Astra", lambda: self.ask("knowledge", composer, "ask_knowledge",
-                    generate=self.generate.get(), review=self.review.get()), accent=True).pack(side="right")
+        self.button(actions, "Ask Astra", lambda: self.ask_budgeted(composer), accent=True).pack(side="right")
         self.button(actions, "Reset context", lambda: self.reset("knowledge")).pack(side="left")
+
+    def ask_budgeted(self, composer):
+        if self.pending:
+            return
+        if not self.generate.get():
+            self.ask("knowledge",composer,"ask_knowledge",generate=False,review=self.review.get())
+            return
+        try:
+            seconds = int(self.request_budget.get())
+            if not 1<=seconds<=900:
+                raise ValueError()
+        except ValueError:
+            messagebox.showerror("Invalid request budget","Choose 1–900 seconds.")
+            return
+        self.ask("knowledge",composer,"ask_knowledge",generate=True,review=self.review.get(),
+                 budget_seconds=seconds)
+
+    def export_compute(self):
+        if self.pending:
+            return
+        path = filedialog.asksaveasfilename(defaultextension=".json",filetypes=[("JSON diagnostics","*.json")])
+        if path:
+            self.submit("runtime_profile","export_compute_history",path,approved=True)
 
     def reset(self, section):
         if not self.pending:
@@ -284,6 +309,7 @@ class AstraApp:
         self.button(actions, "Configure models", self.configure, accent=True).pack(side="right")
         self.button(actions, "Disable generation", lambda: self.submit("runtime", "disable_models")).pack(side="left")
         self.button(actions, "Latest metrics", lambda: self.submit("runtime_profile", "runtime_profile")).pack(side="left", padx=6)
+        self.button(actions, "Export timing history", self.export_compute).pack(side="left", padx=6)
         self.outputs["runtime"] = self.text_widget(frame, readonly=True)
         self.append("runtime", "Models are optional. Configuration checks do not establish native compatibility or answer accuracy. Inference may take several minutes on a CPU. Initial testing should use synthetic, non-confidential inputs.")
 
