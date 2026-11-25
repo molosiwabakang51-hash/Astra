@@ -9,7 +9,7 @@ import subprocess
 import sys
 import tempfile
 
-from astra_desktop_distribution import CORE, GROUPS
+from astra_desktop_distribution import CORE, GROUPS, collect
 
 ROOT = Path(__file__).resolve().parent
 PIN = "6.22.3"
@@ -64,6 +64,9 @@ def build(destination):
         raise RuntimeError("Windows x64 Python required.")
     if importlib.metadata.version("pyinstaller") != PIN:
         raise RuntimeError("Pinned PyInstaller version required.")
+    _, included = collect(ROOT)
+    if set(included) != set(GROUPS):
+        raise ValueError("Complete frozen release requires all eight analytical engines and both reporting groups.")
     destination = Path(destination).resolve()
     destination.mkdir(parents=True, exist_ok=False)
     with tempfile.TemporaryDirectory(prefix="astra-freeze-") as work:
@@ -81,7 +84,7 @@ def build(destination):
     exe = destination/"AstraDesktop"/"AstraDesktop.exe"
     if not exe.is_file():
         raise RuntimeError("Expected executable missing.")
-    subprocess.run([str(exe), "--smoke-test"], cwd=exe.parent, check=True, timeout=60)
+    subprocess.run([str(exe), "--complete-smoke-test"], cwd=exe.parent, check=True, timeout=60)
     manifest = bundle_manifest(exe.parent)
     (destination/"MANIFEST.json").write_text(json.dumps(manifest,indent=2)+"\n",encoding="utf-8")
     verify(exe.parent,manifest)
