@@ -47,5 +47,33 @@ class BoundedOutputTests(unittest.TestCase):
                 self.run_child("raise AssertionError()",limit=limit)
 
 
+    def test_profile_records_actual_child_memory_without_content(self):
+        profile={}
+        with tempfile.TemporaryDirectory() as folder:
+            result=N.run_bounded([sys.executable,"-E","-s","-c",
+                                 "import time; x=bytearray(4*1024*1024); time.sleep(0.7); print('private fixture')"],
+                                 timeout=5,env=dict(os.environ),max_stdout_bytes=128,
+                                 cwd=folder,telemetry=profile)
+        self.assertEqual(0,result.returncode)
+        self.assertEqual("success",profile["outcome"])
+        self.assertEqual(len(result.stdout),profile["output_bytes"])
+        self.assertGreaterEqual(profile["elapsed_seconds"],0.6)
+        if sys.platform=="win32" or sys.platform.startswith("linux"):
+            self.assertGreater(profile["memory_samples"],0)
+            self.assertGreater(profile["observed_peak_working_set_bytes"],0)
+        self.assertNotIn("private fixture",str(profile))
+
+    def test_failed_output_profile_does_not_publish_partial_data(self):
+        profile={"previous":"stale"}
+        with tempfile.TemporaryDirectory() as folder:
+            with self.assertRaises(RuntimeError):
+                N.run_bounded([sys.executable,"-E","-s","-c","print('x'*200)"],
+                              timeout=5,env=dict(os.environ),max_stdout_bytes=128,
+                              cwd=folder,telemetry=profile)
+        self.assertEqual("output_limit",profile["outcome"])
+        self.assertIsNone(profile["output_bytes"])
+        self.assertNotIn("previous",profile)
+
+
 if __name__=="__main__":
     unittest.main()
