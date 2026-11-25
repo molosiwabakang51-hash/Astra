@@ -239,4 +239,44 @@ class AstraConversationReviewTest {
         assertFalse(answer.contains("Review earlier mentions of copper"))
     }
 
+
+    @Test fun followupPreservesAssistantOnlyReviewScope() {
+        val history = listOf(
+            msg("You", "My private copper preference is unrelated to your answer."),
+            msg("Astra", "Copper prices are uncertain."),
+            msg("You", "What did you say earlier about copper?"),
+            msg("Astra", "ASTRA // CHAT REVIEW · copper")
+        )
+        for (request in listOf("in this chat", "earlier than this")) {
+            val answer = AstraConversationReview.respond(request, history)!!
+            assertTrue(answer.contains("Only previous Astra replies were searched"))
+            assertTrue(answer.contains("Copper prices are uncertain"))
+            assertFalse(answer.contains("My private copper preference"))
+        }
+    }
+
+    @Test fun interruptedAnswersAndNoMatchReviewsDoNotBecomePriorClaims() {
+        val history = listOf(
+            msg("You", "Review earlier mentions of copper"),
+            msg("Astra", "No earlier mentions of 'copper' found in this chat. Previous Astra responses were checked."),
+            msg("Astra", "Copper prices are guaranteed.\n\n[Response stopped]")
+        )
+        val answer = AstraConversationReview.respond("What did you say about copper?", history)!!
+        assertTrue(answer.startsWith("No earlier mentions"))
+        assertFalse(answer.contains("guaranteed"))
+        assertFalse(answer.contains("Message #"))
+        val audit = AstraConversationReview.respond("Do you see your mistake?", history)!!
+        assertTrue(audit.contains("no earlier Astra response"))
+    }
+
+    @Test fun multilineHistoricalClaimIsRecognizedInDocumentedCorrection() {
+        val history = listOf(
+            msg("Astra", "Niall Shiller wrote Irrational Exuberance."),
+            msg("Astra", "Robert J. Shiller is an economist at\nChicago."),
+            msg("You", "Review earlier mentions of Shiller")
+        )
+        val answer = AstraConversationReview.respond("Do you see your mistake?", history)!!
+        assertTrue(answer.contains("wrongly attributed"))
+        assertTrue(answer.contains("I also gave a Chicago affiliation"))
+    }
 }
