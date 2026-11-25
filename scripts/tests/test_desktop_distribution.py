@@ -88,7 +88,7 @@ class DistributionTests(unittest.TestCase):
         with zipfile.ZipFile(self.target) as archive:
             archive.extractall(output)
         folder=output/"AstraDesktop"
-        command=[sys.executable,"-E","-s",str(folder/"astra_launcher.py"),"--diagnostics"]
+        command=[sys.executable,"-E","-s","-X","utf8",str(folder/"astra_launcher.py"),"--diagnostics"]
         run=subprocess.run(command,cwd=folder,check=True,capture_output=True,text=True,timeout=30)
         self.assertTrue(json.loads(run.stdout)["assistant_installed"])
         imports="import astra_workbench; import astra_launcher"
@@ -96,8 +96,32 @@ class DistributionTests(unittest.TestCase):
             imports+="; import astra_analytics; assert astra_analytics.available()['portfolio']"
         if "professional-report" in manifest["groups"]:
             imports+="; import astra_report_export"
-        subprocess.run([sys.executable,"-E","-s","-c",imports],cwd=folder,
+        subprocess.run([sys.executable,"-E","-s","-X","utf8","-c",imports],cwd=folder,
                        check=True,capture_output=True,text=True,timeout=30)
+        # Execute each installed example using the extracted source, not merely
+        # import it. All inputs are bundled synthetic fixtures.
+        for group in manifest["groups"]:
+            if group in ("analytics","professional-report"):
+                continue
+            _,reporter,example=D.GROUPS[group]
+            run=subprocess.run([sys.executable,"-E","-s","-X","utf8",reporter,example,"--format","json"],
+                               cwd=folder,check=True,capture_output=True,text=True,
+                               encoding="utf-8",timeout=60)
+            self.assertIsInstance(json.loads(run.stdout),dict,group)
+        if "analytics" in manifest["groups"]:
+            run=subprocess.run([sys.executable,"-E","-s","-X","utf8","astra_analytics.py","portfolio",
+                                "examples/portfolio_analysis.json","--format","json"],
+                               cwd=folder,check=True,capture_output=True,text=True,
+                               encoding="utf-8",timeout=60)
+            self.assertEqual("0.15",json.loads(run.stdout)["result"]["total_return"]["decimal_approximation"])
+        if "professional-report" in manifest["groups"]:
+            html=folder/"smoke-report.html"
+            subprocess.run([sys.executable,"-E","-s","-X","utf8","astra_report_export.py","portfolio",
+                            "examples/portfolio_analysis.json","--output",str(html)],
+                           cwd=folder,check=True,capture_output=True,text=True,timeout=60)
+            rendered=html.read_text(encoding="utf-8")
+            self.assertIn("Closing market-value allocation",rendered)
+            self.assertIn("Canonical request SHA-256",rendered)
 
     def test_launcher_one_child_and_fixed_command(self):
         spawn=Mock()
