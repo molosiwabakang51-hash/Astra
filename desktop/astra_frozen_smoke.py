@@ -10,9 +10,11 @@ from astra_finance_session import FinanceSession
 from astra_evidence import Ledger
 
 
-def smoke_test(*, require_complete=False):
-    if type(require_complete) is not bool:
-        raise ValueError("Invalid completeness setting.")
+def smoke_test(*, require_complete=False, require_gui=True):
+    if type(require_complete) is not bool or type(require_gui) is not bool:
+        raise ValueError("Invalid smoke-test settings.")
+    if getattr(sys,"frozen",False) and not require_gui:
+        raise ValueError("Frozen acceptance must include GUI imports.")
     checks={}
     def check(name,fn):
         try:
@@ -29,8 +31,9 @@ def smoke_test(*, require_complete=False):
                 return len(ledger.search("bond"))==1
     check("reviewed_evidence",reviewed_memory)
     check("finance_session_import",lambda: FinanceSession() is not None)
-    check("assistant_gui_import",lambda:importlib.import_module("astra_desktop_gui").AstraApp is not None)
-    check("tkinter_import",lambda:importlib.import_module("tkinter").TkVersion>=8.6)
+    if require_gui:
+        check("assistant_gui_import",lambda:importlib.import_module("astra_desktop_gui").AstraApp is not None)
+        check("tkinter_import",lambda:importlib.import_module("tkinter").TkVersion>=8.6)
     analytics=importlib.util.find_spec("astra_analytics") is not None
     professional=importlib.util.find_spec("astra_professional_report") is not None
     if require_complete:
@@ -38,7 +41,8 @@ def smoke_test(*, require_complete=False):
         checks["professional_present"]=professional
     if analytics:
         from astra_analytics import available,run_analysis,from_files,export_content
-        check("analytics_gui_import",lambda:importlib.import_module("astra_analytics_gui").AnalyticsWindow is not None)
+        if require_gui:
+            check("analytics_gui_import",lambda:importlib.import_module("astra_analytics_gui").AnalyticsWindow is not None)
         def portfolio():
             envelope,md=run_analysis("portfolio",{
                 "currency":"BWP","start":"2025-01-01","end":"2026-01-01",
@@ -72,4 +76,5 @@ def smoke_test(*, require_complete=False):
     return {"passed":all(checks.values()),"checks":checks,
             "frozen":bool(getattr(sys,"frozen",False)),
             "require_complete":require_complete,
+            "require_gui":require_gui,
             "scope":"Synthetic headless checks only; no model loading, GUI display, or physical hardware validation."}
