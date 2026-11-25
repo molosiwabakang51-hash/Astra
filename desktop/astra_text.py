@@ -36,7 +36,10 @@ def execute(text, *, ledger_path=None, approve_models=False, review=False,
     if request["kind"] == "finance":
         # Even an approved model configuration does not waste inference on
         # deterministic arithmetic.
-        return {"route":"finance", "result":execute_request(request)}
+        output = {"route":"finance", "result":execute_request(request)}
+        if routed.currency:
+            output["currency"] = routed.currency
+        return output
     if request["kind"] == "retrieve" or not approve_models:
         request = {"kind":"retrieve","question":request["question"]}
         return {"route":"retrieve","result":execute_request(request,ledger_path=ledger_path)}
