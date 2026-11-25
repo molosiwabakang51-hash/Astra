@@ -18,8 +18,10 @@ class OwnerErrorPrivacySurfaceTests(unittest.TestCase):
             )
             self.assertNotIn(f"{var}.toString()", MAIN)
 
-    def test_all_identified_17_error_handlers_use_reviewed_mapper(self):
-        self.assertEqual(MAIN.count("AstraPrivateError.forOwner("), 17)
+    def test_all_identified_18_error_handlers_use_reviewed_mapper(self):
+        # The bounded calculator adds one isolated native planning pass.
+        self.assertEqual(MAIN.count("AstraPrivateError.forOwner("), 18)
+        self.assertEqual(MAIN.count("AstraPrivateError.Operation.MODEL_CHAT,"), 2)
         for kind in (
             "MODEL_CHAT", "BACKUP_EXPORT", "BACKUP_READ", "BACKUP_RESTORE",
             "BOOK_IMPORT", "BOOK_CLEAR", "VOCAB_IMPORT", "VOCAB_EXPORT",

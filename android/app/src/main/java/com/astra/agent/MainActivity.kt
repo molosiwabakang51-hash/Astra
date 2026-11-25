@@ -3411,9 +3411,12 @@ class MainActivity :
                     prompt: String,
                     grounding: AstraGroundedMemory.Request? = null,
                     modelOnly: Boolean = false,
-                    isolatedReview: Boolean = false
+                    isolatedReview: Boolean = false,
+                    calculationQuestion: String? = null
                 ) {
                     require(!isolatedReview || (modelOnly && grounding == null))
+                    require(calculationQuestion == null ||
+                        (modelOnly && grounding == null && !isolatedReview))
                     if (modelImportRunning) {
                         history.add(ChatMessage(
                             "Astra", "An offline model is being imported. Ask again after import."
@@ -3475,6 +3478,7 @@ class MainActivity :
                     val turns = AstraConversationHistory.forRecovery(history)
                         .let { retained ->
                             if (isolatedReview) emptyList()
+                            else if (calculationQuestion != null) emptyList()
                             else if (modelOnly) retained.takeLast(AstraModelOnly.previousTurnCount(
                                 retained.map { AstraChatArchive.Message(it.role, it.text) }
                             )) else retained
@@ -3514,6 +3518,7 @@ class MainActivity :
 
                         var groundedFooter = ""
                         var groundedBrief: AstraGroundedMemory.Brief? = null
+                        var calculated: AstraCalculationAssist.Computed? = null
                         try {
                             var effectiveTurns = turns
                             var effectiveGeneration = generation
@@ -3566,6 +3571,44 @@ class MainActivity :
                                     )
                                 )
                             }
+                            if (calculationQuestion != null) {
+                                // Explicit assisted route only. Use a fresh, bounded planning
+                                // pass without streaming or retaining the raw proposed plan.
+                                if (!stillActiveBubble()) return@launch
+                                val planning = "Preparing an independently checkable calculation..."
+                                history[target] = ChatMessage("Astra", planning)
+                                displayed = planning
+                                privateInferenceCounter--
+                                val proposal = try {
+                                    onDeviceBrain.reply(
+                                        listOf(AstraOnDeviceBrain.Turn("user",
+                                            AstraCalculationAssist.planningPrompt(calculationQuestion))),
+                                        privateInferenceCounter,
+                                        diagnosticMaxTokens = 128,
+                                        diagnosticIsolated = true,
+                                        modelOnly = true
+                                    )
+                                } catch (cancel: CancellationException) {
+                                    throw cancel
+                                } catch (error: Exception) {
+                                    AstraPrivateError.forOwner(AstraPrivateError.Operation.MODEL_CHAT, error)
+                                }
+                                if (!stillActiveBubble()) return@launch
+                                calculated = AstraCalculationAssist.evaluate(calculationQuestion, proposal)
+                                val verified = calculated
+                                if (verified == null) {
+                                    history[target] = ChatMessage("Astra",
+                                        "No valid exact calculation could be established from the proposed expression. " +
+                                            "Try a shorter question with explicit numbers, or ask in ordinary chat.")
+                                    persist()
+                                    return@launch
+                                }
+                                // Synthesis is isolated from the planning cache and private memory.
+                                privateInferenceCounter--
+                                effectiveGeneration = privateInferenceCounter
+                                effectiveTurns = listOf(AstraOnDeviceBrain.Turn("user",
+                                    AstraCalculationAssist.synthesisPrompt(calculationQuestion, verified)))
+                            }
                             val response = try {
                                 onDeviceBrain.reply(
                                     effectiveTurns, effectiveGeneration,
@@ -3596,6 +3639,9 @@ class MainActivity :
                                 val visibleResponse = if (grounding != null) {
                                     "ON-DEVICE AI INTERPRETATION · check against sources\n\n" +
                                         response + "\n\n" + groundedFooter
+                                } else if (calculated != null) {
+                                    "CALCULATOR-ASSISTED AI INTERPRETATION\n\n" +
+                                        response + "\n\n" + calculated.footer()
                                 } else if (isolatedReview) AstraCognitiveReview.label(response)
                                 else response
                                 history[target] = ChatMessage("Astra", visibleResponse)
@@ -3666,6 +3712,26 @@ class MainActivity :
                         workflowSession.reset()
                         dialogueAwaiting = false
                         enqueueOffline(message, question, modelOnly = true)
+                        return
+                    }
+
+                    // Only an explicit owner request enables read-only model-led arithmetic.
+                    // Never interpret ordinary model output as a tool call.
+                    AstraCalculationAssist.question(message)?.let { question ->
+                        if (question.length !in 1..AstraCalculationAssist.MAX_QUESTION) {
+                            history.add(ChatMessage("You", message))
+                            history.add(ChatMessage("Astra", "Enter a calculation question of 1–650 characters."))
+                            while (history.size > MAX_HISTORY) history.removeAt(0)
+                            persist()
+                            input = ""
+                            keyboard?.hide()
+                            return
+                        }
+                        dialogue.dismissIncompletePrompt()
+                        workflowSession.reset()
+                        dialogueAwaiting = false
+                        enqueueOffline(message, question, modelOnly = true,
+                            calculationQuestion = question)
                         return
                     }
 
