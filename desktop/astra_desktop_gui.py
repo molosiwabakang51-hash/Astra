@@ -74,6 +74,7 @@ class AstraApp:
         self.primary = tk.StringVar()
         self.critic = tk.StringVar()
         self.timeout = tk.StringVar(value="180")
+        self.adaptive_context = tk.BooleanVar(value=False)
         self.setup_style()
         self.layout()
         root.protocol("WM_DELETE_WINDOW", self.close)
@@ -274,12 +275,15 @@ class AstraApp:
         row.pack(fill="x", pady=8)
         ttk.Label(row, text="Timeout (seconds, 30–300)", width=28).pack(side="left")
         ttk.Entry(row, textvariable=self.timeout, width=10).pack(side="left")
+        ttk.Checkbutton(frame, text="Adapt context to available RAM (experimental; no prompt truncation)",
+                        variable=self.adaptive_context).pack(anchor="w")
         ttk.Checkbutton(frame, text="I approve local inference using these trusted model and runtime files",
                         variable=self.model_approval).pack(anchor="w", pady=10)
         actions = ttk.Frame(frame)
         actions.pack(fill="x")
         self.button(actions, "Configure models", self.configure, accent=True).pack(side="right")
         self.button(actions, "Disable generation", lambda: self.submit("runtime", "disable_models")).pack(side="left")
+        self.button(actions, "Latest metrics", lambda: self.submit("runtime_profile", "runtime_profile")).pack(side="left", padx=6)
         self.outputs["runtime"] = self.text_widget(frame, readonly=True)
         self.append("runtime", "Models are optional. Configuration checks do not establish native compatibility or answer accuracy. Inference may take several minutes on a CPU. Initial testing should use synthetic, non-confidential inputs.")
 
@@ -303,7 +307,8 @@ class AstraApp:
             messagebox.showerror("Missing model files", "Select a runtime and primary model.")
             return
         self.submit("runtime", "configure_models", self.binary.get(), self.primary.get(),
-                    self.critic.get() or None, approved=True, timeout=timeout)
+                    self.critic.get() or None, approved=True, timeout=timeout,
+                    context_policy="adaptive" if self.adaptive_context.get() else "fixed")
 
     def poll(self):
         while True:
@@ -321,7 +326,8 @@ class AstraApp:
                     self.database.set(message)
                     self.append("knowledge", "Evidence database changed; context reset.", replace=True)
             else:
-                self.append(name, ("ASTRA\n" if ok else "UNAVAILABLE\n") + message)
+                self.append("runtime" if name=="runtime_profile" else name,
+                            ("ASTRA\n" if ok else "UNAVAILABLE\n") + message)
             if name == "runtime" and ok:
                 self.models.set(message)
                 self.generate.set(False)
