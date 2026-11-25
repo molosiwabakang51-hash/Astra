@@ -3553,7 +3553,8 @@ class MainActivity :
                             val response = try {
                                 onDeviceBrain.reply(
                                     effectiveTurns, effectiveGeneration,
-                                    visibleUserMessage = displayMessage
+                                    visibleUserMessage = displayMessage,
+                                    memoryGrounded = grounding != null
                                 ) { partial ->
                                     // Compose state and conversation history are
                                     // mutated on the UI thread, not the model thread.

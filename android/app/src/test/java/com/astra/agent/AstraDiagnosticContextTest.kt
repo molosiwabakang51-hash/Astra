@@ -30,4 +30,17 @@ class AstraDiagnosticContextTest {
             assertEquals(choice, AstraDiagnosticContext.replyLanguage(choice, false))
         }
     }
+    @Test fun explicitMemoryGroundingNeverMixesUnrequestedKnowledgeSources() {
+        for (explicit in listOf(false, true)) {
+            for (enabled in listOf(false, true)) {
+                assertFalse(AstraDiagnosticContext.allowPrivateBooks(
+                    explicit, enabled, diagnosticIsolated = false, memoryGrounded = true
+                ))
+            }
+        }
+        assertFalse(AstraDiagnosticContext.allowOpenCourse(false, true))
+        assertFalse(AstraDiagnosticContext.allowOpenCourse(true, false))
+        assertFalse(AstraDiagnosticContext.allowOpenCourse(true, true))
+        assertTrue(AstraDiagnosticContext.allowOpenCourse(false, false))
+    }
 }

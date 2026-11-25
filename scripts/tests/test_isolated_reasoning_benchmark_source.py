@@ -21,6 +21,14 @@ class IsolatedReasoningBenchmarkSourceChecks(unittest.TestCase):
         self.assertIn("AstraDiagnosticContext.allowPrivateBooks(", BRAIN)
         self.assertIn("!diagnosticIsolated &&", POLICY)
 
+    def test_memory_grounding_excludes_unrequested_book_and_course_sources(self):
+        self.assertIn('memoryGrounded = grounding != null', MAIN)
+        self.assertIn('memoryGrounded: Boolean = false', BRAIN)
+        self.assertIn('if (memoryGrounded) null else AstraBookQuery.extract(finalMessage)', BRAIN)
+        self.assertIn('memoryGrounded = memoryGrounded', BRAIN)
+        self.assertIn('AstraDiagnosticContext.allowOpenCourse(diagnosticIsolated, memoryGrounded)', BRAIN)
+        self.assertIn('!diagnosticIsolated && !memoryGrounded', POLICY)
+
     def test_existing_language_and_new_reasoning_suite_both_request_isolation(self):
         self.assertIn("AstraLanguageBenchmark.render(", MAIN)
         self.assertIn("AstraReasoningBenchmark.render(", MAIN)
