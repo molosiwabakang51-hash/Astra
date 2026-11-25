@@ -118,6 +118,7 @@ internal class AstraOnDeviceBrain(
         diagnosticMaxTokens: Int? = null,
         diagnosticIsolated: Boolean = false,
         diagnosticReasoningOverride: Boolean? = null,
+        visibleUserMessage: String? = null,
         onPartial: suspend (String) -> Unit = {}
     ): String = AstraModelOperationGate.withNativeSession {
         mutex.withLock {
@@ -469,7 +470,10 @@ internal class AstraOnDeviceBrain(
                     attributedAnswer
                 }
                 if (attributedAnswer.isNotBlank()) {
-                    session.recordCompletedTurn(earlierTurns.size, transcriptTail, visibleReply)
+                    session.recordCompletedTurn(
+                        earlierTurns.size, transcriptTail,
+                        visibleUserMessage ?: turns.last().content, visibleReply
+                    )
                 }
                 visibleReply
                 }
