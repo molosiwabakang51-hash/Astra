@@ -9,7 +9,8 @@ import threading
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 
-from astra_analytics import available, from_files, run_analysis, render, write_new
+from astra_analytics import (available, from_files, run_analysis, render, write_new,
+                             ReportState, export_content, professional_available)
 from astra_analytics_csv import ingest
 from astra_quantitative_verify import number
 
@@ -68,9 +69,15 @@ class AnalyticsWindow:
         self.status=tk.StringVar(value="Ready · Offline")
         self.results=queue.Queue()
         self.busy=False
-        self.report=None
+        self.report_state=ReportState()
         self.buttons=[]
+        self.editors=[]
+        self.save_buttons=[]
         self.build()
+        for variable in (self.mode,self.kind,self.source,self.metadata,self.currency,
+                         self.start,self.end,self.opening,self.closing,self.benchmark):
+            variable.trace_add('write',self.input_changed)
+        self.sync_controls()
         root.protocol("WM_DELETE_WINDOW",self.close)
 
     def button(self,parent,label,command):
@@ -82,7 +89,9 @@ class AnalyticsWindow:
         row=ttk.Frame(parent)
         row.pack(fill="x",pady=3)
         ttk.Label(row,text=label,width=27).pack(side="left")
-        ttk.Entry(row,textvariable=var).pack(side="left",fill="x",expand=True)
+        entry=ttk.Entry(row,textvariable=var)
+        entry.pack(side="left",fill="x",expand=True)
+        self.editors.append(entry)
         if browse:
             self.button(row,"Browse",lambda:self.pick(var)).pack(side="left",padx=5)
         return row
@@ -102,6 +111,7 @@ class AnalyticsWindow:
                           textvariable=self.kind,state="readonly",width=23)
         kind.pack(side="left",padx=6)
         kind.bind("<<ComboboxSelected>>",self.refresh)
+        self.editors.extend((selector,kind))
         self.field(outer,"Input file",self.source,browse=True)
         self.metadata_row=self.field(outer,"Metadata JSON",self.metadata,browse=True)
         self.basic=ttk.Frame(outer)
@@ -113,8 +123,10 @@ class AnalyticsWindow:
         self.bench_row=self.field(self.basic,"Benchmark return (decimal)",self.benchmark)
         self.basis_text=tk.StringVar()
         ttk.Label(self.basic,textvariable=self.basis_text,wraplength=650).pack(anchor="w",pady=4)
-        ttk.Checkbutton(self.basic,text="I confirm the input basis and reporting conventions",
-                        variable=self.confirmed).pack(anchor="w")
+        confirmation=ttk.Checkbutton(self.basic,text="I confirm the input basis and reporting conventions",
+                                     variable=self.confirmed)
+        confirmation.pack(anchor="w")
+        self.editors.append(confirmation)
         self.basic.pack(fill="x",pady=5)
         actions=ttk.Frame(outer)
         self.actions=actions
@@ -124,8 +136,22 @@ class AnalyticsWindow:
         self.save_md.pack(side="right")
         self.save_json=self.button(actions,"Save JSON",lambda:self.save("json"))
         self.save_json.pack(side="right",padx=5)
-        self.output=tk.Text(outer,wrap="none",font=("Consolas",10),state="disabled")
-        self.output.pack(fill="both",expand=True)
+        self.save_buttons.extend((self.save_md,self.save_json))
+        if professional_available():
+            html_button=self.button(actions,"Save printable HTML",lambda:self.save("html"))
+            html_button.pack(side="right",padx=5)
+            self.save_buttons.append(html_button)
+        report_frame=ttk.Frame(outer)
+        report_frame.pack(fill="both",expand=True)
+        report_frame.rowconfigure(0,weight=1)
+        report_frame.columnconfigure(0,weight=1)
+        self.output=tk.Text(report_frame,wrap="none",font=("Consolas",10),state="disabled")
+        yscroll=ttk.Scrollbar(report_frame,orient="vertical",command=self.output.yview)
+        xscroll=ttk.Scrollbar(report_frame,orient="horizontal",command=self.output.xview)
+        self.output.configure(yscrollcommand=yscroll.set,xscrollcommand=xscroll.set)
+        self.output.grid(row=0,column=0,sticky="nsew")
+        yscroll.grid(row=0,column=1,sticky="ns")
+        xscroll.grid(row=1,column=0,sticky="ew")
         ttk.Label(outer,textvariable=self.status).pack(anchor="w",pady=(6,0))
         self.refresh()
 
@@ -159,12 +185,33 @@ class AnalyticsWindow:
         if path:
             var.set(path)
 
+    def clear_output(self):
+        self.output.configure(state="normal")
+        self.output.delete("1.0","end")
+        self.output.configure(state="disabled")
+
+    def sync_controls(self):
+        for widget in self.editors+self.buttons:
+            widget.state(["disabled"] if self.busy else ["!disabled"])
+        if self.report_state.report is None:
+            for button in self.save_buttons:
+                button.state(["disabled"])
+
+    def input_changed(self,*_):
+        had_report=self.report_state.report is not None
+        self.report_state.invalidate()
+        self.confirmed.set(False)
+        if had_report:
+            self.clear_output()
+        if not self.busy:
+            self.status.set("Inputs changed · Analyze to generate a new report")
+        self.sync_controls()
+
     def submit(self,fn):
         if self.busy:
             return
         self.busy=True
-        for b in self.buttons:
-            b.state(["disabled"])
+        self.sync_controls()
         self.status.set("Working locally · Current operation must finish before closing")
         def worker():
             try:
@@ -179,7 +226,8 @@ class AnalyticsWindow:
     def analyze(self):
         if self.busy:
             return
-        self.report=None
+        revision=self.report_state.invalidate()
+        self.clear_output()
         mode,kind,path=self.mode.get(),self.kind.get(),self.source.get()
         metadata=self.metadata.get()
         if kind=="Basic CSV form":
@@ -188,10 +236,10 @@ class AnalyticsWindow:
             args=(mode,path,self.currency.get(),self.start.get(),self.end.get())
             def task():
                 request,receipt=simple_request(*args,**kwargs)
-                return "report",run_analysis(mode,request,receipt=receipt)
+                return "report",(revision,run_analysis(mode,request,receipt=receipt))
         else:
             def task():
-                return "report",from_files(mode,path,metadata_path=metadata if kind=="CSV + metadata JSON" else None)
+                return "report",(revision,from_files(mode,path,metadata_path=metadata if kind=="CSV + metadata JSON" else None))
         self.submit(task)
 
     def poll(self):
@@ -201,15 +249,17 @@ class AnalyticsWindow:
             self.root.after(80,self.poll)
             return
         self.busy=False
-        for b in self.buttons:
-            b.state(["!disabled"])
+        self.sync_controls()
         if not ok:
             self.status.set("Unavailable · Check input format, conventions or output path")
             return
         kind,value=result
         if kind=="report":
-            self.report=value
-            envelope,markdown=value
+            revision,(envelope,markdown)=value
+            if not self.report_state.publish(revision,envelope,markdown):
+                self.status.set("Inputs changed · Stale result discarded")
+                return
+            self.sync_controls()
             self.output.configure(state="normal")
             self.output.delete("1.0","end")
             self.output.insert("end",render(envelope,markdown,"markdown"))
@@ -219,14 +269,15 @@ class AnalyticsWindow:
             self.status.set("Ready · Report saved")
 
     def save(self,format):
-        if self.report is None or self.busy:
+        if self.report_state.report is None or self.busy:
             return
-        path=filedialog.asksaveasfilename(defaultextension=".md" if format=="markdown" else ".json")
+        extension={"markdown":".md","json":".json","html":".html"}[format]
+        path=filedialog.asksaveasfilename(defaultextension=extension)
         if not path:
             return
-        envelope,markdown=self.report
+        envelope,markdown=self.report_state.report
         def task():
-            write_new(path,render(envelope,markdown,format))
+            write_new(path,export_content(envelope,markdown,format))
             return "saved",None
         self.submit(task)
 

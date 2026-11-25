@@ -21,3 +21,5 @@ python desktop/astra_analytics.py cashflow desktop/examples/cashflow_events.csv 
 ```
 
 Use --format json to export a structured result with provenance. The report records input-file SHA-256 and canonical request identity; CSV imports also report the observation count and applicable date range. These receipts establish input identity, not market data accuracy, independent source validation or execution attestation. All exports create new files rather than overwriting. The per-engine validation, limitations and assumptions remain authoritative. Analysis uses no model or external service. Windows interface testing and commercial validation remain outstanding.
+
+The analytics window invalidates a completed report when an input field changes, requires renewed basis confirmation, and disables input edits during operations. Save controls are enabled only for a current completed report. When the optional professional renderer is installed, Save printable HTML exports that same result with its input traceability; open the file locally and use browser printing to create a PDF. No recalculation is performed on export. Windows visual testing remains pending.

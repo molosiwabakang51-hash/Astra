@@ -85,6 +85,41 @@ def render(envelope,markdown,format):
     return markdown.rstrip()+"\n"+"\n".join(lines)+"\n"
 
 
+
+class ReportState:
+    """Associate a completed report with the current input revision."""
+    def __init__(self):
+        self.revision=0
+        self.report=None
+
+    def invalidate(self):
+        self.revision+=1
+        self.report=None
+        return self.revision
+
+    def publish(self,revision,envelope,markdown):
+        if revision!=self.revision:
+            return False
+        self.report=(envelope,markdown)
+        return True
+
+
+def professional_available():
+    return importlib.util.find_spec("astra_professional_report") is not None
+
+
+def export_content(envelope,markdown,format):
+    """Export the completed result without recomputation or rereading input."""
+    if format=="html":
+        try:
+            from astra_professional_report import render_html
+        except ImportError:
+            raise RuntimeError("Professional renderer is not installed.") from None
+        return render_html(render(envelope,markdown,"markdown"),
+                           envelope["provenance"]["analysis"],envelope["result"])
+    return render(envelope,markdown,format)
+
+
 def from_files(mode,input_path,*,metadata_path=None):
     if metadata_path is None:
         request,digest=read_json(input_path)
