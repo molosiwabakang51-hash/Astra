@@ -1,0 +1,36 @@
+{
+  "currency": "BWP",
+  "start": "2025-01-01",
+  "end": "2026-01-01",
+  "basis": "unchanged_holdings_no_flows_income_excluded",
+  "holdings": [
+    {
+      "symbol": "Asset A",
+      "opening_value": "60000",
+      "closing_value": "72000",
+      "cash_income": "3000"
+    },
+    {
+      "symbol": "Asset B",
+      "opening_value": "40000",
+      "closing_value": "38000",
+      "cash_income": "2000"
+    }
+  ],
+  "benchmark_total_return": "0.12",
+  "scenarios": [
+    {
+      "name": "Asset A downside",
+      "shocks": {
+        "Asset A": "-0.20"
+      }
+    },
+    {
+      "name": "Broad decline",
+      "shocks": {
+        "Asset A": "-0.10",
+        "Asset B": "-0.10"
+      }
+    }
+  ]
+}
