@@ -14,6 +14,7 @@ import subprocess
 import sys
 import tempfile
 
+from astra_native_subprocess import run_bounded
 from astra_resource_plan import model_file, plan, probe
 from astra_quantitative_verify import number
 from astra_verified_finance import (
@@ -60,10 +61,12 @@ class LocalProposer:
             raise ValueError("Distinct model files required.")
         self.models = {"primary": primary, "critic": critic}
         self.timeout = timeout
+        self.last_profile = {}
 
     def __call__(self, role, prompt):
         if role not in self.models or not isinstance(prompt, str):
             raise ValueError("Invalid proposal request.")
+        self.last_profile.clear()
         model = self.models[role]
         payload = (prompt + FORMAT).encode("utf-8")
         if len(payload) > MAX_PROMPT_BYTES:
@@ -88,10 +91,10 @@ class LocalProposer:
                        "--grammar", DECIMAL_GRAMMAR, "-c", "2048", "-n", "48",
                        "-ngl", "0", "-t", threads, "-tb", threads, "--temp", "0", "--seed", "42"]
             try:
-                result = subprocess.run(command, stdin=subprocess.DEVNULL,
-                                        stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
-                                        timeout=self.timeout, shell=False, check=False,
-                                        env=environment, cwd=directory)
+                result = run_bounded(command, timeout=self.timeout,
+                                             env=environment, cwd=directory,
+                                             max_stdout_bytes=MAX_OUTPUT_BYTES,
+                                             telemetry=self.last_profile)
             except subprocess.TimeoutExpired:
                 raise RuntimeError("Local model timed out.") from None
             if result.returncode != 0:

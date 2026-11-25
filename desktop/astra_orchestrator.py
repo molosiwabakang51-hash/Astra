@@ -188,9 +188,15 @@ class Orchestrator:
                     "vector_status": retrieved["vector_status"]}
         ids = {row["id"] for row in chosen}
         try:
-            draft = parse_reply(self.runner("primary", prompt), ids)
+            raw = self.runner("primary", prompt)
         except (OSError, ValueError, RuntimeError, RecursionError):
-            return {"kind": kind, "status": "model_unavailable_or_invalid", "answer": None}
+            return {"kind": kind, "status": "model_unavailable_or_invalid", "answer": None,
+                    "failure_stage":"native_execution"}
+        try:
+            draft = parse_reply(raw, ids)
+        except (ValueError, RuntimeError, RecursionError):
+            return {"kind": kind, "status": "model_unavailable_or_invalid", "answer": None,
+                    "failure_stage":"response_validation"}
         assessment = {"assessment": "not_requested", "concerns": []}
         if review:
             try:

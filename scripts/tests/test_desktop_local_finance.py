@@ -39,7 +39,7 @@ class LocalFinanceTests(unittest.TestCase):
         self.paths = {"binary": self.binary, "primary": self.primary, "critic": self.critic}
 
     def test_deterministic_default_never_starts_native_runner(self):
-        with patch.object(L.subprocess, "run") as run:
+        with patch.object(L,"run_bounded") as run:
             result = L.run_request(request())
             self.assertEqual("0.065", result["result"]["decimal_approximation"])
             self.assertEqual("no_model_proposals", result["proposal_agreement"])
@@ -51,7 +51,7 @@ class LocalFinanceTests(unittest.TestCase):
         self.critic.write_bytes(self.primary.read_bytes())
         with self.assertRaises(ValueError):
             L.LocalProposer(**self.paths)
-        with patch.object(L.subprocess, "run") as run:
+        with patch.object(L,"run_bounded") as run:
             result = L.run_request(request(), allow_model=True, **self.paths)
             self.assertEqual({"primary": "unavailable", "critic": "unavailable"},
                              result["proposal_assessment"])
@@ -68,7 +68,7 @@ class LocalFinanceTests(unittest.TestCase):
 
     def test_low_ram_refuses_each_native_call(self):
         with patch.object(L, "probe", return_value=P.Resources(P.GIB, 4, P.GIB)), \
-             patch.object(L.subprocess, "run") as run:
+             patch.object(L,"run_bounded") as run:
             result = L.run_request(request(), allow_model=True, **self.paths)
             run.assert_not_called()
             self.assertEqual("0.065", result["result"]["decimal_approximation"])
@@ -91,7 +91,7 @@ class LocalFinanceTests(unittest.TestCase):
             self.assertEqual("2", args[args.index("-tb") + 1])
             self.assertIn("--offline", args)
             self.assertIn("--grammar", args)
-            self.assertFalse(kwargs["shell"])
+            self.assertEqual(L.MAX_OUTPUT_BYTES,kwargs["max_stdout_bytes"])
             self.assertEqual(60, kwargs["timeout"])
             self.assertNotIn("LLAMA_ARG_HF_REPO", kwargs["env"])
             self.assertNotIn("HF_TOKEN", kwargs["env"])
@@ -101,7 +101,7 @@ class LocalFinanceTests(unittest.TestCase):
             return subprocess.CompletedProcess(args, 0, output)
 
         with patch.object(L, "probe", return_value=P.Resources(5 * P.GIB, 4, P.GIB)) as probe, \
-             patch.object(L.subprocess, "run", side_effect=execute), \
+             patch.object(L,"run_bounded", side_effect=execute), \
              patch.dict(os.environ, {"LLAMA_ARG_HF_REPO": "remote", "HF_TOKEN": "test"}):
             result = L.run_request(request(), allow_model=True, timeout=60, **self.paths)
         self.assertEqual(["primary.gguf", "critic.gguf"], roles)
@@ -121,7 +121,7 @@ class LocalFinanceTests(unittest.TestCase):
             return subprocess.CompletedProcess(args, 1, b"FINAL: 0.065\n")
 
         with patch.object(L, "probe", return_value=P.Resources(5 * P.GIB, 4, P.GIB)), \
-             patch.object(L.subprocess, "run", side_effect=execute):
+             patch.object(L,"run_bounded", side_effect=execute):
             result = L.run_request(request(), allow_model=True, **self.paths)
         self.assertTrue(all(not x.exists() for x in files))
         self.assertEqual("0.065", result["result"]["decimal_approximation"])
@@ -129,7 +129,7 @@ class LocalFinanceTests(unittest.TestCase):
                          result["proposal_assessment"])
 
     def test_malformed_or_oversized_request_never_executes(self):
-        with patch.object(L.subprocess, "run") as run:
+        with patch.object(L,"run_bounded") as run:
             with self.assertRaises(ValueError):
                 L.run_request({"operation": "eval", "inputs": {}}, allow_model=True, **self.paths)
             with self.assertRaises(ValueError):
