@@ -8,7 +8,6 @@ import csv
 from decimal import Decimal, InvalidOperation, localcontext
 from html import escape
 import io
-import math
 import re
 
 MAX_MARKDOWN = 8 * 1024 * 1024
@@ -179,9 +178,29 @@ def plot(title,x_label,y_label,series,*,connect=True):
     return "".join(out)
 
 
+def allocation_chart(result):
+    values = [(row["symbol"],numeric(row["closing_weight"],100))
+              for row in result["positions"] if row["closing_weight"] is not None]
+    if not values:
+        return ""
+    if any(not 0<=v<=100 for _,v in values):
+        raise ValueError("Invalid allocation weight.")
+    values.sort(key=lambda row:(-row[1],row[0]))
+    if len(values)>10:
+        values=values[:10]+[("Other holdings",sum(v for _,v in values[10:]))]
+    out=['<figure><figcaption>Closing market-value allocation</figcaption>',
+         '<div class="allocation-bars">']
+    for name,value in values:
+        out.append(f'<div class="bar-row"><span>{escape(name)}</span><div class="bar-track"><div class="bar-fill" style="width:{float(value):.6f}%"></div></div><span>{escape(label(value))}%</span></div>')
+    out.append("</div></figure>")
+    return "".join(out)
+
+
 def charts(mode,result):
     """Use only declared result fields, never infer chart data from prose."""
     try:
+        if mode=="portfolio":
+            return allocation_chart(result)
         if mode=="curve":
             points=[(numeric(r["months"]),numeric(r["continuous_zero"],100)) for r in result["nodes"]]
             return plot("Continuous zero curve","Maturity (months)","Annual spot rate (%)",[("Supplied curve nodes",points)])
@@ -232,6 +251,9 @@ figure{border:1px solid #dbe3ed;margin:20px 0;padding:14px 16px;break-inside:avo
 figcaption{font-weight:650;font-size:15px;margin-bottom:8px}svg{display:block;width:100%;height:auto}
 svg text{font:11px Arial,sans-serif;fill:#42566d}.legend{display:flex;flex-wrap:wrap;gap:14px;font-size:12px}
 .legend i{display:inline-block;width:10px;height:10px;margin-right:6px}.notice{color:var(--muted)}
+.bar-row{display:grid;grid-template-columns:150px 1fr 80px;gap:12px;align-items:center;margin:6px 0}
+.bar-row span{overflow-wrap:anywhere}.bar-row span:last-child{text-align:right;font-variant-numeric:tabular-nums}
+.bar-track{height:12px;background:#e7eff4}.bar-fill{background:var(--accent);height:100%}
 footer{border-top:1px solid #dbe3ed;margin-top:30px;padding-top:10px;color:var(--muted);font-size:11px}
 @page{size:A4 landscape;margin:13mm}
 @media print{body{background:white;font-size:10pt}main{max-width:none;margin:0;padding:0;box-shadow:none}
