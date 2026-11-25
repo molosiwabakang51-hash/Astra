@@ -22,7 +22,7 @@ class GroundedFollowUpTests(unittest.TestCase):
 
     def test_followup_anchors_only_ordinary_same_chat_model_prompts(self):
         self.assertIn("AstraFollowUpAnchor.enrich(", MAIN)
-        self.assertIn("if (grounding == null)", MAIN)
+        self.assertIn("if (grounding == null && !modelOnly)", MAIN)
         self.assertIn('AstraOnDeviceBrain.Turn("user", focusedPrompt)', MAIN)
         self.assertIn("CURRENT USER FOLLOW-UP", ANCHOR)
         self.assertIn("Previous user question", ANCHOR)

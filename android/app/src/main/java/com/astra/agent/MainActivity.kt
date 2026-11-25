@@ -3409,7 +3409,8 @@ class MainActivity :
                 fun enqueueOffline(
                     displayMessage: String,
                     prompt: String,
-                    grounding: AstraGroundedMemory.Request? = null
+                    grounding: AstraGroundedMemory.Request? = null,
+                    modelOnly: Boolean = false
                 ) {
                     if (modelImportRunning) {
                         history.add(ChatMessage(
@@ -3435,7 +3436,7 @@ class MainActivity :
                     }
                     // Explicit transcript review uses only the active chat.
                     // Do not ask the model to invent what it said previously.
-                    val chatReview = if (grounding == null) {
+                    val chatReview = if (grounding == null && !modelOnly) {
                         AstraChatReview.respond(
                             prompt,
                             history.map { AstraChatArchive.Message(it.role, it.text) }
@@ -3463,13 +3464,18 @@ class MainActivity :
                     // For short, ambiguous continuations, anchor the current
                     // prompt to the immediately preceding same-chat exchange.
                     // Quoted model text is untrusted and never private memory.
-                    val focusedPrompt = if (grounding == null) {
+                    val focusedPrompt = if (grounding == null && !modelOnly) {
                         AstraFollowUpAnchor.enrich(
                             prompt,
                             history.map { AstraChatArchive.Message(it.role, it.text) }
                         )
                     } else prompt
                     val turns = AstraConversationHistory.forRecovery(history)
+                        .let { retained ->
+                            if (modelOnly) retained.takeLast(AstraModelOnly.previousTurnCount(
+                                retained.map { AstraChatArchive.Message(it.role, it.text) }
+                            )) else retained
+                        }
                         .filterNot { entry ->
                             // Save interrupted partials in the visible chat,
                             // but never replay them as a finished assistant
@@ -3554,7 +3560,8 @@ class MainActivity :
                                 onDeviceBrain.reply(
                                     effectiveTurns, effectiveGeneration,
                                     visibleUserMessage = displayMessage,
-                                    memoryGrounded = grounding != null
+                                    memoryGrounded = grounding != null,
+                                    modelOnly = modelOnly
                                 ) { partial ->
                                     // Compose state and conversation history are
                                     // mutated on the UI thread, not the model thread.
@@ -3636,6 +3643,17 @@ class MainActivity :
                     // Return the conversation to its spacious default after sending.
                     commandDeckExpanded = false
                     val normalized = AstraInput.normalize(message)
+
+                    // Owner-requested pure model conversation must run before
+                    // deterministic answers, local actions, memory and book routing.
+                    // Preserve the visible prefix for retry and restart provenance.
+                    AstraModelOnly.question(message)?.let { question ->
+                        dialogue.dismissIncompletePrompt()
+                        workflowSession.reset()
+                        dialogueAwaiting = false
+                        enqueueOffline(message, question, modelOnly = true)
+                        return
+                    }
 
                     // A cross-feature Discuss draft is a question, never an
                     // executable task/note/command even when the quoted

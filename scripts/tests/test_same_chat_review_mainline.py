@@ -11,7 +11,7 @@ class SameChatReviewSourceTest(unittest.TestCase):
     def test_review_is_routed_before_native_inference(self):
         self.assertIn("AstraChatReview.respond(", MAIN)
         self.assertLess(MAIN.index("AstraChatReview.respond("),
-                        MAIN.index("val focusedPrompt = if (grounding == null)"))
+                        MAIN.index("val focusedPrompt = if (grounding == null && !modelOnly)"))
         self.assertIn('history.add(ChatMessage("Astra", chatReview))', MAIN)
 
     def test_review_is_private_and_does_not_promote_assistant_text(self):
