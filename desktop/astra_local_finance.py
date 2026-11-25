@@ -14,6 +14,7 @@ import subprocess
 import sys
 import tempfile
 
+from astra_native_subprocess import run_external
 from astra_resource_plan import model_file, plan, probe
 from astra_quantitative_verify import number
 from astra_verified_finance import (
@@ -88,7 +89,7 @@ class LocalProposer:
                        "--grammar", DECIMAL_GRAMMAR, "-c", "2048", "-n", "48",
                        "-ngl", "0", "-t", threads, "-tb", threads, "--temp", "0", "--seed", "42"]
             try:
-                result = subprocess.run(command, stdin=subprocess.DEVNULL,
+                result = run_external(command, runner=subprocess.run, stdin=subprocess.DEVNULL,
                                         stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
                                         timeout=self.timeout, shell=False, check=False,
                                         env=environment, cwd=directory)
