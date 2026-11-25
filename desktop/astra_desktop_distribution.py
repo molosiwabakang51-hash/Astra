@@ -19,7 +19,7 @@ CORE=(
     "astra_verified_finance.py","astra_quantitative_verify.py",
     "astra_hybrid_evidence.py","astra_vector_memory.py",
     "astra_knowledge_session.py","astra_orchestrator.py","astra_local_answer.py",
-    "astra_local_finance.py","astra_resource_plan.py",
+    "astra_local_finance.py","astra_native_subprocess.py","astra_resource_plan.py",
     "ASTRA_START.cmd","DESKTOP_DISTRIBUTION.md",
 )
 GROUPS={
