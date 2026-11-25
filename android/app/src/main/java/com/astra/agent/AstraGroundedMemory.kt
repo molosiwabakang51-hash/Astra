@@ -75,9 +75,11 @@ internal object AstraGroundedMemory {
             val match = command.matchEntire(clean) ?: continue
             val question = match.groupValues.last().trim().trimEnd('.', '?', '!')
             if (question.length !in 3..220) return null
-            val notesOnly = clean.lowercase(Locale.ROOT).let {
-                ("my notes" in it || "the notes" in it) && !it.startsWith("ask my memory")
-            }
+            // Scope comes from the command's target, never words in its question.
+            // In particular, "answer using notes" must not retrieve chats/tasks.
+            val notesOnly = command === commands[3] ||
+                (match.groupValues.size == 3 &&
+                    match.groupValues[1].equals("notes", ignoreCase = true))
             return Request(question, notesOnly)
         }
         return null
