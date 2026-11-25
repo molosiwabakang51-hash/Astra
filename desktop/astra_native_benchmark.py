@@ -15,6 +15,7 @@ import secrets
 import sys
 
 import astra_generated_validation as transfer
+import astra_task_routing as routing
 import astra_local_answer as native
 import astra_resource_plan as resources
 import astra_native_subprocess as capture
@@ -36,7 +37,7 @@ def fingerprint(binary, primary, critic, timeout, suite_module):
             name: file_digest(module.__file__) for name, module in (
                 ("native", native), ("resources", resources), ("parsing", parsing),
                 ("capture", capture), ("telemetry", telemetry),
-                ("suite", suite_module),
+                ("suite", suite_module), ("transfer", transfer),
             )
         },
         "timeout": timeout,
@@ -58,7 +59,7 @@ def run(binary, primary, critic, *, suite="transfer", seed=None, timeout=180,
         approved=False, database=None, approve_storage=False):
     if approved is not True:
         raise ValueError("Explicit approval for local native evaluation required.")
-    if suite not in ("transfer", "development"):
+    if suite not in ("transfer", "development", "routing"):
         raise ValueError("Unsupported benchmark suite.")
     if type(timeout) is not int or not 30 <= timeout <= 300:
         raise ValueError("Invalid native timeout.")
@@ -66,11 +67,13 @@ def run(binary, primary, critic, *, suite="transfer", seed=None, timeout=180,
         raise ValueError("Only approved development reports can be recorded to history.")
     if approve_storage and database is None:
         raise ValueError("An explicit history database is required.")
-    if suite == "development" and seed is not None:
-        raise ValueError("The fixed development suite does not use a seed.")
+    if suite != "transfer" and seed is not None:
+        raise ValueError("Only the single-seed transfer suite accepts a seed override.")
 
     if suite == "transfer":
         module = transfer
+    elif suite == "routing":
+        module = routing
     else:
         # Optional integration with independently submitted benchmark/history
         # modules; refuse the request before inference if either is absent.
@@ -111,7 +114,7 @@ def main(argv=None):
     parser.add_argument("binary")
     parser.add_argument("primary")
     parser.add_argument("critic")
-    parser.add_argument("--suite", choices=("transfer", "development"), default="transfer")
+    parser.add_argument("--suite", choices=("transfer", "development", "routing"), default="transfer")
     parser.add_argument("--seed-file")
     parser.add_argument("--timeout", type=int, default=180)
     parser.add_argument("--database")
