@@ -218,4 +218,16 @@ class AstraVerifiedCalculationFollowUpTest {
                 AstraVerifiedCalculationFollowUp.explain(text, verified))
         }
     }
+
+    @Test fun symbolicMathFollowupSurvivesWithIndependentlyVerifiedWorking() {
+        val history = listOf(msg("You", "Calculate 3÷8"), msg("Astra", "0.375"))
+        val proof = AstraVerifiedCalculationFollowUp.explain("Show the steps", history)!!
+        assertTrue(proof.contains("3 ÷ 8 = 0.375"))
+        assertEquals(proof, AstraVerifiedCalculationFollowUp.explain(
+            "Explain that result",
+            history + listOf(msg("You", "Show the steps"), msg("Astra", proof))
+        ))
+        assertNull(AstraVerifiedCalculationFollowUp.explain("Show the steps",
+            listOf(msg("You", "Calculate 3÷8"), msg("Astra", "0.38"))))
+    }
 }
