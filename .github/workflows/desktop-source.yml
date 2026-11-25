@@ -47,6 +47,8 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           python -E -s -c "import tkinter; import astra_workbench; import astra_launcher"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python -E -s astra_launcher.py --complete-smoke-test
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           Pop-Location
       - uses: actions/upload-artifact@v6
         with:
@@ -84,7 +86,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           & .\frozen-dist\AstraDesktop\AstraDesktop.exe --diagnostics
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          & .\frozen-dist\AstraDesktop\AstraDesktop.exe --smoke-test
+          & .\frozen-dist\AstraDesktop\AstraDesktop.exe --complete-smoke-test
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - uses: actions/upload-artifact@v6
         with:
