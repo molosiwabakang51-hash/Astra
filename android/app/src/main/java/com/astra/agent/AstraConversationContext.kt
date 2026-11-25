@@ -154,22 +154,29 @@ internal object AstraConversationContext {
         // correction chain for a clearly named topic before unrelated recent
         // prose consumes the entire context budget. Do not interpret internal
         // follow-up wrappers as new owner instructions.
-        val topicalCorrections = if (!ownerRecall && keywords.size >= 2 &&
+        fun overlap(turn: IndexedValue<Turn>): Int =
+            keywords.count(significantWords(turn.value.content.take(MAX_TURN_CHARS))::contains)
+        val topicalAnchor = if (!ownerRecall && keywords.size >= 2 &&
             !current.startsWith("SAME-CHAT FOLLOW-UP CONTEXT (")
         ) {
-            val anchor = valid.asSequence().filter { it.value.role == "user" }
-                .map { turn ->
-                    turn to keywords.count(
-                        significantWords(turn.value.content.take(MAX_TURN_CHARS))::contains
-                    )
-                }.filter { it.second >= 2 }
+            valid.asSequence().filter { it.value.role == "user" }
+                .map { turn -> turn to overlap(turn) }
+                .filter { it.second >= 2 }
                 .maxWithOrNull(compareBy<Pair<IndexedValue<Turn>, Int>> { it.second }
                     .thenBy { it.first.index })?.first
-            val corrections = anchor?.let { relatedCorrections(it, valid) }.orEmpty()
-            if (anchor != null && corrections.isNotEmpty())
-                corrections.asReversed() + anchor
-            else emptyList()
-        } else emptyList()
+        } else null
+        val linkedCorrections = topicalAnchor?.let { relatedCorrections(it, valid) }.orEmpty()
+        val topicalCorrections = if (topicalAnchor != null)
+            linkedCorrections.asReversed() + topicalAnchor else emptyList()
+        val linkedIndices = topicalCorrections.map { it.index }.toSet()
+        // A correction from another topic must not re-enter through the
+        // generic recency fallback after failing the topic-chain check.
+        // Preserve independently on-topic updates and leave vague follow-ups
+        // (no identifiable topic anchor) on the original recency path.
+        fun unrelatedCorrection(turn: IndexedValue<Turn>): Boolean =
+            topicalAnchor != null && turn.value.role == "user" &&
+                turn.index !in linkedIndices && isCorrection(turn.value.content) &&
+                overlap(turn) < 2
         val priority = (
             when {
                 ownerRecall && ranked.isNotEmpty() ->
@@ -179,7 +186,7 @@ internal object AstraConversationContext {
                 ownerRecall -> recentOwners + candidates.asReversed()
                 else -> topicalCorrections + recent.asReversed() + retrieved + candidates.asReversed()
             }
-        ).distinctBy { it.index }
+        ).distinctBy { it.index }.filterNot(::unrelatedCorrection)
         val selected = mutableListOf<Pair<Int, String>>()
         var remaining = room
         for (item in priority) {
