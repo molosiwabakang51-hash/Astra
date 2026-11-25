@@ -12,6 +12,8 @@ class AstraInterruptedReplyTest {
             "The response was interrupted when Astra closed.",
             "Offline response interrupted.",
             "Offline response stopped.",
+            AstraInterruptedReply.EMPTY_MODEL_REPLY,
+            "Offline model unavailable. Android may not have enough available RAM. Retry from Chat.",
             "Partial finance lecture.\n\n[Response stopped]",
             "Partial Russian lesson.\n\n[Response interrupted]",
             "Partial answer.\n\n[Response stopped]\n\nReferences retained."

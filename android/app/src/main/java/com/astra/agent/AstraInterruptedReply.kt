@@ -9,10 +9,13 @@ package com.astra.agent
  * anchoring. Never suppress or change user-authored messages.
  */
 internal object AstraInterruptedReply {
+    const val EMPTY_MODEL_REPLY = "The offline model did not produce a usable answer. Please try again."
     fun isIncomplete(assistantText: String): Boolean {
         val value = assistantText.trim()
         return value.startsWith("ASTRA // THINKING") ||
             value == "The response was interrupted when Astra closed." ||
+            value == EMPTY_MODEL_REPLY ||
+            value.startsWith("Offline model unavailable.") ||
             value.startsWith("Offline response interrupted.") ||
             value.startsWith("Offline response stopped.") ||
             value.contains("\n\n[Response interrupted]") ||
