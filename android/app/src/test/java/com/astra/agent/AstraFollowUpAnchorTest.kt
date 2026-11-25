@@ -342,7 +342,11 @@ class AstraFollowUpAnchorTest {
             msg("Astra", "b".repeat(319) + "😀")
         )
         val result = AstraFollowUpAnchor.enrich("go deeper", history)
-        assertFalse(result.any { it.isSurrogate() })
+        assertTrue(result.contains("😀"))
+        for (i in result.indices) {
+            if (result[i].isHighSurrogate()) assertTrue(result.getOrNull(i + 1)?.isLowSurrogate() == true)
+            if (result[i].isLowSurrogate()) assertTrue(result.getOrNull(i - 1)?.isHighSurrogate() == true)
+        }
         val numbered = listOf(
             msg("You", "Show the first item."),
             msg("Astra", "1. " + "c".repeat(416) + "😀")
@@ -407,5 +411,42 @@ class AstraFollowUpAnchorTest {
         val request = "Could you explain that with an example?"
         assertEquals(request, AstraFollowUpAnchor.enrich(request, history))
         assertEquals(request, AstraFollowUpAnchor.enrich(request, history.dropLast(1)))
+    }
+
+    @Test fun longExchangeRetainsActualQuestionAndFinalConclusion() {
+        val history = listOf(
+            msg("You", "Consider a fictional project. " + "background ".repeat(60) +
+                "Which route minimizes travel time?"),
+            msg("Astra", "We can compare the routes. " + "analysis ".repeat(60) +
+                "Final conclusion: route B is faster, provided the bridge is open.")
+        )
+        val focused = AstraFollowUpAnchor.enrich("Why is that?", history)
+        assertTrue(focused.contains("Consider a fictional project"))
+        assertTrue(focused.contains("Which route minimizes travel time?"))
+        assertTrue(focused.contains("Final conclusion: route B is faster"))
+        assertTrue(focused.contains("provided the bridge is open"))
+        assertTrue(focused.contains("[middle omitted]"))
+        assertTrue(focused.endsWith("CURRENT USER FOLLOW-UP: Why is that?"))
+        assertTrue(focused.length < 1100)
+    }
+
+    @Test fun multilineLegacyAndNumberedPhrasesAreNotReinterpretedAsFollowups() {
+        val history = listOf(msg("You", "Explain geometry."),
+            msg("Astra", "1. Angles.\n2. Triangles."))
+        for (request in listOf("Go\ndeeper", "Explain point\n2", "Please\rcontinue")) {
+            assertEquals(request, AstraFollowUpAnchor.enrich(request, history))
+        }
+    }
+
+    @Test fun headAndTailCutsDoNotCreateUnpairedSurrogates() {
+        val question = "x".repeat(120) + "😀" + "y".repeat(300) + "😀" + "z".repeat(120)
+        val answer = "a".repeat(150) + "😀" + "b".repeat(300) + "😀" + "c".repeat(150)
+        val focused = AstraFollowUpAnchor.enrich("Go deeper.",
+            listOf(msg("You", question), msg("Astra", answer)))
+        for (i in focused.indices) {
+            if (focused[i].isHighSurrogate()) assertTrue(focused.getOrNull(i + 1)?.isLowSurrogate() == true)
+            if (focused[i].isLowSurrogate()) assertTrue(focused.getOrNull(i - 1)?.isHighSurrogate() == true)
+        }
+        assertTrue(focused.contains("[middle omitted]"))
     }
 }
