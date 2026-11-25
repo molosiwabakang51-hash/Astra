@@ -53,13 +53,16 @@ class WorkflowRuntimePolicyTests(unittest.TestCase):
             self.assertNotIn("ubuntu-latest", source, workflow.name)
         self.assertEqual(set(NODE24_ACTIONS), found)
 
-    def test_all_jobs_pin_a_supported_ubuntu_image(self):
+    def test_all_jobs_pin_a_reviewed_runner_image(self):
         for workflow in sorted(WORKFLOWS.glob("*.yml")):
             source = workflow.read_text(encoding="utf-8")
             runners = RUNNER_LINE.findall(source)
             self.assertTrue(runners, workflow.name + " declares no runner")
+            # Only the desktop distribution workflow needs a Windows runner.
+            # All existing Android and Python workflows retain Ubuntu 24.04.
+            expected = "windows-2025" if workflow.name == "desktop-source.yml" else "ubuntu-24.04"
             self.assertTrue(
-                all(runner == "ubuntu-24.04" for runner in runners),
+                all(runner == expected for runner in runners),
                 workflow.name + ": unexpected moving or unreviewed runner " + str(runners),
             )
 
