@@ -42,6 +42,7 @@ class LocalAnswerRunner:
                 raise ValueError("Independent critic requires distinct weights.")
             self.models["critic"] = critic
         self.timeout = timeout
+        self.last_profile = {}
         self._stamps = {path: stamp(path) for path in (self.binary, *self.models.values())}
         self._lock = threading.Lock()
 
@@ -61,6 +62,7 @@ class LocalAnswerRunner:
         if not payload or len(payload) > MAX_PROMPT_BYTES or b"\x00" in payload:
             raise ValueError("Prompt outside local byte budget.")
         with self._lock:
+            self.last_profile.clear()
             self._check_files()
             model = self.models[role]
             name, size = model_file(model)
@@ -84,7 +86,8 @@ class LocalAnswerRunner:
                 try:
                     process = run_bounded(command, timeout=effective_timeout,
                                              env=environment, cwd=directory,
-                                             max_stdout_bytes=MAX_REPLY_BYTES)
+                                             max_stdout_bytes=MAX_REPLY_BYTES,
+                                             telemetry=self.last_profile)
                 except subprocess.TimeoutExpired:
                     raise RuntimeError("Local answer generation timed out.") from None
                 if process.returncode or len(process.stdout) > MAX_REPLY_BYTES:
