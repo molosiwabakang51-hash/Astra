@@ -4,12 +4,10 @@ Labels describe observable request form, not intelligence or difficulty.
 The quality gate uses synthetic generated families only; it never authorizes
 deployment or interprets a user request as a benchmark observation.
 """
-from collections import Counter
 import hashlib
 import math
 import re
 import secrets
-import statistics
 
 MAX_BYTES=4096
 FAMILIES=("conditional_probability","present_value","simple_interest","weighted_return")
@@ -114,3 +112,24 @@ def validate_transfer_reports(seeds,reports):
             "validation":validation,"candidate_families":candidates,
             "model_calls":288,"deployment_allowed":False,
             "scope":"Caller-supplied synthetic observations; distinct seeds, public related templates, six cases per family per split. No automatic routing, statistical significance or general intelligence claim."}
+
+def evaluate(runner, *, approved=False, seeds=None):
+    """Execute four preselected generated suites; no deployment or training."""
+    from astra_generated_validation import generate, evaluate as run_transfer
+    if approved is not True or not callable(runner):
+        raise ValueError("Explicit synthetic evaluation approval required.")
+    if seeds is None:
+        # Select all splits before inference. Never replace a seed based on results.
+        seeds=tuple(secrets.token_hex(16) for _ in range(4))
+    if type(seeds) not in (tuple,list) or len(seeds)!=4 or any(
+        not isinstance(seed,str) or not SEED.fullmatch(seed) for seed in seeds
+    ) or len(set(seeds))!=4:
+        raise ValueError("Four distinct preselected seeds required.")
+    seeds=tuple(seeds)
+    questions=[case.text for seed in seeds for case in generate(seed)]
+    if len(questions)!=len(set(questions)):
+        raise ValueError("Duplicate rendered generated question; restart with fresh seeds before inference.")
+    reports=[run_transfer(seed,runner,approved=True) for seed in seeds]
+    result=validate_transfer_reports(seeds,reports)
+    result["reproduction_seeds"]=list(seeds)
+    return result
