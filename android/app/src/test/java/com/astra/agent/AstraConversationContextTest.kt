@@ -599,8 +599,8 @@ class AstraConversationContextTest {
         val old = "Unrelated background material. ".repeat(15) +
             "The expedition departure date is 17 September."
         val history = listOf(turn("user", old), turn("assistant", "Noted."),
-            turn("user", "Actually, make it 21 October."))
-            + (1..20).map { turn("assistant", "Unrelated weather conversation $it " + "x".repeat(220)) }
+            turn("user", "Actually, make it 21 October.")) +
+            (1..20).map { turn("assistant", "Unrelated weather conversation $it " + "x".repeat(220)) }
         val answer = AstraConversationContext.userPrompt(
             "What was my expedition departure date?", history, true
         )
