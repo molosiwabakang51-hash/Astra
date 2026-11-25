@@ -1,0 +1,81 @@
+{
+  "currency": "BWP",
+  "basis": "aligned_periodic_total_returns_constant_weights",
+  "assets": [
+    "Equity",
+    "Bonds"
+  ],
+  "returns": [
+    [
+      "0.03",
+      "0.01"
+    ],
+    [
+      "-0.04",
+      "0.005"
+    ],
+    [
+      "0.02",
+      "-0.01"
+    ],
+    [
+      "0.01",
+      "0.008"
+    ],
+    [
+      "-0.025",
+      "0.004"
+    ],
+    [
+      "0.05",
+      "0.009"
+    ],
+    [
+      "0.015",
+      "0.002"
+    ],
+    [
+      "-0.03",
+      "0.012"
+    ],
+    [
+      "0.04",
+      "-0.005"
+    ],
+    [
+      "0.005",
+      "0.006"
+    ],
+    [
+      "0.02",
+      "0.007"
+    ],
+    [
+      "-0.01",
+      "0.003"
+    ]
+  ],
+  "allocations": [
+    {
+      "name": "Baseline",
+      "weights": [
+        "0.60",
+        "0.40"
+      ]
+    },
+    {
+      "name": "Alternative",
+      "weights": [
+        "0.40",
+        "0.60"
+      ]
+    }
+  ],
+  "initial_wealth": "100000",
+  "target_wealth": "110000",
+  "paths": 2000,
+  "horizon_periods": 12,
+  "block_length": 3,
+  "seed": 12345,
+  "confidence": "0.95"
+}
