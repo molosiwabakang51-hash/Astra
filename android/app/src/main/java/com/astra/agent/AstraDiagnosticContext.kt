@@ -12,9 +12,13 @@ internal object AstraDiagnosticContext {
     fun allowPrivateBooks(
         explicitBookQuery: Boolean,
         booksEnabledInChat: Boolean,
-        diagnosticIsolated: Boolean
+        diagnosticIsolated: Boolean,
+        memoryGrounded: Boolean = false
     ): Boolean =
-        !diagnosticIsolated && (explicitBookQuery || booksEnabledInChat)
+        !diagnosticIsolated && !memoryGrounded && (explicitBookQuery || booksEnabledInChat)
+
+    fun allowOpenCourse(diagnosticIsolated: Boolean, memoryGrounded: Boolean): Boolean =
+        !diagnosticIsolated && !memoryGrounded
 
     fun replyLanguage(configuredLanguage: String, diagnosticIsolated: Boolean): String =
         if (diagnosticIsolated) "auto" else configuredLanguage

@@ -122,6 +122,7 @@ internal class AstraOnDeviceBrain(
         diagnosticIsolated: Boolean = false,
         diagnosticReasoningOverride: Boolean? = null,
         visibleUserMessage: String? = null,
+        memoryGrounded: Boolean = false,
         onPartial: suspend (String) -> Unit = {}
     ): String = AstraModelOperationGate.withNativeSession {
         mutex.withLock {
@@ -189,14 +190,17 @@ internal class AstraOnDeviceBrain(
                 previousReplyLanguageId = selectedReplyLanguageId
                 // Fixed benchmark prompts must not invoke user-library retrieval,
                 // even when their wording happens to resemble a book query.
+                // Explicit memory analysis is restricted to its attributed
+                // evidence; never silently mix in book or course passages.
                 val explicitBookQuery = if (diagnosticIsolated) null else
-                    AstraBookQuery.extract(finalMessage)
+                    if (memoryGrounded) null else AstraBookQuery.extract(finalMessage)
                 val question = explicitBookQuery ?: finalMessage
                 val permittedBooks = AstraDiagnosticContext.allowPrivateBooks(
                     explicitBookQuery != null,
                     context.getSharedPreferences("astra", Context.MODE_PRIVATE)
                         .getBoolean("astra_use_books_in_chat", false),
-                    diagnosticIsolated
+                    diagnosticIsolated,
+                    memoryGrounded = memoryGrounded
                 )
                 if (previousBookContextAllowed != null &&
                     previousBookContextAllowed != permittedBooks
@@ -338,7 +342,9 @@ internal class AstraOnDeviceBrain(
                 var firstNativeChunkNs: Long? = null
                 var firstVisiblePublicationNs: Long? = null
                 var nativeChunkCount = 0
-                val openReferences = if (diagnosticIsolated) emptyList() else runCatching {
+                val openReferences = if (diagnosticIsolated) emptyList() else
+                    if (!AstraDiagnosticContext.allowOpenCourse(diagnosticIsolated, memoryGrounded))
+                        emptyList() else runCatching {
                     val bundled = context.assets.open(AstraOpenLibrary.BUNDLED_ASSET)
                         .use(AstraOpenLibrary::load)
                     val synced = java.io.File(
