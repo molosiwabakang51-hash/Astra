@@ -61,11 +61,19 @@ class Workbench:
         self._reset_knowledge()
         return {"status": "database_connected", "name": path.name}
 
-    def configure_models(self, binary, primary, critic=None, *, approved=False, timeout=180):
-        candidate = LocalAnswerRunner(binary, primary, critic, timeout=timeout, approved=approved)
+    def configure_models(self, binary, primary, critic=None, *, approved=False, timeout=180, context_policy="fixed"):
+        candidate = LocalAnswerRunner(binary, primary, critic, timeout=timeout, approved=approved,
+                                      context_policy=context_policy)
         self.runner = candidate
         self._reset_knowledge()
         return {"status": "models_configured", "critic_available": "critic" in candidate.models}
+
+    def runtime_profile(self):
+        profile = getattr(self.runner,"last_profile",{}) if self.runner is not None else {}
+        keys = ("role","context_policy","context_tokens","generation_tokens","threads",
+                "available_ram_mib","elapsed_seconds","outcome","output_bytes",
+                "memory_samples","observed_peak_working_set_bytes")
+        return {"status":"runtime_profile","profile":{k:profile[k] for k in keys if k in profile}}
 
     def disable_models(self):
         self.runner = None
@@ -176,6 +184,17 @@ def format_result(result):
         return f"Reviewed record saved. Evidence ID: {result['id']}."
     if status == "database_connected":
         return "Connected: "+result["name"]
+    if status == "runtime_profile":
+        profile = result["profile"]
+        if not profile:
+            return "No completed native invocation profile available."
+        lines = ["Latest native invocation (not an intelligence score)"]
+        for key,value in profile.items():
+            if key == "observed_peak_working_set_bytes" and value is not None:
+                value = f"{value / (1024*1024):,.1f} MiB"
+            lines.append(f"{key.replace('_',' ')}: {value if value is not None else 'unavailable'}")
+        lines.append("Direct child only. Observed memory is not an enforced limit. No prompt or answer text retained.")
+        return "\n".join(lines)
     if status == "models_configured":
         return "Local models configured (not yet inference-tested)."
     messages = {
