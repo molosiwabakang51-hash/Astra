@@ -75,6 +75,17 @@ class AdaptiveRoutingTests(unittest.TestCase):
             self.assertEqual(losses, result["specialist_losses"])
             self.assertFalse(result["deployment_allowed"])
 
+    def test_error_overlap_is_not_mistaken_for_consensus_correctness(self):
+        rows = observations()
+        case = R.CASES[0]
+        rows[0] = (case.id, wrong(case.expected), wrong(case.expected), 100, 100)
+        result = R.assess(R.score_rows(rows))
+        self.assertEqual(23, result["both_correct"])
+        self.assertEqual(1, result["both_wrong"])
+        self.assertEqual([case.id], result["primary_error_cases"])
+        self.assertEqual([case.id], result["specialist_error_cases"])
+        self.assertEqual("retain_primary", result["recommendation"])
+
     def test_completed_trial_persists_without_raw_answers(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "performance.sqlite"
