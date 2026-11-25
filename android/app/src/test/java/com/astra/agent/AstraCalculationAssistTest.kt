@@ -49,4 +49,15 @@ class AstraCalculationAssistTest {
         assertTrue(synthesis.contains("EXPRESSION: 12*5\nRESULT: 60"))
         assertTrue(synthesis.contains("if not, explain the mismatch"))
     }
+
+    @Test fun punctuationAndAmbiguousNumberFormatsAreHandledConservatively() {
+        assertEquals("67", AstraCalculationAssist.evaluate(
+            "12 packs cost 5 each. Add a fee of 7.", "CALC: 12*5+7")!!.result)
+        assertEquals("3.75", AstraCalculationAssist.evaluate(
+            "Add 1.25 and 2.5.", "CALC: 1.25+2.5")!!.result)
+        for (q in listOf("1,000 and 5", "1,25 and 5", "12e3 and 5",
+            "1234567890 and 5", "1.23456 and 5", "1.2.3 and 5")) {
+            assertNull(q, AstraCalculationAssist.evaluate(q, "CALC: 1+5"))
+        }
+    }
 }

@@ -13,8 +13,11 @@ internal object AstraCalculationAssist {
     const val MAX_QUESTION = 650
     private val number = Regex("""[0-9]{1,9}(?:\.[0-9]{1,4})?""")
     private val ownerNumber = Regex(
-        """(?<![\p{L}\p{N}_.])[0-9]{1,9}(?:\.[0-9]{1,4})?(?![\p{L}\p{N}_.])"""
+        """(?<![\p{L}\p{N}_.])[0-9]{1,9}(?:\.[0-9]{1,4})?(?![\p{L}\p{N}_]|\.[0-9])"""
     )
+    // A comma between digits may be a decimal or grouping separator.
+    // Do not silently interpret parts of a formatted number as operands.
+    private val ambiguousNumber = Regex("""[0-9],[0-9]""")
     private val plan = Regex("""CALC: ([0-9 .()+*/-]{1,120})""")
 
     data class Computed(val expression: String, val result: String) {
@@ -57,7 +60,8 @@ internal object AstraCalculationAssist {
 
     fun evaluate(question: String, proposal: String): Computed? {
         if (question.length !in 1..MAX_QUESTION ||
-            AstraInterruptedReply.isIncomplete(proposal)) return null
+            AstraInterruptedReply.isIncomplete(proposal) ||
+            ambiguousNumber.containsMatchIn(question)) return null
         val expression = plan.matchEntire(proposal.trim())?.groupValues?.get(1)?.trim()
             ?: return null
         val permitted = ownerNumber.findAll(question).map {
