@@ -2,7 +2,7 @@
 
 Owner directive: maintain every item, update at the end of each engineering session using verified evidence, and keep general AI the exclusive priority until independently demonstrated >=90/100. This separate ACIE ledger preserves the original 119 parent release requirements. Engineering completion is not an intelligence score. Existing checked statuses from the owner-approved session checklist denote integrated engineering, not complete capability acceptance. No new item checked merely from a proposed change. 27/119 engineering items checked.
 
-Newly checked: concept-aware retrieval integration (#409, Android/Python passed); initial verification merge and arithmetic verification integration (#408, Android/Python passed); narrow actual-model CPU baseline (run 45712659939, artifact 15068248646). CPU baseline is exploratory only, not the independent 200-case baseline. Isolated review quality remains unchecked until actual native review outcomes. Sampling optimization is integrated, not demonstrated superior; retain that distinction. #407 workflow successfully executed but merge conflict; reconciled in this PR. Hard direct and compact system experiments pending. No verified /100 rating.
+Newly checked: concept-aware retrieval integration (#409, Android/Python passed); initial verification merge and arithmetic verification integration (#408, Android/Python passed); narrow actual-model CPU baseline (run 45712659939, artifact 15068248646). CPU baseline is exploratory only, not the independent 200-case baseline. Isolated review quality remains unchecked until actual native review outcomes. Sampling optimization is integrated, not demonstrated superior; retain that distinction. #407 workflow successfully executed but merge conflict; reconciled in this PR. Hard direct and compact system experiments completed (run 45715461508); #410 merged. Hard direct 3/6 versus soft direct 2/6; compact thinking 2/6 versus production 4/6. These are exploratory strict-format results, not an intelligence score. No verified /100 rating.
 
 ## 1. Native inference engine (7/12)
 
@@ -152,6 +152,10 @@ Newly checked: concept-aware retrieval integration (#409, Android/Python passed)
 - [ ] ACIE-117 Evaluate regressions after major improvements
 - [ ] ACIE-118 Complete independent physical-device assessment
 - [ ] ACIE-119 Demonstrate repeatable intelligence score of at least 90/100
+
+## Latest engineering session
+
+All 119 IDs reviewed; 27/119 remain checked. #411 and #412 are undergoing Android CI; #412 Python checks passed. Implemented exact-token native budget admission: reduce only the production 768/1152/1792-token allowance when the entire prompt otherwise cannot fit, preserving minimum response budgets, exact smaller diagnostic caps, and existing incomplete-generation status. Added a host-compiled test of the actual native arithmetic. ACIE-010 and ACIE-029 remain open pending integrated native CI and actual inference/quality evidence. No new master completion claimed. The 200-case protocol still requires freeze and independent evidence.
 
 ## Acceptance
 
