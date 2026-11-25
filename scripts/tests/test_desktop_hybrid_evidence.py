@@ -123,6 +123,16 @@ class HybridEvidenceTests(unittest.TestCase):
             self.hybrid.search("duration", use_vector=True, approved=True,
                                model_sha="b"*64, embed=lambda texts: self.fail("unexpected call"))
 
+    def test_invalid_similarity_threshold_and_absent_index_are_explicit(self):
+        self.assertFalse(self.hybrid.coverage()["index_available"])
+        self.add("Duration", "Fixed income risk.")
+        self.refresh()
+        self.assertTrue(self.hybrid.coverage()["index_available"])
+        for value in (-0.1, 1.1, float("nan"), True):
+            with self.assertRaises(ValueError):
+                self.search("duration", lambda texts: self.fail("unexpected call"),
+                            minimum_similarity=value)
+
     def test_ledger_active_lookup_is_bounded_and_excludes_superseded_rows(self):
         first = self.add("Duration", "Old.")
         second = self.add("Duration", "New.", supersedes=first)
