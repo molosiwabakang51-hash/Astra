@@ -1,0 +1,15 @@
+{
+  "currency": "BWP",
+  "face_value": "1000",
+  "annual_coupon_rate": "0.06",
+  "payments_per_year": 2,
+  "remaining_periods": 10,
+  "basis": "regular_fixed_rate_bullet_on_coupon_date",
+  "annual_yield": "0.06",
+  "shocks_bps": [
+    -100,
+    -50,
+    50,
+    100
+  ]
+}
