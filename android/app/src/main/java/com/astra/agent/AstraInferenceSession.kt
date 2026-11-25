@@ -27,7 +27,13 @@ internal class AstraInferenceSession {
      * Keep a bounded in-memory tail, never persist or log chat content.
      */
     fun checkTranscript(priorCount: Int, priorTail: List<Pair<String, String>>) {
-        val last = completed ?: return
+        val last = completed ?: run {
+            // Model loading alone does not establish transcript continuity.
+            // A pre-generation early return must not leave a warm session
+            // that falsely appears to contain the visible conversation.
+            if (loadedGeneration != null) invalidate()
+            return
+        }
         val expectedCount = last.priorCount + 2
         val countMatches = priorCount == expectedCount ||
             (expectedCount > AstraConversationHistory.MAX_RETAINED_TURNS &&
