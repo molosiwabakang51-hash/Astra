@@ -62,6 +62,19 @@ internal object AstraAdaptiveReasoning {
         RegexOption.IGNORE_CASE
     )
 
+    private val taskOpening = Regex(
+        """^(?:please )?(?:(?:can|could|would) you )?""" +
+            """(?:compare|evaluate|assess|weigh|determine|test|check|examine|""" +
+            """identify|find|solve|calculate|derive|prove|plan|choose|""" +
+            """given|assuming|under|if|first|is|does|do|would|should|what|which|how)\b""",
+        RegexOption.IGNORE_CASE
+    )
+    private val sourceLabel = Regex(
+        """(?im)^\s*(?:quoted (?:source|text|passage)|source (?:text|material)|""" +
+            """notes follow|transcript|document excerpt|pasted (?:text|document)|""" +
+            """assistant|developer|system|user|previous astra|previous user)\s*:"""
+    )
+
     fun select(
         raw: String,
         automaticEnabled: Boolean,
@@ -74,19 +87,31 @@ internal object AstraAdaptiveReasoning {
         val current = raw.trim()
         // Long imported content or quoted transcripts are not authoritative
         // instructions for model settings. Never infer mode from them.
-        if (current.length !in 45..800 || '\n' in current ||
-            untrustedSource.containsMatchIn(current) || current.contains("```")
+        if (current.length !in 45..800 ||
+            untrustedSource.containsMatchIn(current) || current.contains("```") ||
+            sourceLabel.containsMatchIn(current)
         ) return false
+        val structured = current.contains('\n') || current.contains('\r')
+        // For structured owner questions, the first nonempty line must
+        // identify a reasoning task. Subsequent short lines may supply its
+        // premises and constraints; do not infer mode from pasted passages.
+        val candidate = if (structured) {
+            val lines = current.lines().map { it.trim() }.filter { it.isNotEmpty() }
+            if (lines.size !in 2..8 || lines.any { it.length > 220 } ||
+                !taskOpening.containsMatchIn(lines.first())
+            ) return false
+            lines.joinToString(" ")
+        } else current
         if (AstraGenerationPolicy.depth(current) == AstraGenerationPolicy.Depth.BRIEF ||
             explicitFast.containsMatchIn(current) ||
             languageOrQuotation.containsMatchIn(current)
         ) return false
         // Only recognizable multi-constraint tasks trigger expensive thought.
         // Ordinary chat, lessons and translations retain the fast path.
-        return planning.containsMatchIn(current) ||
-            multistep.containsMatchIn(current) ||
-            conditional.containsMatchIn(current) ||
-            deductive.containsMatchIn(current) ||
-            tradeoffQuestion.containsMatchIn(current)
+        return planning.containsMatchIn(candidate) ||
+            multistep.containsMatchIn(candidate) ||
+            conditional.containsMatchIn(candidate) ||
+            deductive.containsMatchIn(candidate) ||
+            tradeoffQuestion.containsMatchIn(candidate)
     }
 }
