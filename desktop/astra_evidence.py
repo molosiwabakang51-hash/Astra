@@ -124,6 +124,38 @@ class Ledger:
         return [dict(item[2], trust="owner_reviewed_not_independently_verified",
                      lexical_score=item[0]) for item in candidates[:limit]]
 
+    def vector_snapshot(self, limit=256):
+        """Newest active records and their total count from one SQL snapshot."""
+        if type(limit) is not int or not 1 <= limit <= 256:
+            raise ValueError("Vector snapshot limit must be 1–256.")
+        rows = self.connection.execute(
+            "SELECT id,subject,text,source,kind,supersedes,COUNT(*) OVER() AS active_count "
+            "FROM evidence WHERE active=1 ORDER BY id DESC LIMIT ?", (limit,)).fetchall()
+        total = rows[0]["active_count"] if rows else 0
+        records = []
+        for row in rows:
+            record = dict(row)
+            del record["active_count"]
+            records.append(dict(record, active=True,
+                                trust="owner_reviewed_not_independently_verified"))
+        return records, total
+
+    def lookup_active(self, ids):
+        """Re-read only requested active IDs after retrieval or correction."""
+        if not isinstance(ids, (list, tuple)) or len(ids) > 20:
+            raise ValueError("Active lookup requires a bounded ID list.")
+        if any(type(value) is not int or not 1 <= value <= (2**63 - 1) for value in ids):
+            raise ValueError("Invalid evidence ID.")
+        if not ids:
+            return []
+        unique = list(dict.fromkeys(ids))
+        placeholders = ",".join("?" for _ in unique)
+        rows = self.connection.execute(
+            "SELECT id,subject,text,source,kind,supersedes FROM evidence "
+            "WHERE active=1 AND id IN (" + placeholders + ")", unique).fetchall()
+        return [dict(row, active=True, trust="owner_reviewed_not_independently_verified")
+                for row in rows]
+
     def history(self, subject):
         subject = clean(subject, 200, "subject")
         return [dict(row) for row in self.connection.execute(
