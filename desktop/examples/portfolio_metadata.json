@@ -1,0 +1,7 @@
+{
+  "currency": "BWP",
+  "start": "2025-01-01",
+  "end": "2026-01-01",
+  "basis": "unchanged_holdings_no_flows_income_excluded",
+  "benchmark_total_return": "0.12"
+}
