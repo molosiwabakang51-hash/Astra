@@ -166,6 +166,8 @@ class AstraApp:
         self.worker.requests.put_nowait((name, method, args, kwargs))
 
     def ask(self, target, widget, method, **kwargs):
+        if self.pending or self.closing:
+            return
         question = widget.get("1.0", "end-1c").strip()
         if not question:
             return
@@ -331,8 +333,8 @@ class AstraApp:
             self.status.set("Ready · Local operation completed" if ok else "Ready · Operation unavailable")
             for button in self.buttons:
                 button.state(["!disabled"])
-        if not self.closing or self.worker.thread.is_alive():
-            self.root.after(80, self.poll)
+        # Keep polling until the worker explicitly confirms closure.
+        self.root.after(80, self.poll)
 
     def close(self):
         if self.pending:
