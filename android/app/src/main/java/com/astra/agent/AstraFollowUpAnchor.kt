@@ -56,6 +56,21 @@ internal object AstraFollowUpAnchor {
         "continue"
     )
 
+    // Compose polite requests, referring expressions and explanation forms
+    // instead of requiring every natural paraphrase to be enumerated.
+    // Full-message matching deliberately rejects a new explicit subject,
+    // pasted instructions, multi-topic questions or arbitrary action verbs.
+    private val referringFollowUp = Regex(
+        """^(?:please |(?:can|could|would) you (?:please )?)?""" +
+            """(?:(?:briefly )?(?:explain|clarify|expand on|elaborate on|summari[sz]e) """ +
+            """(?:it|this|that|your last answer|your previous answer|the previous answer)""" +
+            """(?: (?:again|more simply|in simpler terms|in (?:more )?detail|step by step|with an example|with examples|briefly))?""" +
+            """|(?:why (?:does|did) (?:this|that) happen|why (?:is|was) (?:this|that) true|""" +
+            """what (?:does|would) (?:this|that) (?:mean|imply)|""" +
+            """how (?:does|would) (?:this|that) work(?: in practice)?))""" +
+            """(?:,? please)?$"""
+    )
+
     // Limit short, numbered-list follow-ups to the last completed same-chat
     // exchange. Spoken words and ordinals must not be treated as arbitrary
     // commands: a request like "explain 2-factor authentication" is untouched.
@@ -133,7 +148,9 @@ internal object AstraFollowUpAnchor {
             .replace(Regex("""\s+"""), " ")
             .trimEnd('?', '.', '!', ' ')
         val selectedIndex = selectedNumber(lower)
-        if (lower !in followUps && selectedIndex == null) return prompt
+        val referring = original.none { it == '\n' || it == '\r' } &&
+            referringFollowUp.matches(lower)
+        if (lower !in followUps && selectedIndex == null && !referring) return prompt
         // Only the last *completed* user/assistant exchange is an anchor.
         // Never pair a newer question with an older assistant reply when its
         // actual response was stopped, interrupted or lost after process death.
