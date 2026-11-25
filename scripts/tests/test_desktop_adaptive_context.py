@@ -81,5 +81,31 @@ class AdaptiveContextTests(unittest.TestCase):
         self.assertIn("1.0 MiB",W.format_result(result))
         self.assertNotIn("private fixture",W.format_result(result))
 
+    def test_refused_attempt_has_actionable_private_profile(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp)
+            binary=root/"llama-cli.exe"
+            binary.write_bytes(b"fixture")
+            model=root/"primary.gguf"
+            model.write_bytes(b"GGUF"+b"x"*1024)
+            runner=A.LocalAnswerRunner(binary,model,approved=True,context_policy="adaptive")
+            with patch.object(A,"probe",return_value=P.Resources(1000*P.MIB,4,P.GIB)),patch.object(A,"run_bounded") as native:
+                with self.assertRaises(RuntimeError):
+                    runner("primary","synthetic secret")
+                native.assert_not_called()
+            wb=W.Workbench()
+            wb.runner=runner
+            profile=wb.runtime_profile()["profile"]
+            self.assertEqual("memory_admission_refused",profile["outcome"])
+            self.assertEqual(1000,profile["available_ram_mib"])
+            self.assertGreater(profile["required_ram_mib"],1000)
+            self.assertNotIn("synthetic secret",W.format_result(wb.runtime_profile()))
+            self.assertIn("Free RAM",W.format_result(wb.runtime_profile()))
+            with patch.object(A,"probe",return_value=P.Resources(8*P.GIB,4,P.GIB)),patch.object(A,"run_bounded") as native:
+                with self.assertRaises(RuntimeError):
+                    runner("primary","x"*4096)
+                native.assert_not_called()
+            self.assertEqual("prompt_context_budget_exceeded",runner.last_profile["outcome"])
+
 if __name__=="__main__":
     unittest.main()

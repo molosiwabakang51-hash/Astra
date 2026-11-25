@@ -12,7 +12,7 @@ import threading
 
 from astra_local_finance import file_digest
 from astra_native_subprocess import run_bounded
-from astra_resource_plan import model_file, plan, probe, adaptive_plan
+from astra_resource_plan import model_file, plan, probe, adaptive_plan, ADAPTIVE_CONTEXTS, PROMPT_OVERHEAD, MIB
 from astra_orchestrator import MAX_PROMPT_BYTES, MAX_REPLY_BYTES
 
 CONTEXT = 4096
@@ -67,19 +67,38 @@ class LocalAnswerRunner:
             raise ValueError("Prompt outside local byte budget.")
         with self._lock:
             self.last_profile.clear()
+            self.last_profile.update(role=role, context_policy=self.context_policy,
+                                     outcome="preflight_file_check", prompt_bytes=len(payload))
             self._check_files()
             model = self.models[role]
             name, size = model_file(model)
+            self.last_profile.update(outcome="resource_probe_failed",model_mib=round(size/MIB,1))
             resources = probe(model.parent)
+            self.last_profile.update(available_ram_mib=round(resources.available_ram/MIB,1))
             context = CONTEXT
             if self.context_policy == "adaptive":
+                eligible=[c for c in ADAPTIVE_CONTEXTS
+                          if len(payload)+PROMPT_OVERHEAD+GENERATE_TOKENS<=c]
+                if not eligible:
+                    self.last_profile["outcome"]="prompt_context_budget_exceeded"
+                    raise RuntimeError("Prompt exceeds conservative adaptive context allowance.")
+                minimum=min(eligible)
+                estimate=plan(resources,[("local_model",size)],context=minimum)
+                peaks=[v for k,v in self._observed[role].items() if k<=minimum]
+                measured=(max(peaks)*5+3)//4 if peaks else 0
+                self.last_profile.update(outcome="memory_admission_refused",
+                    minimum_context_tokens=minimum,
+                    required_ram_mib=round(1536+max(estimate["models"][0]["estimated_peak_mib"],measured/MIB),1))
                 admission = adaptive_plan(resources,size,len(payload),generation_tokens=GENERATE_TOKENS,
                                           observed=self._observed[role])
                 context = admission["context_tokens"]
             else:
                 admission = plan(resources, [(name, size)], context=CONTEXT)
+                self.last_profile.update(outcome="memory_admission_refused",minimum_context_tokens=CONTEXT,
+                    required_ram_mib=round(1536+admission["models"][0]["estimated_peak_mib"],1))
                 if not admission["all_admitted_individually"]:
                     raise RuntimeError("Insufficient available RAM.")
+            self.last_profile["outcome"]="prompt_preparation_failed"
             threads = str(admission["threads"])
             environment = {key: value for key, value in os.environ.items()
                            if not key.upper().startswith(("LLAMA_", "HF_", "HUGGINGFACE_", "MTMD_"))}

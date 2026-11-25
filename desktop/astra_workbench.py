@@ -79,7 +79,8 @@ class Workbench:
     def runtime_profile(self):
         profile = getattr(self.runner,"last_profile",{}) if self.runner is not None else {}
         keys = ("role","context_policy","context_tokens","generation_tokens","threads",
-                "available_ram_mib","elapsed_seconds","outcome","output_bytes",
+                "available_ram_mib","required_ram_mib","minimum_context_tokens","model_mib","prompt_bytes",
+                "elapsed_seconds","outcome","output_bytes",
                 "memory_samples","observed_peak_working_set_bytes")
         return {"status":"runtime_profile","profile":{k:profile[k] for k in keys if k in profile}}
 
@@ -232,13 +233,20 @@ def _format_result(result):
     if status == "runtime_profile":
         profile = result["profile"]
         if not profile:
-            return "No completed native invocation profile available."
-        lines = ["Latest native invocation (not an intelligence score)"]
+            return "No native attempt profile available."
+        lines = ["Latest native attempt (not an intelligence score)"]
         for key,value in profile.items():
             if key == "observed_peak_working_set_bytes" and value is not None:
                 value = f"{value / (1024*1024):,.1f} MiB"
             lines.append(f"{key.replace('_',' ')}: {value if value is not None else 'unavailable'}")
-        lines.append("Direct child only. Observed memory is not an enforced limit. No prompt or answer text retained.")
+        guidance={"preflight_file_check":"Reconfigure the runtime and model files; a file check failed.",
+                  "resource_probe_failed":"The available-memory or disk probe failed.",
+                  "prompt_context_budget_exceeded":"Narrow the question or supporting evidence; the conservative prompt limit was exceeded.",
+                  "memory_admission_refused":"Free RAM and retry. Required RAM is an estimate, including the system reserve.",
+                  "prompt_preparation_failed":"The temporary prompt could not be prepared."}
+        if profile.get("outcome") in guidance:
+            lines.append(guidance[profile["outcome"]])
+        lines.append("Direct child only when launched. Observed memory is not an enforced limit. No prompt or answer text retained.")
         return "\n".join(lines)
     if status == "models_configured":
         return "Local models configured (not yet inference-tested)."
