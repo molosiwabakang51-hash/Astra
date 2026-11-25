@@ -11,6 +11,7 @@ import tempfile
 import threading
 
 from astra_local_finance import file_digest
+from astra_native_subprocess import run_external
 from astra_resource_plan import model_file, plan, probe
 from astra_orchestrator import MAX_PROMPT_BYTES, MAX_REPLY_BYTES
 
@@ -81,7 +82,7 @@ class LocalAnswerRunner:
                            "-ngl", "0", "-t", threads, "-tb", threads,
                            "--temp", "0", "--seed", "42"]
                 try:
-                    process = subprocess.run(command, stdin=subprocess.DEVNULL,
+                    process = run_external(command, runner=subprocess.run, stdin=subprocess.DEVNULL,
                                              stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
                                              timeout=effective_timeout, shell=False, check=False,
                                              env=environment, cwd=directory)
