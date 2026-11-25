@@ -123,14 +123,14 @@ INTERFACE_RULES = (
     ),
     (
         "    fun cleanUp()",
-        "    /** Signal native CPU decode immediately without touching model memory. */\n    fun requestAbort()\n\n    fun cleanUp()",
+        "    /** Signal native CPU decode immediately without touching model memory. */\n    fun requestAbort()\n\n    /** Read only after generation completes under exclusive native ownership. */\n    fun generationLimitReached(): Boolean\n\n    fun cleanUp()",
     ),
 )
 
 IMPL_RULES = (
     (
         "    private external fun generateNextToken(): String?",
-        "    private external fun generateNextToken(): String?\n\n    private external fun requestNativeDecodeAbort()",
+        "    private external fun generateNextToken(): String?\n\n    private external fun requestNativeDecodeAbort()\n\n    private external fun generationLimitReachedNative(): Boolean",
     ),
     (
         "private external fun processUserPrompt(userPrompt: String, predictLength: Int): Int",
@@ -158,7 +158,7 @@ IMPL_RULES = (
     ),
     (
         "    override fun cleanUp() {",
-        "    override fun requestAbort() {\n        _cancelGeneration = true\n        requestNativeDecodeAbort()\n    }\n\n    override fun cleanUp() {",
+        "    override fun requestAbort() {\n        _cancelGeneration = true\n        requestNativeDecodeAbort()\n    }\n\n    override fun generationLimitReached(): Boolean = generationLimitReachedNative()\n\n    override fun cleanUp() {",
     ),
 )
 

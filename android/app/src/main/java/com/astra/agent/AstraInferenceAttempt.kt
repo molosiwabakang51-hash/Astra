@@ -15,7 +15,7 @@ internal data class AstraInferenceAttempt private constructor(
     }
     enum class Outcome {
         RUNNING, VISIBLE_REPLY, EMPTY_REPLY, TIMEOUT, CANCELLED,
-        LOW_MEMORY, LINKAGE_FAILURE, FAILED, NO_GENERATION
+        LOW_MEMORY, LINKAGE_FAILURE, FAILED, NO_GENERATION, TOKEN_LIMIT
     }
 
     fun advance(value: Phase): AstraInferenceAttempt =
@@ -52,6 +52,7 @@ internal data class AstraInferenceAttempt private constructor(
                 Outcome.LINKAGE_FAILURE -> "JNI linkage failure"
                 Outcome.FAILED -> "failed; cause not established"
                 Outcome.NO_GENERATION -> "ended without native generation"
+                Outcome.TOKEN_LIMIT -> "output token limit reached; incomplete response"
             }
             val duration = attempt.elapsedMs?.let { "; elapsed ${it} ms" } ?: ""
             return "Latest native attempt: $phase; $outcome$duration. No chat content recorded."

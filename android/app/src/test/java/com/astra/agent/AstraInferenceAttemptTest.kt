@@ -32,4 +32,16 @@ class AstraInferenceAttemptTest {
         assertNull(AstraInferenceAttempt.start().finish(AstraInferenceAttempt.Outcome.FAILED, 100, 99).elapsedMs)
         assertTrue(AstraInferenceAttempt.describe(null).contains("No native inference attempt"))
     }
+
+    @Test fun cappedResponseIsIncompleteEvenWithVisibleText() {
+        val result = AstraInterruptedReply.budgetLimited("The first step is")
+        assertTrue(result.contains("The first step is"))
+        assertTrue(AstraInterruptedReply.isIncomplete(result))
+        assertTrue(AstraInterruptedReply.isIncomplete(AstraInterruptedReply.budgetLimited("")))
+        assertFalse(AstraInterruptedReply.isIncomplete("The first step is complete."))
+        val limit = AstraInferenceAttempt.start()
+            .finish(AstraInferenceAttempt.Outcome.TOKEN_LIMIT, 0, 100)
+        assertTrue(AstraInferenceAttempt.describe(limit).contains("incomplete response"))
+        assertFalse(AstraInferenceAttempt.describe(limit).contains("visible reply produced"))
+    }
 }
