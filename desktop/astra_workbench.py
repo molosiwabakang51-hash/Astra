@@ -6,8 +6,11 @@ require explicit approval; model output is never written automatically.
 """
 from decimal import Decimal, localcontext
 from contextlib import closing
+from collections import deque
+import json
 from pathlib import Path
 
+from astra_compute_budget import BudgetedRunner, LatencyProfile, Policy
 from astra_evidence import Ledger
 from astra_finance_session import FinanceSession
 from astra_hybrid_evidence import HybridEvidence
@@ -23,6 +26,8 @@ class Workbench:
         self.retrieval = None
         self.runner = None
         self.knowledge = None
+        self.latency = LatencyProfile()
+        self.compute_history = deque(maxlen=24)
 
     def _reset_knowledge(self):
         self.knowledge = (KnowledgeSession(Orchestrator(self.ledger, self.retrieval, self.runner))
@@ -65,6 +70,8 @@ class Workbench:
         candidate = LocalAnswerRunner(binary, primary, critic, timeout=timeout, approved=approved,
                                       context_policy=context_policy)
         self.runner = candidate
+        self.latency = LatencyProfile()
+        self.compute_history.clear()
         self._reset_knowledge()
         return {"status": "models_configured", "critic_available": "critic" in candidate.models}
 
@@ -77,13 +84,15 @@ class Workbench:
 
     def disable_models(self):
         self.runner = None
+        self.latency = LatencyProfile()
+        self.compute_history.clear()
         self._reset_knowledge()
         return {"status": "models_disabled"}
 
     def ask_finance(self, question):
         return self.finance.execute(question)
 
-    def ask_knowledge(self, question, *, generate=False, review=False):
+    def ask_knowledge(self, question, *, generate=False, review=False, budget_seconds=None):
         if type(generate) is not bool or type(review) is not bool:
             raise ValueError("Invalid knowledge settings.")
         if self.ledger is None:
@@ -99,7 +108,39 @@ class Workbench:
             raise ValueError("Configure explicitly approved local models first.")
         if review and "critic" not in self.runner.models:
             raise ValueError("Independent review requires a distinct critic model.")
-        return self.knowledge.execute(question, approve_models=True, review=review)
+        if budget_seconds is None:
+            return self.knowledge.execute(question, approve_models=True, review=review)
+        policy = Policy("balanced" if review else "fast", budget_seconds)
+        wrapped = BudgetedRunner(self.runner, policy, self.latency, approved=True)
+        # Preserve the existing contextual session and evidence receipts; the
+        # request-scoped wrapper is removed even if validation or generation fails.
+        orchestrator = self.knowledge.orchestrator
+        previous = orchestrator.runner
+        orchestrator.runner = wrapped
+        try:
+            result = self.knowledge.execute(question, approve_models=True, review=review)
+        finally:
+            orchestrator.runner = previous
+        receipt = wrapped.report()
+        if receipt["model_calls"]:
+            self.compute_history.append(receipt)
+        return dict(result, compute=receipt)
+
+    def export_compute_history(self, path, *, approved=False):
+        if approved is not True:
+            raise ValueError("Explicit local diagnostics export approval required.")
+        if not self.compute_history:
+            raise ValueError("No completed budgeted invocation records.")
+        path = Path(path)
+        if path.suffix.lower() != ".json":
+            raise ValueError("Choose a new JSON diagnostics file.")
+        report = {"format":"astra-compute-history-v1",
+                  "scope":"Session-local request timing, not accuracy or authenticated configuration identity. No prompts or answers. Not imported for future routing.",
+                  "records":list(self.compute_history)}
+        with path.open("x", encoding="utf-8") as output:
+            json.dump(report,output,indent=2,allow_nan=False)
+            output.write("\n")
+        return {"status":"compute_history_exported","count":len(self.compute_history)}
 
     def add_evidence(self, subject, text, source, *, reviewed=False, supersedes=None):
         if self.ledger is None:
@@ -126,6 +167,8 @@ class Workbench:
         if self.ledger is not None:
             self.ledger.close()
         self.ledger = self.retrieval = self.runner = self.knowledge = None
+        self.compute_history.clear()
+        self.latency = LatencyProfile()
 
 
 def numeric_display(value, currency=None):
@@ -137,7 +180,7 @@ def numeric_display(value, currency=None):
         return ("P" if currency=="BWP" else "") + f"{amount:,.2f}"
 
 
-def format_result(result):
+def _format_result(result):
     """Render human-readable output without promoting drafts to facts."""
     status = result["status"]
     if status == "calculated":
@@ -209,3 +252,16 @@ def format_result(result):
         "knowledge_context_cleared":"Knowledge context cleared.",
     }
     return messages.get(status,"No usable result.")
+
+def format_result(result):
+    message = _format_result(result)
+    if result["status"]=="compute_history_exported":
+        return f"Saved {result['count']} content-free compute receipts to a new JSON file."
+    if "compute" in result:
+        receipt=result["compute"]
+        message += "\n\nCompute: "+str(receipt["model_calls"])+"/"+str(receipt["max_model_calls"])+ " model calls"
+        message += f" · {receipt['remaining_seconds']:.1f}s budget remaining"
+        if any(event["status"]=="budget_skipped" for event in receipt["events"]):
+            message += "\nOptional review skipped: estimated cost exceeds the remaining budget."
+        message += "\nTiming is not a measure of factual accuracy."
+    return message
