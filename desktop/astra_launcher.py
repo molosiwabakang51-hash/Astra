@@ -4,6 +4,7 @@ One child workspace at a time, no shell, no automatic model loading.
 Separate processes isolate Tk event loops and SQLite lifetimes. Closing a
 workspace releases its session state; persistent evidence remains on disk.
 """
+import importlib
 import importlib.util
 from pathlib import Path
 import subprocess
@@ -21,6 +22,8 @@ WORKSPACES = {
 def installed(workspace, root=ROOT):
     if workspace not in WORKSPACES:
         raise ValueError("Unknown workspace.")
+    if getattr(sys,"frozen",False) and Path(root).resolve()==ROOT:
+        return importlib.util.find_spec(Path(WORKSPACES[workspace][0]).stem) is not None
     path=Path(root)/WORKSPACES[workspace][0]
     return path.is_file() and not path.is_symlink()
 
@@ -42,9 +45,15 @@ class WorkspaceProcess:
         if not installed(name,self.root):
             raise ValueError("Workspace is not installed.")
         script=self.root/WORKSPACES[name][0]
-        # A fixed executable and script, no user command or shell expansion.
-        process=self.spawn([self.executable,"-E","-s",str(script)],
-                           cwd=str(self.root),shell=False)
+        # Frozen builds invoke the same executable with a fixed workspace name.
+        # Source builds retain the isolated Python subprocess entry point.
+        if getattr(sys,"frozen",False):
+            command=[self.executable,"--workspace",name]
+            cwd=str(Path(self.executable).resolve().parent)
+        else:
+            command=[self.executable,"-E","-s",str(script)]
+            cwd=str(self.root)
+        process=self.spawn(command,cwd=cwd,shell=False)
         self.process,self.name=process,name
 
     def collect(self):
@@ -61,11 +70,13 @@ class WorkspaceProcess:
 def diagnostics(root=ROOT):
     return {
         "python": ".".join(map(str,sys.version_info[:3])),
+        "frozen":bool(getattr(sys,"frozen",False)),
         "python_supported": sys.version_info>=(3,10),
         "tkinter_available":importlib.util.find_spec("tkinter") is not None,
         "assistant_installed":installed("assistant",root),
         "analytics_installed":installed("analytics",root),
-        "professional_export_installed":(Path(root)/"astra_report_export.py").is_file(),
+        "professional_export_installed":(importlib.util.find_spec("astra_report_export") is not None
+            if getattr(sys,"frozen",False) else (Path(root)/"astra_report_export.py").is_file()),
         "scope":"Presence checks only; not GUI, model or hardware validation.",
     }
 
@@ -74,11 +85,26 @@ def main(argv=None):
     import argparse
     import json
     parser=argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--diagnostics",action="store_true")
+    group=parser.add_mutually_exclusive_group()
+    group.add_argument("--diagnostics",action="store_true")
+    group.add_argument("--workspace",choices=tuple(WORKSPACES))
+    group.add_argument("--smoke-test",action="store_true")
     args=parser.parse_args(argv)
     if args.diagnostics:
         print(json.dumps(diagnostics(),indent=2))
         return 0
+    if args.smoke_test:
+        from astra_frozen_smoke import smoke_test
+        result=smoke_test()
+        print(json.dumps(result,indent=2))
+        return 0 if result["passed"] else 1
+    if args.workspace:
+        if not installed(args.workspace):
+            print("Workspace unavailable.",file=sys.stderr)
+            return 1
+        module=importlib.import_module(Path(WORKSPACES[args.workspace][0]).stem)
+        result=module.main()
+        return result if isinstance(result,int) else 0
     if sys.version_info<(3,10):
         print("Python 3.10 or later required.",file=sys.stderr)
         return 1
@@ -124,7 +150,7 @@ def main(argv=None):
         buttons[name]=button
         ttk.Label(row,text=description,wraplength=400).pack(side="left",fill="x",expand=True)
     ttk.Separator(outer).pack(fill="x",pady=14)
-    ttk.Label(outer,text="Professional reports are available through the local report-export command when installed.",wraplength=670,style="Muted.TLabel").pack(anchor="w")
+    ttk.Label(outer,text="Professional report support depends on the installed analytics modules.",wraplength=670,style="Muted.TLabel").pack(anchor="w")
     ttk.Label(outer,textvariable=status,wraplength=670).pack(side="bottom",anchor="w",pady=8)
     def poll():
         finished=controller.collect()
