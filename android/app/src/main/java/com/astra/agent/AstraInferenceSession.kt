@@ -11,6 +11,37 @@ package com.astra.agent
 internal class AstraInferenceSession {
     private var loadedGeneration: Int? = null
     private var invalidated: Boolean = false
+    private var completed: CompletedTurn? = null
+
+    private data class CompletedTurn(
+        val priorCount: Int,
+        val priorTail: List<Pair<String, String>>,
+        val reply: String
+    )
+
+    /**
+     * The visible chat can advance through deterministic tools, courses or
+     * failed requests without advancing native KV-cache. Only reuse a warm
+     * session when the last completed native turn still ends the transcript.
+     * Keep a bounded in-memory tail, never persist or log chat content.
+     */
+    fun checkTranscript(priorCount: Int, priorTail: List<Pair<String, String>>) {
+        val last = completed ?: return
+        val expectedCount = last.priorCount + 2
+        val countMatches = priorCount == expectedCount ||
+            (expectedCount > AstraConversationHistory.MAX_RETAINED_TURNS &&
+                priorCount in (expectedCount - 2)..expectedCount)
+        val same = countMatches && priorTail.size >= 2 &&
+            priorTail.last() == ("assistant" to last.reply) &&
+            priorTail[priorTail.lastIndex - 1].first == "user" &&
+            priorTail.dropLast(2).takeLast(last.priorTail.size) == last.priorTail
+        if (!same) invalidate()
+    }
+
+    fun recordCompletedTurn(priorCount: Int, priorTail: List<Pair<String, String>>, reply: String) {
+        require(reply.isNotBlank())
+        completed = CompletedTurn(priorCount, priorTail.takeLast(4).toList(), reply)
+    }
 
     fun requiresLoad(conversationGeneration: Int, nativeModelReady: Boolean): Boolean {
         if (!nativeModelReady) {
@@ -30,5 +61,6 @@ internal class AstraInferenceSession {
     fun invalidate() {
         loadedGeneration = null
         invalidated = true
+        completed = null
     }
 }
