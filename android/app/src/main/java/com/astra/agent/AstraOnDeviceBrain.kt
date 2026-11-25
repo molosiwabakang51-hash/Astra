@@ -126,6 +126,8 @@ internal class AstraOnDeviceBrain(
         memoryGrounded: Boolean = false,
         modelOnly: Boolean = false,
         memoryBrief: AstraGroundedMemory.Brief? = null,
+        ownerRequest: String? = null,
+        allowAutomaticReferences: Boolean = true,
         onPartial: suspend (String) -> Unit = {}
     ): String = AstraModelOperationGate.withNativeSession {
         mutex.withLock {
@@ -161,6 +163,9 @@ internal class AstraOnDeviceBrain(
                 session.checkTranscript(earlierTurns.size, transcriptTail)
                 val finalMessage = AstraConversationContext.currentUserMessage(turns.last().content)
                 require(finalMessage.isNotEmpty()) { "Message cannot be empty." }
+                val policyQuestion = AstraInferenceIntent.policyQuestion(
+                    ownerRequest, finalMessage, diagnosticIsolated
+                )
                 // Benchmark switches may ONLY alter Qwen's mode for one of
                 // the fixed, owner-approved synthetic questions. They cannot
                 // enable deep reasoning on chats, private files or older
@@ -173,7 +178,7 @@ internal class AstraOnDeviceBrain(
                 ).getBoolean("astra_adaptive_reasoning", false)
                 val carefulReasoning = diagnosticReasoningOverride ?:
                     AstraAdaptiveReasoning.select(
-                        finalMessage,
+                        policyQuestion,
                         automaticEnabled = adaptiveEnabled,
                         diagnosticIsolated = diagnosticIsolated
                     )
@@ -206,8 +211,9 @@ internal class AstraOnDeviceBrain(
                 val question = explicitBookQuery ?: finalMessage
                 val permittedBooks = AstraDiagnosticContext.allowPrivateBooks(
                     explicitBookQuery != null,
-                    context.getSharedPreferences("astra", Context.MODE_PRIVATE)
-                        .getBoolean("astra_use_books_in_chat", false),
+                    allowAutomaticReferences &&
+                        context.getSharedPreferences("astra", Context.MODE_PRIVATE)
+                            .getBoolean("astra_use_books_in_chat", false),
                     diagnosticIsolated,
                     memoryGrounded = memoryGrounded || modelOnly
                 )
@@ -352,7 +358,8 @@ internal class AstraOnDeviceBrain(
                 var firstVisiblePublicationNs: Long? = null
                 var nativeChunkCount = 0
                 val openReferences = if (diagnosticIsolated) emptyList() else
-                    if (modelOnly || !AstraDiagnosticContext.allowOpenCourse(diagnosticIsolated, memoryGrounded))
+                    if (modelOnly || !AstraDiagnosticContext.allowOpenCourse(diagnosticIsolated, memoryGrounded) ||
+                        !allowAutomaticReferences)
                         emptyList() else runCatching {
                     val bundled = context.assets.open(AstraOpenLibrary.BUNDLED_ASSET)
                         .use(AstraOpenLibrary::load)
@@ -412,9 +419,9 @@ internal class AstraOnDeviceBrain(
                 }
                 val answerBudget = AstraGenerationPolicy.effectiveBudget(
                     AstraGenerationPolicy.maxAnswerTokens(
-                        finalMessage,
+                        policyQuestion,
                         advancedModel = modelPath.name == AstraModelImport.ADVANCED_NAME,
-                        hasReferences = citedBooks.isNotEmpty() || citedOpenCourse.isNotEmpty(),
+                        hasReferences = memoryGrounded || citedBooks.isNotEmpty() || citedOpenCourse.isNotEmpty(),
                         thinkingRequested = carefulReasoning
                     ),
                     diagnosticMaxTokens
