@@ -29,3 +29,6 @@ The Knowledge workspace displays a conservative English request-form label (comp
 
 ## Complete distribution gate
 The integrated Windows build requires all eight analytic engine groups and both analytics/professional reporting groups before starting PyInstaller. Both Windows jobs use `--complete-smoke-test` to require all eight bundled examples and professional report generation. The ordinary `--smoke-test` remains a partial-installation diagnostic. The complete gate is necessary but not sufficient for release: native model compatibility, GUI operation, supply-chain review and physical resource measurements are still required.
+
+## Relocated executable acceptance
+The Windows CI packaging job copies the complete onedir bundle to a fresh runner-temporary path containing spaces, verifies its manifest, removes Python-specific environment paths, and runs the strict executable smoke test from outside the repository. Publication requires a receipt reporting frozen=true, require_complete=true and passed=true. This checks packaging independence from an installed Python on that runner, not compatibility with every clean Windows machine or the owner's CPU/RAM. The packaging workflow has explicit integration-branch push and PR review triggers; the branch remains experimental until the actual Windows job succeeds.
