@@ -16,6 +16,7 @@ internal class AstraInferenceSession {
     private data class CompletedTurn(
         val priorCount: Int,
         val priorTail: List<Pair<String, String>>,
+        val userMessage: String,
         val reply: String
     )
 
@@ -33,14 +34,19 @@ internal class AstraInferenceSession {
                 priorCount in (expectedCount - 2)..expectedCount)
         val same = countMatches && priorTail.size >= 2 &&
             priorTail.last() == ("assistant" to last.reply) &&
-            priorTail[priorTail.lastIndex - 1].first == "user" &&
+            priorTail[priorTail.lastIndex - 1] == ("user" to last.userMessage) &&
             priorTail.dropLast(2).takeLast(last.priorTail.size) == last.priorTail
         if (!same) invalidate()
     }
 
-    fun recordCompletedTurn(priorCount: Int, priorTail: List<Pair<String, String>>, reply: String) {
+    fun recordCompletedTurn(
+        priorCount: Int,
+        priorTail: List<Pair<String, String>>,
+        userMessage: String,
+        reply: String
+    ) {
         require(reply.isNotBlank())
-        completed = CompletedTurn(priorCount, priorTail.takeLast(4).toList(), reply)
+        completed = CompletedTurn(priorCount, priorTail.takeLast(4).toList(), userMessage, reply)
     }
 
     fun requiresLoad(conversationGeneration: Int, nativeModelReady: Boolean): Boolean {
@@ -56,6 +62,7 @@ internal class AstraInferenceSession {
     fun markLoaded(conversationGeneration: Int) {
         loadedGeneration = conversationGeneration
         invalidated = false
+        completed = null
     }
 
     fun invalidate() {
