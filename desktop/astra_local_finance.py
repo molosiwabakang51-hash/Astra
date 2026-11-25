@@ -82,7 +82,7 @@ class LocalProposer:
             path.write_bytes(payload)
             command = [str(self.binary), "-m", str(model), "-f", str(path),
                        "--offline", "--no-mmproj", "--no-escape", "--log-disable",
-                       "--conversation", "--single-turn", "--no-display-prompt",
+                       "--single-turn", "--no-display-prompt",
                        "--simple-io", "--color", "off", "--no-show-timings",
                        "--reasoning", "off", "--cache-ram", "0", "--no-context-shift",
                        "--grammar", DECIMAL_GRAMMAR, "-c", "2048", "-n", "48",
