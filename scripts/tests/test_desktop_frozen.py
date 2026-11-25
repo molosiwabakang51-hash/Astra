@@ -89,5 +89,41 @@ class FrozenTests(unittest.TestCase):
         self.assertTrue(result["checks"]["reviewed_evidence"])
 
 
+    @unittest.skipUnless(importlib.util.find_spec("tkinter") is not None,"Tkinter not installed on source runner")
+    def test_complete_release_exercises_all_eight_engines(self):
+        from astra_frozen_smoke import smoke_test
+        result=smoke_test(require_complete=True)
+        self.assertTrue(result["passed"],result["checks"])
+        expected=set(D.GROUPS)-{"analytics","professional-report"}
+        self.assertEqual(8,len(expected))
+        self.assertEqual(expected,{k.removeprefix("example_") for k in result["checks"] if k.startswith("example_")})
+        self.assertTrue(result["checks"]["professional_present"])
+        self.assertTrue(result["checks"]["professional_renderer"])
+
+    @unittest.skipUnless(importlib.util.find_spec("tkinter") is not None,"Tkinter not installed on source runner")
+    def test_complete_release_refuses_missing_renderer(self):
+        from astra_frozen_smoke import smoke_test
+        original=importlib.util.find_spec
+        def without_renderer(name,*args,**kwargs):
+            if name=="astra_professional_report":
+                return None
+            return original(name,*args,**kwargs)
+        with patch.object(importlib.util,"find_spec",side_effect=without_renderer):
+            result=smoke_test(require_complete=True)
+        self.assertFalse(result["passed"])
+        self.assertFalse(result["checks"]["professional_present"])
+
+    @unittest.skipUnless(importlib.util.find_spec("tkinter") is not None,"Tkinter not installed on source runner")
+    def test_complete_release_refuses_unavailable_engine(self):
+        from astra_frozen_smoke import smoke_test
+        import astra_analytics
+        modes=astra_analytics.available()
+        modes["simulation"]=False
+        with patch.object(astra_analytics,"available",return_value=modes):
+            result=smoke_test(require_complete=True)
+        self.assertFalse(result["passed"])
+        self.assertFalse(result["checks"]["example_simulation"])
+
+
 if __name__=="__main__":
     unittest.main()
