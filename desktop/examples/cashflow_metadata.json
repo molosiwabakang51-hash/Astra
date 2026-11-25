@@ -1,0 +1,8 @@
+{
+  "currency": "BWP",
+  "start": "2025-01-01",
+  "end": "2026-01-01",
+  "basis": "pre_flow_valuations_total_portfolio_value",
+  "opening_value": "1000",
+  "closing_value": "1760"
+}
