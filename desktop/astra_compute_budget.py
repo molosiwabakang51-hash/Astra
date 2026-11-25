@@ -113,9 +113,9 @@ class BudgetedRunner:
         if role not in ROLES:
             raise ValueError("Unsupported budgeted model role.")
         remaining = math.floor(self.remaining())
-        estimate = min(self.runner.timeout, self.profile.estimate(role))
+        estimate = self.profile.estimate(role)
         if self.calls >= self.policy.max_calls or remaining < 1 or (
-            (self.calls > 0 or role == "critic") and remaining < estimate
+            (self.calls > 0 or role == "critic") and min(remaining, self.runner.timeout) < estimate
         ):
             if len(self.events) < 2 * max(MODES.values()):
                 self.events.append({"role": role, "status": "budget_skipped"})
