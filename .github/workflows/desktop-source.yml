@@ -6,6 +6,14 @@ on:
       - 'scripts/tests/test_desktop_distribution.py'
       - '.github/workflows/desktop-source.yml'
       - 'scripts/tests/test_workflow_runtime_policy.py'
+  push:
+    branches:
+      - main
+    paths:
+      - 'desktop/**'
+      - 'scripts/tests/test_desktop_distribution.py'
+      - 'scripts/tests/test_workflow_runtime_policy.py'
+      - '.github/workflows/desktop-source.yml'
   workflow_dispatch:
 permissions:
   contents: read
