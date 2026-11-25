@@ -14,7 +14,7 @@ import zipfile
 
 ROOT=Path(__file__).resolve().parent
 CORE=(
-    "astra_launcher.py","astra_frozen_smoke.py","astra_desktop_distribution.py","astra_desktop_gui.py","astra_workbench.py",
+    "astra_launcher.py","astra_compute_budget.py","astra_frozen_smoke.py","astra_desktop_distribution.py","astra_desktop_gui.py","astra_workbench.py",
     "astra_evidence.py","astra_finance_session.py","astra_natural_language.py",
     "astra_verified_finance.py","astra_quantitative_verify.py",
     "astra_hybrid_evidence.py","astra_vector_memory.py",
