@@ -59,8 +59,9 @@ class KnowledgeSession:
             request, approve_models=True, approve_embeddings=approve_embeddings,
             embed=embed, model_sha=model_sha, conversation=context)
         status = result["status"]
-        if status in ("evidence_changed_retry", "context_budget_exceeded"):
-            # The previous draft can no longer be safely reused.
+        if status != "unverified_evidence_grounded_draft":
+            # A failed turn must not silently make a later reference point
+            # to an older answer rather than the most recent exchange.
             self.reset()
         if status == "unverified_evidence_grounded_draft":
             receipts = result["evidence_receipts"]
