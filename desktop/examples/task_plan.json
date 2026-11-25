@@ -1,0 +1,33 @@
+{
+  "objective": "Compare the present values of 10000 at 8% and 10% over five years.",
+  "steps": [
+    {
+      "id": "base",
+      "kind": "finance",
+      "depends_on": [],
+      "calculation": {
+        "operation": "present_value",
+        "inputs": {
+          "amount": "10000",
+          "rate": "0.08",
+          "periods": 5
+        }
+      }
+    },
+    {
+      "id": "stress",
+      "kind": "finance",
+      "depends_on": [
+        "base"
+      ],
+      "calculation": {
+        "operation": "present_value",
+        "inputs": {
+          "amount": "10000",
+          "rate": "0.10",
+          "periods": 5
+        }
+      }
+    }
+  ]
+}
