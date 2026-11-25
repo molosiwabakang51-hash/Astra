@@ -193,4 +193,34 @@ class AstraGroundedMemoryTest {
         )
         assertEquals(1, brief.evidence.size)
     }
+    @Test fun bareAndSavedNotesCommandsNeverRetrieveChatsOrTasks() {
+        for (command in listOf(
+            "answer using notes about copper",
+            "answer from saved notes about copper",
+            "answer using the saved notes about copper",
+            "connect my notes about copper"
+        )) {
+            val request = AstraGroundedMemory.parse(command)!!
+            assertTrue(command, request.notesOnly)
+            val brief = AstraGroundedMemory.retrieve(
+                request, notes = emptyList(),
+                tasks = listOf("Copper task"),
+                current = listOf(msg("You", "Copper private conversation")),
+                archived = listOf(AstraChatArchive.Chat("old", "Old",
+                    listOf(msg("You", "Copper archived conversation"))))
+            )
+            assertTrue(command, brief.evidence.isEmpty())
+        }
+    }
+
+    @Test fun wordsInsideQuestionCannotChangeExplicitMemoryScope() {
+        for (command in listOf(
+            "ask memory what did my notes say about copper",
+            "answer from my memory what did my notes say about copper",
+            "analyse my memory about the notes on copper"
+        )) {
+            assertFalse(command, AstraGroundedMemory.parse(command)!!.notesOnly)
+        }
+    }
+
 }
