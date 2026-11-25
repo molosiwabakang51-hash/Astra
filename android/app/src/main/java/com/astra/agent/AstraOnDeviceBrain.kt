@@ -125,6 +125,7 @@ internal class AstraOnDeviceBrain(
         visibleUserMessage: String? = null,
         memoryGrounded: Boolean = false,
         modelOnly: Boolean = false,
+        memoryBrief: AstraGroundedMemory.Brief? = null,
         onPartial: suspend (String) -> Unit = {}
     ): String = AstraModelOperationGate.withNativeSession {
         mutex.withLock {
@@ -389,6 +390,16 @@ internal class AstraOnDeviceBrain(
                 )
                 // Attribution must reflect the exact prompt after language
                 // preferences, recovery and truncation have been applied.
+                val verifiedMemoryPassages = memoryBrief?.includedCount(requestPrompt) ?: 0
+                if (memoryGrounded) {
+                    check(!modelOnly && !diagnosticIsolated && memoryBrief != null &&
+                        verifiedMemoryPassages > 0
+                    ) { "Complete memory evidence did not survive prompt preparation." }
+                } else {
+                    check(memoryBrief == null) { "Memory evidence requires explicit grounded routing." }
+                }
+                fun guardMemory(text: String): String = if (memoryGrounded)
+                    AstraSourceCitationGuard.protectMemory(text, verifiedMemoryPassages) else text
                 val citedBooks = if (bookReferences.isNotEmpty()) {
                     books?.includedEvidence(question, bookReferences, requestPrompt).orEmpty()
                 } else emptyList()
@@ -442,11 +453,11 @@ internal class AstraOnDeviceBrain(
                             // Android main thread while native Qwen3 is generating.
                             // Bound these expensive UI updates without changing
                             // the token stream, native output or persisted answer.
-                            val partial = AstraSourceCitationGuard.protect(
+                            val partial = guardMemory(AstraSourceCitationGuard.protect(
                                 AstraOfflinePolicy.publicReply(answer.snapshot()),
                                 verifiedPrivatePassages = citedBooks.size,
                                 verifiedOpenPassages = citedOpenCourse.size
-                            )
+                            ))
                             if (AstraStreamingUiPolicy.hasNewVisibleText(
                                     partial, lastPublishedText
                                 )) {
@@ -475,11 +486,11 @@ internal class AstraOnDeviceBrain(
                 // evidence blocks actually reached the native model prompt.
                 // Strip forged headings before appending app-owned sources;
                 // an AI claim must never authorize book follow-up access.
-                val attributedAnswer = AstraSourceCitationGuard.protect(
+                val attributedAnswer = guardMemory(AstraSourceCitationGuard.protect(
                     publicAnswer,
                     verifiedPrivatePassages = citedBooks.size,
                     verifiedOpenPassages = citedOpenCourse.size
-                )
+                ))
                 if (attributedAnswer.isNotBlank() && !budgetExhausted) {
                     // A cancelled, failed, think-only or citation-filtered-empty
                     // reply cannot establish successful visible generation.

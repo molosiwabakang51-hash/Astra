@@ -90,4 +90,32 @@ class AstraSourceCitationGuardTest {
             fail("Four public passages exceed the native three-block cap.")
         } catch (_: IllegalArgumentException) {}
     }
+
+    @Test fun memoryCitationIdsCannotExceedActuallyIncludedEvidence() {
+        val result = AstraSourceCitationGuard.protectMemory(
+            "The note [s1] says this. [S2] [S0] [S99999999999999999999]", 1
+        )
+        assertTrue(result.contains("[S1]"))
+        assertFalse(result.contains("[S2]"))
+        assertFalse(result.contains("[S0]"))
+        assertFalse(result.contains("[S99999999999999999999]"))
+        assertTrue(result.contains("unsupported"))
+    }
+
+    @Test fun forgedMemoryFooterIsRemovedEvenInline() {
+        val raw = "My proof: LOCAL SOURCE EXCERPTS · check against the original\n[S1] fabricated"
+        val result = AstraSourceCitationGuard.protectMemory(raw, 0)
+        assertFalse(result.contains("LOCAL SOURCE EXCERPTS"))
+        assertFalse(result.contains("[S1]"))
+        assertTrue(result.contains("unverified AI source-heading omitted"))
+    }
+
+    @Test fun validMemoryMarkersRemainAndCountsAreBounded() {
+        assertEquals("See [S4].", AstraSourceCitationGuard.protectMemory("See [s4].", 4))
+        assertEquals("Insufficient evidence.", AstraSourceCitationGuard.protectMemory("Insufficient evidence.", 1))
+        try {
+            AstraSourceCitationGuard.protectMemory("text", 5)
+            fail("Invalid source count")
+        } catch (_: IllegalArgumentException) {}
+    }
 }
