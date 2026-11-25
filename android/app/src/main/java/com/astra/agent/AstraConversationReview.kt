@@ -67,13 +67,17 @@ internal object AstraConversationReview {
                 .filter { it.role == "You" }
                 .take(8)
                 .mapNotNull { previous ->
-                    mentions.matchEntire(previous.text.trim())?.groupValues?.get(1)
-                        ?: compoundReviewPattern.matchEntire(previous.text.trim())
-                            ?.groupValues?.get(1)
+                    val text = previous.text.trim().replace(Regex("""\s+"""), " ")
+                    assistantRecall.matchEntire(text)?.groupValues?.get(1)?.let { it to true }
+                        ?: mentions.matchEntire(text)?.groupValues?.get(1)?.let { it to false }
+                        ?: compoundReviewPattern.matchEntire(text)
+                            ?.groupValues?.get(1)?.let { it to false }
                 }
                 .firstOrNull()
             if (priorQuery != null) {
-                return earlierMentions(priorQuery, history)
+                val term = priorQuery.first.trim().trimEnd('.', '?', '!')
+                if (term.length !in 2..65) return null
+                return earlierMentions(term, history, onlyAssistant = priorQuery.second)
             }
         }
         val earlierAssistant = assistantRecall.matchEntire(command)
@@ -98,6 +102,12 @@ internal object AstraConversationReview {
             compoundReviewPattern.matches(text)
     }
 
+    private fun isReviewResponse(raw: String): Boolean {
+        val text = raw.trim()
+        return text.startsWith("ASTRA // CHAT REVIEW") ||
+            text.startsWith("No earlier mentions of '")
+    }
+
     private fun earlierMentions(
         term: String,
         history: List<AstraChatArchive.Message>,
@@ -120,7 +130,8 @@ internal object AstraConversationReview {
             } else if (entry.value.role == "You" && isReviewQuery(entry.value.text)) {
                 // A search request is not evidence that the topic was discussed.
                 false
-            } else if (entry.value.text.trim().startsWith("ASTRA // CHAT REVIEW")) {
+            } else if (entry.value.role == "Astra" &&
+                (isReviewResponse(entry.value.text) || AstraInterruptedReply.isIncomplete(entry.value.text))) {
                 false
             } else {
                 val present = wordTokens.findAll(
@@ -161,7 +172,8 @@ internal object AstraConversationReview {
             topic.contains("stiller") || topic.contains("irrational exuberance")
         val earlierReplies = history.withIndex().filter {
             it.value.role == "Astra" &&
-                !it.value.text.trim().startsWith("ASTRA // CHAT REVIEW")
+                !isReviewResponse(it.value.text) &&
+                !AstraInterruptedReply.isIncomplete(it.value.text)
         }
         if (reviewingShiller) {
             // Correct only an attribution that the assistant actually made.
@@ -176,7 +188,7 @@ internal object AstraConversationReview {
             }
             if (falseAttribution != null) {
                 val chicagoClaim = earlierReplies.any { entry ->
-                    val claim = entry.value.text.replace(Regex("""\\s+"""), " ")
+                    val claim = entry.value.text.replace(Regex("""\s+"""), " ")
                         .lowercase(Locale.ROOT)
                     // Mentioning Chicago to *deny* a false affiliation
                     // is not proof that Astra assigned that affiliation.
