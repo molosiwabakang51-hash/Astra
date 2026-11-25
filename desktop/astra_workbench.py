@@ -17,6 +17,7 @@ from astra_hybrid_evidence import HybridEvidence
 from astra_knowledge_session import KnowledgeSession
 from astra_local_answer import LocalAnswerRunner
 from astra_orchestrator import Orchestrator
+from astra_task_routing import classify
 
 
 class Workbench:
@@ -110,6 +111,7 @@ class Workbench:
             raise ValueError("Independent review requires a distinct critic model.")
         if budget_seconds is None:
             return self.knowledge.execute(question, approve_models=True, review=review)
+        task = classify(question)
         policy = Policy("balanced" if review else "fast", budget_seconds)
         wrapped = BudgetedRunner(self.runner, policy, self.latency, approved=True)
         # Preserve the existing contextual session and evidence receipts; the
@@ -124,7 +126,7 @@ class Workbench:
         receipt = wrapped.report()
         if receipt["model_calls"]:
             self.compute_history.append(receipt)
-        return dict(result, compute=receipt)
+        return dict(result, compute=receipt, task_form=task)
 
     def export_compute_history(self, path, *, approved=False):
         if approved is not True:
@@ -263,5 +265,7 @@ def format_result(result):
         message += f" · {receipt['remaining_seconds']:.1f}s budget remaining"
         if any(event["status"]=="budget_skipped" for event in receipt["events"]):
             message += "\nOptional review skipped: estimated cost exceeds the remaining budget."
-        message += "\nTiming is not a measure of factual accuracy."
+        if "task_form" in result:
+            message += "\nTask form: "+result["task_form"]["task_form"].replace("_"," ")
+        message += "\nTiming and task-form labels are not accuracy measurements."
     return message
