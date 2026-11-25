@@ -2,9 +2,9 @@
 from pathlib import Path
 import unittest
 
-BRAIN = (Path(__file__).resolve().parents[2] /
-         "android/app/src/main/java/com/astra/agent/AstraOnDeviceBrain.kt").read_text(
-             encoding="utf-8")
+SRC = Path(__file__).resolve().parents[2] / "android/app/src/main/java/com/astra/agent"
+BRAIN = (SRC / "AstraOnDeviceBrain.kt").read_text(encoding="utf-8")
+INTERRUPTED = (SRC / "AstraInterruptedReply.kt").read_text(encoding="utf-8")
 
 
 class GuardedReplyContracts(unittest.TestCase):
@@ -21,7 +21,10 @@ class GuardedReplyContracts(unittest.TestCase):
         end = BRAIN.index("} else if (citedBooks.isNotEmpty())", start)
         recovery = BRAIN[start:end]
         self.assertIn("session.invalidate()", recovery)
-        self.assertIn("The offline model did not produce a usable answer.", recovery)
+        self.assertIn("loadedModelPath = null", recovery)
+        self.assertIn("AstraInterruptedReply.EMPTY_MODEL_REPLY", recovery)
+        self.assertIn("The offline model did not produce a usable answer.", INTERRUPTED)
+        self.assertIn("value == EMPTY_MODEL_REPLY", INTERRUPTED)
         self.assertNotIn("attributedAnswer +", recovery)
 
 
