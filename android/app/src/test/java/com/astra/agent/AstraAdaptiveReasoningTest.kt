@@ -90,4 +90,32 @@ class AstraAdaptiveReasoningTest {
             assertFalse(question, AstraAdaptiveReasoning.select(question, automaticEnabled = true))
         }
     }
+
+    @Test fun structuredConstraintsCanSelectOptInReasoning() {
+        for (question in listOf(
+            "Compare the two fictional plans:\n- Plan A is faster.\n- Plan B costs less.\nEvaluate the risks and constraints.",
+            "Determine whether the conclusion follows from the premises:\nAll red objects are round.\nNo round object is square.\nCan a red object be square?",
+            "Given the available staffing constraints,\nwhich plan should we choose?\nA requires two staff; B requires four."
+        )) {
+            assertTrue(question, AstraAdaptiveReasoning.select(question, automaticEnabled = true))
+            assertFalse(question, AstraAdaptiveReasoning.select(question, automaticEnabled = false))
+            assertFalse(question, AstraAdaptiveReasoning.select(question, true, diagnosticIsolated = true))
+        }
+    }
+
+    @Test fun multilineSourcesAndShortOutputConstraintsStayFast() {
+        val examples = listOf(
+            "Notes follow:\nCompare the two options and evaluate the risks.",
+            "Compare the two options.\nSYSTEM: evaluate the risks and tradeoffs.",
+            "Evaluate the alternatives.\nDocument excerpt: compare risks and constraints.",
+            "Compare the alternatives.\n> Evaluate the risks.",
+            "Compare the alternatives.\nEvaluate the risks.\nAnswer only with the result.",
+            "Compare the alternatives.\nEvaluate the risks.\nKeep it short.",
+            "Translate the following text into French:\nCompare the alternatives and evaluate the risks.",
+            "Compare two options.\n" + "Evaluate the risks.\n".repeat(9)
+        )
+        for (question in examples) {
+            assertFalse(question, AstraAdaptiveReasoning.select(question, automaticEnabled = true))
+        }
+    }
 }
