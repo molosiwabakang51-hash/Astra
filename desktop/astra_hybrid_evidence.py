@@ -38,6 +38,7 @@ class HybridEvidence:
 
     def coverage(self):
         return {
+            "index_available": self._index is not None,
             "indexed_snapshot_records": self._snapshot_indexed,
             "active_records_at_index_build": self._snapshot_total,
             "partial_snapshot": self._snapshot_indexed < self._snapshot_total,
@@ -53,6 +54,9 @@ class HybridEvidence:
             raise ValueError("Vector settings require explicit vector retrieval.")
         if use_vector is True and (approved is not True or not callable(embed)):
             raise ValueError("Explicit approval and local embedding callback required.")
+        if use_vector is True and (type(minimum_similarity) not in (float, int)
+                                    or not 0 <= minimum_similarity <= 1):
+            raise ValueError("Invalid similarity threshold.")
         lexical = self.ledger.search(query, limit=10)
         vector = []
         vector_status = "not_requested"
