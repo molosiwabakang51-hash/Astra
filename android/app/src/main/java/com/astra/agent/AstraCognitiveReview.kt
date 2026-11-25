@@ -17,6 +17,14 @@ internal object AstraCognitiveReview {
         RegexOption.IGNORE_CASE
     )
 
+    // A formalization proposed by Qwen is never silently accepted as the
+    // owner's intended meaning. The owner must explicitly submit the full
+    // checked formula for independent verification, not a bare "yes".
+    private val confirmedFormal = Regex(
+        """^(?:verify|check) this formal argument:\s*(.+)$""",
+        RegexOption.IGNORE_CASE
+    )
+
     sealed interface Result {
         data object NotRequested : Result
         data class Native(val prompt: String) : Result
@@ -36,6 +44,32 @@ internal object AstraCognitiveReview {
         ) answer else HEADER + "\n\n" + answer
 
     fun resolve(raw: String, history: List<AstraChatArchive.Message>): Result {
+        val submitted = raw.trim()
+        if (submitted.length <= 300) {
+            val formal = confirmedFormal.matchEntire(submitted)?.groupValues?.get(1)
+            if (formal != null) {
+                val checked = AstraPropositionalVerifier.verify(formal)
+                    ?: return Result.Local(
+                        "I could not parse the complete formal argument. Use explicit " +
+                            "Premises: and Conclusion: with single-letter propositions, " +
+                            "and the final question Does the conclusion follow?"
+                    )
+                val result = when (checked.verdict) {
+                    AstraPropositionalVerifier.Verdict.ENTAILED ->
+                        "YES. Every assignment satisfying the premises makes the conclusion true."
+                    AstraPropositionalVerifier.Verdict.COUNTEREXAMPLE ->
+                        "NO. Counterexample: " + checked.witness + "."
+                    AstraPropositionalVerifier.Verdict.INCONSISTENT_PREMISES ->
+                        "The premises are inconsistent. Classical entailment is vacuous; " +
+                            "no substantive conclusion is established."
+                }
+                return Result.Local(
+                    "INDEPENDENT FORMAL CHECK — " + result +
+                        "\nChecked " + checked.assignments + " truth assignments. " +
+                        "This verifies only the submitted formulas, not their translation from natural language."
+                )
+            }
+        }
         if (!request.matches(raw.trim().replace(Regex("""\s+"""), " "))) {
             return Result.NotRequested
         }
@@ -96,7 +130,15 @@ internal object AstraCognitiveReview {
             "errors or missing assumptions; do not invent a mistake. State whether the " +
             "answer is supported, incorrect, or uncertain. If incorrect, supply a concise " +
             "correction and its justification. If external evidence or missing context " +
-            "is required, say so. Do not claim independent factual verification.\n" +
+            "is required, say so. Do not claim independent factual verification. " +
+            "For a purely propositional argument only, you may propose a mapping of " +
+            "single-letter propositions to the original statements and a candidate formal " +
+            "argument using !, &, |, -> and parentheses. Label the mapping as unverified; " +
+            "do not formalize quantifiers, uncertain meanings or missing premises. " +
+            "If a valid candidate is useful, invite the owner to check the mapping and submit " +
+            "Verify this formal argument: Premises: [formulas separated by semicolons]. " +
+            "Conclusion: [formula]. Does the conclusion follow? " +
+            "Never claim the formal check has already run.\n" +
             "ORIGINAL QUESTION: \"" + quote(original) + "\"\n" +
             "PREVIOUS ANSWER: \"" + quote(answer) + "\""
         if (prompt.length > 2_700) {

@@ -83,6 +83,39 @@ class QwenProfileComparisonTests(unittest.TestCase):
                              b["prompt"].split("<|im_start|>user", 1)[1])
             self.assertNotEqual(a["prompt"], b["prompt"])
 
+    def test_fresh_cases_are_balanced_and_distinct(self):
+        fresh = comparison.fresh_cases(42)
+        self.assertEqual(fresh, comparison.fresh_cases(42))
+        self.assertNotEqual(fresh, comparison.fresh_cases(43))
+        self.assertEqual(len(fresh), 8)
+        self.assertEqual(sum(c[2] == "YES" for c in fresh), 2)
+        self.assertEqual(sum(c[2] == "NO" for c in fresh), 2)
+        self.assertFalse(set(c[0] for c in fresh) & set(c[0] for c in comparison.cases(42)))
+
+    def test_fresh_ablation_uses_deployed_profiles_and_isolates_one_change(self):
+        calls = []
+        def fake(payload):
+            calls.append(payload)
+            return dict(generation_settings=payload, stop_type="eos",
+                        truncated=False, tokens_predicted=1, content="NO")
+        result = comparison.evaluate(42, fake, "fresh_reasoning")
+        self.assertEqual(len(calls), 32)
+        self.assertEqual(set(result["totals"]), {"direct:soft_direct", "direct:hard_direct",
+                                                "think:baseline", "think:decomposition"})
+        self.assertIsNone(result["official_ai_rating"])
+        for a, b in zip(calls[::2], calls[1::2]):
+            self.assertEqual({k:v for k,v in a.items() if k != "prompt"},
+                             {k:v for k,v in b.items() if k != "prompt"})
+            self.assertNotEqual(a["prompt"], b["prompt"])
+            if a["n_predict"] == 256:
+                self.assertEqual(a["temperature"], 0.7)
+                self.assertEqual(a["prompt"].removesuffix("<think>\n\n</think>\n\n"),
+                                 b["prompt"].removesuffix("<think>\n\n</think>\n\n"))
+            else:
+                self.assertEqual(a["temperature"], 0.6)
+                self.assertEqual(a["prompt"].replace(comparison.DECOMPOSITION, "", 1),
+                                 b["prompt"].replace(comparison.DECOMPOSITION, "", 1))
+
     def test_native_comparison_workflow_is_bounded_and_pinned(self):
         source = (comparison.ROOT / ".github/workflows/qwen3-profile-evaluation.yml").read_text()
         for marker in ("runs-on: ubuntu-24.04", "timeout-minutes: 35",

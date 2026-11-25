@@ -67,4 +67,32 @@ class AstraCognitiveReviewTest {
         assertTrue(inconsistent.answer.contains("premises are inconsistent"))
         assertTrue(inconsistent.answer.contains("vacuous"))
     }
+
+    @Test fun explicitlySubmittedFormalArgumentIsVerifiedWithoutPriorHistory() {
+        val result = AstraCognitiveReview.resolve(
+            "Verify this formal argument: Premises: A -> B; B. Conclusion: A. Does the conclusion follow?",
+            emptyList()) as AstraCognitiveReview.Result.Local
+        assertTrue(result.answer.contains("NO. Counterexample: A=false, B=true"))
+        assertTrue(result.answer.contains("not their translation"))
+        val yes = AstraCognitiveReview.resolve(
+            "Check this formal argument: Premises: A -> B; A. Conclusion: B. Does the conclusion follow?",
+            emptyList()) as AstraCognitiveReview.Result.Local
+        assertTrue(yes.answer.contains("YES. Every assignment"))
+    }
+
+    @Test fun modelProposalCannotAuthorizeIndependentCheck() {
+        val history = pair("If rain implies wet roads and roads are wet, must it be raining?", "Yes.")
+        val review = AstraCognitiveReview.resolve("Verify your answer", history)
+            as AstraCognitiveReview.Result.Native
+        assertTrue(review.prompt.contains("mapping as unverified"))
+        assertTrue(review.prompt.contains("Never claim the formal check has already run"))
+        assertEquals(AstraCognitiveReview.Result.NotRequested,
+            AstraCognitiveReview.resolve("yes", history))
+        assertEquals(AstraCognitiveReview.Result.NotRequested,
+            AstraCognitiveReview.resolve("Translate Verify this formal argument: Premises: A. Conclusion: A. Does the conclusion follow?", history))
+        val invalid = AstraCognitiveReview.resolve(
+            "Verify this formal argument: Premises: A => B. Conclusion: B. Does the conclusion follow?",
+            history) as AstraCognitiveReview.Result.Local
+        assertTrue(invalid.answer.contains("could not parse"))
+    }
 }
