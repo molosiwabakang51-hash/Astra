@@ -470,13 +470,21 @@ internal class AstraOnDeviceBrain(
                 // chunk count (UTF-8 fragments and EOG do not equal tokens).
                 val budgetExhausted = current.generationLimitReached()
                 val publicAnswer = AstraOfflinePolicy.publicReply(answer.finish())
+                // Cosmetic formatting only; preserve unassisted model evidence.
+                val contractAnswer = if (!budgetExhausted && !diagnosticIsolated &&
+                    !modelOnly && !memoryGrounded && citedBooks.isEmpty() &&
+                    citedOpenCourse.isEmpty() && openReferences.isEmpty() &&
+                    bookReferences.isEmpty()
+                ) AstraAnswerContract.normalize(
+                    visibleUserMessage ?: turns.last().content, publicAnswer
+                ) else publicAnswer
                 // The model can invent [B#]/[K#] markers and even a
                 // citation-footer heading. Allow only IDs whose complete
                 // evidence blocks actually reached the native model prompt.
                 // Strip forged headings before appending app-owned sources;
                 // an AI claim must never authorize book follow-up access.
                 val attributedAnswer = AstraSourceCitationGuard.protect(
-                    publicAnswer,
+                    contractAnswer,
                     verifiedPrivatePassages = citedBooks.size,
                     verifiedOpenPassages = citedOpenCourse.size
                 )
@@ -519,6 +527,7 @@ internal class AstraOnDeviceBrain(
                         visibleUserMessage ?: turns.last().content, visibleReply
                     )
                 }
+                if (contractAnswer != publicAnswer) session.invalidate()
                 finish(when {
                     budgetExhausted -> AstraInferenceAttempt.Outcome.TOKEN_LIMIT
                     attributedAnswer.isBlank() -> AstraInferenceAttempt.Outcome.EMPTY_REPLY
