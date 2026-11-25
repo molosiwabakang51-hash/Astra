@@ -17,6 +17,8 @@ import sys
 import astra_generated_validation as transfer
 import astra_local_answer as native
 import astra_resource_plan as resources
+import astra_native_subprocess as capture
+import astra_native_profile as telemetry
 import astra_symbiotic_eval as parsing
 from astra_local_finance import file_digest
 
@@ -28,15 +30,17 @@ def fingerprint(binary, primary, critic, timeout, suite_module):
         raise ValueError("Distinct local model weights required.")
     # No hostname, username, serial number or raw model path in the report.
     profile = {
-        "protocol": "native-benchmark-v1",
+        "protocol": "native-benchmark-v2",
         "binary_sha": file_digest(paths[0]),
         "source_sha": {
             name: file_digest(module.__file__) for name, module in (
                 ("native", native), ("resources", resources), ("parsing", parsing),
+                ("capture", capture), ("telemetry", telemetry),
                 ("suite", suite_module),
             )
         },
         "timeout": timeout,
+        "context_policy": "fixed",
         "context_tokens": native.CONTEXT,
         "generation_tokens": native.GENERATE_TOKENS,
         "cpu_count": os.cpu_count() or 1,
