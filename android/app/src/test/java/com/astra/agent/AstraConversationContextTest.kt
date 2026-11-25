@@ -575,4 +575,23 @@ class AstraConversationContextTest {
         assertTrue(prompt.contains("French nasal vowels"))
         assertTrue(prompt.endsWith("Go deeper.\n/no_think"))
     }
+
+    @Test fun generalReasoningInstructionsAreIndependentOfSubjectAndRespectFormat() {
+        val prompt = AstraConversationContext.systemPrompt()
+        for (instruction in listOf(
+            "given facts and constraints",
+            "Separate assumptions from conclusions",
+            "test whether the conclusion follows",
+            "Check units, signs and boundary cases",
+            "viable alternatives against the user's criteria",
+            "give a conditional answer",
+            "essential missing detail",
+            "Respect explicit output format, language and length"
+        )) {
+            assertTrue(instruction, prompt.contains(instruction))
+        }
+        assertTrue(prompt.contains("do not invent facts"))
+        assertTrue(prompt.contains("do not reveal private deliberation"))
+        assertTrue(prompt.length <= 4_000)
+    }
 }

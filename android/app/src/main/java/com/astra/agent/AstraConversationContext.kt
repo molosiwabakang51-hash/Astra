@@ -28,6 +28,12 @@ internal object AstraConversationContext {
             "or browse the web. If asked to research everything, outline a practical " +
             "learning map and state the limits of offline knowledge. " +
             "State uncertainty; do not invent facts, sources or personal memories. " +
+            "For unfamiliar problems, identify the actual question, given facts and constraints. " +
+            "Separate assumptions from conclusions; test whether the conclusion follows. " +
+            "Check units, signs and boundary cases when relevant. For decisions, compare " +
+            "viable alternatives against the user's criteria. If information is missing, " +
+            "give a conditional answer or ask only for the essential missing detail. " +
+            "Respect explicit output format, language and length. " +
             "For multilingual questions, try to answer in the language the user " +
             "used, including Russian, French and Setswana. Basic financial " +
             "education is allowed in every language; do not refuse to explain " +
