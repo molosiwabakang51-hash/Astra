@@ -125,4 +125,19 @@ class AstraChatReviewTest {
             listOf(msg("Astra", "Niall Shiller is not the author; Robert J. Shiller is.")))!!
         assertFalse(corrected.contains("I was wrong"))
     }
+
+    @Test fun scopeSuffixAndEmptyAuditAreHandledWithoutFalseEvidence() {
+        val request = "review earlier mentions of copper in this chat"
+        val first = AstraChatReview.respond(request, emptyList())!!
+        assertTrue(first.contains("no earlier references to 'copper'"))
+        val repeated = AstraChatReview.respond("earlier than this",
+            listOf(msg("You", request), msg("Astra", first)))!!
+        assertTrue(repeated == first)
+        val actual = AstraChatReview.respond(request,
+            listOf(msg("Astra", "Copper prices can fluctuate.")))!!
+        assertTrue(actual.contains("Copper prices can fluctuate."))
+        val nonClaim = AstraChatReview.respond("review earlier mentions of Shiller",
+            listOf(msg("Astra", "Niall Shiller is a fictional name.")))!!
+        assertFalse(nonClaim.contains("I was wrong"))
+    }
 }
