@@ -223,4 +223,29 @@ class AstraGroundedMemoryTest {
         }
     }
 
+
+    @Test fun compactNumericCorrectionIsRetainedInGroundedMemory() {
+        val brief = AstraGroundedMemory.retrieve(
+            AstraGroundedMemory.parse("ask memory about bond maturity")!!,
+            emptyList(), emptyList(),
+            listOf(msg("You", "My hypothetical bond maturity is seven years."),
+                msg("Astra", "Understood."),
+                msg("You", "No, 3.")), emptyList()
+        )
+        assertEquals(1, brief.evidence.size)
+        assertTrue(brief.evidence.single().excerpt.contains("seven years"))
+        assertTrue(brief.evidence.single().excerpt.contains("No, 3."))
+    }
+
+    @Test fun unrelatedNegativeReplyDoesNotBecomeNumericCorrection() {
+        val brief = AstraGroundedMemory.retrieve(
+            AstraGroundedMemory.parse("ask memory about bond maturity")!!,
+            emptyList(), emptyList(),
+            listOf(msg("You", "My hypothetical bond maturity is seven years."),
+                msg("You", "No need to cook dinner."),
+                msg("You", "Actually, use rice.")), emptyList()
+        )
+        assertFalse(brief.sourceFooter().contains("use rice"))
+        assertFalse(brief.sourceFooter().contains("cook dinner"))
+    }
 }

@@ -111,7 +111,12 @@ internal object AstraMemoryRecall {
         }
 
         notes.forEachIndexed { index, note ->
-            consider("Saved note #${index + 1}", note, boost = 8)
+            val generated = note.startsWith("Astra reply (unverified; check important facts):")
+            if (!generated) {
+                consider("Saved note #${index + 1}", note, boost = 8)
+            } else if (notesOnly) {
+                consider("UNVERIFIED saved Astra reply #${index + 1}", note, boost = -12)
+            }
         }
 
         if (!notesOnly) {
@@ -120,7 +125,8 @@ internal object AstraMemoryRecall {
             }
 
             active.forEachIndexed { index, message ->
-                if (message.role == "You" && parse(message.text) == null) {
+                if (message.role == "You" && parse(message.text) == null &&
+                    AstraGroundedMemory.parse(message.text) == null) {
                     consider("Current chat · message #${index + 1}", message.text, 4)
                 }
             }
@@ -129,7 +135,8 @@ internal object AstraMemoryRecall {
             // original chat, rather than attributing model output to the user.
             archived.forEach { chat ->
                 chat.messages.forEachIndexed { index, message ->
-                    if (message.role == "You" && parse(message.text) == null) {
+                    if (message.role == "You" && parse(message.text) == null &&
+                    AstraGroundedMemory.parse(message.text) == null) {
                         consider(
                             "Conversation '${chat.title.take(50)}' · message #${index + 1}",
                             message.text, 2
@@ -149,7 +156,8 @@ internal object AstraMemoryRecall {
             appendLine("ASTRA // PRIVATE MEMORY RECALL")
             appendLine("Query: $term")
             appendLine("Found $matched matching entries; showing ${best.size}.")
-            appendLine("Sources are local user messages, notes and tasks, not AI guesses.")
+            appendLine(if (notesOnly) "Saved notes may include explicitly labelled unverified Astra replies."
+                else "Sources are local user messages, notes and tasks, not AI guesses.")
             appendLine()
             best.sortedWith(
                 compareByDescending<Match> { it.score }.thenByDescending { it.order }

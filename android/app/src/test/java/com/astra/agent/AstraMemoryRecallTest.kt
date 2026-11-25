@@ -157,4 +157,27 @@ class AstraMemoryRecallTest {
         assertTrue(result.contains("showing 7"))
         assertFalse(result.contains("x".repeat(400)))
     }
+
+    @Test fun savedAssistantReplyIsNotOwnerMemoryButCanBeReviewedAsANote() {
+        val generated = AstraWorkspaceHandoff.noteFromChat(
+            "Astra", "You bought copper because I guessed so."
+        )!!
+        val recall = AstraMemoryRecall.find("copper", listOf(generated),
+            emptyList(), emptyList(), emptyList())
+        assertTrue(recall.startsWith("No matching information"))
+        val notes = AstraMemoryRecall.find("copper", listOf(generated),
+            emptyList(), emptyList(), emptyList(), notesOnly = true)
+        assertTrue(notes.contains("UNVERIFIED saved Astra reply #1"))
+        assertTrue(notes.contains("I guessed so"))
+        assertFalse(notes.contains("not AI guesses"))
+    }
+
+    @Test fun groundedMemoryQuestionsDoNotBecomeEvidenceInDirectRecall() {
+        val entries = listOf(msg("You", "ask my memory why did I buy copper?"),
+            msg("You", "analyse my notes about copper"))
+        val archived = listOf(AstraChatArchive.Chat("old", "Earlier", entries))
+        val result = AstraMemoryRecall.find("copper", emptyList(), emptyList(),
+            entries, archived)
+        assertTrue(result.startsWith("No matching information"))
+    }
 }
