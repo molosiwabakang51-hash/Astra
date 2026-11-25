@@ -55,7 +55,7 @@ internal object AstraGroundedMemory {
             RegexOption.IGNORE_CASE),
         Regex("""^connect my notes about\s+(.+)$""", RegexOption.IGNORE_CASE)
     )
-    private val words = Regex("""[\p{L}\p{N}]+""")
+    private val words = Regex("""[\p{L}\p{N}_]+""")
     private val stopWords = setOf(
         "a", "about", "all", "am", "an", "and", "are", "as", "at", "be",
         "because", "can", "could", "did", "do", "does", "for", "from",
@@ -94,7 +94,7 @@ internal object AstraGroundedMemory {
     ): Brief {
         val tokens = tokenize(request.question).distinct().take(12)
         if (tokens.isEmpty()) return Brief(request.question, emptyList())
-        val queryTerms = tokens.toSet()
+        val queryConcepts = tokens.map(AstraConceptMatching::key).distinct().size
 
         val best = mutableListOf<Evidence>()
         var sequence = 0
@@ -103,17 +103,17 @@ internal object AstraGroundedMemory {
         fun consider(source: String, raw: String, sourceBoost: Int) {
             if (raw.isBlank()) return
             val line = AstraUnicodeBounds.prefix(raw.replace(Regex("""\s+"""), " ").trim(), 2_000)
-            if (tokenize(line).none(queryTerms::contains)) return
+            if (!AstraConceptMatching.compare(tokens, tokenize(line).toSet()).eligible) return
             val excerpt = excerpt(line, tokens)
             // Rank the evidence that Qwen will actually receive, not distant
             // matches in omitted parts of a long private note.
             val visible = tokenize(excerpt).toSet()
-            val hits = tokens.count { it in visible }
-            if (hits == 0) return
+            val match = AstraConceptMatching.compare(tokens, visible)
+            if (!match.eligible) return
             val dedupKey = excerpt.lowercase(Locale.ROOT)
             if (!dedup.add(dedupKey)) return
-            val score = hits * 10 + sourceBoost +
-                (if (hits == tokens.size) 12 else 0)
+            val score = match.weight + sourceBoost +
+                (if (match.count == queryConcepts && match.exact > 0) 12 else 0)
             val item = Evidence(source, excerpt, score, sequence++)
             best.add(item)
             // Keep memory bounded while scanning all archived user messages.
@@ -155,7 +155,9 @@ internal object AstraGroundedMemory {
                     // Match only the same bounded text considered by the
                     // evidence ranker. Never scan unlimited archived bodies.
                     val candidateText = AstraUnicodeBounds.prefix(entry.text, 2_000)
-                    val onTopic = tokenize(candidateText).any(queryTerms::contains)
+                    val onTopic = AstraConceptMatching.compare(
+                        tokens, tokenize(candidateText).toSet()
+                    ).eligible
                     val corrected = if (onTopic) {
                         AstraGroundedCorrections.annotated(
                             messages, index, excerpt(candidateText, tokens)
@@ -196,7 +198,9 @@ internal object AstraGroundedMemory {
         "chose", "chosen", "choosing" -> "choose"
         "bought", "buying" -> "buy"
         "invested", "investing", "investments" -> "invest"
-        else -> if (word.length >= 5 && word.endsWith("s") &&
+        else -> if (word.contains('_')) word
+        else if (word.length > 5 && word.endsWith("ies")) word.dropLast(3) + "y"
+        else if (word.length >= 5 && word.endsWith("s") &&
             !word.endsWith("ss") && !word.endsWith("us") &&
             !word.endsWith("is")) word.dropLast(1) else word
     }
@@ -209,7 +213,7 @@ internal object AstraGroundedMemory {
         val query = tokens.toSet()
         val matches = words.findAll(raw).mapNotNull { match ->
             val term = stem(match.value.lowercase(Locale.ROOT))
-            if (term in query) match.range to term else null
+            if (query.any { AstraConceptMatching.matches(it, term) }) match.range to term else null
         }.toList()
         val maxStart = raw.length - limit
         val candidates = (listOf(0) + matches.flatMap { (range, _) ->
@@ -220,10 +224,12 @@ internal object AstraGroundedMemory {
         // At most 2,000 input units and 12 query tokens are considered.
         val start = candidates.maxWithOrNull(
             compareBy<Int> { candidate ->
-                matches.asSequence()
+                val visible = matches.asSequence()
                     .filter { (range, _) ->
                         range.first >= candidate && range.last < candidate + limit
-                    }.map { it.second }.distinct().count()
+                    }.map { it.second }.toSet()
+                val match = AstraConceptMatching.compare(tokens, visible)
+                if (match.eligible) match.weight else -1
             }.thenBy { -it }
         ) ?: 0
         return (if (start > 0) "…" else "") +

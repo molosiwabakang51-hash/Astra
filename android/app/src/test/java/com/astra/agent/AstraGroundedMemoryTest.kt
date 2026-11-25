@@ -323,4 +323,59 @@ class AstraGroundedMemoryTest {
         assertTrue(evidence.excerpt.contains("October"))
         assertTrue(evidence.excerpt.length <= 220)
     }
+
+    @Test fun retrievesParaphraseWithoutSharedLiteralTerms() {
+        val brief = AstraGroundedMemory.retrieve(
+            AstraGroundedMemory.parse("ask memory purchase automobile")!!,
+            listOf("I bought a car for 85000 pula.", "I purchased groceries."),
+            emptyList(), emptyList(), emptyList()
+        )
+        assertTrue(brief.evidence.any { it.excerpt.contains("bought a car") })
+        assertTrue(brief.evidence.any { it.excerpt.contains("purchased groceries") }.not())
+    }
+
+    @Test fun exactMatchesOutrankAliasOnlyAndRepeatedConceptsDoNotInflate() {
+        val brief = AstraGroundedMemory.retrieve(
+            AstraGroundedMemory.parse("ask memory purchase automobile")!!,
+            listOf("I bought a car last year.", "Purchase automobile budget: 70000."),
+            emptyList(), emptyList(), emptyList()
+        )
+        assertEquals(2, brief.evidence.size)
+        assertTrue(brief.evidence.first().excerpt.startsWith("Purchase automobile"))
+        val duplicated = AstraGroundedMemory.retrieve(
+            AstraGroundedMemory.parse("ask memory purchase buying")!!,
+            listOf("I bought a book."), emptyList(), emptyList(), emptyList()
+        )
+        // Both query terms represent one concept; exact normalized "buy" still qualifies.
+        assertEquals(1, duplicated.evidence.size)
+        assertEquals(1, AstraConceptMatching.compare(
+            listOf("purchase", "purchased"), setOf("buy")).alias)
+        assertFalse(AstraConceptMatching.compare(
+            listOf("purchase", "purchased"), setOf("buy")).eligible)
+    }
+
+    @Test fun aliasesRetainLateEvidenceAndCorrectionsWithinTheirChat() {
+        val brief = AstraGroundedMemory.retrieve(
+            AstraGroundedMemory.parse("ask memory purchase automobile")!!,
+            emptyList(), emptyList(),
+            listOf(msg("You", "unrelated background ".repeat(20) +
+                "I bought a car for 85000 pula."),
+                msg("Astra", "It cost 100."),
+                msg("You", "Actually, make it 80000 pula.")),
+            emptyList()
+        )
+        val hit = brief.evidence.single()
+        assertTrue(hit.excerpt.contains("bought a car"))
+        assertTrue(hit.excerpt.contains("80000 pula"))
+        assertFalse(brief.modelPrompt().contains("It cost 100"))
+    }
+
+    @Test fun noSingleAliasOrIdentifierSubstringCreatesPersonalEvidence() {
+        val brief = AstraGroundedMemory.retrieve(
+            AstraGroundedMemory.parse("ask memory purchase automobile")!!,
+            listOf("I bought groceries.", "PRIVATE_PURCHASE_AUTOMOBILE"),
+            emptyList(), emptyList(), emptyList()
+        )
+        assertTrue(brief.evidence.isEmpty())
+    }
 }
