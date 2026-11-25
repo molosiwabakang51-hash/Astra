@@ -1,0 +1,50 @@
+name: Actual Qwen3 1.7B CPU profile comparison
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/qwen3-profile-evaluation.yml'
+      - 'scripts/quality/run_qwen_profile_comparison.py'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: astra-qwen-profile-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  compare:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Verify evaluation contracts
+        run: python -m unittest discover -s scripts/tests -p test_qwen_profile_comparison.py -v
+      - name: Obtain exact public 1.7B model and pinned native source
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -c 'import sys; sys.path.insert(0, "scripts"); from prepare_offline_android import prepare_model; prepare_model()'
+          git clone --depth 1 --branch b12248 https://github.com/ggml-org/llama.cpp.git cpu-llama
+          [[ "$(git -C cpu-llama rev-parse HEAD)" == 3837bf0* ]]
+      - name: Compile native CPU inference server
+        shell: bash
+        run: |
+          set -euo pipefail
+          cmake -S cpu-llama -B cpu-build -G Ninja -DCMAKE_BUILD_TYPE=Release -DLLAMA_BUILD_TESTS=OFF -DLLAMA_BUILD_EXAMPLES=OFF -DLLAMA_BUILD_TOOLS=ON -DLLAMA_BUILD_SERVER=ON -DLLAMA_BUILD_UI=OFF -DLLAMA_USE_PREBUILT_UI=OFF -DGGML_CUDA=OFF
+          cmake --build cpu-build --target llama-server --parallel 4
+      - name: Compare real model-generated answers
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p evaluation
+          python scripts/quality/run_qwen_profile_comparison.py cpu-build/bin/llama-server > evaluation/profile-comparison.json
+          cat evaluation/profile-comparison.json >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v6
+        with:
+          name: qwen3-native-cpu-comparison
+          path: evaluation/profile-comparison.json
+          if-no-files-found: error
+          retention-days: 14
