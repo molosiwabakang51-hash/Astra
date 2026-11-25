@@ -104,6 +104,7 @@ internal object AstraMultiTurnReasoningBenchmark {
             results.map { it.scenario }.toSet() == scenarios.toSet() &&
             results.all { it.interimPassed in 0..2 }
         ) { "All synthetic multi-turn cases must complete." }
+        if (!AstraReasoningBenchmark.verifiedModel(model)) return AstraReasoningBenchmark.UNSCORED
         return buildString {
             appendLine("QWEN3 ON-PHONE MULTI-TURN CHECKS — EXPERIMENTAL")
             appendLine("Loaded model: " + (model ?: "unverified"))
