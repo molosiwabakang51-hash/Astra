@@ -133,7 +133,7 @@ class OrchestratorTests(unittest.TestCase):
         primary.write_bytes(b"GGUF"+b"x"*1024)
         runner = A.LocalAnswerRunner(binary,primary,approved=True)
         with patch.object(A,"probe",return_value=P.Resources(P.GIB,4,P.GIB)), \
-             patch.object(A.subprocess,"run") as run:
+             patch.object(A,"run_bounded") as run:
             with self.assertRaises(RuntimeError):
                 runner("primary","private question")
             run.assert_not_called()
@@ -145,10 +145,10 @@ class OrchestratorTests(unittest.TestCase):
             self.assertNotIn("private question"," ".join(args))
             self.assertEqual("0",args[args.index("-ngl")+1])
             self.assertIn("--offline",args)
-            self.assertFalse(kwargs["shell"])
+            self.assertEqual(A.MAX_REPLY_BYTES,kwargs["max_stdout_bytes"])
             return subprocess.CompletedProcess(args,0,self.reply().encode())
         with patch.object(A,"probe",return_value=P.Resources(6*P.GIB,4,P.GIB)), \
-             patch.object(A.subprocess,"run",side_effect=execute):
+             patch.object(A,"run_bounded",side_effect=execute):
             self.assertEqual(self.reply(),runner("primary","private question"))
         self.assertTrue(paths)
         self.assertFalse(paths[0].exists())
