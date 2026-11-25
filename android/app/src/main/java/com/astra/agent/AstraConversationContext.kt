@@ -112,6 +112,13 @@ internal object AstraConversationContext {
         val recent = valid.takeLast(3)
         val older = valid.dropLast(recent.size)
         val keywords = significantWords(current)
+        // Rank the exact bounded, escaped excerpt that may reach the model.
+        // Cache the normal-sized excerpts for repeated topic/owner checks.
+        val recoveryQuotes = mutableMapOf<Int, String>()
+        fun recoveryQuote(turn: IndexedValue<Turn>, limit: Int = MAX_TURN_CHARS): String =
+            if (limit == MAX_TURN_CHARS) recoveryQuotes.getOrPut(turn.index) {
+                focusedQuote(turn.value.content, keywords, limit)
+            } else focusedQuote(turn.value.content, keywords, limit)
         val ownerRecall = Regex(
             """(?i)\b(?:what did i say|what did i tell|what was my|my earlier|remind me of my)\b"""
         ).containsMatchIn(current)
@@ -123,7 +130,7 @@ internal object AstraConversationContext {
         val ranked = candidates.map { turn ->
             // Score only terms that can actually appear in the displayed
             // excerpt, rather than matching an invisible part of a long turn.
-            val terms = significantWords(turn.value.content.take(MAX_TURN_CHARS))
+            val terms = significantWords(recoveryQuote(turn))
             val matches = keywords.count(terms::contains)
             val userTieBreak = if (matches > 0 && ownerRecall && turn.value.role == "user") 1 else 0
             turn to (matches * 2 + userTieBreak)
@@ -147,8 +154,7 @@ internal object AstraConversationContext {
         val recentOwners = recent.asReversed().filter { it.value.role == "user" }
         val relevantRecentOwners = if (keywords.isEmpty()) recentOwners else
             recentOwners.filter { turn ->
-                significantWords(turn.value.content.take(MAX_TURN_CHARS))
-                    .any(keywords::contains)
+                significantWords(recoveryQuote(turn)).any(keywords::contains)
             }.flatMap { anchor ->
                 // Retain topic-free corrections such as "Actually, make it
                 // three" beside the matched owner statement, in time order
@@ -161,7 +167,7 @@ internal object AstraConversationContext {
         // prose consumes the entire context budget. Do not interpret internal
         // follow-up wrappers as new owner instructions.
         fun overlap(turn: IndexedValue<Turn>): Int =
-            keywords.count(significantWords(turn.value.content.take(MAX_TURN_CHARS))::contains)
+            keywords.count(significantWords(recoveryQuote(turn))::contains)
         val topicalAnchor = if (!ownerRecall && keywords.size >= 2 &&
             !current.startsWith("SAME-CHAT FOLLOW-UP CONTEXT (")
         ) {
@@ -199,14 +205,14 @@ internal object AstraConversationContext {
             if (selected.size == MAX_TURNS || remaining < 42) break
             val speaker = if (item.value.role == "user")
                 "Previous user" else "Previous Astra"
-            val source = quote(item.value.content)
-            if (source.isBlank()) continue
             val prefix = "$speaker: \""
             val suffix = "\"\n"
             val availableText = minOf(
                 MAX_TURN_CHARS, remaining - prefix.length - suffix.length
             )
             if (availableText < 10) break
+            val source = recoveryQuote(item, availableText)
+            if (source.isBlank()) continue
             // Do not cut immediately after an escaped backslash: otherwise
             // the following closing quote could become escaped too.
             var bounded = source.take(availableText)
@@ -287,7 +293,9 @@ internal object AstraConversationContext {
         return result
     }
 
-    private val topicWords = Regex("""[\p{L}\p{N}]{3,}""")
+    // Identifiers such as PRIVATE_BOND_FACT are single tokens, not
+    // three independent topical matches.
+    private val topicWords = Regex("""[\p{L}\p{N}_]{3,}""")
     private val fillerWords = setOf(
         "what", "when", "where", "which", "about", "would", "could",
         "should", "please", "tell", "said", "say", "that", "this", "there",
@@ -317,6 +325,49 @@ internal object AstraConversationContext {
         topicWords.findAll(text.lowercase(java.util.Locale.ROOT))
             .take(150).map { it.value }.filterNot(fillerWords::contains)
             .map(::stem).toSet()
+
+    /**
+     * Select an on-topic window rather than blindly quoting the start of a
+     * long turn. A later passage is eligible only when at least two distinct
+     * current topic words survive serialization and improve on the opening.
+     * Vague follow-ups and isolated word matches retain the old prefix.
+     */
+    private fun focusedQuote(raw: String, keywords: Set<String>, limit: Int): String {
+        val boundedRaw = AstraUnicodeBounds.prefix(raw, 2_000)
+        fun safeQuote(value: String, size: Int): String {
+            val escaped = AstraUnicodeBounds.prefix(quote(value), size)
+            return if (escaped.takeLastWhile { it == '\\' }.length % 2 != 0)
+                escaped.dropLast(1) else escaped
+        }
+        var best = safeQuote(boundedRaw, limit)
+        if (keywords.size < 2 || boundedRaw.length <= limit || limit < 50) return best
+        fun hits(value: String): Int =
+            keywords.count(significantWords(value)::contains)
+        var bestHits = hits(best)
+        if (bestHits == keywords.size) return best
+        val matches = topicWords.findAll(boundedRaw).filter {
+            stem(it.value.lowercase(java.util.Locale.ROOT)) in keywords
+        }.toList()
+        if (matches.size < 2) return best
+        // Fixed per-turn search bound, including later occurrences when a
+        // long message repeats the same topic many times.
+        val sampled = (matches.take(16) + matches.takeLast(8)).distinctBy { it.range.first }
+        for (match in sampled) {
+            for (start in listOf((match.range.first - 40).coerceAtLeast(0), match.range.first)) {
+                if (start == 0) continue
+                val value = AstraUnicodeBounds.slice(
+                    boundedRaw, start, minOf(boundedRaw.length, start + limit)
+                )
+                val candidate = "… " + safeQuote(value, limit - 2)
+                val score = hits(candidate)
+                if (score >= 2 && score > bestHits) {
+                    best = candidate
+                    bestHits = score
+                }
+            }
+        }
+        return best
+    }
 
     private fun quote(text: String): String =
         text.trim()
