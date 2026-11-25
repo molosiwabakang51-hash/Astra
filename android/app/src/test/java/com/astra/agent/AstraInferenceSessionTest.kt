@@ -119,4 +119,11 @@ class AstraInferenceSessionTest {
         session.checkTranscript(4, prior + listOf("user" to "Go deeper", "assistant" to "Detailed answer"))
         assertFalse(session.requiresLoad(8, true))
     }
+
+    @Test fun loadingWithoutCompletingATurnDoesNotEstablishWarmContinuity() {
+        val session = AstraInferenceSession()
+        session.markLoaded(8)
+        session.checkTranscript(2, listOf("user" to "Question", "assistant" to "No model answer"))
+        assertTrue(session.requiresLoad(8, true))
+    }
 }
