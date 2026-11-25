@@ -144,5 +144,53 @@ class FrozenTests(unittest.TestCase):
             smoke_test(require_complete=True,require_gui=False)
 
 
+    def acceptance_receipt(self):
+        checks={key:True for key in ("exact_finance","reviewed_evidence","finance_session_import",
+                "assistant_gui_import","tkinter_import","analytics_gui_import",
+                "analytics_present","professional_present","professional_renderer","portfolio_analytics")}
+        checks.update({"example_"+name:True for name in D.GROUPS if name not in ("analytics","professional-report")})
+        return {"passed":True,"frozen":True,"require_complete":True,"require_gui":True,"checks":checks}
+
+    def test_acceptance_requires_full_frozen_receipt(self):
+        good=self.acceptance_receipt()
+        with patch.object(B.subprocess,"run",return_value=Mock(stdout=json.dumps(good))) as run:
+            self.assertEqual(good,B.acceptance("AstraDesktop.exe",cwd="."))
+            self.assertEqual(["AstraDesktop.exe","--complete-smoke-test"],run.call_args.args[0])
+        for key in ("frozen","require_complete","require_gui","passed"):
+            bad=self.acceptance_receipt()
+            bad[key]=False
+            with patch.object(B.subprocess,"run",return_value=Mock(stdout=json.dumps(bad))),self.assertRaises(ValueError):
+                B.acceptance("AstraDesktop.exe",cwd=".")
+        bad=self.acceptance_receipt()
+        del bad["checks"]["example_simulation"]
+        with patch.object(B.subprocess,"run",return_value=Mock(stdout=json.dumps(bad))),self.assertRaises(ValueError):
+            B.acceptance("AstraDesktop.exe",cwd=".")
+
+    def test_relocated_acceptance_uses_verified_copy_and_clean_environment(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            folder=Path(tmp)/"original"
+            folder.mkdir()
+            (folder/"AstraDesktop.exe").write_bytes(b"fixture")
+            manifest=B.bundle_manifest(folder)
+            def accept(exe,*,cwd,env):
+                self.assertNotEqual(folder,exe.parent)
+                self.assertIn(" ",str(exe.parent))
+                self.assertTrue(exe.is_file())
+                self.assertEqual(cwd,exe.parent.parent)
+                self.assertNotIn("PYTHONPATH",env)
+                self.assertNotIn("PYTHONHOME",env)
+                self.assertNotIn("_PYI_APPLICATION_HOME_DIR",env)
+                self.assertNotIn("untrusted-python",env["PATH"])
+                self.assertTrue(B.verify(exe.parent,manifest))
+                return self.acceptance_receipt()
+            with patch.dict(B.os.environ,{"SystemRoot":str(Path(tmp)/"Windows"),
+                                          "PATH":"untrusted-python","PYTHONHOME":"untrusted-python",
+                                          "PYTHONPATH":"untrusted-python","_PYI_APPLICATION_HOME_DIR":"old"}), \
+                 patch.object(B,"acceptance",side_effect=accept):
+                receipt=B.relocated_acceptance(folder,manifest)
+            self.assertTrue(receipt["passed"])
+            self.assertTrue(B.verify(folder,manifest))
+
+
 if __name__=="__main__":
     unittest.main()
