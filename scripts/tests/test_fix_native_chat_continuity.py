@@ -38,6 +38,16 @@ class NativeChatContinuityTest(unittest.TestCase):
         self.assertLess(cap, record)
         self.assertLess(record, stop)
 
+    def test_exact_token_limit_is_distinct_from_eog_and_resets(self):
+        source = hardened(upstream_fixture())
+        self.assertIn("generationLimitReachedNative(", source)
+        self.assertIn("return astra_generation_limit_reached ? JNI_TRUE : JNI_FALSE;", source)
+        self.assertIn("remaining_generation_tokens = 0;\n    astra_generation_limit_reached = false;", source)
+        cap = source.index("if (remaining_generation_tokens <= 0)")
+        self.assertLess(cap, source.index("astra_generation_limit_reached = true;"))
+        self.assertEqual(source.count("astra_generation_limit_reached = true;"), 1)
+        self.assertNotIn("astra_generation_limit_reached = true;", source[source.index("if (llama_vocab_is_eog(...)"):])
+
     def test_checks_cap_before_context_shift(self):
         source = hardened(upstream_fixture())
         self.assertLess(

@@ -10,6 +10,12 @@ package com.astra.agent
  */
 internal object AstraInterruptedReply {
     const val EMPTY_MODEL_REPLY = "The offline model did not produce a usable answer. Please try again."
+    private const val LIMIT_MARKER = "[Response reached the offline token limit]"
+
+    fun budgetLimited(visible: String): String =
+        (visible.trim().ifBlank { "No complete answer was produced within the reasoning budget." }) +
+            "\n\n" + LIMIT_MARKER
+
     fun isIncomplete(assistantText: String): Boolean {
         val value = assistantText.trim()
         return value.startsWith("ASTRA // THINKING") ||
@@ -19,6 +25,7 @@ internal object AstraInterruptedReply {
             value.startsWith("Offline response interrupted.") ||
             value.startsWith("Offline response stopped.") ||
             value.contains("\n\n[Response interrupted]") ||
-            value.contains("\n\n[Response stopped]")
+            value.contains("\n\n[Response stopped]") ||
+            value.contains("\n\n" + LIMIT_MARKER)
     }
 }

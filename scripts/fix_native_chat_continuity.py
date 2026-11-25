@@ -24,12 +24,22 @@ REWRITES = (
 static std::string cached_token_chars;""",
         """// Generation budget is independent of context-window KV positions.
 static int remaining_generation_tokens;
-static std::string cached_token_chars;""",
+// Only the native generation worker writes; queried after Flow completion.
+static bool astra_generation_limit_reached = false;
+static std::string cached_token_chars;
+
+extern "C"
+JNIEXPORT jboolean JNICALL
+Java_com_arm_aichat_internal_InferenceEngineImpl_generationLimitReachedNative(
+        JNIEnv * /*env*/, jobject /*unused*/) {
+    return astra_generation_limit_reached ? JNI_TRUE : JNI_FALSE;
+}""",
     ),
     (
         """    stop_generation_position = 0;
     cached_token_chars.clear();""",
         """    remaining_generation_tokens = 0;
+    astra_generation_limit_reached = false;
     cached_token_chars.clear();""",
     ),
     (
@@ -58,6 +68,7 @@ static std::string cached_token_chars;""",
     // next user turn is formatted with the prior assistant turn in history.
     if (remaining_generation_tokens <= 0) {
         LOGd("%s: STOP: assistant token budget exhausted", __func__);
+        astra_generation_limit_reached = true;
         chat_add_and_format(ROLE_ASSISTANT, assistant_ss.str());
         return nullptr;
     }
@@ -86,6 +97,9 @@ static std::string cached_token_chars;""",
 
 GUARDS = (
     "static int remaining_generation_tokens;",
+    "astra_generation_limit_reached = false;",
+    "astra_generation_limit_reached = true;",
+    "InferenceEngineImpl_generationLimitReachedNative(",
     "remaining_generation_tokens = std::max(0, static_cast<int>(n_predict));",
     "if (remaining_generation_tokens <= 0) {",
     "--remaining_generation_tokens;",

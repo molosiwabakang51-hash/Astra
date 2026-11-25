@@ -466,6 +466,9 @@ internal class AstraOnDeviceBrain(
                     "Offline generation exceeded its time budget. Retry after cleanup."
                 }
                 phase(AstraInferenceAttempt.Phase.RESPONSE_FILTERING)
+                // Query the actual native termination branch, not emitted
+                // chunk count (UTF-8 fragments and EOG do not equal tokens).
+                val budgetExhausted = current.generationLimitReached()
                 val publicAnswer = AstraOfflinePolicy.publicReply(answer.finish())
                 // The model can invent [B#]/[K#] markers and even a
                 // citation-footer heading. Allow only IDs whose complete
@@ -477,7 +480,7 @@ internal class AstraOnDeviceBrain(
                     verifiedPrivatePassages = citedBooks.size,
                     verifiedOpenPassages = citedOpenCourse.size
                 )
-                if (attributedAnswer.isNotBlank()) {
+                if (attributedAnswer.isNotBlank() && !budgetExhausted) {
                     // A cancelled, failed, think-only or citation-filtered-empty
                     // reply cannot establish successful visible generation.
                     // Store only numeric timing, never prompt or response text.
@@ -489,7 +492,13 @@ internal class AstraOnDeviceBrain(
                         firstVisiblePublicationNs
                     )
                 }
-                val visibleReply = if (attributedAnswer.isBlank()) {
+                val visibleReply = if (budgetExhausted) {
+                    // Preserve useful visible partial output, but never let a
+                    // capped answer seed future native or recovered context.
+                    session.invalidate()
+                    loadedModelPath = null
+                    AstraInterruptedReply.budgetLimited(attributedAnswer)
+                } else if (attributedAnswer.isBlank()) {
                     // Source/citation filtering can remove every visible token.
                     // Never return a blank bubble or preserve that native session.
                     session.invalidate()
@@ -504,14 +513,17 @@ internal class AstraOnDeviceBrain(
                 } else {
                     attributedAnswer
                 }
-                if (attributedAnswer.isNotBlank()) {
+                if (attributedAnswer.isNotBlank() && !budgetExhausted) {
                     session.recordCompletedTurn(
                         earlierTurns.size, transcriptTail,
                         visibleUserMessage ?: turns.last().content, visibleReply
                     )
                 }
-                finish(if (attributedAnswer.isBlank()) AstraInferenceAttempt.Outcome.EMPTY_REPLY
-                    else AstraInferenceAttempt.Outcome.VISIBLE_REPLY)
+                finish(when {
+                    budgetExhausted -> AstraInferenceAttempt.Outcome.TOKEN_LIMIT
+                    attributedAnswer.isBlank() -> AstraInferenceAttempt.Outcome.EMPTY_REPLY
+                    else -> AstraInferenceAttempt.Outcome.VISIBLE_REPLY
+                })
                 visibleReply
                 }
             } catch (linkage: LinkageError) {

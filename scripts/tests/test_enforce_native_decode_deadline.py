@@ -90,6 +90,17 @@ class NativeDecodeDeadlineTest(unittest.TestCase):
         self.assertIn("withTimeoutOrNull(nativeDeadlineMs)", brain)
         self.assertIn("requestPrompt, answerBudget, nativeDeadlineMs", brain)
 
+    def test_generation_completion_signal_is_exposed_and_consumed(self):
+        interface = hardened_interface(fixture(INTERFACE_RULES))
+        impl = hardened_impl(fixture(IMPL_RULES))
+        self.assertIn("fun generationLimitReached(): Boolean", interface)
+        self.assertIn("override fun generationLimitReached(): Boolean = generationLimitReachedNative()", impl)
+        brain = (ROOT / "android/app/src/main/java/com/astra/agent/AstraOnDeviceBrain.kt").read_text()
+        self.assertIn("val budgetExhausted = current.generationLimitReached()", brain)
+        self.assertIn("AstraInterruptedReply.budgetLimited(attributedAnswer)", brain)
+        self.assertIn("AstraInferenceAttempt.Outcome.TOKEN_LIMIT", brain)
+        self.assertIn("if (attributedAnswer.isNotBlank() && !budgetExhausted)", brain)
+
     def test_patch_is_idempotent_and_rejects_unknown_upstream_drift(self):
         for patched, rules in (
             (hardened_cpp, CPP_RULES),

@@ -32,4 +32,28 @@ class AstraInferenceAttemptTest {
         assertNull(AstraInferenceAttempt.start().finish(AstraInferenceAttempt.Outcome.FAILED, 100, 99).elapsedMs)
         assertTrue(AstraInferenceAttempt.describe(null).contains("No native inference attempt"))
     }
+
+    @Test fun cappedResponseIsIncompleteEvenWithVisibleText() {
+        val result = AstraInterruptedReply.budgetLimited("The first step is")
+        assertTrue(result.contains("The first step is"))
+        assertTrue(AstraInterruptedReply.isIncomplete(result))
+        assertTrue(AstraInterruptedReply.isIncomplete(AstraInterruptedReply.budgetLimited("")))
+        assertFalse(AstraInterruptedReply.isIncomplete("The first step is complete."))
+        val limit = AstraInferenceAttempt.start()
+            .finish(AstraInferenceAttempt.Outcome.TOKEN_LIMIT, 0, 100)
+        assertTrue(AstraInferenceAttempt.describe(limit).contains("incomplete response"))
+        assertFalse(AstraInferenceAttempt.describe(limit).contains("visible reply produced"))
+    }
+
+    @Test fun noBenchmarkCreditsCorrectButIncompleteNativeReplies() {
+        fun capped(answer: String) = AstraInterruptedReply.budgetLimited(answer)
+        assertFalse(AstraLanguageBenchmark.score(AstraLanguageBenchmark.Probe.ARITHMETIC, capped("42")))
+        assertFalse(AstraReasoningBenchmark.score(AstraReasoningBenchmark.Probe.LOGICAL_DEDUCTION, capped("NO")))
+        val scenario = AstraMultiTurnReasoningBenchmark.scenarios.first()
+        assertFalse(AstraMultiTurnReasoningBenchmark.interimMatches(scenario, 0, capped("ACK")))
+        assertFalse(AstraMultiTurnReasoningBenchmark.score(scenario, capped("3")))
+        // A source footer must never conceal an incomplete-generation marker.
+        assertFalse(AstraReasoningBenchmark.score(AstraReasoningBenchmark.Probe.LOGICAL_DEDUCTION,
+            capped("NO\n\nOpen-course references:\nexample")))
+    }
 }

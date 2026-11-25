@@ -99,6 +99,7 @@ internal object AstraReasoningBenchmark {
     )
 
     fun score(probe: Probe, output: String): Boolean {
+        if (AstraInterruptedReply.isIncomplete(output)) return false
         val answer = normalizedAnswer(output)
         if (answer.isBlank() || answer.length > 90) return false
         if (probe.answerType == AnswerType.YES_NO) {
