@@ -9,6 +9,7 @@ import hashlib
 import json
 from pathlib import Path
 import sys
+import stat
 import zipfile
 
 ROOT=Path(__file__).resolve().parent
@@ -128,15 +129,20 @@ def verify(path):
         if manifest_name not in names or any(
                 not i.filename.startswith(prefix) or
                 (i.filename!=manifest_name and i.filename[len(prefix):] not in allowed) or
-                i.file_size>MAX_FILE or i.is_dir()
+                i.file_size>MAX_FILE or i.is_dir() or
+                (i.create_system==3 and stat.S_IFMT(i.external_attr>>16) not in (0,stat.S_IFREG))
                 for i in infos):
             raise ValueError("Unexpected archive contents.")
         if sum(i.file_size for i in infos)>MAX_TOTAL+MAX_FILE:
             raise ValueError("Archive exceeds uncompressed size budget.")
         manifest=json.loads(archive.read(manifest_name).decode("utf-8"))
-        if manifest.get("format")!="astra-desktop-source-v1" or not isinstance(manifest.get("files"),list):
+        if type(manifest) is not dict or manifest.get("format")!="astra-desktop-source-v1" or not isinstance(manifest.get("files"),list):
             raise ValueError("Unknown manifest format.")
         rows=manifest["files"]
+        if any(type(row) is not dict or set(row)!={"path","bytes","sha256"} or
+               not isinstance(row["path"],str) or type(row["bytes"]) is not int or
+               not isinstance(row["sha256"],str) for row in rows):
+            raise ValueError("Invalid manifest file records.")
         paths=[row["path"] for row in rows]
         if len(paths)!=len(set(paths)) or set(paths)!=set(n[len(prefix):] for n in names if n!=manifest_name):
             raise ValueError("Manifest entries do not match archive.")
