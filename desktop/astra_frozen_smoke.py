@@ -30,7 +30,7 @@ def smoke_test():
     check("assistant_gui_import",lambda:importlib.import_module("astra_desktop_gui").AstraApp is not None)
     check("tkinter_import",lambda:importlib.import_module("tkinter").TkVersion>=8.6)
     if importlib.util.find_spec("astra_analytics") is not None:
-        from astra_analytics import available,run_analysis
+        from astra_analytics import available,run_analysis,from_files,export_content
         check("analytics_gui_import",lambda:importlib.import_module("astra_analytics_gui").AnalyticsWindow is not None)
         def portfolio():
             envelope,md=run_analysis("portfolio",{
@@ -40,6 +40,24 @@ def smoke_test():
             })
             return envelope["result"]["total_return"]["decimal_approximation"]=="0.15" and "Total return" in md
         check("portfolio_analytics",portfolio)
+        from astra_desktop_distribution import GROUPS
+        modes=available()
+        for mode,files in GROUPS.items():
+            if mode not in modes:
+                continue
+            path=Path(__file__).resolve().parent/files[2]
+            ready=modes[mode]
+            if not ready and not path.is_file():
+                continue
+            def example(m=mode,p=path,installed=ready):
+                if not installed or not p.is_file():
+                    return False
+                envelope,md=from_files(m,p)
+                if importlib.util.find_spec("astra_professional_report") is not None:
+                    html=export_content(envelope,md,"html")
+                    return "<table>" in html and "Canonical request SHA-256" in html
+                return bool(envelope["result"]) and bool(md.strip())
+            check("example_"+mode,example)
         if importlib.util.find_spec("astra_professional_report") is not None:
             from astra_professional_report import render_html
             check("professional_renderer",lambda:"<table>" in render_html(
