@@ -34,6 +34,20 @@ class NativeLoadRamGuardSourceTest(unittest.TestCase):
         self.assertNotIn("if (loadError is AstraNativeLowMemoryException)", BRAIN)
         self.assertIn("AstraInferenceCheckpoint.clear(context)", BRAIN)
 
+    def test_reload_releases_stale_native_allocation_before_ram_check(self):
+        reload = BRAIN.split("suspend fun loadPreparedModel(path: File) {", 1)[1]
+        reload = reload.split("loadPreparedModel(modelPath)", 1)[0]
+        self.assertEqual(1, reload.count("current.cleanUp()"))
+        self.assertLess(reload.index("current.cleanUp()"),
+                        reload.index("AstraNativeLoadGuard.requireCapacity(context)"))
+        self.assertLess(reload.index("loadedModelPath = null"),
+                        reload.index("AstraNativeLoadGuard.requireCapacity(context)"))
+        self.assertLess(reload.index("AstraNativeLoadGuard.requireCapacity(context)"),
+                        reload.index("current.loadModel(path.absolutePath)"))
+        self.assertLess(reload.index("AstraNativeLoadGuard.requireCapacity(context)"),
+                        reload.index("try {\n                            current.loadModel"))
+        self.assertIn("AstraModelOperationGate.withNativeSession", BRAIN)
+
 
 if __name__ == "__main__":
     unittest.main()

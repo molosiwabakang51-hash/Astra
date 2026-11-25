@@ -138,6 +138,8 @@ internal class AstraOnDeviceBrain(
                     AstraInferenceCheckpoint.begin(context)
                 }
                 withContext(Dispatchers.IO) {
+                // Never present a previous successful timing as evidence of this attempt.
+                lastNativeTiming = null
                 val requestStartedNs = System.nanoTime()
                 require(turns.lastOrNull()?.role == "user") { "A current user turn is required." }
                 val earlierTurns = turns.dropLast(1)
@@ -271,6 +273,14 @@ internal class AstraOnDeviceBrain(
                         // Android's own low-memory signal takes precedence over
                         // starting a large new JNI model allocation. This does
                         // not interfere with an already-running model session.
+                        // Release the obsolete native allocation first: otherwise
+                        // the RAM check counts memory owned by the model we intend
+                        // to replace. The process-wide native session is locked.
+                        if (current.state.value is InferenceEngine.State.ModelReady) {
+                            current.cleanUp()
+                        }
+                        session.invalidate()
+                        loadedModelPath = null
                         AstraNativeLoadGuard.requireCapacity(context)
                         // This is only a native-load backoff. Do not quarantine
                         // a healthy file for temporary Android low-RAM pressure,
@@ -283,11 +293,6 @@ internal class AstraOnDeviceBrain(
                         AstraInferenceCheckpoint.mark(
                             context, AstraInferenceCheckpoint.MODEL_LOADING
                         )
-                        // Unload stale native KV-cache when changing conversations
-                        // or switching model weights. No network call is involved.
-                        if (current.state.value is InferenceEngine.State.ModelReady) {
-                            current.cleanUp()
-                        }
                         try {
                             current.loadModel(path.absolutePath)
                         } catch (cancel: kotlinx.coroutines.CancellationException) {
