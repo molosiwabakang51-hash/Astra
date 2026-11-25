@@ -15,12 +15,23 @@ internal object AstraVerifiedArithmetic {
     private val expression = Regex(
         """^(?:what is|what's|calculate|compute|how much is|work out|please calculate)\s+""" +
             "($NUMBER)" +
-            """\s+(plus|minus|times|multiplied by|divided by)\s+""" +
+            """(?:\s+(plus|minus|times|multiplied by|divided by)\s+|\s*([+\-−*×/÷])\s*)""" +
             "($NUMBER)" +
             """\s*\??(?:\s*(?:reply|answer)\s+only\s+with\s+(?:the\s+)?""" +
             """(?:number|result|answer)\s*[.!]?)?$""",
         RegexOption.IGNORE_CASE
     )
+
+    // Canonicalize only the explicit operators in a fully matched owner request.
+    private fun operator(match: MatchResult): String =
+        when (val value = match.groupValues[2].ifEmpty { match.groupValues[3] }
+            .lowercase(java.util.Locale.ROOT)) {
+            "+" -> "plus"
+            "-", "−" -> "minus"
+            "*", "×" -> "times"
+            "/", "÷" -> "divided by"
+            else -> value
+        }
 
     /**
      * Explain a previous answer only when its exact value can be independently
@@ -35,9 +46,9 @@ internal object AstraVerifiedArithmetic {
         val match = expression.matchEntire(originalQuestion.trim()) ?: return null
         val left = match.groupValues[1].toBigDecimalOrNull()
             ?.stripTrailingZeros()?.toPlainString() ?: return null
-        val right = match.groupValues[3].toBigDecimalOrNull()
+        val right = match.groupValues[4].toBigDecimalOrNull()
             ?.stripTrailingZeros()?.toPlainString() ?: return null
-        val symbol = when (match.groupValues[2].lowercase(java.util.Locale.ROOT)) {
+        val symbol = when (operator(match)) {
             "plus" -> "+"
             "minus" -> "−"
             "times", "multiplied by" -> "×"
@@ -77,8 +88,8 @@ internal object AstraVerifiedArithmetic {
         if (question.length !in 8..180 || question.contains('\n')) return null
         val match = expression.matchEntire(question) ?: return null
         val left = match.groupValues[1].toBigDecimalOrNull() ?: return null
-        val right = match.groupValues[3].toBigDecimalOrNull() ?: return null
-        val result = when (match.groupValues[2].lowercase(java.util.Locale.ROOT)) {
+        val right = match.groupValues[4].toBigDecimalOrNull() ?: return null
+        val result = when (operator(match)) {
             "plus" -> left.add(right)
             "minus" -> left.subtract(right)
             "times", "multiplied by" -> left.multiply(right)
