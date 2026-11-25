@@ -11,7 +11,7 @@ from fractions import Fraction
 import re
 
 from astra_evidence import clean, MAX_QUERY
-from astra_natural_language import route, ratio, NUM, PERIOD, SUFFIX
+from astra_natural_language import route, ratio, years, NUM, PERIOD, TIME_AMOUNT, SUFFIX
 from astra_verified_finance import adjudicate
 
 TIME_OPERATIONS = {"present_value", "compound_growth"}
@@ -27,9 +27,9 @@ PERIOD_CHANGE = re.compile(
     r"what if (?:the )?(?:period|term) (?:is|changes to))\s+"
     + PERIOD + r"\s+years?" + SUFFIX, re.I)
 AMOUNT_CHANGE = re.compile(
-    r"(?:change|set) (?:the )?(?:amount|principal) to\s+(" + NUM + r")" + SUFFIX, re.I)
+    r"(?:change|set) (?:the )?(?:amount|principal) to\s+" + TIME_AMOUNT + SUFFIX, re.I)
 COMPARE = re.compile(r"(?:please )?compare (?:both results|the (?:two |last two )?results|"
-                     r"with (?:the )?(?:previous|original)(?: result)?)" + SUFFIX, re.I)
+                     r"with (?:the )?(?:previous|original)(?: result)?)(?: and explain (?:the )?implications)?" + SUFFIX, re.I)
 RESET = re.compile(r"(?:reset|clear) (?:the )?(?:calculation|scenario|finance context)" + SUFFIX, re.I)
 FOLLOWUP_HINT = re.compile(
     r"^(?:what (?:happens )?if|what about|and at|at\s+[+-]?\d|"
@@ -61,14 +61,14 @@ class FinanceSession:
     def _clarify(self, message):
         return {"status": "clarification_required", "clarification": message}
 
-    def _calculate(self, calculation, *, changed=None):
+    def _calculate(self, calculation, *, changed=None, currency=None):
         # Commit state only after complete successful calculation.
         request = deepcopy(calculation)
         try:
             result = adjudicate(request)
         except ValueError:
             return self._clarify("The proposed values are outside the supported calculation domain.")
-        snapshot = {"calculation": request, "finance": result}
+        snapshot = {"calculation": request, "finance": result, "currency": currency}
         if changed is None:
             self._original = deepcopy(snapshot)
             self._previous = None
@@ -85,7 +85,7 @@ class FinanceSession:
             return self._clarify("Start with an explicit present-value or compound-growth calculation.")
         request = deepcopy(self._current["calculation"])
         request["inputs"][field] = value
-        return self._calculate(request, changed=field)
+        return self._calculate(request, changed=field, currency=self._current["currency"])
 
     def _compare(self, original=False):
         prior = self._original if original else self._previous
@@ -95,8 +95,13 @@ class FinanceSession:
         new = fraction_from_result(self._current["finance"])
         change = new - old
         relative = change / old if old > 0 else None
+        explanation = "The recalculated result is higher." if change > 0 else "The recalculated result is lower." if change < 0 else "The recalculated result is unchanged."
+        before, after = prior["calculation"]["inputs"], self._current["calculation"]["inputs"]
+        if self._current["calculation"]["operation"] == "present_value" and set(before) == {"amount", "rate", "periods"} and before["amount"] == after["amount"] and before["periods"] == after["periods"] and Fraction(before["rate"]) != Fraction(after["rate"]) and Fraction(before["amount"]) > 0 and before["periods"] > 0:
+            explanation += " With the same positive future cash flow and term, a higher discount rate lowers present value, and a lower discount rate raises it."
         return {
             "status": "compared",
+            "explanation": explanation,
             "comparison_base": "original" if original else "previous",
             "before": deepcopy(prior),
             "after": deepcopy(self._current),
@@ -123,17 +128,19 @@ class FinanceSession:
             return self._modify("rate", ratio(rate[1]))
         periods = PERIOD_CHANGE.fullmatch(normalized)
         if periods:
-            return self._modify("periods", int(periods[1]))
+            return self._modify("periods", years(periods[1]))
         amount = AMOUNT_CHANGE.fullmatch(normalized)
         if amount:
-            return self._modify("amount", amount[1])
+            if amount[1] and (self._current is None or self._current["currency"] != "BWP"):
+                return self._clarify("Currency must match the original scenario. Start a new calculation to change currency.")
+            return self._modify("amount", amount[2].replace(",", ""))
         if FOLLOWUP_HINT.search(normalized):
             return self._clarify("Specify one new annual rate, term in years, or amount. No change has been applied.")
         routed = route(text)
         if routed.status == "clarification_required":
             return self._clarify(routed.clarification)
         if routed.request["kind"] == "finance":
-            return self._calculate(routed.request["calculation"])
+            return self._calculate(routed.request["calculation"], currency=routed.currency)
         # Never apply an old financial anchor after changing topic.
         self.reset()
         if self.fallback is not None:
