@@ -1,51 +1,50 @@
-name: Build Astra Desktop distribution
+name: Build Astra Desktop source distribution
 on:
   pull_request:
     paths:
       - 'desktop/**'
-      - 'scripts/tests/test_desktop*.py'
+      - 'scripts/tests/test_desktop_distribution.py'
       - '.github/workflows/desktop-source.yml'
       - 'scripts/tests/test_workflow_runtime_policy.py'
   push:
     branches:
       - main
-      - feat/desktop-frozen-integrated
     paths:
       - 'desktop/**'
-      - 'scripts/tests/test_desktop*.py'
-      - '.github/workflows/desktop-source.yml'
+      - 'scripts/tests/test_desktop_distribution.py'
       - 'scripts/tests/test_workflow_runtime_policy.py'
+      - '.github/workflows/desktop-source.yml'
   workflow_dispatch:
 permissions:
   contents: read
 jobs:
   windows-source:
     runs-on: windows-2025
-    timeout-minutes: 30
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-python@v6
         with:
           python-version: '3.11'
-      - name: Run desktop regression tests
-        run: python -m unittest discover -s scripts/tests -p 'test_desktop*.py' -v
-      - name: Build source archive
-        run: python desktop/astra_desktop_distribution.py build AstraDesktop.zip
-      - name: Verify source archive
-        run: python desktop/astra_desktop_distribution.py verify AstraDesktop.zip
+      - name: Run distribution regression tests
+        run: python -m unittest discover -s scripts/tests -p 'test_desktop_distribution.py' -v
+      - name: Build and verify archive
+        run: |
+          python desktop/astra_desktop_distribution.py build AstraDesktop.zip
+          python desktop/astra_desktop_distribution.py verify AstraDesktop.zip
+      - name: Extract and inspect
+        shell: pwsh
+        run: |
+          Expand-Archive AstraDesktop.zip -DestinationPath extracted
+          Push-Location extracted/AstraDesktop
+          python -E -s astra_launcher.py --diagnostics
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python -E -s -c "import tkinter; import astra_workbench; import astra_launcher"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Pop-Location
       - uses: actions/upload-artifact@v6
         with:
           name: AstraDesktop-source
           path: AstraDesktop.zip
-          if-no-files-found: error
-          retention-days: 7
-      - name: Install pinned packaging tool
-        run: python -m pip install --disable-pip-version-check --only-binary=:all: pyinstaller==6.22.3
-      - name: Build and verify relocated frozen application
-        run: python desktop/astra_frozen_build.py frozen-dist
-      - uses: actions/upload-artifact@v6
-        with:
-          name: AstraDesktop-frozen-unsigned-x64
-          path: frozen-dist/
           if-no-files-found: error
           retention-days: 7
