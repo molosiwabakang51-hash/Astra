@@ -102,11 +102,14 @@ internal object AstraGroundedMemory {
 
         fun consider(source: String, raw: String, sourceBoost: Int) {
             if (raw.isBlank()) return
-            val line = raw.replace(Regex("""\s+"""), " ").trim().take(2_000)
-            val normalized = tokenize(line).toSet()
-            val hits = tokens.count { it in normalized }
-            if (hits == 0) return
+            val line = AstraUnicodeBounds.prefix(raw.replace(Regex("""\s+"""), " ").trim(), 2_000)
+            if (tokenize(line).none(queryTerms::contains)) return
             val excerpt = excerpt(line, tokens)
+            // Rank the evidence that Qwen will actually receive, not distant
+            // matches in omitted parts of a long private note.
+            val visible = tokenize(excerpt).toSet()
+            val hits = tokens.count { it in visible }
+            if (hits == 0) return
             val dedupKey = excerpt.lowercase(Locale.ROOT)
             if (!dedup.add(dedupKey)) return
             val score = hits * 10 + sourceBoost +
@@ -151,7 +154,7 @@ internal object AstraGroundedMemory {
                     }
                     // Match only the same bounded text considered by the
                     // evidence ranker. Never scan unlimited archived bodies.
-                    val candidateText = entry.text.take(2_000)
+                    val candidateText = AstraUnicodeBounds.prefix(entry.text, 2_000)
                     val onTopic = tokenize(candidateText).any(queryTerms::contains)
                     val corrected = if (onTopic) {
                         AstraGroundedCorrections.annotated(
@@ -200,12 +203,31 @@ internal object AstraGroundedMemory {
 
     private fun excerpt(raw: String, tokens: List<String>): String {
         if (raw.length <= 220) return raw
-        val lower = raw.lowercase(Locale.ROOT)
-        val nearest = tokens.asSequence()
-            .map { lower.indexOf(it) }.filter { it >= 0 }.minOrNull() ?: 0
-        val start = (nearest - 50).coerceIn(0, raw.length - 220)
+        // Match normalized whole words using offsets in the original text.
+        // Lowercasing the whole document can change UTF-16 indices, and a
+        // substring match can select a different word or miss inflections.
+        val query = tokens.toSet()
+        val matches = words.findAll(raw).mapNotNull { match ->
+            val term = stem(match.value.lowercase(Locale.ROOT))
+            if (term in query) match.range to term else null
+        }.toList()
+        val maxStart = raw.length - 220
+        val candidates = (listOf(0) + matches.flatMap { (range, _) ->
+            listOf((range.first - 50).coerceIn(0, maxStart),
+                range.first.coerceIn(0, maxStart))
+        }).distinct()
+        // Select the window with the greatest distinct visible query coverage.
+        // At most 2,000 input units and 12 query tokens are considered.
+        val start = candidates.maxWithOrNull(
+            compareBy<Int> { candidate ->
+                matches.asSequence()
+                    .filter { (range, _) ->
+                        range.first >= candidate && range.last < candidate + 220
+                    }.map { it.second }.distinct().count()
+            }.thenBy { -it }
+        ) ?: 0
         return (if (start > 0) "…" else "") +
-            raw.substring(start, start + 220) +
+            AstraUnicodeBounds.slice(raw, start, start + 220) +
             (if (start + 220 < raw.length) "…" else "")
     }
 }
