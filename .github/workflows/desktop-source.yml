@@ -114,7 +114,7 @@ jobs:
               $json = & (Join-Path $target 'AstraDesktop.exe') --complete-smoke-test
               if ($LASTEXITCODE -ne 0) { throw 'Relocated executable failed' }
               $receipt = ($json -join "`n") | ConvertFrom-Json
-              if (-not $receipt.frozen -or -not $receipt.require_complete -or -not $receipt.passed) {
+              if (-not $receipt.frozen -or -not $receipt.require_complete -or -not $receipt.require_gui -or -not $receipt.passed) {
                 throw 'Expected successful complete frozen smoke receipt'
               }
               $receipt | ConvertTo-Json -Depth 5
