@@ -74,7 +74,7 @@ def route(text, *, review=False, use_vector=False):
     match = RETRIEVE.fullmatch(normalized)
     if match:
         return Route("routed", {"kind": "retrieve", "question": match[1], "use_vector": use_vector})
-    if CALC_HINT.search(normalized) and not DEFINITION.search(normalized):
+    if CALC_HINT.search(normalized) and (not DEFINITION.search(normalized) or re.search(r"[0-9%]", normalized)):
         return Route("clarification_required", clarification="Specify the calculation and its inputs unambiguously. Supported calculations are percentage change, annual compound growth, present value and weighted returns.")
     return Route("routed", {"kind": "answer", "question": text, "review": review, "use_vector": use_vector})
 
