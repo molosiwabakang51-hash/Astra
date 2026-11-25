@@ -21,6 +21,7 @@ internal object AstraChatReview {
         """[.!?]+\s+(?:do you see|where was|in this chat|look earlier|look further)\b.*$""",
         RegexOption.IGNORE_CASE
     )
+    private val scopeSuffix = Regex("""\s+(?:in|from) this chat$""", RegexOption.IGNORE_CASE)
     private val continuation = setOf(
         "in this chat", "earlier than this", "earlier in this chat",
         "do you see your mistake", "do you see the mistake", "where was your mistake",
@@ -28,6 +29,7 @@ internal object AstraChatReview {
     )
     private val words = Regex("""[\p{L}\p{N}]+""")
     private const val REPORT_HEADER = "EARLIER MENTIONS IN THIS CHAT · "
+    private const val EMPTY_PREFIX = "I found no earlier references to '"
     private data class Request(val subject: String, val assistantOnly: Boolean)
 
     private fun normalize(text: String): String =
@@ -39,7 +41,8 @@ internal object AstraChatReview {
         val direct = explicit.matchEntire(clean)
         val ask = question.matchEntire(clean)
         val subject = (direct?.groupValues?.get(1) ?: ask?.groupValues?.get(2)
-            ?: return null).replace(trailingFollowUp, "").trim().trimEnd('?', '.', '!', ' ')
+            ?: return null).replace(trailingFollowUp, "").replace(scopeSuffix, "")
+            .trim().trimEnd('?', '.', '!', ' ')
         if (subject.length !in 1..100 || words.findAll(subject).count() !in 1..8) return null
         return Request(subject, ask != null && ask.groupValues[1] != "we")
     }
@@ -90,10 +93,11 @@ internal object AstraChatReview {
                 // evidence: repeated review must never amplify its own quotes.
                 !(turn.role == "You" && (parse(turn.text) != null ||
                     normalize(turn.text) in continuation)) &&
-                !(turn.role == "Astra" && turn.text.startsWith(REPORT_HEADER)) &&
+                !(turn.role == "Astra" && (turn.text.startsWith(REPORT_HEADER) ||
+                    (turn.text.startsWith(EMPTY_PREFIX) && turn.text.endsWith("' in this chat.")))) &&
                 matchAt(turn.text, topic) != null
         }
-        if (matches.isEmpty()) return "I found no earlier references to '" +
+        if (matches.isEmpty()) return EMPTY_PREFIX +
             request.subject + "' in this chat."
 
         // Preserve a narrow, sourced correction for the actual reported
@@ -102,7 +106,7 @@ internal object AstraChatReview {
         val shillerTopic = "shiller" in topic
         val priorAstra = matches.filter { it.value.role == "Astra" }.map { it.value.text }
         val wrongIdentity = shillerTopic && priorAstra.any {
-            Regex("""\bNiall Shiller\s+(?:wrote|is\s+(?:a|an|the))\b""",
+            Regex("""\bNiall Shiller\s+(?:wrote\s+Irrational Exuberance|is\s+a\s+Chicago economist)\b""",
                 RegexOption.IGNORE_CASE).containsMatchIn(it)
         }
         val wrongAffiliation = shillerTopic && priorAstra.any {
