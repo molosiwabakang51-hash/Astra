@@ -1,0 +1,41 @@
+name: Build Astra Desktop source distribution
+on:
+  pull_request:
+    paths:
+      - 'desktop/**'
+      - 'scripts/tests/test_desktop_distribution.py'
+      - '.github/workflows/desktop-source.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  windows-source:
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Run distribution regression tests
+        run: python -m unittest discover -s scripts/tests -p 'test_desktop_distribution.py' -v
+      - name: Build and verify archive
+        run: |
+          python desktop/astra_desktop_distribution.py build AstraDesktop.zip
+          python desktop/astra_desktop_distribution.py verify AstraDesktop.zip
+      - name: Extract and inspect
+        shell: pwsh
+        run: |
+          Expand-Archive AstraDesktop.zip -DestinationPath extracted
+          Push-Location extracted/AstraDesktop
+          python -E -s astra_launcher.py --diagnostics
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python -E -s -c "import tkinter; import astra_workbench; import astra_launcher"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Pop-Location
+      - uses: actions/upload-artifact@v4
+        with:
+          name: AstraDesktop-source
+          path: AstraDesktop.zip
+          if-no-files-found: error
+          retention-days: 7
