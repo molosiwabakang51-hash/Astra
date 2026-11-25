@@ -493,4 +493,41 @@ class AstraConversationContextTest {
         )
         assertEquals("Hello\n/no_think", result)
     }
+
+    @Test fun shortTopicFreeCorrectionSurvivesReload() {
+        val history = listOf(
+            turn("user", "My hypothetical bond maturity is seven years."),
+            turn("assistant", "Noted."),
+            turn("user", "No, 3.")
+        ) + (1..12).map { turn("assistant", "Unrelated weather note $it.") }
+        val restored = AstraConversationContext.userPrompt(
+            "What was my bond maturity?", history, true
+        )
+        assertTrue(restored.contains("maturity is seven years"))
+        assertTrue(restored.contains("Previous user: \"No, 3.\""))
+        assertTrue(restored.indexOf("seven years") < restored.indexOf("No, 3."))
+        assertFalse(restored.contains("Previous Astra:"))
+    }
+
+    @Test fun shortRecentRepliesRemainAvailableToFollowup() {
+        val history = listOf(
+            turn("user", "Calculate 2 plus 3."),
+            turn("assistant", "5"),
+            turn("user", "Yes")
+        )
+        val restored = AstraConversationContext.userPrompt("Double that.", history, true)
+        assertTrue(restored.contains("Previous Astra: \"5\""))
+        assertTrue(restored.contains("Previous user: \"Yes\""))
+    }
+
+    @Test fun evenTrailingEscapePairKeepsQuotedClosingDelimiter() {
+        val old = "A".repeat(248) + "\\" + " more text"
+        val restored = AstraConversationContext.userPrompt(
+            "What did I say?", listOf(turn("user", old)), true
+        )
+        val line = restored.lineSequence().first { it.startsWith("Previous user:") }
+        assertTrue(line.endsWith("\\\\\""))
+        assertEquals(2, line.dropLast(1).takeLastWhile { it == '\\' }.length)
+        assertFalse(restored.contains("more text"))
+    }
 }
