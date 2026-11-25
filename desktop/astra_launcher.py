@@ -89,13 +89,14 @@ def main(argv=None):
     group.add_argument("--diagnostics",action="store_true")
     group.add_argument("--workspace",choices=tuple(WORKSPACES))
     group.add_argument("--smoke-test",action="store_true")
+    group.add_argument("--complete-smoke-test",action="store_true")
     args=parser.parse_args(argv)
     if args.diagnostics:
         print(json.dumps(diagnostics(),indent=2))
         return 0
-    if args.smoke_test:
+    if args.smoke_test or args.complete_smoke_test:
         from astra_frozen_smoke import smoke_test
-        result=smoke_test()
+        result=smoke_test(require_complete=args.complete_smoke_test)
         print(json.dumps(result,indent=2))
         return 0 if result["passed"] else 1
     if args.workspace:
