@@ -108,9 +108,10 @@ class DistributionTests(unittest.TestCase):
         controller=L.WorkspaceProcess(self.root,executable="trusted-python",spawn=spawn)
         controller.launch("assistant")
         self.assertTrue(controller.active())
-        self.assertEqual(["trusted-python","-E","-s",str(self.root/"astra_desktop_gui.py")],
+        self.assertEqual(["trusted-python","-E","-s",str(self.root.resolve()/"astra_desktop_gui.py")],
                          spawn.call_args.args[0])
         self.assertFalse(spawn.call_args.kwargs["shell"])
+        self.assertEqual(self.root.resolve(),Path(spawn.call_args.kwargs["cwd"]))
         with self.assertRaises(RuntimeError):
             controller.launch("analytics")
         self.assertIsNone(controller.collect())
