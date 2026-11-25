@@ -61,6 +61,13 @@ class WorkbenchBudgetTests(unittest.TestCase):
         self.assertEqual("no_issue_found",followup["review"]["assessment"])
         self.assertEqual(2,followup["compute"]["model_calls"])
 
+    def test_known_slow_critic_skips_even_with_long_request_budget(self):
+        self.wb.latency.record("critic",100)
+        result=self.ask(budget=180)
+        self.assertEqual("unavailable",result["review"]["assessment"])
+        self.assertEqual([("primary",60)],self.calls)
+        self.assertEqual("budget_skipped",result["compute"]["events"][-1]["status"])
+
     def test_no_review_never_calls_critic(self):
         result=self.ask(review=False)
         self.assertEqual([("primary",60)],self.calls)
