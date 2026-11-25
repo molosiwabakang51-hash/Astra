@@ -49,7 +49,8 @@ internal object AstraGroundedCorrections {
     fun annotated(
         messages: List<AstraChatArchive.Message>,
         originalIndex: Int,
-        focusedOriginal: String
+        focusedOriginal: String,
+        focusWithin: ((Int) -> String)? = null
     ): String? {
         if (messages.getOrNull(originalIndex)?.role != "You") return null
         val corrections = mutableListOf<String>()
@@ -63,11 +64,15 @@ internal object AstraGroundedCorrections {
             if (corrections.size == 2) break
         }
         if (corrections.isEmpty()) return null
+        // Focus at the FINAL available original-text budget, not at 220
+        // units followed by a blind prefix cut that may erase the topic.
+        fun original(limit: Int): String =
+            text(focusWithin?.invoke(limit - 2) ?: focusedOriginal, limit)
         return if (corrections.size == 1) {
-            "Earlier owner: " + text(focusedOriginal, 88) +
+            "Earlier owner: " + original(88) +
                 " | Later owner correction: " + text(corrections.single(), 76)
         } else {
-            "Earlier owner: " + text(focusedOriginal, 56) +
+            "Earlier owner: " + original(56) +
                 " | Owner correction 1: " + text(corrections[0], 46) +
                 " | Owner correction 2: " + text(corrections[1], 46)
         }

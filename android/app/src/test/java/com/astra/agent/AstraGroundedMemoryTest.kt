@@ -289,4 +289,38 @@ class AstraGroundedMemoryTest {
         )
         assertFalse(brief.evidence.single().excerpt.any { it.isSurrogate() })
     }
+
+    @Test fun longOriginalWithLateTopicRetainsEvidenceAndTwoCorrections() {
+        val original = "irrelevant introduction ".repeat(16) +
+            "The project budget is 900 dollars."
+        val brief = AstraGroundedMemory.retrieve(
+            AstraGroundedMemory.parse("ask memory about project budget")!!,
+            emptyList(), emptyList(),
+            listOf(msg("You", original), msg("Astra", "Noted."),
+                msg("You", "Actually, make it 600 dollars."),
+                msg("Astra", "Understood."), msg("You", "No, 450.")), emptyList()
+        )
+        val evidence = brief.evidence.single().excerpt
+        assertTrue(evidence.contains("project budget is 900 dollars"))
+        assertTrue(evidence.contains("600 dollars"))
+        assertTrue(evidence.contains("No, 450."))
+        assertTrue(evidence.indexOf("900 dollars") < evidence.indexOf("No, 450."))
+        assertTrue(evidence.length <= 220)
+    }
+
+    @Test fun archivedLongOriginalStillGroundsItsLaterCorrection() {
+        val original = "background material ".repeat(20) +
+            "Our fictional expedition starts in September."
+        val brief = AstraGroundedMemory.retrieve(
+            AstraGroundedMemory.parse("ask memory about expedition starts")!!,
+            emptyList(), emptyList(), emptyList(),
+            listOf(AstraChatArchive.Chat("exp", "Expedition",
+                listOf(msg("You", original), msg("You", "Actually, make it October."))))
+        )
+        val evidence = brief.evidence.single()
+        assertTrue(evidence.source.contains("Expedition"))
+        assertTrue(evidence.excerpt.contains("expedition starts in September"))
+        assertTrue(evidence.excerpt.contains("October"))
+        assertTrue(evidence.excerpt.length <= 220)
+    }
 }
