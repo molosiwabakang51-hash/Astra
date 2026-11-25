@@ -530,4 +530,49 @@ class AstraConversationContextTest {
         assertEquals(2, line.dropLast(1).takeLastWhile { it == '\\' }.length)
         assertFalse(restored.contains("more text"))
     }
+
+    @Test fun ordinaryReasoningUsesCorrectedPremisesAfterModelReload() {
+        val history = listOf(
+            turn("user", "The fictional project budget is 900 dollars. " + "A".repeat(210)),
+            turn("assistant", "Understood."),
+            turn("user", "Actually, make it 600 dollars. " + "B".repeat(220)),
+            turn("assistant", "Noted."),
+            turn("user", "No, 450.")
+        ) + (1..12).map { turn("assistant", "Unrelated recent text " + "X".repeat(230)) }
+        val prompt = AstraConversationContext.userPrompt(
+            "Use the project budget to estimate the remaining funds.", history, true
+        )
+        assertTrue(prompt.contains("budget is 900 dollars"))
+        assertTrue(prompt.contains("make it 600 dollars"))
+        assertTrue(prompt.contains("No, 450."))
+        assertTrue(prompt.indexOf("900 dollars") < prompt.indexOf("No, 450."))
+        assertTrue(prompt.endsWith("Use the project budget to estimate the remaining funds.\n/no_think"))
+        assertTrue(prompt.length <= 3010)
+    }
+
+    @Test fun unrelatedCorrectionIsNotPromotedForOrdinaryReasoning() {
+        val history = listOf(
+            turn("user", "The fictional project budget is 900 dollars."),
+            turn("assistant", "Noted."),
+            turn("user", "The dinner recipe needs vegetables."),
+            turn("user", "Actually, use rice.")
+        ) + (1..12).map { turn("assistant", "Unrelated recent text " + "X".repeat(230)) }
+        val prompt = AstraConversationContext.userPrompt(
+            "Use the project budget to estimate remaining funds.", history, true
+        )
+        assertTrue(prompt.contains("budget is 900 dollars"))
+        assertFalse(prompt.contains("Actually, use rice."))
+    }
+
+    @Test fun genericFollowupKeepsLatestTopicInsteadOfPromotingOldCorrection() {
+        val history = listOf(
+            turn("user", "The fictional project budget is 900 dollars."),
+            turn("user", "Actually, make it 600 dollars."),
+            turn("user", "Teach me French pronunciation."),
+            turn("assistant", "French nasal vowels differ from English vowels.")
+        )
+        val prompt = AstraConversationContext.userPrompt("Go deeper.", history, true)
+        assertTrue(prompt.contains("French nasal vowels"))
+        assertTrue(prompt.endsWith("Go deeper.\n/no_think"))
+    }
 }

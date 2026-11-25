@@ -149,6 +149,27 @@ internal object AstraConversationContext {
                 // when serializing the selected excerpts.
                 relatedCorrections(anchor, valid).asReversed() + anchor
             }
+        // Ordinary reasoning questions also depend on corrected premises,
+        // not just explicit requests to recall a memory. Reserve a bounded
+        // correction chain for a clearly named topic before unrelated recent
+        // prose consumes the entire context budget. Do not interpret internal
+        // follow-up wrappers as new owner instructions.
+        val topicalCorrections = if (!ownerRecall && keywords.size >= 2 &&
+            !current.startsWith("SAME-CHAT FOLLOW-UP CONTEXT (")
+        ) {
+            val anchor = valid.asSequence().filter { it.value.role == "user" }
+                .map { turn ->
+                    turn to keywords.count(
+                        significantWords(turn.value.content.take(MAX_TURN_CHARS))::contains
+                    )
+                }.filter { it.second >= 2 }
+                .maxWithOrNull(compareBy<Pair<IndexedValue<Turn>, Int>> { it.second }
+                    .thenBy { it.first.index })?.first
+            val corrections = anchor?.let { relatedCorrections(it, valid) }.orEmpty()
+            if (anchor != null && corrections.isNotEmpty())
+                corrections.asReversed() + anchor
+            else emptyList()
+        } else emptyList()
         val priority = (
             when {
                 ownerRecall && ranked.isNotEmpty() ->
@@ -156,7 +177,7 @@ internal object AstraConversationContext {
                 ownerRecall && keywords.isNotEmpty() ->
                     relevantRecentOwners
                 ownerRecall -> recentOwners + candidates.asReversed()
-                else -> recent.asReversed() + retrieved + candidates.asReversed()
+                else -> topicalCorrections + recent.asReversed() + retrieved + candidates.asReversed()
             }
         ).distinctBy { it.index }
         val selected = mutableListOf<Pair<Int, String>>()
