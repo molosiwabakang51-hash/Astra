@@ -107,5 +107,24 @@ class AdaptiveContextTests(unittest.TestCase):
                 native.assert_not_called()
             self.assertEqual("prompt_context_budget_exceeded",runner.last_profile["outcome"])
 
+    def test_workbench_grammar_is_opt_in_and_role_specific(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp)
+            binary=root/"llama-cli.exe"
+            binary.write_bytes(b"fixture")
+            model=root/"primary.gguf"
+            model.write_bytes(b"GGUF"+b"x"*1024)
+            critic=root/"critic.gguf"
+            critic.write_bytes(b"GGUF"+b"y"*1024)
+            plain=A.LocalAnswerRunner(binary,model,approved=True)
+            structured=A.LocalAnswerRunner(binary,model,critic,approved=True,output_policy="grounded")
+            with patch.object(A,"probe",return_value=P.Resources(6*P.GIB,4,P.GIB)),patch.object(A,"run_bounded",return_value=subprocess.CompletedProcess([],0,b"fixture")) as run:
+                plain("primary","synthetic")
+                self.assertNotIn("--grammar",run.call_args.args[0])
+                for role,grammar in (("primary",A.ANSWER_GRAMMAR),("critic",A.CRITIC_GRAMMAR)):
+                    structured(role,"synthetic")
+                    command=run.call_args.args[0]
+                    self.assertEqual(grammar,command[command.index("--grammar")+1])
+
 if __name__=="__main__":
     unittest.main()

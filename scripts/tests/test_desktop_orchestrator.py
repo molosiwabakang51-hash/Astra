@@ -86,6 +86,16 @@ class OrchestratorTests(unittest.TestCase):
             self.assertIsNone(result["answer"])
         self.assertEqual(1,len(self.ledger.search("duration")))
 
+    def test_native_and_validation_failures_are_distinguished_without_raw_text(self):
+        def broken(*args):
+            raise RuntimeError("private path")
+        for runner,stage in ((broken,"native_execution"),(lambda *args:"private malformed answer","response_validation")):
+            service=O.Orchestrator(self.ledger,self.hybrid,runner)
+            result=service.execute(self.request,approve_models=True)
+            self.assertEqual(stage,result["failure_stage"])
+            self.assertIsNone(result["answer"])
+            self.assertNotIn("private",str(result))
+
     def test_changed_evidence_discards_generated_answer(self):
         def runner(role,prompt):
             self.ledger.add("Bond duration","New reviewed correction.","Reviewed textbook",

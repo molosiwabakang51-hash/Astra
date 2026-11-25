@@ -18,6 +18,18 @@ from astra_orchestrator import MAX_PROMPT_BYTES, MAX_REPLY_BYTES
 CONTEXT = 4096
 GENERATE_TOKENS = 512
 
+# Workbench-only grammar. Benchmarks retain their original unrestricted output.
+JSON_RULES = r'''
+ws ::= [ \t\n\r]*
+string ::= "\"" char* "\""
+char ::= [^"\\\x00-\x1f] | "\\" (["\\/bfnrt] | "u" [0-9a-fA-F]{4})
+id ::= [1-9] [0-9]{0,18}
+ids ::= "[" ws id (ws "," ws id){0,4} ws "]"
+concerns ::= "[" ws (string (ws "," ws string){0,3})? ws "]"
+'''
+ANSWER_GRAMMAR = r'root ::= "{" ws "\"answer\"" ws ":" ws string ws "," ws "\"citations\"" ws ":" ws ids ws "}" ws' + "\n" + JSON_RULES
+CRITIC_GRAMMAR = r'root ::= "{" ws "\"assessment\"" ws ":" ws ("\"no_issue_found\"" | "\"concerns\"" | "\"uncertain\"") ws "," ws "\"concerns\"" ws ":" ws concerns ws "}" ws' + "\n" + JSON_RULES
+
 
 def stamp(path):
     metadata = path.stat()
@@ -25,7 +37,7 @@ def stamp(path):
 
 
 class LocalAnswerRunner:
-    def __init__(self, binary, primary, critic=None, *, timeout=180, approved=False, context_policy="fixed"):
+    def __init__(self, binary, primary, critic=None, *, timeout=180, approved=False, context_policy="fixed", output_policy="unrestricted"):
         if approved is not True:
             raise ValueError("Explicit local model approval required.")
         self.binary, primary = Path(binary).resolve(), Path(primary).resolve()
@@ -36,6 +48,9 @@ class LocalAnswerRunner:
         if context_policy not in ("fixed", "adaptive"):
             raise ValueError("Unknown inference context policy.")
         self.context_policy = context_policy
+        if output_policy not in ("unrestricted","grounded"):
+            raise ValueError("Unknown output policy.")
+        self.output_policy = output_policy
         model_file(primary)
         self.models = {"primary": primary}
         if critic is not None:
@@ -113,6 +128,8 @@ class LocalAnswerRunner:
                            "-c", str(context), "-n", str(GENERATE_TOKENS),
                            "-ngl", "0", "-t", threads, "-tb", threads,
                            "--temp", "0", "--seed", "42"]
+                if self.output_policy == "grounded":
+                    command.extend(("--grammar", ANSWER_GRAMMAR if role == "primary" else CRITIC_GRAMMAR))
                 try:
                     process = run_bounded(command, timeout=effective_timeout,
                                              env=environment, cwd=directory,

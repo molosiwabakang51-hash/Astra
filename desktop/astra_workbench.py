@@ -69,7 +69,7 @@ class Workbench:
 
     def configure_models(self, binary, primary, critic=None, *, approved=False, timeout=180, context_policy="fixed"):
         candidate = LocalAnswerRunner(binary, primary, critic, timeout=timeout, approved=approved,
-                                      context_policy=context_policy)
+                                      context_policy=context_policy, output_policy="grounded")
         self.runner = candidate
         self.latency = LatencyProfile()
         self.compute_history.clear()
@@ -267,6 +267,10 @@ def format_result(result):
     message = _format_result(result)
     if result["status"]=="compute_history_exported":
         return f"Saved {result['count']} content-free compute receipts to a new JSON file."
+    if result.get("failure_stage")=="response_validation":
+        message += "\nThe native call returned, but its answer format or evidence IDs failed validation."
+    elif result.get("failure_stage")=="native_execution":
+        message += "\nThe native call did not return usable text. Check Runtime → Latest metrics."
     if "compute" in result:
         receipt=result["compute"]
         message += "\n\nCompute: "+str(receipt["model_calls"])+"/"+str(receipt["max_model_calls"])+ " model calls"
