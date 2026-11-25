@@ -63,4 +63,31 @@ class AstraAdaptiveReasoningTest {
             diagnosticIsolated = true
         ))
     }
+
+    @Test fun broaderReasoningTasksAreRecognizedWithoutDomainKeywords() {
+        for (question in listOf(
+            "Determine whether the conclusion follows from the stated premises about the fictional village.",
+            "Check whether these premises are consistent given the proposed interpretation of the experiment.",
+            "Is the conclusion logically valid if the second premise is false?",
+            "Given limited transport and staffing constraints, which plan should we choose?",
+            "Under these competing risks and alternatives, justify which plan is better."
+        )) {
+            assertTrue(question, AstraAdaptiveReasoning.select(question, automaticEnabled = true))
+            assertFalse(question, AstraAdaptiveReasoning.select(question, automaticEnabled = false))
+            assertFalse(question, AstraAdaptiveReasoning.select(question, true, diagnosticIsolated = true))
+        }
+    }
+
+    @Test fun quotedReasoningPhrasesAndLanguageTasksRemainFast() {
+        for (question in listOf(
+            "Translate the sentence compare these two options and evaluate the risks into French.",
+            "What does the phrase compare two alternatives and assess the risks mean?",
+            "Please paraphrase determine whether the conclusion follows from the stated premises.",
+            "Define the expression compare these risks and evaluate the alternatives.",
+            "Briefly determine whether the conclusion follows from the stated premises.",
+            "Determine whether the conclusion follows from the stated premises. Answer only with yes or no."
+        )) {
+            assertFalse(question, AstraAdaptiveReasoning.select(question, automaticEnabled = true))
+        }
+    }
 }
