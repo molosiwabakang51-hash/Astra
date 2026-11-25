@@ -12,7 +12,7 @@ ROOT = Path(__file__).resolve().parents[2]
 for name in ("astra_resource_plan", "astra_evidence", "astra_vector_memory",
              "astra_hybrid_evidence", "astra_quantitative_verify", "astra_verified_finance",
              "astra_local_finance", "astra_orchestrator", "astra_local_answer",
-             "astra_compute_budget", "astra_adaptive_answer"):
+             "astra_compute_budget", "astra_recursive_revision", "astra_adaptive_answer"):
     spec = importlib.util.spec_from_file_location(name, ROOT / "desktop" / (name + ".py"))
     module = importlib.util.module_from_spec(spec)
     sys.modules[name] = module
@@ -164,6 +164,60 @@ class ComputeBudgetTests(unittest.TestCase):
                                   B.Policy("fast",60),profile,approved=True)
                 self.assertEqual("insufficient_evidence",result["status"])
                 self.assertEqual(0,result["compute"]["model_calls"])
+
+
+    def test_deep_mode_preserves_valid_drafts_when_budget_is_exhausted(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            with E.Ledger(Path(tmp)/"evidence.sqlite") as ledger:
+                identifier = ledger.add("Duration","Price sensitivity.","Reviewed source",reviewed=True)
+                clock = Clock()
+                class Runner:
+                    timeout = 60
+                    def __init__(self):
+                        self.calls = []
+                    def __call__(self,role,prompt,*,timeout_seconds):
+                        self.calls.append((role,timeout_seconds))
+                        clock.value += 20
+                        if role == "primary":
+                            return json.dumps({"answer":"Tentative explanation","citations":[identifier]})
+                        return json.dumps({"assessment":"concerns","concerns":["Explain yield changes."]})
+                runner = Runner()
+                profile = B.LatencyProfile()
+                profile.record("critic",5)
+                original = B.BudgetedRunner
+                with patch.object(C,"BudgetedRunner",side_effect=lambda runner,policy,profile,**kwargs:
+                                  original(runner,policy,profile,clock=clock,**kwargs)):
+                    result = C.answer("duration",ledger,H.HybridEvidence(ledger),runner,
+                                      B.Policy("deep",45),profile,approved=True)
+                self.assertEqual("unverified_drafts",result["status"])
+                self.assertEqual(1,len(result["drafts"]))
+                self.assertEqual(2,result["compute"]["model_calls"])
+                self.assertEqual("budget_skipped",result["compute"]["events"][-1]["status"])
+
+    def test_deep_mode_runs_at_most_four_calls_and_reports_comparison(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            with E.Ledger(Path(tmp)/"evidence.sqlite") as ledger:
+                identifier = ledger.add("Duration","Price sensitivity.","Reviewed source",reviewed=True)
+                class Runner:
+                    timeout = 60
+                    def __init__(self):
+                        self.calls = []
+                    def __call__(self,role,prompt,*,timeout_seconds):
+                        self.calls.append(role)
+                        replies = [
+                            {"answer":"Original","citations":[identifier]},
+                            {"assessment":"concerns","concerns":["Explain yield changes."]},
+                            {"answer":"Revision","citations":[identifier]},
+                            {"preference":"first","reason":"Addresses the concern."},
+                        ]
+                        return json.dumps(replies[len(self.calls)-1])
+                runner = Runner()
+                result = C.answer("duration",ledger,H.HybridEvidence(ledger),runner,
+                                  B.Policy("deep",180),B.LatencyProfile(),approved=True)
+                self.assertEqual(["primary","critic","primary","critic"],runner.calls)
+                self.assertEqual(4,result["compute"]["model_calls"])
+                self.assertEqual("revision",result["comparison"]["preference"])
+                self.assertEqual("advisory_only",result["comparison"]["status"])
 
 
 if __name__ == "__main__":
