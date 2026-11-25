@@ -63,6 +63,8 @@ internal class AstraContinualLearning(private val file: File) {
     private val b2 = DoubleArray(outputs)
     private var steps = 0
     private var lastLoss = 0.0
+    private val maximumSteps = 10_000_000
+    private val maximumSampleChars = 350
 
     init {
         resetWeights()
@@ -71,6 +73,9 @@ internal class AstraContinualLearning(private val file: File) {
 
     @Synchronized
     fun learn(message: String): State {
+        // Defence in depth: an accidental direct caller cannot bypass the
+        // existing private-command and sensitive-content learning filters.
+        if (steps >= maximumSteps || !AstraLearningSignals.eligible(message)) return status()
         val label = teacherLabel(message)
         val x = features(message)
         if (x.all { it == 0.0 }) return status()
@@ -89,27 +94,43 @@ internal class AstraContinualLearning(private val file: File) {
             signal * (1.0 - h[row] * h[row])
         }
         val rate = 0.055 / (1.0 + steps / 800.0)
-        for (column in 0 until outputs) {
+        val parameters = arrayOf(w1, b1, w2, b2)
+        val previous = parameters.map { it.copyOf() }
+        val oldSteps = steps
+        val oldLoss = lastLoss
+        try {
+            for (column in 0 until outputs) {
+                for (row in 0 until hidden) {
+                    w2[column * hidden + row] -= rate * dOutput[column] * h[row]
+                }
+                b2[column] -= rate * dOutput[column]
+            }
             for (row in 0 until hidden) {
-                w2[column * hidden + row] -= rate * dOutput[column] * h[row]
+                for (index in 0 until inputs) {
+                    w1[row * inputs + index] -= rate * dHidden[row] * x[index]
+                }
+                b1[row] -= rate * dHidden[row]
             }
-            b2[column] -= rate * dOutput[column]
+            steps++
+            lastLoss = loss
+            check(lastLoss.isFinite() && lastLoss >= 0.0 && parameters.all { values ->
+                values.all { it.isFinite() && kotlin.math.abs(it) < 100.0 }
+            }) { "Local learning update exceeded safe parameter bounds." }
+            persist()
+        } catch (failure: Exception) {
+            // A failed disk write or invalid numerical update must not leave
+            // the active adapter ahead of its durable checkpoint.
+            parameters.forEachIndexed { i, values -> previous[i].copyInto(values) }
+            steps = oldSteps
+            lastLoss = oldLoss
+            throw failure
         }
-        for (row in 0 until hidden) {
-            for (index in 0 until inputs) {
-                w1[row * inputs + index] -= rate * dHidden[row] * x[index]
-            }
-            b1[row] -= rate * dHidden[row]
-        }
-        steps++
-        lastLoss = loss
-        persist()
         return status()
     }
 
     @Synchronized
     fun predict(message: String): Prediction {
-        val scores = softmax(hiddenLayer(features(message)))
+        val scores = softmax(hiddenLayer(features(message.take(maximumSampleChars))))
         val index = scores.indices.maxByOrNull { scores[it] } ?: 2
         return Prediction(Topic.entries[index], scores[index])
     }
@@ -119,12 +140,18 @@ internal class AstraContinualLearning(private val file: File) {
 
     @Synchronized
     fun reset() {
-        resetWeights()
-        steps = 0
-        lastLoss = 0.0
+        // Remove any interrupted temporary checkpoint first. If deletion
+        // fails, retain the current state instead of reporting a false reset.
+        val partial = File(file.parentFile, file.name + ".partial")
+        if (partial.exists() && !partial.delete()) {
+            throw IllegalStateException("Unable to clear temporary learning checkpoint.")
+        }
         if (file.exists() && !file.delete()) {
             throw IllegalStateException("Unable to clear local neural adapter.")
         }
+        resetWeights()
+        steps = 0
+        lastLoss = 0.0
     }
 
     private fun hiddenLayer(x: DoubleArray): DoubleArray =
@@ -224,7 +251,7 @@ internal class AstraContinualLearning(private val file: File) {
                 }
                 val loadedSteps = stream.readInt()
                 val loss = stream.readDouble()
-                require(loadedSteps in 0..10_000_000 && loss.isFinite())
+                require(loadedSteps in 0..maximumSteps && loss.isFinite() && loss >= 0.0)
                 fun readWeight(): Double {
                     val value = stream.readDouble()
                     require(value.isFinite() && kotlin.math.abs(value) < 100.0)
@@ -247,6 +274,7 @@ internal class AstraContinualLearning(private val file: File) {
                         for (i in values.indices) values[i] = readWeight()
                     }
                 }
+                require(stream.read() == -1) { "Unexpected trailing learning checkpoint data." }
                 steps = loadedSteps
                 lastLoss = loss
             }
