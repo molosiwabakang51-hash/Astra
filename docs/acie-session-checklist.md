@@ -155,7 +155,7 @@ Newly checked: concept-aware retrieval integration (#409, Android/Python passed)
 
 ## Latest engineering session
 
-All 119 IDs reviewed; 27/119 remain checked. #411 and #412 are undergoing Android CI; #412 Python checks passed. Implemented exact-token native budget admission: reduce only the production 768/1152/1792-token allowance when the entire prompt otherwise cannot fit, preserving minimum response budgets, exact smaller diagnostic caps, and existing incomplete-generation status. Added a host-compiled test of the actual native arithmetic. ACIE-010 and ACIE-029 remain open pending integrated native CI and actual inference/quality evidence. No new master completion claimed. The 200-case protocol still requires freeze and independent evidence.
+All 119 IDs reviewed; 27/119 remain checked. #412 passed both Android and Python CI and merged as 7f7b87c4456fc9d35e0ffc2c37e19a2d94ee0973. The protocol implementation is integrated; ACIE-109 remains unchecked until its pre-test independent freeze. #411 Android CI was still running at review. Implemented exact-token native budget admission: reduce only the production 768/1152/1792-token allowance when the entire prompt otherwise cannot fit, preserving minimum response budgets, exact smaller diagnostic caps, and existing incomplete-generation status. Added a host-compiled test of the actual native arithmetic. ACIE-010 and ACIE-029 remain open pending integrated native CI and actual inference/quality evidence. No new master completion claimed. The 200-case protocol still requires freeze and independent evidence.
 
 ## Acceptance
 
