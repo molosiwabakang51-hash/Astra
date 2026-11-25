@@ -143,13 +143,12 @@ internal object AstraFollowUpAnchor {
         currentChat: List<AstraChatArchive.Message>
     ): String {
         val original = prompt.trim()
-        if (original.length > 150) return prompt
+        if (original.length > 150 || original.any { it == '\n' || it == '\r' }) return prompt
         val lower = original.lowercase(Locale.ROOT)
             .replace(Regex("""\s+"""), " ")
             .trimEnd('?', '.', '!', ' ')
         val selectedIndex = selectedNumber(lower)
-        val referring = original.none { it == '\n' || it == '\r' } &&
-            referringFollowUp.matches(lower)
+        val referring = referringFollowUp.matches(lower)
         if (lower !in followUps && selectedIndex == null && !referring) return prompt
         // Only the last *completed* user/assistant exchange is an anchor.
         // Never pair a newer question with an older assistant reply when its
@@ -164,8 +163,8 @@ internal object AstraFollowUpAnchor {
                 !AstraInterruptedReply.isIncomplete(it.text)
         } ?: return prompt
 
-        val question = quote(AstraUnicodeBounds.prefix(lastUser.text, 260))
-        val answer = quote(AstraUnicodeBounds.prefix(lastAssistant.text, 320))
+        val question = quote(boundedExchangeExcerpt(lastUser.text, 260))
+        val answer = quote(boundedExchangeExcerpt(lastAssistant.text, 320))
         val numberedItem = selectedIndex?.let {
             specificNumberedItem(lastAssistant.text, it)
         }
@@ -196,6 +195,22 @@ internal object AstraFollowUpAnchor {
             }
             append("CURRENT USER FOLLOW-UP: $original")
         }
+    }
+
+    // A long question frequently ends in the actual task, and a long answer
+    // often concludes with the result, qualification or final recommendation.
+    // Preserve both ends of the latest exchange instead of silently quoting
+    // just the opening. Keep the same total budget and mark the omission.
+    private fun boundedExchangeExcerpt(value: String, limit: Int): String {
+        if (value.length <= limit) return value
+        val marker = " [middle omitted] "
+        val available = limit - marker.length
+        val headLimit = available / 2
+        val tailLimit = available - headLimit
+        val head = AstraUnicodeBounds.prefix(value, headLimit)
+        var start = value.length - tailLimit
+        if (value[start].isLowSurrogate() && value[start - 1].isHighSurrogate()) start++
+        return head.trimEnd() + marker + value.substring(start).trimStart()
     }
 
     private fun specificNumberedItem(reply: String, index: Int): String? {
