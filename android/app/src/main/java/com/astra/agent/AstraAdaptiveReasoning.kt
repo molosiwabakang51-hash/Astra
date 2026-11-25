@@ -21,6 +21,36 @@ internal object AstraAdaptiveReasoning {
         """\bif\b.{10,180}\b(?:and|but|unless)\b.{8,160}\b(?:then|what|would|should|can)\b""",
         RegexOption.IGNORE_CASE
     )
+    // A reasoning request is not necessarily a multi-step imperative.
+    // Recognize common deductive, counterfactual and consistency tasks
+    // without requiring specific subject matter or benchmark answers.
+    private val deductive = Regex(
+        """^(?:please )?(?:(?:can|could|would) you )?""" +
+            """(?:determine|test|check|examine|evaluate|assess|identify|find|""" +
+            """is|does|do|would|what)\b.{0,220}\b""" +
+            """(?:premises?|conclusions?|contradictions?|inconsistenc(?:y|ies)|""" +
+            """counterexamples?|logical(?:ly)?|necessary|sufficient)\b.{0,180}\b""" +
+            """(?:follows?|follow|valid|invalid|consistent|inconsistent|""" +
+            """implies?|imply|prove|disprove|given|assuming|if|because|""" +
+            """assumptions?|evidence)\b""",
+        RegexOption.IGNORE_CASE
+    )
+    private val tradeoffQuestion = Regex(
+        """^(?:given|assuming|under|which|what|how|would|should)\b.{0,260}\b""" +
+            """(?:constraints?|tradeoffs?|alternatives?|opportunity cost|risks?)\b.{0,180}\b""" +
+            """(?:choose|prefer|decide|better|best|optimal|recommend|prioriti[sz]e|""" +
+            """balance|evaluate|compare|justify)\b""",
+        RegexOption.IGNORE_CASE
+    )
+    // Do not interpret a request to translate or define a quoted reasoning
+    // phrase as a request to spend the larger reasoning budget.
+    private val languageOrQuotation = Regex(
+        """^(?:please )?(?:(?:can|could|would) you )?""" +
+            """(?:translate|define|paraphrase|pronounce|rewrite|""" +
+            """what does the (?:word|phrase|expression|sentence)|""" +
+            """what is the meaning of|explain the (?:word|phrase|expression))\b""",
+        RegexOption.IGNORE_CASE
+    )
     private val explicitFast = Regex(
         """\b(?:reply only|answer only|just the answer|no explanation|do not explain|""" +
             """without explanation|do not think|don't think|fast mode)\b""",
@@ -48,12 +78,15 @@ internal object AstraAdaptiveReasoning {
             untrustedSource.containsMatchIn(current) || current.contains("```")
         ) return false
         if (AstraGenerationPolicy.depth(current) == AstraGenerationPolicy.Depth.BRIEF ||
-            explicitFast.containsMatchIn(current)
+            explicitFast.containsMatchIn(current) ||
+            languageOrQuotation.containsMatchIn(current)
         ) return false
         // Only recognizable multi-constraint tasks trigger expensive thought.
         // Ordinary chat, lessons and translations retain the fast path.
         return planning.containsMatchIn(current) ||
             multistep.containsMatchIn(current) ||
-            conditional.containsMatchIn(current)
+            conditional.containsMatchIn(current) ||
+            deductive.containsMatchIn(current) ||
+            tradeoffQuestion.containsMatchIn(current)
     }
 }
