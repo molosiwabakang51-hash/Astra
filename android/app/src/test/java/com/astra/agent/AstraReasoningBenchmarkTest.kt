@@ -79,10 +79,25 @@ class AstraReasoningBenchmarkTest {
             B.render(listOf(yes, yes), "Qwen3 1.7B")
         }.exceptionOrNull()
         assertTrue(duplicated is IllegalArgumentException)
-        val report = B.render(listOf(yes), "Qwen3 1.7B")
-        assertTrue(report.contains("1/1 narrowly scored"))
+        val all = AstraReasoningBenchmark.Probe.entries.map { B.outcome(it, it.expected + if (it.answerType == AstraReasoningBenchmark.AnswerType.PERCENT) "%" else "", 120L) }
+        val report = B.render(all, "Qwen3 1.7B · Q4_K_M")
+        assertTrue(report.contains("8/8 narrowly scored"))
+        assertEquals(B.UNSCORED, B.render(listOf(yes), "Qwen3 1.7B · Q4_K_M"))
+        assertEquals(B.UNSCORED, B.render(all, null))
+        assertEquals(B.UNSCORED, B.render(all, "Qwen3 0.6B"))
         assertTrue(report.contains("not establish general reasoning"))
         assertFalse(report.contains("private explanation"))
         assertFalse(report.contains("10/10 AI rating achieved"))
+    }
+
+    @Test fun malformedNumericGroupingAndWrongUnitsNeverPass() {
+        val B = AstraReasoningBenchmark
+        assertFalse(B.score(AstraReasoningBenchmark.Probe.COMPOUNDING, "2,3,32.80"))
+        assertFalse(B.score(AstraReasoningBenchmark.Probe.COMPOUNDING, "2332,.80"))
+        assertFalse(B.score(AstraReasoningBenchmark.Probe.ALGEBRA, "P8"))
+        assertFalse(B.score(AstraReasoningBenchmark.Probe.ALGEBRA, "8.00001"))
+        assertFalse(B.score(AstraReasoningBenchmark.Probe.WEIGHTED_RETURN, "P6%"))
+        assertFalse(B.score(AstraReasoningBenchmark.Probe.WEIGHTED_RETURN, "6.00001%"))
+        assertTrue(B.score(AstraReasoningBenchmark.Probe.COMPOUNDING, "BWP2,332.80"))
     }
 }

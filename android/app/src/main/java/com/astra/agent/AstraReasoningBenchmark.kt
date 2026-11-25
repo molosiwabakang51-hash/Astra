@@ -1,6 +1,5 @@
 package com.astra.agent
 
-import java.math.BigDecimal
 import java.math.RoundingMode
 import java.util.Locale
 
@@ -96,7 +95,7 @@ internal object AstraReasoningBenchmark {
     }
 
     private val numericPattern = Regex(
-        """^(?:p|bwp)?\s*([+-]?[0-9][0-9,]*(?:\.[0-9]+)?)\s*(%)?\s*[.]?$"""
+        """^(p|bwp)?\s*([+-]?(?:[0-9]+|[0-9]{1,3}(?:,[0-9]{3})+)(?:\.[0-9]+)?)\s*(%)?\s*[.]?$"""
     )
 
     fun score(probe: Probe, output: String): Boolean {
@@ -107,20 +106,20 @@ internal object AstraReasoningBenchmark {
                 answer.trimEnd('.', '!') == probe.expected
         }
         val matched = numericPattern.matchEntire(answer) ?: return false
-        if (probe.answerType == AnswerType.PERCENT && matched.groupValues[2] != "%") {
+        if (probe.answerType != AnswerType.MONEY && matched.groupValues[1].isNotEmpty()) return false
+        if (probe.answerType == AnswerType.PERCENT && matched.groupValues[3] != "%") {
             return false
         }
-        if (probe.answerType != AnswerType.PERCENT && matched.groupValues[2].isNotEmpty()) {
+        if (probe.answerType != AnswerType.PERCENT && matched.groupValues[3].isNotEmpty()) {
             return false
         }
-        val number = matched.groupValues[1].replace(",", "")
+        val number = matched.groupValues[2].replace(",", "")
             .toBigDecimalOrNull() ?: return false
         val expected = probe.expected.toBigDecimal()
         // Two-decimal finance questions are graded at the precision requested.
-        val scale = if (probe.answerType == AnswerType.MONEY) 2 else 4
-        return number.setScale(scale, RoundingMode.HALF_UP).compareTo(
-            expected.setScale(scale, RoundingMode.HALF_UP)
-        ) == 0
+        return if (probe.answerType == AnswerType.MONEY) {
+            number.setScale(2, RoundingMode.HALF_UP).compareTo(expected) == 0
+        } else number.compareTo(expected) == 0
     }
 
     fun outcome(probe: Probe, reply: String, milliseconds: Long): Outcome =
@@ -131,11 +130,17 @@ internal object AstraReasoningBenchmark {
             normalizedAnswer(reply).replace(Regex("""\s+"""), " ").take(120)
         )
 
+    internal fun verifiedModel(model: String?): Boolean =
+        model != null && model == AstraModelChoice.loadedName(AstraModelImport.ADVANCED_NAME)
+
+    internal const val UNSCORED = "UNVERIFIED MODEL OR INCOMPLETE RUN — NO SCORE."
+
     fun render(outcomes: List<Outcome>, model: String?): String {
         require(outcomes.size <= Probe.entries.size) { "Too many reasoning checks." }
         require(outcomes.map { it.probe }.distinct().size == outcomes.size) {
             "Duplicate reasoning checks cannot inflate a score."
         }
+        if (!verifiedModel(model) || outcomes.size != Probe.entries.size) return UNSCORED
         val passed = outcomes.count { it.passed }
         return buildString {
             appendLine("QWEN3 ON-DEVICE REASONING CHECKS")

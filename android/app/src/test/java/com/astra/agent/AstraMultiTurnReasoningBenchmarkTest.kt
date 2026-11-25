@@ -75,7 +75,7 @@ class AstraMultiTurnReasoningBenchmarkTest {
                 scenario, index < 2, 500L + index, index % 3
             )
         }
-        val report = AstraMultiTurnReasoningBenchmark.render(samples, "Qwen3 1.7B")
+        val report = AstraMultiTurnReasoningBenchmark.render(samples, "Qwen3 1.7B · Q4_K_M")
         assertTrue(report.contains("2/4 strict final-answer checks passed"))
         assertTrue(report.contains("3/8 earlier-turn instruction checks passed"))
         assertTrue(report.contains("early replies 0/2"))
@@ -91,7 +91,7 @@ class AstraMultiTurnReasoningBenchmarkTest {
             )
         }
         val report = AstraMultiTurnReasoningBenchmark.render(
-            outcomes, "Verified Qwen3 1.7B"
+            outcomes, "Qwen3 1.7B · Q4_K_M"
         )
         assertTrue(report.contains("2/4 strict final-answer checks"))
         assertTrue(report.contains("No private source data"))
@@ -113,5 +113,15 @@ class AstraMultiTurnReasoningBenchmarkTest {
             AstraMultiTurnReasoningBenchmark.render(repeats, "Qwen3")
             fail("Duplicate scenario must not inflate the check count.")
         } catch (_: IllegalArgumentException) {}
+    }
+
+    @Test fun unknownModelCannotEarnMultiTurnScore() {
+        val outcomes = AstraMultiTurnReasoningBenchmark.scenarios.map {
+            AstraMultiTurnReasoningBenchmark.Outcome(it, true, 100L, 2)
+        }
+        assertEquals(AstraReasoningBenchmark.UNSCORED,
+            AstraMultiTurnReasoningBenchmark.render(outcomes, null))
+        assertEquals(AstraReasoningBenchmark.UNSCORED,
+            AstraMultiTurnReasoningBenchmark.render(outcomes, "Qwen3 0.6B"))
     }
 }

@@ -60,7 +60,7 @@ class AstraPairedReasoningTest {
                 AstraReasoningBenchmark.Outcome(probe, false, 800L + i, "HIDDEN_REPLY")
             )
         }
-        val output = AstraPairedReasoning.render(pairs, "Qwen3 1.7B local")
+        val output = AstraPairedReasoning.render(pairs, "Qwen3 1.7B · Q4_K_M")
         assertTrue(output.contains("Fast: 4/4 correct"))
         assertTrue(output.contains("Think: 0/4 correct"))
         assertTrue(output.contains("100 ms"))
@@ -74,6 +74,21 @@ class AstraPairedReasoningTest {
         try {
             AstraPairedReasoning.render(emptyList(), "Qwen3")
             fail("Incomplete trial must never be called a completed comparison")
+        } catch (_: IllegalArgumentException) {}
+    }
+
+    @Test fun reportsRejectUnknownModelAndMislabelledPair() {
+        val pairs = AstraPairedReasoning.probes.map { probe ->
+            val outcome = AstraReasoningBenchmark.Outcome(probe, true, 100L, "test")
+            AstraPairedReasoning.compare(probe, outcome, outcome)
+        }
+        assertEquals(AstraReasoningBenchmark.UNSCORED, AstraPairedReasoning.render(pairs, null))
+        assertEquals(AstraReasoningBenchmark.UNSCORED, AstraPairedReasoning.render(pairs, "Qwen3 0.6B"))
+        val invalid = pairs.toMutableList()
+        invalid[0] = invalid[0].copy(think = invalid[1].think)
+        try {
+            AstraPairedReasoning.render(invalid, "Qwen3 1.7B · Q4_K_M")
+            fail("Mismatched paired evidence must not be scored")
         } catch (_: IllegalArgumentException) {}
     }
 }
