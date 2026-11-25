@@ -48,7 +48,12 @@ class LocalAnswerRunner:
         if any(stamp(path) != saved for path, saved in self._stamps.items()):
             raise RuntimeError("Runtime or model changed; reconfigure before use.")
 
-    def __call__(self, role, prompt):
+    def __call__(self, role, prompt, *, timeout_seconds=None):
+        # A caller may reduce, never extend, the configured native timeout.
+        if timeout_seconds is not None and (type(timeout_seconds) is not int
+                                            or not 1 <= timeout_seconds <= self.timeout):
+            raise ValueError("Invalid per-call timeout override.")
+        effective_timeout = self.timeout if timeout_seconds is None else timeout_seconds
         if role not in self.models or not isinstance(prompt, str):
             raise ValueError("Requested local model unavailable.")
         payload = prompt.encode("utf-8")
@@ -78,7 +83,7 @@ class LocalAnswerRunner:
                 try:
                     process = subprocess.run(command, stdin=subprocess.DEVNULL,
                                              stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
-                                             timeout=self.timeout, shell=False, check=False,
+                                             timeout=effective_timeout, shell=False, check=False,
                                              env=environment, cwd=directory)
                 except subprocess.TimeoutExpired:
                     raise RuntimeError("Local answer generation timed out.") from None
