@@ -98,6 +98,14 @@ class DistributionTests(unittest.TestCase):
             imports+="; import astra_report_export"
         subprocess.run([sys.executable,"-E","-s","-X","utf8","-c",imports],cwd=folder,
                        check=True,capture_output=True,text=True,timeout=30)
+        if set(manifest["groups"]) == set(D.GROUPS):
+            run=subprocess.run([sys.executable,"-E","-s","-X","utf8","astra_launcher.py","--complete-smoke-test"],
+                               cwd=folder,check=True,capture_output=True,text=True,encoding="utf-8",timeout=60)
+            receipt=json.loads(run.stdout)
+            self.assertTrue(receipt["passed"],receipt["checks"])
+            self.assertTrue(receipt["require_complete"])
+            self.assertFalse(receipt["frozen"])
+            self.assertEqual(8,sum(k.startswith("example_") and v for k,v in receipt["checks"].items()))
         # Execute each installed example using the extracted source, not merely
         # import it. All inputs are bundled synthetic fixtures.
         for group in manifest["groups"]:
