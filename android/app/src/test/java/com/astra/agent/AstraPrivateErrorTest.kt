@@ -246,4 +246,14 @@ class AstraPrivateErrorTest {
             assertFalse(first.contains("secret"))
         }
     }
+
+    @Test fun oversizedNativeQuestionGetsSpecificActionableAdvice() {
+        val message = AstraPrivateError.forOwner(
+            AstraPrivateError.Operation.MODEL_CHAT,
+            IllegalStateException("Native prompt processing failed (code 5)")
+        )
+        assertTrue(message.contains("complete question and response budget"))
+        assertTrue(message.contains("shorter question or direct-answer mode"))
+        assertFalse(message.contains("may be unavailable or invalid"))
+    }
 }
