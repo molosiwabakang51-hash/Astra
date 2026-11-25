@@ -135,7 +135,7 @@ class ComputeBudgetTests(unittest.TestCase):
             model.write_bytes(b"GGUF"+b"x"*1024)
             runner = A.LocalAnswerRunner(binary,model,timeout=60,approved=True)
             with patch.object(A,"probe",return_value=P.Resources(6*P.GIB,4,P.GIB)), \
-                 patch.object(A.subprocess,"run",return_value=subprocess.CompletedProcess([],0,b"answer")) as run:
+                 patch.object(A,"run_bounded",return_value=subprocess.CompletedProcess([],0,b"answer")) as run:
                 self.assertEqual("answer",runner("primary","question",timeout_seconds=7))
                 self.assertEqual(7,run.call_args.kwargs["timeout"])
                 for bad in (0,61,True):
