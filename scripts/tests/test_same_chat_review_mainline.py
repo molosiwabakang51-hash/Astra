@@ -18,7 +18,12 @@ class SameChatReviewSourceTest(unittest.TestCase):
         self.assertNotIn("archivedChats", REVIEW)
         self.assertNotIn("AstraOnDeviceBrain", REVIEW)
         self.assertIn("quotes, not automatically verified", REVIEW)
-        self.assertIn('turn.role == "Astra" || turn.role == "You"', REVIEW)
+        # Preserve both-role review while requiring the narrower assistant-only scope.
+        self.assertIn('turn.role == "Astra" || (turn.role == "You" && !request.assistantOnly)', REVIEW)
+        self.assertIn('ask != null && ask.groupValues[1] != "we"', REVIEW)
+        self.assertIn('turn.text.startsWith(REPORT_HEADER)', REVIEW)
+        self.assertIn('turn.text.startsWith(EMPTY_PREFIX)', REVIEW)
+        self.assertIn('parse(turn.text) != null', REVIEW)
 
 if __name__ == "__main__":
     unittest.main()
