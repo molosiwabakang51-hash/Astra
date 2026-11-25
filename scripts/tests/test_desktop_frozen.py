@@ -125,5 +125,24 @@ class FrozenTests(unittest.TestCase):
         self.assertFalse(result["checks"]["example_simulation"])
 
 
+    def test_source_only_complete_smoke_needs_no_gui_imports(self):
+        from astra_frozen_smoke import smoke_test
+        original=importlib.import_module
+        def no_gui(name,*args,**kwargs):
+            if name in ("tkinter","astra_desktop_gui","astra_analytics_gui"):
+                raise AssertionError("GUI import is not permitted in source-only verification.")
+            return original(name,*args,**kwargs)
+        with patch.object(importlib,"import_module",side_effect=no_gui):
+            receipt=smoke_test(require_complete=True,require_gui=False)
+        self.assertTrue(receipt["passed"],receipt["checks"])
+        self.assertFalse(receipt["require_gui"])
+        self.assertEqual(8,sum(key.startswith("example_") and value for key,value in receipt["checks"].items()))
+
+    def test_frozen_cannot_skip_gui_acceptance(self):
+        from astra_frozen_smoke import smoke_test
+        with patch.object(sys,"frozen",True,create=True),self.assertRaises(ValueError):
+            smoke_test(require_complete=True,require_gui=False)
+
+
 if __name__=="__main__":
     unittest.main()
