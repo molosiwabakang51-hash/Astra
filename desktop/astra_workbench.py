@@ -5,6 +5,7 @@ Finance requires no database or model. Knowledge generation and writes
 require explicit approval; model output is never written automatically.
 """
 from decimal import Decimal, localcontext
+from contextlib import closing
 from pathlib import Path
 
 from astra_evidence import Ledger
@@ -41,11 +42,17 @@ class Workbench:
         # as evidence merely because it has the same schema version.
         if not create:
             import sqlite3
-            with sqlite3.connect(path.as_uri()+"?mode=ro", uri=True) as inspection:
+            with closing(sqlite3.connect(path.as_uri()+"?mode=ro", uri=True)) as inspection:
                 tables = {row[0] for row in inspection.execute(
                     "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'")}
-                if tables != {"evidence"}:
+                columns = {row[1] for row in inspection.execute("PRAGMA table_info(evidence)")}
+                if tables != {"evidence"} or columns != {"id", "subject", "text", "source", "kind", "supersedes", "fingerprint", "active"}:
                     raise ValueError("Not a dedicated Astra evidence database.")
+        if create:
+            # Exclusive creation prevents accidentally opening a file created
+            # between the initial existence check and database initialization.
+            with path.open("xb"):
+                pass
         candidate = Ledger(path)
         if self.ledger is not None:
             self.ledger.close()
