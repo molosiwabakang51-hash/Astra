@@ -7,6 +7,8 @@ import threading
 import queue
 import time
 
+from astra_native_profile import NativeProfile
+
 _LOCK = threading.Lock()
 
 
@@ -64,7 +66,7 @@ def _start(command, env, **kwargs):
                          popen=subprocess.Popen, set_directory=setter, **kwargs)
 
 
-def run_bounded(command, *, timeout, env, max_stdout_bytes, cwd, clock=time.monotonic):
+def run_bounded(command, *, timeout, env, max_stdout_bytes, cwd, clock=time.monotonic, telemetry=None):
     """Read at most limit + 1 bytes, reject excess, never return partial output.
 
     Timeout includes startup and reading, except an OS process-creation call
@@ -76,10 +78,21 @@ def run_bounded(command, *, timeout, env, max_stdout_bytes, cwd, clock=time.mono
         raise ValueError("Invalid stdout byte limit.")
     if type(timeout) is not int or not 1 <= timeout <= 300:
         raise ValueError("Invalid native timeout.")
-    deadline = clock() + timeout
-    child = _start(command, env, cwd=cwd, stdin=subprocess.DEVNULL,
-                   stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
-                   shell=False, bufsize=0)
+    started = clock()
+    deadline = started + timeout
+    profile = NativeProfile()
+    outcome = 'launch_error'
+    output_bytes = None
+    if telemetry is not None:
+        telemetry.clear()
+    try:
+        child = _start(command, env, cwd=cwd, stdin=subprocess.DEVNULL,
+                       stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+                       shell=False, bufsize=0)
+    except BaseException:
+        if telemetry is not None:
+            telemetry.update(profile.report(clock()-started,outcome))
+        raise
     result = queue.Queue(maxsize=1)
 
     def reader():
@@ -100,19 +113,43 @@ def run_bounded(command, *, timeout, env, max_stdout_bytes, cwd, clock=time.mono
 
     try:
         threading.Thread(target=reader, daemon=True, name="astra-native-output").start()
-        try:
-            status, output = result.get(timeout=max(0, deadline-clock()))
-        except queue.Empty:
-            raise subprocess.TimeoutExpired(command, timeout) from None
+        while True:
+            if telemetry is not None:
+                profile.sample(child.pid)
+            remaining = deadline-clock()
+            if remaining<=0:
+                raise subprocess.TimeoutExpired(command, timeout)
+            try:
+                status, output = result.get(timeout=min(0.2, remaining))
+                break
+            except queue.Empty:
+                continue
         if status!="ok":
+            outcome = "output_limit" if status=="overflow" else "read_error"
             raise RuntimeError("Native output exceeds limit." if status=="overflow" else
                                "Native output could not be read.")
         remaining = deadline-clock()
         if remaining<=0:
             raise subprocess.TimeoutExpired(command, timeout)
-        code = child.wait(timeout=remaining)
+        while True:
+            if telemetry is not None:
+                profile.sample(child.pid)
+            remaining = deadline-clock()
+            if remaining<=0:
+                raise subprocess.TimeoutExpired(command, timeout)
+            try:
+                code = child.wait(timeout=min(0.2,remaining))
+                break
+            except subprocess.TimeoutExpired:
+                continue
+        outcome = 'success' if code==0 else 'nonzero_exit'
+        output_bytes = len(output)
         return subprocess.CompletedProcess(command, code, output, None)
-    except BaseException:
+    except BaseException as failure:
+        if isinstance(failure,subprocess.TimeoutExpired):
+            outcome = 'timeout'
+        elif outcome=='launch_error':
+            outcome = 'execution_error'
         if child.poll() is None:
             child.kill()
         # Bound cleanup as well; do not wait indefinitely for descendants.
@@ -121,6 +158,9 @@ def run_bounded(command, *, timeout, env, max_stdout_bytes, cwd, clock=time.mono
         except subprocess.TimeoutExpired:
             raise RuntimeError("Native child termination could not be confirmed.") from None
         raise
+    finally:
+        if telemetry is not None:
+            telemetry.update(profile.report(clock()-started,outcome,output_bytes))
 
 
 def run_external(command, *, timeout, env, runner=subprocess.run, check=False, **kwargs):
