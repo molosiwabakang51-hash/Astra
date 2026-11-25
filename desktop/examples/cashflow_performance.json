@@ -1,0 +1,15 @@
+{
+  "currency": "BWP",
+  "start": "2025-01-01",
+  "end": "2026-01-01",
+  "opening_value": "1000",
+  "closing_value": "1760",
+  "basis": "pre_flow_valuations_total_portfolio_value",
+  "events": [
+    {
+      "date": "2025-07-02",
+      "value_before_flow": "1100",
+      "external_flow": "500"
+    }
+  ]
+}
