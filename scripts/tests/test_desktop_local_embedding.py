@@ -11,7 +11,7 @@ from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[2]
 for name in ("astra_resource_plan", "astra_evidence", "astra_vector_memory",
-             "astra_hybrid_evidence", "astra_local_embedding"):
+             "astra_hybrid_evidence", "astra_local_embedding", "astra_embedding_smoke"):
     spec = importlib.util.spec_from_file_location(name, ROOT / "desktop" / (name + ".py"))
     module = importlib.util.module_from_spec(spec)
     sys.modules[name] = module
@@ -136,6 +136,26 @@ class LocalEmbeddingTests(unittest.TestCase):
                 results = hybrid.search("interest-rate exposure",use_vector=True,approved=True,
                                         embed=adapter.query,model_sha=adapter.profile_sha)
                 self.assertEqual([],results["results"])
+
+
+    def test_smoke_evaluation_requires_complete_native_results(self):
+        smoke = sys.modules["astra_embedding_smoke"]
+        adapter = self.adapter()
+        with patch.object(L, "probe", return_value=P.Resources(6*P.GIB,4,P.GIB)), \
+             patch.object(L.subprocess, "run") as run:
+            def execute(args, **kwargs):
+                raw = Path(args[args.index("-f")+1]).read_bytes()
+                count = len(raw.split(L.SEPARATOR.encode()))
+                return subprocess.CompletedProcess(args,0,json.dumps([[1,0]]*count).encode())
+            run.side_effect = execute
+            result = smoke.smoke(adapter)
+            self.assertEqual(4,len(result["cases"]))
+            self.assertEqual(adapter.profile_sha,result["profile_sha"])
+            self.assertEqual(5,run.call_count)
+            run.side_effect = None
+            run.return_value = subprocess.CompletedProcess([],1,b"")
+            with self.assertRaises(RuntimeError):
+                smoke.smoke(adapter)
 
 
 if __name__ == "__main__":
