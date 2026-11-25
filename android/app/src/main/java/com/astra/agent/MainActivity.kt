@@ -3410,8 +3410,10 @@ class MainActivity :
                     displayMessage: String,
                     prompt: String,
                     grounding: AstraGroundedMemory.Request? = null,
-                    modelOnly: Boolean = false
+                    modelOnly: Boolean = false,
+                    isolatedReview: Boolean = false
                 ) {
+                    require(!isolatedReview || (modelOnly && grounding == null))
                     if (modelImportRunning) {
                         history.add(ChatMessage(
                             "Astra", "An offline model is being imported. Ask again after import."
@@ -3472,7 +3474,8 @@ class MainActivity :
                     } else prompt
                     val turns = AstraConversationHistory.forRecovery(history)
                         .let { retained ->
-                            if (modelOnly) retained.takeLast(AstraModelOnly.previousTurnCount(
+                            if (isolatedReview) emptyList()
+                            else if (modelOnly) retained.takeLast(AstraModelOnly.previousTurnCount(
                                 retained.map { AstraChatArchive.Message(it.role, it.text) }
                             )) else retained
                         }
@@ -3513,6 +3516,11 @@ class MainActivity :
                         try {
                             var effectiveTurns = turns
                             var effectiveGeneration = generation
+                            if (isolatedReview) {
+                                // Review only the explicitly supplied question/answer pair.
+                                privateInferenceCounter--
+                                effectiveGeneration = privateInferenceCounter
+                            }
                             if (grounding != null) {
                                 if (!stillActiveBubble()) return@launch
                                 val scanning = "Finding relevant private evidence on this phone..."
@@ -3567,8 +3575,10 @@ class MainActivity :
                                     // mutated on the UI thread, not the model thread.
                                     withContext(Dispatchers.Main.immediate) {
                                         if (stillActiveBubble()) {
-                                            history[target] = ChatMessage("Astra", partial)
-                                            displayed = partial
+                                            val visible = if (isolatedReview)
+                                                AstraCognitiveReview.label(partial) else partial
+                                            history[target] = ChatMessage("Astra", visible)
+                                            displayed = visible
                                         }
                                     }
                                 }
@@ -3583,7 +3593,8 @@ class MainActivity :
                                 val visibleResponse = if (grounding != null) {
                                     "ON-DEVICE AI INTERPRETATION · check against sources\n\n" +
                                         response + "\n\n" + groundedFooter
-                                } else response
+                                } else if (isolatedReview) AstraCognitiveReview.label(response)
+                                else response
                                 history[target] = ChatMessage("Astra", visibleResponse)
                                 persist()
                                 if (speakResponses && grounding == null &&
@@ -3653,6 +3664,36 @@ class MainActivity :
                         dialogueAwaiting = false
                         enqueueOffline(message, question, modelOnly = true)
                         return
+                    }
+
+                    // Owner-initiated ACIE audit precedes scripted reviews and actions.
+                    // Only the immediately preceding completed exchange is eligible.
+                    when (val review = AstraCognitiveReview.resolve(
+                        message, history.map { AstraChatArchive.Message(it.role, it.text) }
+                    )) {
+                        AstraCognitiveReview.Result.NotRequested -> Unit
+                        else -> {
+                            if (offlineJob != null || modelImportRunning || offlineModelTestRunning) return
+                            dialogue.dismissIncompletePrompt()
+                            workflowSession.reset()
+                            dialogueAwaiting = false
+                            when (review) {
+                                is AstraCognitiveReview.Result.Native -> {
+                                    enqueueOffline(message, review.prompt, modelOnly = true,
+                                        isolatedReview = true)
+                                }
+                                is AstraCognitiveReview.Result.Local -> {
+                                    history.add(ChatMessage("You", message))
+                                    history.add(ChatMessage("Astra", review.answer))
+                                    while (history.size > MAX_HISTORY) history.removeAt(0)
+                                    persist()
+                                    input = ""
+                                    keyboard?.hide()
+                                }
+                                AstraCognitiveReview.Result.NotRequested -> Unit
+                            }
+                            return
+                        }
                     }
 
                     // A cross-feature Discuss draft is a question, never an
