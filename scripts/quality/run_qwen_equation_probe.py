@@ -28,12 +28,12 @@ def cases(seed):
         ("inverse_number", f"A number multiplied by {a} and then decreased by {b} equals {a*x-b}. What is that number?", str(x)),
         ("inverse_inventory", f"A warehouse starts with full crates of {a} items each. After selling {c} full crates, {(x-c)*a} items remain. How many crates were present initially?", str(x)),
         ("inverse_share", f"An unknown amount of liquid is divided equally among {a} vessels. Each receives {x} litres. How many litres were there initially?", str(a*x)),
-        ("inverse_comparison", f"Ada has {b} more coins than Bea. Together they have {2*x+b} coins. How many coins does Bea have?", str(x)),
+        ("inverse_comparison", f"There are 2 people, Ada and Bea. Ada has {b} more coins than Bea. Together they have {2*x+b} coins. How many coins does Bea have?", str(x)),
         ("control_forward", f"Buy {a} books costing {x} coins each and pay {d} coins in delivery. What is the total cost?", str(a*x+d)),
         ("control_decimal", f"A delivery costs 1.5 coins per item plus {c} coins. The total is {1.5*x+c} coins. How many items were delivered?", str(x)),
         ("unsuitable_missing", f"A shop sells {a} items at an unspecified price. What is the revenue?", None),
         ("unsuitable_nonlinear", f"A rectangle has an area of {a*x} square units. Its side lengths are not given. What is its perimeter?", None),
-        ("unsuitable_recurring", "Three identical items cost 10 coins in total. What is the exact terminating decimal cost of one item?", None),
+        ("unsuitable_recurring", "3 identical items cost 10 coins in total. What is the exact terminating decimal cost of one item?", None),
     ]
 
 
