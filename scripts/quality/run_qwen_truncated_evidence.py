@@ -16,7 +16,7 @@ SEED = 52681743
 CAP = 768
 BASELINE_COMMIT = "a6a6b8d0dfa147abdb27db2ce629dd415edead96"
 CANDIDATE_COMMIT = "db99d6a8acd78fdbacebe6f6fe7994842ed68448"
-GAP = "[Some linked corrections are omitted."
+GAP = "[Some linked corrections are omitted"
 TAIL = "[Some linked corrections are omitted, including a later correction."
 FILLER = "background material " * 40
 
