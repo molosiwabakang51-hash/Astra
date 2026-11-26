@@ -45,9 +45,13 @@ jobs:
           mkdir -p evaluation
           python scripts/quality/run_qwen_scalar_framing.py cpu-build/bin/llama-server --seed 79218431 > evaluation/scalar-framing.json
           cat evaluation/scalar-framing.json >> "$GITHUB_STEP_SUMMARY"
+          python scripts/quality/run_qwen_scalar_framing.py cpu-build/bin/llama-server --suite transfer --seed 91374521 > evaluation/scalar-framing-transfer.json
+          cat evaluation/scalar-framing-transfer.json >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@v6
         with:
           name: qwen3-scalar-framing-results
-          path: evaluation/scalar-framing.json
+          path: |
+            evaluation/scalar-framing.json
+            evaluation/scalar-framing-transfer.json
           if-no-files-found: error
           retention-days: 14
