@@ -485,6 +485,35 @@ General-AI-only scope under #308 and #315; preserve #313 without expansion. The 
 
 All 119 sequential ACIE requirements reconciled: 27 engineering items checked, 92 outstanding. All 119 canonical release parents remain unchecked at last verification. Narrow engineering milestones, including successful host-only diagnostics, are not broad capability acceptance or a general intelligence score.
 
+
+## Session update — verified state reasoning, context integrity and measurement (26 November)
+
+Owner scope remains general AI quality only under #308/#315; preserve #313 without expansion. These milestones are implementation or validation evidence, not independent neural quality or canonical release acceptance.
+
+- #467 corrected Android run 45878094317 passed, exact-head merge 4e9925d0bc6394a74e14bc33c6c31dff9b2c8cb9. Bounded sequential state recomputation and explicit review, signed-integer correction, 200 generated oracle cases.
+- #469 Python 45879073959 and Android 45879074002 passed, merge f3cab4a6a8dcddca0ec026369356ed35c25ca9e7. Per-form/per-domain resource reporting, completed/failed attempts, separate provisional 80 numerical threshold, A/B score spread; existing 90-point acceptance floors and commitment preserved. No independent records assessed.
+- #470 Android 45879781228 passed, merge fa737cbaa63b2e25361692836f317aa781ceb090. Atomic simultaneous assignments, 200 generated snapshot cases, unchanged explicit-only review boundary.
+- #471 Android 45880123877 passed, merge ad612a379d98fae403885ca2c63ce1688a8f3c1d. Bounded conditional single-counter recurrence, 200 generated cases; review route remains pending.
+- #472 Android 45880493002 and CPU 45880493028 passed, merge a80f32616b8c9d01102fe09a0b1b03ebf1eae727. Scalar format paraphrases and quote-boundary regression. CPU artifact 15146899721 was existing context-tail diagnostic, not scalar-format A/B: 4/8 to 7/8, 16 complete, 1273 to 935 tokens, 114768 to 91913 ms.
+- #473 Android 45880899743 and CPU 45880899724 passed, merge 816201ab0756cfc2042b0de8581c63e6ae46fb80. Warning when newest known correction is omitted; recalculate warning after reserving space. CPU artifact 15147940691: context-tail 4/8 to 7/8, 16 complete, 1273 to 935 tokens, 106702 to 85412 ms. No warning-triggered case, so no causal effect of this specific warning established.
+- #475 reconciles #474 against main after #471 and #470, exact head baeec9b787b9fa1588b861161ba4dd5710d0d12d. Android 45881609016 in progress at inspection; explicit conditional verification and prior-answer scalar audit not yet integrated.
+- #476 exact head a880955db1b0a1aa78e528b1e17b23ed7fe88f75: 8 synthetic fixtures and 16 paired planned calls comparing generic and specific warnings, unchanged controls; Python 45882350000 passed, Android 45882350065 and actual CPU 45882349800 pending at inspection. Host-only warning ablation, not end-to-end recovery or private held-out evidence.
+
+### Incremental milestones (not additional master requirements)
+
+- [x] Milestone — ACIE-056/057/065: corrected sequential verifier Android validation and integration.
+- [x] Milestone — ACIE-034/057: validated simultaneous state verification.
+- [x] Milestone — ACIE-030/057: validated bounded conditional recurrence engine.
+- [x] Milestone — ACIE-021/023/102: scalar instruction paraphrase and quotation protection integration.
+- [x] Milestone — ACIE-048/052/098: integrate newest-known-correction omission warning.
+- [x] Milestone — ACIE-084/114/116: integrate descriptive assessment resource and repeatability reporting.
+- [x] Milestone — ACIE-062/113: implement targeted warning evaluation and pass Python validation.
+- [ ] Milestone — ACIE-055/057/065: conditional review Android validation and integration.
+- [ ] Milestone — ACIE-062/113/115: inspect targeted warning-only native results; validate actual recovered-history behavior separately.
+- [ ] Milestone — ACIE-040/109/118/119: independent protocol freeze, held-out and physical-device acceptance; earn target score.
+
+All 119 ACIE master requirements remain 27 checked and 92 outstanding; all 119 canonical release parents remain unchecked at last reconciliation. No independent intelligence score.
+
 ## Acceptance
 
 90/100 independent repeated general intelligence score; separate model-only/assisted results; no model substitution, paid API or unsupported capability claims. Freeze protocol before held-out testing. Preserve offline and memory constraints. Recheck any completed engineering item if a later regression invalidates it.
