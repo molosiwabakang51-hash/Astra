@@ -263,6 +263,23 @@ Reconciled all three non-ledger files from #428 (profile evaluator, its tests an
 
 All 119 sequential ACIE requirements verified; 27 master ticks, 92 outstanding. No new broad master acceptance or general intelligence score claimed. Separate subtask prefixes prevent double counting.
 
+## Session update — controlled-language deductive verification
+
+At inspection #451 head da1b7e3bc6ae7650d83371cc691ab35100c9ac2c Android 45844958657 and calculator CPU 45844958297 remained running; #452 head 7499a976d0c3456c6936f6d02e13c58071a52352 Python 45845542653 passed, Android 45845542499 and actual consensus CPU 45845542657 running. Both mergeable against main 83e85ca49c95797927d5ea39e23933add6ff92b5; preserve in-flight checks. Previous unrestricted model-led logical formalization repeatedly failed (1/7 baseline faithful and correct in prior thinking diagnostic). Implement a narrow alternative on a separate branch: complete controlled-English categorical arguments consisting of one to six All/No/Some/Some-not premises with explicitly named single-word classes, and an explicit Does it follow that conclusion. Compile exact class names into up to eight symbolic predicates without model inference, then reuse existing exhaustive categorical verifier. Reject unsupported quantifiers, noncategorical statements, extra text, quotations, multiline requests, reserved words, capitalization-only collisions and out-of-bounds arguments; no stemming, synonym inference, singular/plural inference or outside facts. Preserve classical nonempty-domain semantics, countermodels, inconsistent-premise handling and explicit mapping. Integrate only into existing explicit categorical verification and prior-answer review; do not automatically intercept arbitrary chat or model-only inference. Add three JVM verifier regression methods, including 128 generated named-to-formal equivalences, and one review integration test. All new validation pending. This is a narrow assisted semantic/deductive capability, not a higher unassisted score, not arbitrary natural-language formalization. No model weight or default sampling changes.
+
+### Incremental milestones (not additional master requirements)
+
+- [x] Milestone — ACIE-052: historical-tail retrieval integrated by #450.
+- [x] Milestone — ACIE-031/058: implement controlled-language named categorical compilation candidate.
+- [x] Milestone — ACIE-059/080: preserve explicit class mapping and reject unsupported or ambiguous inputs.
+- [x] Milestone — ACIE-065: implement independent prior-answer correction for supported controlled-language arguments.
+- [ ] Milestone — ACIE-031/058: validate and integrate candidate.
+- [ ] Milestone — ACIE-057: complete #451 final validation and merge.
+- [ ] Milestone — ACIE-039/065: determine actual-model consensus gains and losses in #452.
+- [ ] Milestone — ACIE-040/118/119: independent broad physical-device assessment and target attainment.
+
+All 119 sequential master requirements reviewed; 27 checked, 92 outstanding. ACIE-017/020/031/058/059/065/080/117 remain open for broader acceptance. No new master completion or general intelligence score claimed. Reconcile concurrent ledger updates before integration.
+
 ## Acceptance
 
 90/100 independent repeated general intelligence score; separate model-only/assisted results; no model substitution, paid API or unsupported capability claims. Freeze protocol before held-out testing. Preserve offline and memory constraints. Recheck any completed engineering item if a later regression invalidates it.
