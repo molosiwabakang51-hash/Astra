@@ -451,6 +451,7 @@ class AstraConversationContextTest {
                 assertTrue(value, prompt.contains(value))
             }
             assertTrue(prompt.indexOf("900 coins") < prompt.indexOf("600 coins"))
+            assertFalse(prompt.contains("Some linked corrections are omitted."))
             assertTrue(prompt.endsWith(question + "\n/no_think"))
             assertTrue(prompt.length <= 3010)
         }
@@ -471,8 +472,29 @@ class AstraConversationContextTest {
         assertFalse(prompt.contains("800 coins"))
         assertFalse(prompt.contains("700 coins"))
         assertFalse(prompt.contains("spicy rice"))
+        assertTrue(prompt.contains("Some linked corrections are omitted."))
         assertTrue(prompt.indexOf("600 coins") < prompt.indexOf("400 coins"))
         assertTrue(prompt.length <= 3010)
+    }
+
+    @Test fun missingRelativeAdjustmentsAreFlaggedRatherThanImpliedComplete() {
+        val history = listOf(turn("user", "The fictional greenhouse budget is 900 coins.")) +
+            listOf(11, 22, 33, 44, 55).flatMap {
+                listOf(turn("assistant", "Noted."),
+                    turn("user", "Actually, increase it by $it coins."))
+            } + (1..20).map { turn("assistant", "Unrelated weather note $it.") }
+        for (question in listOf("What was my greenhouse budget?",
+            "Use the greenhouse budget to estimate the remaining funds.")) {
+            val prompt = AstraConversationContext.userPrompt(question, history, true)
+            assertTrue(prompt.contains("Some linked corrections are omitted."))
+            assertTrue(prompt.contains("If the result depends on missing steps, ask for clarification."))
+            assertTrue(prompt.contains("900 coins"))
+            assertTrue(prompt.contains("increase it by 55 coins"))
+            assertFalse(prompt.contains("increase it by 11 coins"))
+            assertFalse(prompt.contains("increase it by 22 coins"))
+            assertTrue(prompt.endsWith(question + "\n/no_think"))
+            assertTrue(prompt.length <= 3010)
+        }
     }
 
     @Test fun topicFreeCorrectionIsNotLinkedPastAnUnrelatedOwnerTurn() {
