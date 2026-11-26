@@ -415,6 +415,28 @@ Stacked #460 on #459 exact head to avoid interrupting ongoing evaluation. Added 
 
 All 119 sequential ACIE requirements reviewed; 27 checked, 92 outstanding. No new broad master completion from partial validation or inactive code. No independent intelligence rating.
 
+## Session update — verified equation merge and conditional planning diagnostic
+
+#458 exact head c02dedd1535b3058b879528e4da2aca6ce0e0d49 Android 45870050614 and actual calculator CPU 45870050633 completed successfully. Downloaded and directly inspected artifact 15143920540: historical 8/8 exact values, 0/8 direct strict synthesis, 4/4 unsuitable rejected; fresh paired 7/8 exact computed values, direct 0/8 vs thinking 7/8 (7 attempted), 4/4 unsuitable rejected. One fresh_stock planning response was complete but parser rejected it, no synthesis attempted. Prior #451 had 8/8 computed and direct 1/8 vs thinking 7/8, so disclose variation/regression, not an accuracy gain. No raw proposals available; cannot establish reason for parser rejection. Rational same-proposal parser comparison 1/4 to 4/4, zero paired losses, both reject 3/3 unsuitable, direct synthesis 0/4 vs thinking 4/4. All plans complete. The #458 change is confined to explicit affine solution explanation path, leaving model arithmetic expression planning/evaluation unchanged; Android tests validate the new exact explanation path. Compared main against #458 base: ledger-only changes. GitHub reported mergeable on recheck; squash merged into main ba5b1aaef9cac0ef98054e0f095dbda902db7078. Exact verified equation working now integrated; no unassisted intelligence gain claimed.
+
+#459 head 1f45958c465d7a2f3d42324853482fcd312cec58 Python 45871315969, Android 45871315981, context CPU 45871316081 and budget CPU 45871316029 passed. Directly inspected context artifact 15143293159, seed 69401723, pinned baseline 5f4b1723: strict 4/8 vs 7/8, tail 0/4 vs 3/4, gap 1/1 and controls 3/3 both, 16/16 complete, zero paired losses and wrong scalars, 4 vs 1 noncanonical, 1273 vs 935 tokens, 115617 vs 92278 ms. Budget artifact 15142803408, seed 83712049: 768 vs 1792 both 8/12 strict, completed 11/12 vs 12/12, no gains/losses, 3661 vs 4059 tokens, 173012 vs 188037 ms; no budget change. Framing transfer run 45871315983 still running. #460 revised native run 45871884353 job 140089132491 passed Python contract checks, compiled Kotlin bridge, 15 rejection/filter canaries and native build; actual model inference running. No production activation yet.
+
+#461 head 97c6f238409aa47e6387523b55e235e975e94ce7 created on merged main ba5b1aaef9cac0ef98054e0f095dbda902db7078. New host-only runner scripts/quality/run_qwen_conditional_planning.py, four Python regression methods, dedicated actual Qwen workflow. Fresh seed 92846173, eight eligible arithmetic interpretation tasks and four unsuitable controls. Preserve complete accepted direct plan, explicit NONE, empty and incomplete outputs; only complete nonempty rejected non-NONE plans get one thinking retry with alternate seed and cap. Reuse production exact planner prompt and parser; same baseline output reused, never expose expected key to selector, no live activation or synthesis. Measure newly accepted unsuitable controls, paired exact-value gains/losses and total latency/token costs. Verify reference arithmetic across 128 seeds; mean divisor explicitly supplied to respect parser operand authorization. Different mode, seed and cap by design, not an isolated mode ablation. CI pending. No broad intelligence rating or claim of improved model capability until actual evidence.
+
+### Incremental milestones (not additional master requirements)
+
+- [x] Milestone — ACIE-057/083/100: validate and merge exact equation explanation (#458).
+- [x] Milestone — ACIE-117: inspect calculator regression, disclose fresh plan rejection and preserve evidence.
+- [x] Milestone — ACIE-052/117: reproduce contextual retrieval gain (#459).
+- [x] Milestone — ACIE-029/110: inspect another budget comparison, preserve production settings.
+- [x] Milestone — ACIE-102/117: corrected #460 Python contracts and compiled Kotlin canaries passed.
+- [x] Milestone — ACIE-078/079/080/065: implement conditional rejected-plan retry diagnostic and safety/reference tests (#461).
+- [ ] Milestone — ACIE-102/110/117: complete #459 and #460 actual inference and reconcile validated changes.
+- [ ] Milestone — ACIE-078/083/110: validate #461 retry accuracy, inappropriate acceptance and cost before considering activation.
+- [ ] Milestone — ACIE-040/118/119: independent broad physical-device assessment and target attainment.
+
+All 119 sequential master requirements reviewed; 27 checked, 92 outstanding. Narrow completed milestone separate from master acceptance. No independent intelligence rating or release claim.
+
 ## Acceptance
 
 90/100 independent repeated general intelligence score; separate model-only/assisted results; no model substitution, paid API or unsupported capability claims. Freeze protocol before held-out testing. Preserve offline and memory constraints. Recheck any completed engineering item if a later regression invalidates it.
