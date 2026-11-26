@@ -9,6 +9,14 @@ on:
       - 'scripts/tests/test_qwen_logic_probe.py'
       - 'android/app/src/main/java/com/astra/agent/AstraPropositionalVerifier.kt'
   workflow_dispatch:
+    inputs:
+      experiment:
+        description: Host-only diagnostic; grammar is not enabled in the app
+        type: choice
+        default: modes
+        options:
+          - modes
+          - grammar
 permissions:
   contents: read
 concurrency:
@@ -45,10 +53,12 @@ jobs:
           cmake -S cpu-llama -B cpu-build -G Ninja -DCMAKE_BUILD_TYPE=Release -DLLAMA_BUILD_TESTS=OFF -DLLAMA_BUILD_EXAMPLES=OFF -DLLAMA_BUILD_TOOLS=ON -DLLAMA_BUILD_SERVER=ON -DLLAMA_BUILD_UI=OFF -DLLAMA_USE_PREBUILT_UI=OFF -DGGML_CUDA=OFF
           cmake --build cpu-build --target llama-server --parallel 4
       - name: Measure formalization fidelity and independent logical verdict
+        env:
+          EXPERIMENT: ${{ inputs.experiment || 'modes' }}
         shell: bash
         run: |
           set -euo pipefail
-          python scripts/quality/run_qwen_logic_probe.py cpu-build/bin/llama-server evaluation/logic-bridge.jar > evaluation/logic-results.json
+          python scripts/quality/run_qwen_logic_probe.py cpu-build/bin/llama-server evaluation/logic-bridge.jar --experiment "$EXPERIMENT" > evaluation/logic-results.json
           cat evaluation/logic-results.json >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@v6
         with:
