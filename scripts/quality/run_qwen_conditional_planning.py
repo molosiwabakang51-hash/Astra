@@ -30,7 +30,7 @@ def cases(seed):
         ("eligible_weight",f"A crate holds {a} pieces weighing {b} grams each, and packaging weighing {d} grams. What is the total mass? Reply only with the number.",str(a*b+d)),
         ("eligible_change",f"A counter starts at {d}, decreases by {c}, then is multiplied by {b}. What is its final value? Reply only with the number.",str((d-c)*b)),
         ("eligible_fraction",f"Divide {a} by {b}, then multiply that result by {b}. What is the exact result? Reply only with the number.",str(a)),
-        ("eligible_average",f"Three measurements are {d-c}, {d}, and {d+c}. What is their mean? Reply only with the number.",str(d)),
+        ("eligible_average",f"There are 3 measurements: {d-c}, {d}, and {d+c}. What is their mean? Reply only with the number.",str(d)),
         ("eligible_negative",f"An account has {c} coins and spends {a} coins. Negative balances are allowed. What is the final balance? Reply only with the number.",str(c-a)),
         ("unsuitable_missing",f"A shop buys {a} items. The unit cost is not known. What is the total cost?",None),
         ("unsuitable_comma",f"Add {a},{b} and {c}. The comma convention is unspecified.",None),
