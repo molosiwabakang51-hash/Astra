@@ -1,7 +1,7 @@
 name: Actual Qwen3 propositional formalization
 on:
   pull_request:
-    branches: [main]
+    branches: [main, intelligence/acie-verified-arithmetic-and-deduction]
     paths:
       - '.github/workflows/qwen3-logic-evaluation.yml'
       - 'scripts/quality/run_qwen_logic_probe.py'
@@ -45,14 +45,21 @@ jobs:
           cmake -S cpu-llama -B cpu-build -G Ninja -DCMAKE_BUILD_TYPE=Release -DLLAMA_BUILD_TESTS=OFF -DLLAMA_BUILD_EXAMPLES=OFF -DLLAMA_BUILD_TOOLS=ON -DLLAMA_BUILD_SERVER=ON -DLLAMA_BUILD_UI=OFF -DLLAMA_USE_PREBUILT_UI=OFF -DGGML_CUDA=OFF
           cmake --build cpu-build --target llama-server --parallel 4
       - name: Measure formalization fidelity and independent logical verdict
+        if: github.event_name != 'pull_request' || github.base_ref == 'main'
         shell: bash
         run: |
           set -euo pipefail
           python scripts/quality/run_qwen_logic_probe.py cpu-build/bin/llama-server evaluation/logic-bridge.jar > evaluation/logic-results.json
           cat evaluation/logic-results.json >> "$GITHUB_STEP_SUMMARY"
+      - name: Compare syntax-constrained and unconstrained direct formalization
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/quality/run_qwen_logic_probe.py cpu-build/bin/llama-server evaluation/logic-bridge.jar --experiment grammar > evaluation/logic-grammar-results.json
+          cat evaluation/logic-grammar-results.json >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@v6
         with:
           name: qwen3-logic-cpu-results
-          path: evaluation/logic-results.json
+          path: evaluation/logic*.json
           if-no-files-found: error
           retention-days: 14
