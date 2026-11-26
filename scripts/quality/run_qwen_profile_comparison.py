@@ -360,14 +360,37 @@ def recovery_prompt(jar, question, history):
     return prompt.removesuffix("\n/think")
 
 
+def budget_cases(seed):
+    """Fresh developmental tasks: isolate generation cap, not prompt framing."""
+    rng = random.Random(seed)
+    a, b, c, d = rng.sample(["Nelm", "Farn", "Tesk", "Ruv", "Jorl"], 4)
+    n, k, m = rng.randint(7, 11), rng.randint(3, 5), rng.randint(15, 23)
+    return [
+        ("logic_chain_exclusion", f"If {a} is present then {b} is present. If {b} is present then {c} is absent. {c} is present. Must {a} be absent? Reply YES or NO only.", "YES"),
+        ("logic_disjoint_witness", f"Some {a} are {b}. Some {a} are {c}. No {b} are {c}. Must at least two different {a} exist? Reply YES or NO only.", "YES"),
+        ("logic_unresolved_choice", f"Exactly two of {a}, {b}, {c}, and {d} are active. {a} is active and {b} is inactive. Must {c} be active? Reply YES or NO only.", "NO"),
+        ("quantity_inverse_operations", f"A counter is doubled, increased by {k}, and then tripled, giving {3*(2*m+k)}. What was its starting value? Reply with only the integer.", str(m)),
+        ("quantity_nested_inventory", f"A store has {n} cases of {k} packs, each holding {m} items. It sells 2 cases and 1 more pack. How many items remain? Reply with only the integer.", str(((n-2)*k-1)*m)),
+        ("quantity_net_transfer", f"An account begins with {m} coins. Each of {k} cycles adds {n} coins and removes 2 coins. A final fee of {k} coins is paid. What is the balance? Reply with only the integer.", str(m+k*(n-2)-k)),
+        ("context_referent_transfer", f"{a} lends {n} objects to {b}. {b} transfers {k} of these objects to {c}, then returns the rest to {a}. How many of the original objects does {a} now have? Reply with only the integer.", str(n-k)),
+        ("context_missing_rate", f"A report records {n} trips and a total travel time of {m} hours. It gives no distances. Can the exact average speed over all trips be determined? Reply YES or NO only.", "NO"),
+        ("context_authority_revision", f"A draft assigns {n} units to room A and {m} to room B. A correction changes room B to {k} units; room A is unchanged. What is the corrected combined allocation? Reply with only the integer.", str(n+k)),
+        ("strategy_capacity_budget", f"A project needs {n*k+1} items. A vehicle holds at most {n} items per trip, and only {k} trips are permitted. Is the project feasible under these constraints? Reply YES or NO only.", "NO"),
+        ("strategy_order_constraints", f"Four tasks occur exactly once. {a} precedes {c}; {b} follows {c}; {d} precedes {a}. Which task is second? Reply only with its name.", a),
+        ("strategy_cost_deadline", f"Plan {a} costs {m} coins and takes {n} days; plan {b} costs {m-k} coins and takes {n+1} days; plan {c} costs {m+k} coins and takes {n-1} days. Minimize cost subject to a deadline of {n} days. Which plan is best? Reply only with its name.", a),
+    ]
+
+
 def evaluate(seed, infer, experiment="sampling", normalize=None, context_builders=None):
     context_experiment = experiment in ("context_recovery", "context_transfer", "context_tail")
-    if experiment not in ("sampling", "framing", "system", "fresh_reasoning", "breadth", "authority", "quantitative_check", "context_recovery", "context_transfer", "context_tail"):
+    if experiment not in ("sampling", "framing", "system", "fresh_reasoning", "breadth", "authority", "quantitative_check", "context_recovery", "context_transfer", "context_tail", "budget_transfer"):
         raise ValueError("Unknown experiment")
     system = system_prompt()
     if context_experiment and (context_builders is None or set(context_builders) != {"baseline", "recovery"}):
         raise ValueError("Context recovery requires both production builders")
     def arms(mode):
+        if experiment == "budget_transfer":
+            return ["baseline", "production_budget"] if mode == "think" else []
         if context_experiment:
             return ["baseline", "recovery"] if mode == "think" else []
         if experiment == "quantitative_check":
@@ -384,7 +407,7 @@ def evaluate(seed, infer, experiment="sampling", normalize=None, context_builder
             return ["production", "compact"]
         return ["legacy", "qwen_" + mode]
     def configuration(mode, name):
-        if context_experiment:
+        if context_experiment or experiment == "budget_transfer":
             return PROFILES["qwen_think"], system, False
         if experiment == "sampling":
             return PROFILES[name], system, False
@@ -402,6 +425,7 @@ def evaluate(seed, infer, experiment="sampling", normalize=None, context_builder
                      long_context_cases(seed) if experiment == "context_transfer" else context_cases(seed)) if context_experiment else []
     histories = {name: history for name, _, _, history in context_suite}
     suite = ([(name, question, expected) for name, question, expected, _ in context_suite] if context_experiment else
+             budget_cases(seed) if experiment == "budget_transfer" else
              quantitative_cases(seed) if experiment == "quantitative_check" else
              authority_cases(seed) if experiment == "authority" else
              breadth_cases(seed) if experiment == "breadth" else
@@ -417,8 +441,9 @@ def evaluate(seed, infer, experiment="sampling", normalize=None, context_builder
                 call_seed = (seed + index * 13) % (2**31 - 1)
                 active_question = (context_builders[name](question, histories[case]) if context_experiment else
                                    DECOMPOSITION + question if name == "decomposition" else question)
+                cap = 1792 if name == "production_budget" else CAPS[mode]
                 payload = dict(prompt=raw_prompt(active_system, active_question, mode, hard_direct=hard_direct),
-                               n_predict=CAPS[mode], seed=call_seed,
+                               n_predict=cap, seed=call_seed,
                                cache_prompt=False, stream=False, ignore_eos=False,
                                repeat_penalty=1.0, presence_penalty=0.0,
                                frequency_penalty=0.0, **settings)
@@ -426,7 +451,7 @@ def evaluate(seed, infer, experiment="sampling", normalize=None, context_builder
                 reply = infer(payload)
                 elapsed = round((time.monotonic() - t) * 1000)
                 actual = reply.get("generation_settings", {})
-                for key, value in dict(settings, seed=call_seed, n_predict=CAPS[mode]).items():
+                for key, value in dict(settings, seed=call_seed, n_predict=cap).items():
                     found = actual.get(key)
                     if type(found) not in (float, int) or not math.isclose(found, value, rel_tol=1e-6, abs_tol=1e-8):
                         raise RuntimeError("Native server did not confirm requested sampling configuration")
@@ -434,7 +459,7 @@ def evaluate(seed, infer, experiment="sampling", normalize=None, context_builder
                 if stop not in ("eos", "limit", "word") or type(reply.get("truncated")) is not bool:
                     raise RuntimeError("Unverified native completion outcome")
                 tokens = reply.get("tokens_predicted")
-                if type(tokens) is not int or not 0 <= tokens <= CAPS[mode] + 8:
+                if type(tokens) is not int or not 0 <= tokens <= cap + 8:
                     raise RuntimeError("Invalid native token count")
                 visible = visible_answer(reply.get("content"))
                 complete = stop in ("eos", "word") and not reply["truncated"]
@@ -449,7 +474,7 @@ def evaluate(seed, infer, experiment="sampling", normalize=None, context_builder
                            "wrong_scalar" if scalar else "noncanonical_ungraded")
                 row = dict(case=case, mode=mode, profile=name, seed=call_seed,
                            passed=passed, complete=complete, stop=stop, failure=failure,
-                           generated_tokens=tokens, elapsed_ms=elapsed)
+                           generated_tokens=tokens, elapsed_ms=elapsed, token_cap=cap)
                 if context_experiment:
                     row["recovery_prompt_sha256"] = hashlib.sha256(active_question.encode()).hexdigest()
                     row["correction_gap_notice"] = "[Some linked corrections are omitted" in active_question
@@ -503,11 +528,13 @@ def evaluate(seed, infer, experiment="sampling", normalize=None, context_builder
             key = ("both_correct" if scores["think"] and scores["direct"] else
                    "think_only" if scores["think"] else "direct_only" if scores["direct"] else "neither")
             matched[key] += 1
-    if experiment in ("authority", "quantitative_check", "context_recovery", "context_transfer", "context_tail"):
-        domains = (("quote", "control") if experiment == "authority" else
+    if experiment in ("authority", "quantitative_check", "context_recovery", "context_transfer", "context_tail", "budget_transfer"):
+        domains = (("logic", "quantity", "context", "strategy") if experiment == "budget_transfer" else
+                   ("quote", "control") if experiment == "authority" else
                    ("tail", "gap", "control") if experiment == "context_tail" else
                    ("replacement", "gap", "control") if context_experiment else ("arithmetic", "inverse", "control"))
-        candidate = ("authority_rule" if experiment == "authority" else
+        candidate = ("production_budget" if experiment == "budget_transfer" else
+                     "authority_rule" if experiment == "authority" else
                      "recovery" if context_experiment else "quantitative_check")
         for domain in domains:
             by_domain[domain] = {}
@@ -523,6 +550,7 @@ def evaluate(seed, infer, experiment="sampling", normalize=None, context_builder
             matched["both_correct" if a and b else "baseline_only" if a else "candidate_only" if b else "neither"] += 1
     return dict(status="COMPLETE_CPU_DIAGNOSTIC", experiment=experiment, seed=seed, model_sha256=MODEL_SHA256,
                 context_tokens=CONTEXT, caps=CAPS,
+                budget_caps={"baseline": 768, "production_budget": 1792} if experiment == "budget_transfer" else None,
                 system_prompt_sha256=hashlib.sha256(system.encode()).hexdigest(),
                 compact_prompt_sha256=hashlib.sha256(COMPACT_SYSTEM.encode()).hexdigest(),
                 authority_candidate_sha256=hashlib.sha256((system + AUTHORITY_RULE).encode()).hexdigest() if experiment == "authority" else None,
@@ -574,7 +602,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("binary", type=Path)
     parser.add_argument("--seed", type=int)
-    parser.add_argument("--experiment", choices=("sampling", "framing", "system", "fresh_reasoning", "breadth", "authority", "quantitative_check", "context_recovery", "context_transfer", "context_tail"), default="sampling")
+    parser.add_argument("--experiment", choices=("sampling", "framing", "system", "fresh_reasoning", "breadth", "authority", "quantitative_check", "context_recovery", "context_transfer", "context_tail", "budget_transfer"), default="sampling")
     parser.add_argument("--answer-contract-jar", type=Path)
     parser.add_argument("--baseline-context-jar", type=Path)
     parser.add_argument("--candidate-context-jar", type=Path)
