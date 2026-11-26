@@ -27,3 +27,22 @@ For EACH form, score two separate tracks, model-only and assisted. Use the same 
 An independent reviewer privately retains rubrics, transcripts and evidence. Record complete/failed outcome, duration, peak RAM, route, model generation, reviewer credit, opaque unique case and evidence identifiers. Freeze APK SHA, commit, pinned model SHA, system/policy fingerprint, context size and device label across runs. Airplane mode and Wi-Fi disabled; restart before each form; no external AI, paid services or smaller fallback. Report handset reliability separately: 20 consecutive native turns, 10 cancellations/retries, no ANR or crash, measured memory and thermal behavior. A successful benchmark alone does not establish release readiness.
 
 A private record uses four runs, exactly one per (form A/B, track model/assisted), with configuration and attestations per validator. No transcript, private prompt, personal data or reviewer name is exported. `python scripts/quality/evaluate_acie_assessment.py private-record.json` reports separate scores and lower score by track. The validator checks record structure and attestations, not actual device behavior, reviewer independence, case difficulty or answer correctness. Synthetic tests are not intelligence evidence. Before genuine acceptance data is gathered, freeze this protocol version, private rubrics and independent authorship; no post-hoc scoring changes.
+
+
+### Pre-run commitment (candidate validation extension)
+
+Before any acceptance run, the independent reviewer privately constructs a JSON manifest with exactly three top-level keys: `protocol` (the string `ACIE-v1-freeze`), `configuration` (the same frozen configuration as the result record), and `runs` (four objects, each with exactly `form`, `track`, and `cases`). Each run has 200 cases. Each planned case contains only `variant_id`, `dimension` and `rubric_sha256`. The rubric digest commits to the reviewer's exact private rubric bytes, including the prompt/variant, essential checkpoints and scoring rules. No private prompts or answers belong in the manifest. The reviewer independently retains the original rubric bytes and recomputes their hashes; opaque identifiers must not encode personal information.
+
+Calculate the manifest commitment with the validator's `manifest_digest` function (SHA-256 of canonical JSON: sorted object keys, compact separators, ASCII escaping, UTF-8 bytes, no nonfinite numbers). For example, from the repository root:
+
+```bash
+python -c 'import json,sys; sys.path.insert(0,"scripts/quality"); from evaluate_acie_assessment import manifest_digest; print(manifest_digest(json.load(open("private-freeze.json",encoding="utf-8"))))'
+```
+
+The independent reviewer retains this digest in a separate trusted dated record **before** the first assessment run. The assessment record adds the corresponding `rubric_sha256` for every scored case. Then run:
+
+```bash
+python scripts/quality/evaluate_acie_assessment.py private-record.json --freeze-manifest private-freeze.json --expected-freeze-sha256 REVIEWER_RETAINED_DIGEST
+```
+
+The validator binds all 800 variants, their dimensions and rubric hashes to the committed configuration, rejects substitutions, and distinguishes the numerical target from `acceptance_record_eligible`. Legacy uncommitted records can still report numerical scores but cannot be acceptance-record eligible. A digest supplied together with a newly fabricated manifest is not evidence of advance commitment; matching proves content consistency only. Independent custody, pre-run timing, genuine rubric review and physical-device evidence must still be established. The proposed protocol remains unapproved for actual independent testing until a reviewer freezes it. No scoring thresholds, allocation, routes or deployed inference behavior change.
