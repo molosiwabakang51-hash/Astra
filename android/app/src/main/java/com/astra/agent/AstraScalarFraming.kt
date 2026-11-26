@@ -14,7 +14,7 @@ internal object AstraScalarFraming {
         """(?i)(?:[?.!]\s+|^)(?:reply|answer|respond)\s+(?:with\s+only|only\s+with)\s+(?:the\s+|an?\s+)?integer[.!?]?$"""
     )
     private val sourceOrConflict = Regex(
-        """(?i)(?:\b(?:translate|quote|paraphrase|transcript|verbatim|source text|document excerpt|show (?:the|your) (?:work|working|steps)|explain your reasoning|without thinking|no thinking|fast mode|do not think)\b|/no_think\b|/think\b|(?:^|[.!?]\s+)(?:system|assistant|user|source|previous answer)\s*:)"""
+        """(?i)(?:\b(?:translate|quote|paraphrase|transcript|verbatim|source text|document excerpt|show (?:the|your) (?:work|working|steps)|explain|step.by.step|justify|without thinking|no thinking|fast mode|do not think)\b|/no_think\b|/think\b|(?:^|[.!?]\s+)(?:system|assistant|user|source|previous answer)\s*:)"""
     )
 
     fun prepare(
