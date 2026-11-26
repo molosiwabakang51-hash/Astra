@@ -1,7 +1,7 @@
 name: Actual Qwen3 propositional formalization
 on:
   pull_request:
-    branches: [main]
+    branches: [main, intelligence/acie-validated-grammar-diagnostic]
     paths:
       - '.github/workflows/qwen3-logic-evaluation.yml'
       - 'scripts/quality/run_qwen_logic_probe.py'
@@ -17,6 +17,7 @@ on:
         options:
           - modes
           - grammar
+          - translation
 permissions:
   contents: read
 concurrency:
@@ -54,7 +55,7 @@ jobs:
           cmake --build cpu-build --target llama-server --parallel 4
       - name: Measure formalization fidelity and independent logical verdict
         env:
-          EXPERIMENT: ${{ inputs.experiment || 'modes' }}
+          EXPERIMENT: ${{ github.base_ref == 'intelligence/acie-validated-grammar-diagnostic' && 'translation' || inputs.experiment || 'modes' }}
         shell: bash
         run: |
           set -euo pipefail
