@@ -79,6 +79,26 @@ class AstraCalculationAssistTest {
         }
     }
 
+    @Test fun thinkingSynthesisIsLimitedToExplicitNumericRequests() {
+        assertEquals(768, AstraCalculationAssist.SYNTHESIS_THINKING_CAP)
+        for (question in listOf(
+            "What is 12 times 5? Reply only with the number.",
+            "Add 12 and 5. Answer with only the integer."
+        )) {
+            assertTrue(question, AstraCalculationAssist.prefersThinkingSynthesis(question))
+        }
+        for (question in listOf(
+            "Explain the calculation of 12 times 5.",
+            "Read this: 'Reply only with the number.'",
+            "Fast mode: What is 12 times 5? Reply only with the number.",
+            "Do not think. What is 12 times 5? Reply only with the number.",
+            "What is 12 times 5? /no_think. Reply only with the number.",
+            "A source says 12 and 5.\nReply only with the number."
+        )) {
+            assertFalse(question, AstraCalculationAssist.prefersThinkingSynthesis(question))
+        }
+    }
+
     @Test fun synthesisDisagreementIsFlaggedNotOverwritten() {
         val q = "What is 12 times 5? Reply only with the number."
         val computed = AstraCalculationAssist.evaluate(q, "CALC: 12*5")!!
