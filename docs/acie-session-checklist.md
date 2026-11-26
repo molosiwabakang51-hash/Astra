@@ -303,6 +303,25 @@ All 119 sequential ACIE master requirements verified, 27 checked, 92 outstanding
 
 All 119 sequential ACIE master requirements reviewed; 27 checked, 92 outstanding. No broad master tick added from narrow capability checks. Ledger updated on main rather than introducing a new PR solely for reporting. Do not infer model intelligence from deterministic policy checks or repeated calculator cases.
 
+## Session update — validated named deduction reconciliation
+
+#452 corrected head 188dd8ed63d3165521cad03329ba2a72c7c9b79e passed Python 45847027688 and Android 45847027709; actual consensus CPU 45847027616 still running. This clears the prior signed-integer selector regression, but does not yet demonstrate improved model accuracy. #453 head 37ccdfb4251050cc5a30dc8c3a84071855569cf5 Android 45846565744 passed, including the controlled-English categorical verification tests and 128 generated named-to-formal equivalence cases. Both branches conflicted after the #451 merge. #454 head 29c35b07487b92dd772d35141c2f422b7fe7f786 Python 45848276724 passed; Android 45848276675, native budget 45848277146 and native context profile 45848276755 running. Preserve these in-flight experiments.
+
+Reconcile validated #453 against main 4f021d906cf8a7e4e2929da91c81091415d6140d. Verified unchanged ancestor blobs for three files and exact copied candidate blob hashes for AstraCategoricalVerifier.kt (5e382ec3143b4f2a4ef2a14d3c1b5da76ea8ec40), AstraCognitiveReview.kt (0374aae30356b76953680e1a31bcaaa74ebf8b81), and AstraCategoricalVerifierTest.kt (4b1a8145de2d5cf4a01290d905ac5988fd28643b). Shared AstraCognitiveReviewTest.kt changed in merged #451: verified #453 differs from its original ancestor only by the namedCategoricalReviewUsesLiteralClassMapping test insertion; insert that exact test into current main without deleting independentlyChecksExplicitLinearEquationAnswers or other existing tests. Result blob e7c81cc67357576b03a7799a14c25ee579ffc3f0. Combined validation required before merging. This is a bounded explicit verification capability, not unrestricted model intelligence. No automatic chat interception or model weight change.
+
+### Incremental milestones (not additional master requirements)
+
+- [x] Milestone — ACIE-057: exact inverse-equation solver merged (#451).
+- [x] Milestone — ACIE-039/065/117: corrected consensus selector passed Android and Python CI (#452).
+- [x] Milestone — ACIE-031/058/059: named categorical compilation and explicit review passed Android CI (#453).
+- [x] Milestone — ACIE-117: reconcile exact tested deduction source files and preserve combined inverse-equation/named-deduction tests.
+- [ ] Milestone — ACIE-031/058: validate and merge combined named-deduction candidate.
+- [ ] Milestone — ACIE-039/065/110: inspect actual-model consensus accuracy and cost.
+- [ ] Milestone — ACIE-029/110: inspect production-budget comparison and determine allocation strategy.
+- [ ] Milestone — ACIE-040/118/119: independent broad physical-device assessment and target attainment.
+
+All 119 sequential ACIE master requirements reviewed, 27 checked and 92 outstanding. No master tick added merely for bounded tests. No new unassisted intelligence rating. Reconcile remaining experimental branches only after their actual results are inspected.
+
 ## Acceptance
 
 90/100 independent repeated general intelligence score; separate model-only/assisted results; no model substitution, paid API or unsupported capability claims. Freeze protocol before held-out testing. Preserve offline and memory constraints. Recheck any completed engineering item if a later regression invalidates it.
