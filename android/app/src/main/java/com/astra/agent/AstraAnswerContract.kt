@@ -6,11 +6,16 @@ package com.astra.agent
  */
 internal object AstraAnswerContract {
     private val integerRequest = Regex(
-        """(?i)(?:[?.!]\s+|^)(?:reply|answer|respond)\s+(?:with\s+only|only\s+with)\s+(?:the\s+|an?\s+)?integer[.!?]?$"""
+        """(?i)(?:[?.!]\s+|^)(?:reply|answer|respond)\s+(?:(?:with\s+only|only\s+with|only)\s+(?:the\s+|an?\s+)?integer|with\s+(?:the\s+|an?\s+)?integer\s+only)[.!?]?$"""
     )
     private val yesNoRequest = Regex(
-        """(?i)(?:[?.!]\s+|^)(?:reply|answer|respond)\s+(?:only\s+)?yes\s+or\s+no\s+only[.!?]?$"""
+        """(?i)(?:[?.!]\s+|^)(?:reply|answer|respond)\s+(?:(?:only\s+|with\s+only\s+|only\s+with\s+)yes\s+or\s+no(?:\s+only)?|(?:with\s+)?yes\s+or\s+no\s+only)[.!?]?$"""
     )
+    // Distinguish a conservative apostrophe inside a word from quotation
+    // boundaries. An unmatched single quote can otherwise expose a fake
+    // terminal instruction. Fail closed on ambiguous quotation, including
+    // possessive endings, rather than normalize source material.
+    private val singleQuoteBoundary = Regex("""(?<![\p{L}\p{N}])['’]|['’](?![\p{L}\p{N}])|‘""")
     private val integer = Regex("""[+-]?[0-9]{1,80}""")
     private val boolean = Regex("""(?i)yes|no""")
     private val label = Regex("""(?i)^(?:final\s+answer|answer|result)\s*:\s*(.+)$""")
@@ -20,6 +25,7 @@ internal object AstraAnswerContract {
         val question = rawQuestion.trim()
         if (question.length !in 12..700 ||
             question.any { it in listOf('\n', '\r', '"', '“', '”', 96.toChar(), '<', '>') } ||
+            singleQuoteBoundary.containsMatchIn(question) ||
             question.contains("SAME-CHAT FOLLOW-UP", ignoreCase = true) ||
             question.contains("ORIGINAL QUESTION:", ignoreCase = true) ||
             question.contains("EARLIER CHAT EXCERPTS", ignoreCase = true)
