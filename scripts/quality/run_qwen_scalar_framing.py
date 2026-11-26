@@ -1,5 +1,6 @@
 """Matched final-answer framing experiment, never a production routing policy."""
 import argparse
+import base64
 import hashlib
 import json
 import math
@@ -59,7 +60,17 @@ def transfer_cases(seed):
         ("control_name", f"Route {x} costs {a} coins, route {y} costs {a+d} coins and route {z} costs {a+e+d} coins. Which route is cheapest? Reply only with its name.", x),
     ]
 
-def evaluate(seed, infer, suite=None):
+def kotlin_bridge(jar, operation, value):
+    encoded=base64.b64encode(value.encode()).decode("ascii")
+    result=subprocess.run(["java","-jar",str(jar)],input=operation+"\n"+encoded+"\n",
+                          text=True,capture_output=True,check=True,timeout=15)
+    lines=result.stdout.splitlines()
+    if len(lines)!=1:
+        raise RuntimeError("Invalid Kotlin bridge output")
+    return base64.b64decode(lines[0],validate=True).decode("utf-8")
+
+def evaluate(seed, infer, suite=None, bridge=None):
+    cap=1792 if bridge is not None else CAP
     suite = cases(seed) if suite is None else suite
     system = native.system_prompt()
     settings = native.PROFILES["qwen_think"]
@@ -68,25 +79,31 @@ def evaluate(seed, infer, suite=None):
         arms = ("baseline", "framing") if i % 2 == 0 else ("framing", "baseline")
         for arm in arms:
             q = question + (SUFFIX if arm == "framing" else "")
+            if bridge is not None:
+                prepared=bridge(arm,question)
+                if not prepared.endswith("\n/think"):
+                    raise RuntimeError("Unexpected production thinking marker")
+                q=prepared.removesuffix("\n/think")
             call_seed = (seed+i*13) % (2**31-1)
-            payload = dict(prompt=native.raw_prompt(system, q, "think"), n_predict=CAP,
+            payload = dict(prompt=native.raw_prompt(system, q, "think"), n_predict=cap,
                            seed=call_seed, cache_prompt=False, stream=False, ignore_eos=False,
                            repeat_penalty=1.0, presence_penalty=0.0, frequency_penalty=0.0, **settings)
             started = time.monotonic()
             reply = infer(payload)
             elapsed = round((time.monotonic()-started)*1000)
             actual = reply.get("generation_settings", {})
-            for key, value in dict(settings, seed=call_seed, n_predict=CAP).items():
+            for key, value in dict(settings, seed=call_seed, n_predict=cap).items():
                 found = actual.get(key)
                 if type(found) not in (int,float) or not math.isclose(found,value,rel_tol=1e-6,abs_tol=1e-8):
                     raise RuntimeError("Unverified native settings")
             stop, truncated, tokens = reply.get("stop_type"), reply.get("truncated"), reply.get("tokens_predicted")
             if stop not in ("eos","word","limit") or type(truncated) is not bool:
                 raise RuntimeError("Unverified native completion")
-            if type(tokens) is not int or not 0 <= tokens <= CAP+8:
+            if type(tokens) is not int or not 0 <= tokens <= cap+8:
                 raise RuntimeError("Unverified native token count")
             complete = stop in ("eos","word") and not truncated
-            visible = native.visible_answer(reply.get("content"))
+            raw=reply.get("content")
+            visible = bridge("visible",raw) if bridge is not None and isinstance(raw,str) else native.visible_answer(raw)
             correct = complete and visible.rstrip(".!").casefold() == expected.casefold()
             scalar = bool(re.fullmatch(r"[+-]?\d+|[A-Za-z]+",visible.rstrip(".!").strip()))
             failure = ("pass" if correct else "incomplete" if not complete else "no_visible_answer" if not visible
@@ -107,14 +124,14 @@ def evaluate(seed, infer, suite=None):
         a = {r["arm"]:r["correct"] for r in rows if r["case"]==case}
         matched["both_correct" if a["baseline"] and a["framing"] else "baseline_only" if a["baseline"]
                 else "candidate_only" if a["framing"] else "neither"] += 1
-    return dict(status="COMPLETE_SCALAR_FRAMING_DIAGNOSTIC",seed=seed,cap=CAP,
+    return dict(status="COMPLETE_SCALAR_FRAMING_DIAGNOSTIC",seed=seed,cap=cap,production_prompt_bridge=bridge is not None,
                 model_sha256=native.MODEL_SHA256,system_prompt_sha256=hashlib.sha256(system.encode()).hexdigest(),
                 framing_sha256=hashlib.sha256(SUFFIX.encode()).hexdigest(),totals=summary(rows),
                 by_domain={d:summary([r for r in rows if r["case"].startswith(d+"_")]) for d in ("arithmetic","inverse","control")},
                 matched=matched,cases=rows,official_ai_rating=None,
-                scope="Public developmental tasks. Identical model, seed and cap; only user-level final-format framing changes. No answer keys in requests.")
+                scope=("Production Kotlin initial-turn prompt builder and visible filter, 1792 cap, inactive integer-only gate; CPU not Android JNI." if bridge is not None else "Public developmental tasks. Identical model, seed and cap; only user-level final-format framing changes. No answer keys in requests."))
 
-def run(binary,seed,suite=None):
+def run(binary,seed,suite=None,bridge=None):
     if not native.check_model(native.MODEL_PATH):
         raise RuntimeError("Unverified model")
     opener=urllib.request.build_opener(urllib.request.ProxyHandler({}))
@@ -136,7 +153,7 @@ def run(binary,seed,suite=None):
                 time.sleep(1)
             else:
                 raise RuntimeError("Native server startup timed out")
-            result=evaluate(seed,lambda p:native.request(opener,"/completion",p),suite)
+            result=evaluate(seed,lambda p:native.request(opener,"/completion",p),suite,bridge)
             if not native.check_model(native.MODEL_PATH):
                 raise RuntimeError("Model identity changed")
             return result
@@ -154,10 +171,12 @@ if __name__=="__main__":
     parser.add_argument("binary",type=Path)
     parser.add_argument("--seed",type=int,default=SEED)
     parser.add_argument("--suite",choices=("original","transfer"),default="original")
+    parser.add_argument("--production-bridge",type=Path)
     args=parser.parse_args()
     if not 0<=args.seed<2**31-1:
         parser.error("Invalid seed")
     suite=transfer_cases(args.seed) if args.suite=="transfer" else None
-    report=run(args.binary,args.seed,suite)
+    bridge=(lambda operation,value:kotlin_bridge(args.production_bridge,operation,value)) if args.production_bridge else None
+    report=run(args.binary,args.seed,suite,bridge)
     report["suite"]=args.suite
     print(json.dumps(report,indent=2,allow_nan=False))
