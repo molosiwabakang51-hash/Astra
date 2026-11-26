@@ -271,6 +271,42 @@ def context_cases(seed):
     ]
 
 
+def long_context_cases(seed):
+    """Fresh long-chain transfer cases, scored independently of the builder."""
+    rng = random.Random(seed)
+    initial = rng.randint(850, 999)
+    values = rng.sample(range(120, 800), 13)
+    def chain(topic, count):
+        history = [("user", f"My fictional {topic} is {initial} coins.")]
+        for value in values[:count]:
+            history += [("assistant", "Noted."), ("user", f"Actually, make it {value} coins.")]
+        return history
+    def noise(history):
+        return history + [("assistant", f"Unrelated weather discussion {i}.") for i in range(16)]
+    def question(topic):
+        return f"What was my {topic}? Reply with only the integer."
+    def gap_question(topic):
+        return (f"From the available excerpts, is the exact latest {topic} known "
+                "without assuming missing corrections? Reply YES or NO only.")
+    return [
+        ("replacement_seven", question("observatory budget"), str(values[6]), noise(chain("observatory budget", 7))),
+        ("replacement_eight", question("orchard allocation"), str(values[7]), noise(chain("orchard allocation", 8))),
+        ("replacement_twelve", question("archive budget"), str(values[11]), noise(chain("archive budget", 12))),
+        ("replacement_reasoning", "Use the ferry budget to find the remaining coins after spending 9 coins. Reply with only the integer.", str(values[8]-9), noise(chain("ferry budget", 9))),
+        ("gap_tail", gap_question("aquarium budget"), "NO", noise(chain("aquarium budget", 13))),
+        ("gap_relative", gap_question("nursery budget"), "NO", noise(
+            [("user", f"My fictional nursery budget is {initial} coins.")] +
+            [turn for value in values[:8] for turn in (("assistant", "Noted."), ("user", f"Actually, increase it by {value} coins."))])),
+        ("control_short", question("theatre budget"), str(values[1]), noise(chain("theatre budget", 2))),
+        ("control_break", question("bakery budget"), str(values[7]), noise(chain("bakery budget", 8) + [
+            ("user", "I want a new dinner menu."), ("user", "Actually, make it spicy rice.")])),
+        ("control_owner", question("studio budget"), str(initial), noise([
+            ("user", f"My fictional studio budget is {initial} coins."),
+            ("assistant", f"I guessed your studio budget was {values[0]} coins.")])),
+        ("control_known", gap_question("clinic budget"), "YES", noise(chain("clinic budget", 2))),
+    ]
+
+
 def recovery_prompt(jar, question, history):
     def encoded(value):
         return base64.b64encode(value.encode()).decode("ascii")
@@ -289,13 +325,14 @@ def recovery_prompt(jar, question, history):
 
 
 def evaluate(seed, infer, experiment="sampling", normalize=None, context_builders=None):
-    if experiment not in ("sampling", "framing", "system", "fresh_reasoning", "breadth", "authority", "quantitative_check", "context_recovery"):
+    context_experiment = experiment in ("context_recovery", "context_transfer")
+    if experiment not in ("sampling", "framing", "system", "fresh_reasoning", "breadth", "authority", "quantitative_check", "context_recovery", "context_transfer"):
         raise ValueError("Unknown experiment")
     system = system_prompt()
-    if experiment == "context_recovery" and (context_builders is None or set(context_builders) != {"baseline", "recovery"}):
+    if context_experiment and (context_builders is None or set(context_builders) != {"baseline", "recovery"}):
         raise ValueError("Context recovery requires both production builders")
     def arms(mode):
-        if experiment == "context_recovery":
+        if context_experiment:
             return ["baseline", "recovery"] if mode == "think" else []
         if experiment == "quantitative_check":
             return ["baseline", "quantitative_check"] if mode == "think" else []
@@ -311,7 +348,7 @@ def evaluate(seed, infer, experiment="sampling", normalize=None, context_builder
             return ["production", "compact"]
         return ["legacy", "qwen_" + mode]
     def configuration(mode, name):
-        if experiment == "context_recovery":
+        if context_experiment:
             return PROFILES["qwen_think"], system, False
         if experiment == "sampling":
             return PROFILES[name], system, False
@@ -325,8 +362,9 @@ def evaluate(seed, infer, experiment="sampling", normalize=None, context_builder
         # thinking is the better exploratory baseline, not a deployed change.
         return PROFILES["legacy"], (COMPACT_SYSTEM if name == "compact" else system), name == "hard_direct"
     rows = []
-    histories = {name: history for name, _, _, history in context_cases(seed)} if experiment == "context_recovery" else {}
-    suite = ([(name, question, expected) for name, question, expected, _ in context_cases(seed)] if experiment == "context_recovery" else
+    context_suite = (long_context_cases(seed) if experiment == "context_transfer" else context_cases(seed)) if context_experiment else []
+    histories = {name: history for name, _, _, history in context_suite}
+    suite = ([(name, question, expected) for name, question, expected, _ in context_suite] if context_experiment else
              quantitative_cases(seed) if experiment == "quantitative_check" else
              authority_cases(seed) if experiment == "authority" else
              breadth_cases(seed) if experiment == "breadth" else
@@ -340,7 +378,7 @@ def evaluate(seed, infer, experiment="sampling", normalize=None, context_builder
             for name in names:
                 settings, active_system, hard_direct = configuration(mode, name)
                 call_seed = (seed + index * 13) % (2**31 - 1)
-                active_question = (context_builders[name](question, histories[case]) if experiment == "context_recovery" else
+                active_question = (context_builders[name](question, histories[case]) if context_experiment else
                                    DECOMPOSITION + question if name == "decomposition" else question)
                 payload = dict(prompt=raw_prompt(active_system, active_question, mode, hard_direct=hard_direct),
                                n_predict=CAPS[mode], seed=call_seed,
@@ -375,9 +413,10 @@ def evaluate(seed, infer, experiment="sampling", normalize=None, context_builder
                 row = dict(case=case, mode=mode, profile=name, seed=call_seed,
                            passed=passed, complete=complete, stop=stop, failure=failure,
                            generated_tokens=tokens, elapsed_ms=elapsed)
-                if experiment == "context_recovery":
+                if context_experiment:
                     row["recovery_prompt_sha256"] = hashlib.sha256(active_question.encode()).hexdigest()
-                    row["correction_gap_notice"] = "[Some linked corrections are omitted." in active_question
+                    row["correction_gap_notice"] = "[Some linked corrections are omitted" in active_question
+                    row["correction_tail_notice"] = "[Some linked corrections are omitted, including a later correction." in active_question
                 if normalize is not None:
                     # Separate postprocessing diagnostic, never replace the
                     # raw strict score or give credit to incomplete generation.
@@ -427,11 +466,11 @@ def evaluate(seed, infer, experiment="sampling", normalize=None, context_builder
             key = ("both_correct" if scores["think"] and scores["direct"] else
                    "think_only" if scores["think"] else "direct_only" if scores["direct"] else "neither")
             matched[key] += 1
-    if experiment in ("authority", "quantitative_check", "context_recovery"):
+    if experiment in ("authority", "quantitative_check", "context_recovery", "context_transfer"):
         domains = (("quote", "control") if experiment == "authority" else
-                   ("replacement", "gap", "control") if experiment == "context_recovery" else ("arithmetic", "inverse", "control"))
+                   ("replacement", "gap", "control") if context_experiment else ("arithmetic", "inverse", "control"))
         candidate = ("authority_rule" if experiment == "authority" else
-                     "recovery" if experiment == "context_recovery" else "quantitative_check")
+                     "recovery" if context_experiment else "quantitative_check")
         for domain in domains:
             by_domain[domain] = {}
             for arm in arms("think"):
@@ -452,7 +491,7 @@ def evaluate(seed, infer, experiment="sampling", normalize=None, context_builder
                 quantitative_candidate_sha256=hashlib.sha256((system + QUANTITATIVE_CHECK).encode()).hexdigest() if experiment == "quantitative_check" else None,
                 totals=totals, cases=rows, by_domain=by_domain, matched=matched,
                 answer_contract_audit=contract_audit, official_ai_rating=None,
-                scope=(f"{len(suite)} synthetic restored-conversation cases per builder; CPU server, not live multi-turn JNI or independent held-out review." if experiment == "context_recovery" else
+                scope=(f"{len(suite)} synthetic restored-conversation cases per builder; CPU server, not live multi-turn JNI or independent held-out review." if context_experiment else
                        f"{len(suite)} synthetic single-turn problems per mode; CPU server, not Android JNI or independent held-out review."))
 
 
@@ -497,7 +536,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("binary", type=Path)
     parser.add_argument("--seed", type=int)
-    parser.add_argument("--experiment", choices=("sampling", "framing", "system", "fresh_reasoning", "breadth", "authority", "quantitative_check", "context_recovery"), default="sampling")
+    parser.add_argument("--experiment", choices=("sampling", "framing", "system", "fresh_reasoning", "breadth", "authority", "quantitative_check", "context_recovery", "context_transfer"), default="sampling")
     parser.add_argument("--answer-contract-jar", type=Path)
     parser.add_argument("--baseline-context-jar", type=Path)
     parser.add_argument("--candidate-context-jar", type=Path)
@@ -508,7 +547,7 @@ def main():
     try:
         normalize = (lambda q, a: answer_contract(args.answer_contract_jar, q, a)) if args.answer_contract_jar else None
         builders = None
-        if args.experiment == "context_recovery":
+        if args.experiment in ("context_recovery", "context_transfer"):
             if not args.baseline_context_jar or not args.candidate_context_jar or normalize is not None:
                 raise ValueError("Use both context builders without answer formatting")
             builders = {"baseline": lambda q, h: recovery_prompt(args.baseline_context_jar, q, h),
