@@ -89,7 +89,10 @@ def prepare(seed, builders, suite):
         candidate = prompt
         if not case.startswith("single_"):
             head, current = prompt.rsplit(BOUNDARY, 1)
-            candidate = head + BOUNDARY + PLAN + "\n\n" + current
+            suffix = "Reply with only the integer, or UNKNOWN if not established."
+            if not current.endswith(suffix):
+                raise RuntimeError("Unexpected baseline output contract")
+            candidate = head + BOUNDARY + current[:-len(suffix)] + PLAN
         if len(candidate) > 3000:
             raise RuntimeError("Candidate prompt exceeds production bound")
         prepared[case] = {"baseline": prompt, "assisted": candidate}
