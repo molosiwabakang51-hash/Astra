@@ -548,6 +548,37 @@ Reconciliation of subsequent results supersedes pending statuses in older histor
 
 Master ACIE 27/119 checked, 92 outstanding. Canonical #166 release acceptance 0/119. No independent intelligence rating.
 
+
+## Session reconciliation — scoped reasoning, semantic eligibility and verification (27 November local)
+
+Supersedes pending historical milestone statuses above; preserves the original 119 parent requirements. Source references are merged commits, CI and synthetic development artifacts, not independent device acceptance.
+
+- #487 Android retry passed and diagnostic merged 2d15fd65d12bf97b9467215dadb5f32e9465e257; reject source-membership-only planning.
+- #488 all CI passed and diagnostic merged 08ac187a8c8e92ca05abf772341da2d21db8fd63. Artifact 15155862307: 32/32 calls, 7/10 to 9/10, dual 3/6 to 5/6, operands 9/12 to 11/12, single controls 4/4 both. Equal 16 calls per arm; 2212 to 2103 tokens and 256971 to 245686 ms. Oracle decomposition, not autonomous routing.
+- #490 production merged 4d9b04293121b47c0d270924e48beefa80754a40; Android and native passed. Detect truncated original premises within recovered correction chains; existing regression is not isolated evidence of neural improvement.
+- #491 production merged 2a25767445b5dbca8917cd03355c50c48bde5c17; corrected wiring and Android/Python checks passed. Exact rational arithmetic review only.
+- #492 diagnostic merged 3ff9a0cc675404075e8f36485e9ebf8c441240a4. Artifact 15155854327: 40/40 calls, 9/12 to 11/12, complete dual 1/4 to 3/4, missing and single 4/4 both; 3728 to 4314 tokens, 371802 to 417180 ms. Known operand in missing-value cases correct only 1/4 in each arm, so final UNKNOWN is not full comprehension.
+- #493 diagnostic merged a971f45532f36771de4c5c022e051463ed38218c. Artifact 15157027131: 31/32 complete, direct/think each 8/16 overall, eligible 0/8 and 1/8; reject production planner.
+- #494 production merged d355f2cc543230e424283696aad4d1aae27b2b66; narrow terminal formatting instruction isolation from retrieval ranking. #497 exact pre/post diagnostic all three CI passed; merged be8e3ba5e9726310f0090194e4555f3db2369e95. Direct artifact 15158395274: 16/16 complete, formatted 4/4 both, distractor retained 4/4 to 0/4, correct owner correction retained 8/8 both, no paired accuracy changes, 1523 to 1770 tokens, 162118 to 179389 ms. Unformatted controls 0/4 both under strict scalar grading, not demonstrated factual errors. Retain relevance safeguard, no isolated answer-accuracy gain.
+- #496 diagnostic merged 136d8bf1038f92b6c7fcd688108d90895f36ea21; all CI passed. Artifact 15156948577 recorded 8/16 to 12/16, eligible 0/8 to 5/8, unsuitable 8/8 to 7/8; hypothetical false acceptance, exact topics 3/16 to 11/16, CPU 30938 to 53024 ms. Reject live activation; source-span checks do not certify semantic meaning.
+- #495 Android passed but superseded by byte-identical reconciliation #498, merged 6c3210513dd87c2694e89dc576d2522f5bc32ab5 after fresh Android 45905128623 success. Explicit bounded repeated state assignments; 24 expanded assignments, eight variables, no nested loops or arbitrary code. #495 closed.
+- #499 head 3227b7f5310b542776c177bb28ffa0e87719c0ad: 328 additions, 3 regression methods, 16 fresh requests (8 eligible including two harmless conditional wordings, 4 hypothetical and 4 other unsuitable); 32 planned native calls. Reuse same planner result and assess separate classifier veto, wrong accepted plans, lost correct plans and incremental cost. Same model, not independent model judgment. Python 45911611772, Android 45911611753, native 45911611821 pending at inspection.
+
+### Latest incremental checklist
+
+- [x] Milestone — ACIE-117: retried #487 validated and diagnostic integrated.
+- [x] Milestone — ACIE-042/030/110: scoped extraction and uncertainty-transfer evaluation completed.
+- [x] Milestone — ACIE-043/048/052: original-premise completeness safeguard integrated.
+- [x] Milestone — ACIE-055/057/058: exact rational and bounded repeated-state explicit reviews integrated.
+- [x] Milestone — ACIE-042/102: formatting isolation integrated and targeted relevance validated.
+- [x] Milestone — ACIE-030/078/080: autonomous and contrastive planner evaluated, unreliable live activation rejected.
+- [x] Milestone — ACIE-016/019/078: separate semantic eligibility diagnostic implemented.
+- [ ] Milestone — ACIE-016/019/078/110: #499 Python, Android and native validation.
+- [ ] Milestone — ACIE-030/062/078/082: reliable autonomous decomposition, evidence extraction and semantic eligibility.
+- [ ] Milestone — ACIE-040/109/118/119: independent protocol freeze, held-out assessment and physical-device acceptance.
+
+Master ACIE 27/119 checked, 92 outstanding; original #166 release acceptance 0/119. No independent rating.
+
 ## Acceptance
 
 90/100 independent repeated general intelligence score; separate model-only/assisted results; no model substitution, paid API or unsupported capability claims. Freeze protocol before held-out testing. Preserve offline and memory constraints. Recheck any completed engineering item if a later regression invalidates it.
