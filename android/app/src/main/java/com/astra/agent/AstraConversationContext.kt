@@ -253,25 +253,32 @@ internal object AstraConversationContext {
         }
         var selected = selectExcerpts(room)
         if (selected.isEmpty()) return AstraOfflinePolicy.modelPrompt(current, thinkingRequested)
-        val included = selected.map { it.first }.toSet()
-        // Warn when a recognized chain intersects the recovered excerpts but
-        // some of its known steps or original anchor did not survive selection.
-        // The notice is app-owned metadata, never quoted as a user statement.
-        val correctionGap = correctionChains.any { (anchorIndex, chain) ->
-            chain.any(included::contains) &&
-                (anchorIndex in boundedChains || !included.containsAll(chain))
+        // Assess the actual selected indices, including a newest correction
+        // evicted by excerpt limits rather than only by the scan limit.
+        // Re-evaluate after reserving notice space: that reservation itself
+        // may remove a later correction. Never downgrade a warning.
+        fun omissionLevel(excerpts: List<Pair<Int, String>>): Int {
+            val included = excerpts.map { it.first }.toSet()
+            var level = 0
+            for ((anchorIndex, chain) in correctionChains) {
+                if (chain.none(included::contains)) continue
+                val newest = chain.maxOrNull() ?: continue
+                if (anchorIndex in boundedChains || newest !in included) return 2
+                if (!included.containsAll(chain)) level = 1
+            }
+            return level
         }
-        val tailOmitted = correctionChains.any { (anchorIndex, chain) ->
-            anchorIndex in boundedChains && chain.any(included::contains)
-        }
-        val notice = when {
-            tailOmitted -> CORRECTION_TAIL_NOTICE
-            correctionGap -> CORRECTION_GAP_NOTICE
-            else -> ""
-        }
-        if (notice.isNotEmpty()) {
+        var level = omissionLevel(selected)
+        var notice = ""
+        // There are only two nonzero warning levels; at most two
+        // reselections are needed and the level is monotonic.
+        while (level > 0) {
+            notice = if (level == 2) CORRECTION_TAIL_NOTICE else CORRECTION_GAP_NOTICE
             selected = selectExcerpts((room - notice.length).coerceAtLeast(0))
             if (selected.isEmpty()) return AstraOfflinePolicy.modelPrompt(current, thinkingRequested)
+            val revised = omissionLevel(selected)
+            if (revised <= level) break
+            level = revised
         }
 
         val composed = HISTORY_HEADER +
