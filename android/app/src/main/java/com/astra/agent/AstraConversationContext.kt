@@ -194,8 +194,41 @@ internal object AstraConversationContext {
                     .thenBy { it.first.index })?.first
         } else null
         val linkedCorrections = topicalAnchor?.let { retainedCorrections(it) }.orEmpty()
-        val topicalCorrections = if (topicalAnchor != null)
-            linkedCorrections.asReversed() + topicalAnchor else emptyList()
+        // A question may explicitly refer to two distinct topics. Preserve
+        // the second owner's actual correction rather than relying on the
+        // model to infer uncertainty from a generic omission notice.
+        // Require two NEW matched terms, a distinct non-correction anchor,
+        // and a recognized adjacent correction chain. At most one extra
+        // anchor; do not broaden vague follow-ups or cross-chat retrieval.
+        val primaryTerms = topicalAnchor?.let {
+            significantWords(recoveryQuote(it)).intersect(keywords)
+        }.orEmpty()
+        val secondaryAnchor = if (topicalAnchor != null &&
+            !isCorrection(topicalAnchor.value.content) && keywords.size >= 4) {
+            valid.asSequence().filter {
+                it.index != topicalAnchor.index && it.value.role == "user" &&
+                    !isCorrection(it.value.content) &&
+                    significantWords(recoveryQuote(it)).intersect(keywords)
+                        .minus(primaryTerms).size >= 2
+            }.map { it to relatedCorrections(it, valid) }
+                .filter { it.second.steps.isNotEmpty() &&
+                    it.second.steps.none { step -> step.index == topicalAnchor.index } }
+                .maxWithOrNull(compareBy<Pair<IndexedValue<Turn>, CorrectionChain>> {
+                    overlap(it.first)
+                }.thenBy { it.first.index })?.first
+        } else null
+        val secondaryCorrections = secondaryAnchor?.let { retainedCorrections(it) }.orEmpty()
+        val topicalCorrections = if (topicalAnchor != null) {
+            if (secondaryAnchor == null) linkedCorrections.asReversed() + topicalAnchor
+            else {
+                // Preserve both original anchors and the latest correction
+                // for each before older steps consume the excerpt budget.
+                // Serialization below still restores chronological order.
+                listOfNotNull(linkedCorrections.lastOrNull(), topicalAnchor,
+                    secondaryCorrections.lastOrNull(), secondaryAnchor) +
+                    linkedCorrections.asReversed() + secondaryCorrections.asReversed()
+            }
+        } else emptyList()
         val linkedIndices = topicalCorrections.map { it.index }.toSet()
         // A correction from another topic must not re-enter through the
         // generic recency fallback after failing the topic-chain check.
