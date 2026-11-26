@@ -263,6 +263,27 @@ Reconciled all three non-ledger files from #428 (profile evaluator, its tests an
 
 All 119 sequential ACIE requirements verified; 27 master ticks, 92 outstanding. No new broad master acceptance or general intelligence score claimed. Separate subtask prefixes prevent double counting.
 
+## Session update — validated retrieval merge and exact inverse reasoning integration
+
+#450 head 826d2cac0c0ee67381969a5dcf337e6510fa785d passed Python 45842974671, Android 45842974788 and native CPU 45842974670. Downloaded artifact 15130855788: historical-tail seed 69401723 pinned baseline 5f4b1723b6fa6594ee21828ad1b01bdd0a2f818d, 4/8 vs 7/8, tail 0/4 vs 3/4, gap 1/1 both, controls 3/3 both, both correct 4, candidate-only 3, baseline-only 0, neither 1, 16/16 completed, zero wrong scalars both, noncanonical 4 vs 1, generated tokens 1384 vs 923, CPU milliseconds 149262 vs 130284. Repeated public cases, not independent generalization. #450 squash merged into main 83e85ca49c95797927d5ea39e23933add6ff92b5. Historical retrieval improvement is now in main.
+
+#448 Android 45841805512 passed, including job 139985134228 Run tests and build debug APK, LITE build and native model composition checks. Native calculator 45841805703 passed. Downloaded artifact 15130266451 confirms historical computed values 8/8, direct synthesis 0/8, unsuitable rejected 4/4; paired 8/8 computed, direct 1/8, thinking 7/8, unsuitable rejected 4/4; rational old parser 1/4 vs new 4/4, no losses, 3/3 unsuitable rejected, direct synthesis 0/4 vs thinking 4/4. This is a regression suite, not an independent measure of the explicit linear solver. The latter is covered by the Android test suite, including 128 generated equations and independent prior-answer audit. Reconcile all four exact tested nonledger source/test files of #448 onto post-#450 main, verify ancestor equality and copied blob equality; combined validation pending. Explicit single-variable affine equation path only, no automatic word-problem formalization.
+
+#449 native 45842398700 passed; downloaded artifact 15130337107, seed 90276143, matched 768-token thinking profiles. Unassisted 8/8 vs equation-assisted 7/8 exact-value correct, both 7, unassisted-only 1 (inventory), equation-only 0, neither 0; 22/22 complete. Three unsuitable cases yielded no numeric answer in either arm, unassisted explicitly NONE 3/3 vs assisted 0/3 (all three equation proposals rejected). Unassisted 2759 tokens / 222793 ms vs equation 4066 tokens / 336492 ms. Candidate is slower and loses one correct answer; do not enable automatic model-led equation solving or promote the candidate as a general intelligence improvement. The unassisted result is promising on a narrow synthetic suite, not evidence of 100% general mathematical intelligence. Retain evidence, not automatic activation. No changes to model weights or default thinking configuration. Prioritize successful integration over new speculative branches.
+
+### Incremental milestones (not additional master requirements)
+
+- [x] Milestone — ACIE-052: merge reproducibly improved historical-tail retrieval (#450).
+- [x] Milestone — ACIE-117: validate combined Python, Android and native retrieval changes.
+- [x] Milestone — ACIE-057: validate explicit exact linear solver and independent audit in Android CI (#448).
+- [x] Milestone — ACIE-084/117: measure unassisted versus equation-assisted inverse word-problem accuracy (#449).
+- [x] Milestone — ACIE-078/083: reject automatic equation interpretation when it regresses against standard thinking.
+- [x] Milestone — ACIE-057: reconcile exact validated linear solver files onto current main.
+- [ ] Milestone — ACIE-057: merge reconciled explicit linear solver after combined validation.
+- [ ] Milestone — ACIE-040/118/119: independent broad assessment on physical device and target attainment.
+
+All 119 sequential ACIE master requirements verified, 27 checked, 92 outstanding. Narrow verified milestones remain separate from full master acceptance. No new independent general intelligence score or release claim.
+
 ## Acceptance
 
 90/100 independent repeated general intelligence score; separate model-only/assisted results; no model substitution, paid API or unsupported capability claims. Freeze protocol before held-out testing. Preserve offline and memory constraints. Recheck any completed engineering item if a later regression invalidates it.
