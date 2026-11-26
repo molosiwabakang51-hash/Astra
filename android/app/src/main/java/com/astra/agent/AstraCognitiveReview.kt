@@ -177,18 +177,10 @@ internal object AstraCognitiveReview {
         AstraCalculationAssist.auditLinearEquation(original, answer)?.let {
             return Result.Local(it)
         }
-        // Independent validation only for an exact, unambiguous arithmetic
-        // request and an unambiguous numeric response. No inference points.
-        val expected = AstraVerifiedArithmetic.answer(original)
-        val actualNumber = answer.toBigDecimalOrNull()
-        val expectedNumber = expected?.toBigDecimalOrNull()
-        if (actualNumber != null && expectedNumber != null) {
-            val equal = actualNumber.compareTo(expectedNumber) == 0
-            return Result.Local(
-                "INDEPENDENT ARITHMETIC CHECK — " +
-                    (if (equal) "correct." else "incorrect; corrected result: $expected.") +
-                    "\nComputed from the original operands using exact decimal arithmetic."
-            )
+        // Independently compare exact bounded decimal or fractional answers.
+        // No arbitrary-precision exponent or ambiguous prose is interpreted.
+        AstraVerifiedArithmetic.audit(original, answer)?.let {
+            return Result.Local(it)
         }
         // Only audit an unambiguous YES/NO answer against the exact
         // owner-supplied formal argument. Never infer missing formal premises.
