@@ -183,6 +183,12 @@ All 119 ACIE IDs reviewed and preserved. #411 Android CI passed and the response
 
 This session adds a 12-case actual-model paired revision experiment (up to 36 calls) using fresh questions and matched thinking retry/review arms, with original wrong-scalar recovery, correct-answer loss and fixed-denominator paired scoring. Candidate prompt only; not a deployed review change. All 119 IDs preserved; 27 checked and 92 outstanding. ACIE-055/063/065/115 remain pending production/handset evidence; no new broad acceptance or official score. 
 
+## Session update — actual self-review and calculator synthesis contract
+
+#424 passed all three checks and merged 2ffff9e60582853611a688eac05f9131965f6133. Inspected artifact 15077604549: all 36 calls complete. Original direct 4/12; fresh thinking retry 9/12; candidate review 3/12. Retry recovered five strict failures, review recovered zero and lost one previously correct answer; neither recovered a confirmed wrong scalar. Retry 2634 tokens/223320 ms vs review 3500 tokens/302431 ms. Paired retry-only six, review-only zero, both three, neither three. Do not deploy candidate review prompt. Keep existing explicit audit; no broad claim of self-review ineffectiveness, since most failures were noncanonical. No independent score.
+
+New calculator synthesis contract recognizes explicit terminal numeric-only owner instruction outside quotes and promotes it outside untrusted question data. Model may return MISMATCH rather than endorsing a wrong expression. Output warning for exact numeric disagreement, incomplete interpretation, or noncanonical scalar format; retain original response and independent expression/value footer. No silent substitution or claim of semantic verification. Added fresh 12-case probe suite; historical suite remains default for reproducible rerun. Regression checks and actual fresh model evaluation pending. All 119 IDs reviewed, 27 checked, 92 outstanding; ACIE-078/079/080/082/083/102 still require broader evidence; ACIE-055/065/115 not accepted. 
+
 ## Acceptance
 
 90/100 independent repeated general intelligence score; separate model-only/assisted results; no model substitution, paid API or unsupported capability claims. Freeze protocol before held-out testing. Preserve offline and memory constraints. Recheck any completed engineering item if a later regression invalidates it.

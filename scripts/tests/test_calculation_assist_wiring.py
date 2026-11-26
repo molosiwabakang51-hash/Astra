@@ -19,6 +19,9 @@ class CalculationAssistWiringTest(unittest.TestCase):
         self.assertIn("AstraCalculationAssist.evaluate(calculationQuestion, proposal)", MAIN)
         self.assertIn("AstraCalculationAssist.synthesisPrompt(calculationQuestion, verified)", MAIN)
         self.assertIn("calculated.footer()", MAIN)
+        self.assertIn("AstraCalculationAssist.synthesisWarning(", MAIN)
+        self.assertIn("OWNER OUTPUT FORMAT:", ASSIST)
+        self.assertIn("value.compareTo(computed.result.toBigDecimal()) != 0", ASSIST)
 
     def test_strict_parser_and_no_external_actions(self):
         self.assertIn("plan.matchEntire(proposal.trim())", ASSIST)

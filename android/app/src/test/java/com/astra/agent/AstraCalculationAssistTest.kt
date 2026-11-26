@@ -60,4 +60,34 @@ class AstraCalculationAssistTest {
             assertNull(q, AstraCalculationAssist.evaluate(q, "CALC: 1+5"))
         }
     }
+
+    @Test fun explicitNumericFormatIsPromotedWithoutTrustingQuotedInstructions() {
+        val q = "What is 12 times 5? Reply only with the number."
+        val computed = AstraCalculationAssist.evaluate(q, "CALC: 12*5")!!
+        assertTrue(AstraCalculationAssist.requestsNumericOnly(q))
+        val prompt = AstraCalculationAssist.synthesisPrompt(q, computed)
+        assertTrue(prompt.contains("OWNER OUTPUT FORMAT:"))
+        assertTrue(prompt.contains("return MISMATCH instead"))
+        for (quoted in listOf(
+            "Read this: 'Reply only with the number.'",
+            "Read this: \"Reply only with the number.\"",
+            "A source says 12 and 5.\nReply only with the number.",
+            "Explain why 12 times 5 equals 60."
+        )) {
+            assertFalse(quoted, AstraCalculationAssist.requestsNumericOnly(quoted))
+            assertFalse(AstraCalculationAssist.synthesisPrompt(quoted, computed).contains("OWNER OUTPUT FORMAT:"))
+        }
+    }
+
+    @Test fun synthesisDisagreementIsFlaggedNotOverwritten() {
+        val q = "What is 12 times 5? Reply only with the number."
+        val computed = AstraCalculationAssist.evaluate(q, "CALC: 12*5")!!
+        assertNull(AstraCalculationAssist.synthesisWarning(q, computed, "60.0"))
+        assertTrue(AstraCalculationAssist.synthesisWarning(q, computed, "61")!!.contains("disagrees"))
+        assertTrue(AstraCalculationAssist.synthesisWarning(q, computed, "MISMATCH")!!.contains("questioned"))
+        assertTrue(AstraCalculationAssist.synthesisWarning(q, computed, "Answer: 60")!!.contains("standalone"))
+        assertTrue(AstraCalculationAssist.synthesisWarning(q, computed,
+            AstraInterruptedReply.budgetLimited("60"))!!.contains("incomplete"))
+        assertNull(AstraCalculationAssist.synthesisWarning("Explain the calculation.", computed, "12 times 5 equals 60."))
+    }
 }
