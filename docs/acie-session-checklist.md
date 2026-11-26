@@ -340,6 +340,22 @@ All 119 sequential ACIE master requirements reviewed, 27 checked and 92 outstand
 
 All 119 sequential master requirements reviewed, 27 checked, 92 outstanding. No new broad master ticks. No independent general intelligence score or release claim.
 
+## Session update — isolated quantitative final-answer framing
+
+#456 head 45273ead2d6f12da9aedc68c014b5f6141f3211a: Python 45868123125 passed, Android 45868122899 and actual native profile 45868122902 / budget 45868122976 running at inspection. Do not merge until combined evidence is verified. #457 head a6cb399a41dd4358f426fa885ddc8255d82ca71a opened on main 3a3983511f9823bf2e0cde386e863199e2a64009. Three new host-only files: scripts/quality/run_qwen_scalar_framing.py, scripts/tests/test_qwen_scalar_framing.py and .github/workflows/qwen3-scalar-framing.yml. Fresh seed 79218431, 12 synthetic tasks (four arithmetic, four inverse, four controls), 24 paired actual Qwen3 calls. Candidate adds concise user-level instruction to keep reasoning in thinking and emit only the requested final answer; all native settings, seeds, thinking cap 768 and system prompt matched. Alternate arm order; strict answer scoring, fixed denominators, completion and verified native settings; separate wrong scalar versus noncanonical ungraded, tokens, elapsed time, prompt hashes and paired gains/losses. No raw answer or answer key exported or passed into inference. Four test methods include 128 generated reference-key checks, paired regression accounting, incomplete/noncanonical scoring and fail-closed setting validation. CI and actual inference pending. No production settings, weights, routing or Android source changes. Candidate may harm reasoning and must be rejected if paired evidence does not support activation.
+
+### Incremental milestones (not additional master requirements)
+
+- [x] Milestone — ACIE-117: inspect #456 current CI and verify Python pass.
+- [x] Milestone — ACIE-102/110: implement matched final-format framing experiment on fresh quantitative tasks.
+- [x] Milestone — ACIE-111/117: implement independent reference-key tests and regression-accounting contract tests.
+- [x] Milestone — ACIE-107: submit actual-model native workflow (#457).
+- [ ] Milestone — ACIE-117: finish combined native and Android validation of #456.
+- [ ] Milestone — ACIE-102/110/111: verify #457 tests and actual-model paired accuracy before deciding on production use.
+- [ ] Milestone — ACIE-040/118/119: independent broad physical-device assessment and target attainment.
+
+All 119 sequential requirements reviewed; 27 checked, 92 outstanding. No new master acceptance claim from implementation alone. No independent intelligence score.
+
 ## Acceptance
 
 90/100 independent repeated general intelligence score; separate model-only/assisted results; no model substitution, paid API or unsupported capability claims. Freeze protocol before held-out testing. Preserve offline and memory constraints. Recheck any completed engineering item if a later regression invalidates it.
