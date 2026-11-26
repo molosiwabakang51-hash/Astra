@@ -164,6 +164,8 @@ internal object AstraCalculationAssist {
         fun divide(other: Rational): Rational =
             of(numerator.multiply(other.denominator), denominator.multiply(other.numerator))
         fun negate(): Rational = of(numerator.negate(), denominator)
+        fun exactText(): String = if (denominator == BigInteger.ONE) numerator.toString()
+            else "$numerator/$denominator"
         fun decimal(): BigDecimal {
             val result = BigDecimal(numerator).divide(BigDecimal(denominator)).stripTrailingZeros()
             if (result.precision() > 40 || result.scale() !in -30..12 ||
@@ -179,7 +181,13 @@ internal object AstraCalculationAssist {
         RegexOption.IGNORE_CASE
     )
 
-    fun solveLinearEquation(question: String): String? {
+    fun solveLinearEquation(question: String): String? = solveLinear(question, null)
+
+    /** Explain only a matching prior answer, recomputing from the owner equation. */
+    fun verifiedLinearWorking(question: String, observedAnswer: String): String? =
+        solveLinear(question, observedAnswer.trim())
+
+    private fun solveLinear(question: String, observedAnswer: String?): String? {
         if (question.length !in 12..180 || question.any { it == '\n' || it == '\r' }) return null
         val source = linearRequest.matchEntire(question.trim())?.groupValues?.get(1)?.trim()
             ?: return null
@@ -194,15 +202,30 @@ internal object AstraCalculationAssist {
             if (parser.operands + rightParser.operands !in 2..16) return null
             val coefficient = left.coefficient.subtract(right.coefficient)
             val constant = right.constant.subtract(left.constant)
+            val reduced = "Collect terms: (${coefficient.exactText()}) × x = ${constant.exactText()}."
             if (coefficient.numerator.signum() == 0) {
-                if (constant.numerator.signum() == 0) "Infinitely many solutions." else "No solution."
+                val identity = constant.numerator.signum() == 0
+                val result = if (identity) "Infinitely many solutions." else "No solution."
+                if (observedAnswer == null) result
+                else if (observedAnswer != result) null
+                else "Verified equation working:\nOriginal: $source\n$reduced\n" +
+                    (if (identity) "Both sides reduce to the same expression for every x."
+                    else "Zero cannot equal a nonzero constant.") +
+                    "\n$result\nRecomputed locally using exact rational arithmetic."
             } else {
                 val solution = constant.divide(coefficient)
                 // Substitute into both ORIGINAL sides before returning.
                 val l = left.coefficient.multiply(solution).add(left.constant)
                 val r = right.coefficient.multiply(solution).add(right.constant)
                 if (l.numerator != r.numerator || l.denominator != r.denominator) return null
-                solution.decimal().toPlainString()
+                val result = solution.decimal().toPlainString()
+                if (observedAnswer == null) result
+                else if (observedAnswer != result) null
+                else "Verified equation working:\nOriginal: $source\n$reduced\n" +
+                    "Divide by ${coefficient.exactText()}: x = $result.\n" +
+                    "Substitute x = $result into the original sides: " +
+                    "left = ${l.exactText()}, right = ${r.exactText()}.\n" +
+                    "Recomputed locally using exact rational arithmetic."
             }
         } catch (_: Invalid) {
             null
