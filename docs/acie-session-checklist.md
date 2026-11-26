@@ -263,6 +263,37 @@ Reconciled all three non-ledger files from #428 (profile evaluator, its tests an
 
 All 119 sequential ACIE requirements verified; 27 master ticks, 92 outstanding. No new broad master acceptance or general intelligence score claimed. Separate subtask prefixes prevent double counting.
 
+## Session update — independent reasoning consensus candidate
+
+#451 head da1b7e3bc6ae7650d83371cc691ab35100c9ac2c was mergeable against main 83e85ca49c95797927d5ea39e23933add6ff92b5 at inspection. Android 45844958657 and native calculator 45844958297 still running; do not merge before checks finish. #450 historical retrieval remains merged. Prior #449 word-problem baseline 8/8 versus equation-assisted 7/8 is narrow developmental evidence; automatic equation interpretation stays disabled. Implement a new experimental independent-retry consensus policy rather than another self-review prompt: AstraReasoningConsensus.select accepts three separate attempts and an explicit bounded integer or YES/NO request, keeps the first answer unless both complete retries agree on a different canonical scalar, rejects incomplete/noncanonical retry output and disallowed quoted/context-marked requests, returns an existing attempt index (never fabricates an answer). Not wired into live Android generation. Host bridge calls actual Kotlin candidate. Twelve fresh seeded public developmental tasks in four domains (logic, quantitative, contextual and strategic reasoning; three per domain), 36 actual Qwen inference calls; identical question, system prompt, thinking sampling profile and 768-token cap within each triple, distinct deterministic seeds, no previous answer supplied to later generation, no answer key to selector. Paired first-response versus selected-response accuracy, candidate-only gains, baseline-only losses, any-attempt-correct diagnostic, completion, generated tokens and total CPU elapsed time. All retries count toward candidate cost. Three JVM regression methods and three synthetic evaluator tests cover agreement, rejection, bounded scope, seed separation and fixed denominators. New pinned-model CPU workflow. No new results until validation; same-model samples can have correlated errors, and three calls can materially increase latency. Not an independent model, general intelligence score, or handset assessment. No weight or default behavior changes.
+
+### Incremental milestones (not additional master requirements)
+
+- [x] Milestone — ACIE-052: historical-tail retrieval integrated by #450.
+- [x] Milestone — ACIE-039/065: implement independent-attempt consensus selection candidate.
+- [x] Milestone — ACIE-110/117: implement matched multi-domain comparison, including paired losses and full inference cost.
+- [ ] Milestone — ACIE-057: complete #451 final checks and integrate explicit linear solver.
+- [ ] Milestone — ACIE-039/065: establish whether consensus improves accuracy enough to justify cost and avoids regressions; no automatic activation before evidence.
+- [ ] Milestone — ACIE-040/118/119: broad independent physical-device assessment and target attainment.
+
+All 119 sequential ACIE master requirements reviewed; 27 checked, 92 outstanding. ACIE-029/039/040/055/063/065/088/110/115/116/117 remain open. No master completion or new verified intelligence rating claimed. Reconcile concurrent #451 ledger if it merges first.
+
+## Session update — fix consensus canonicalization regression
+
+#451 Android 45844958657 passed; native calculator 45844958297 still running at inspection. #452 Python 45845542653 passed; Android 45845542499 failed, job 139998108726, one failure in 1,060 tests, AstraReasoningConsensusTest.changesOnlyWhenTwoCompleteRetriesAgreeOnCanonicalScalar line 15. Native 45845542657 still running on old head 7499a976d0c3456c6936f6d02e13c58071a52352 at inspection; its results cannot validate corrected candidate. Reproduced original failure locally in Kotlin: "+020".toBigIntegerOrNull() returns null. Correct strict integer canonicalization by stripping exactly one leading plus after existing regex validation, before BigInteger conversion. Commit a3497fb564628fbb47feb47402c44b629ac5d881. Locally executed nine checks for positive/negative/zero canonicalization and rejection of repeated signs, decimals, scientific notation and overlong integers, all passed. Existing failing Android regression preserved unchanged; full CI and corrected native-model evaluation required. No production wiring or additional model weights. #453 controlled-language deduction candidate head 37ccdfb4251050cc5a30dc8c3a84071855569cf5 Android 45846565744 running. Preserve #451/#453 validation. No merge or new intelligence claim.
+
+### Incremental milestones (not additional master requirements)
+
+- [x] Milestone — ACIE-039/065: implement consensus selection candidate and regression tests.
+- [x] Milestone — ACIE-117: diagnose actual failed Android test using job logs and locally reproduce root cause.
+- [x] Milestone — ACIE-080/117: correct signed integer canonicalization and pass nine local checks.
+- [ ] Milestone — ACIE-039/065/117: complete corrected Android and native evaluations and assess consensus accuracy/cost.
+- [ ] Milestone — ACIE-057: final native validation and merge of #451.
+- [ ] Milestone — ACIE-031/058: validate controlled-language deduction #453.
+- [ ] Milestone — ACIE-118/119: independent physical-device assessment and target attainment.
+
+All 119 sequential ACIE master requirements reviewed, 27 checked, 92 outstanding. No additional master tick; implementation remains experimental. Reconcile concurrent ledger changes before integration.
+
 ## Acceptance
 
 90/100 independent repeated general intelligence score; separate model-only/assisted results; no model substitution, paid API or unsupported capability claims. Freeze protocol before held-out testing. Preserve offline and memory constraints. Recheck any completed engineering item if a later regression invalidates it.
