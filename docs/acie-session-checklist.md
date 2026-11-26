@@ -189,6 +189,10 @@ This session adds a 12-case actual-model paired revision experiment (up to 36 ca
 
 New calculator synthesis contract recognizes explicit terminal numeric-only owner instruction outside quotes and promotes it outside untrusted question data. Model may return MISMATCH rather than endorsing a wrong expression. Output warning for exact numeric disagreement, incomplete interpretation, or noncanonical scalar format; retain original response and independent expression/value footer. No silent substitution or claim of semantic verification. Added fresh 12-case probe suite; historical suite remains default for reproducible rerun. Regression checks and actual fresh model evaluation pending. All 119 IDs reviewed, 27 checked, 92 outstanding; ACIE-078/079/080/082/083/102 still require broader evidence; ACIE-055/065/115 not accepted. 
 
+## Session update — instruction authority ablation
+
+#426 and #427 Python regressions passed; Android validation and #426 actual-model results pending at review. Add a candidate system instruction distinguishing quoted records/documents/examples as content from the current owner's actual request. Eight public developmental cases (four conflicting quoted directives and four legitimate instruction controls) compare baseline versus candidate under the deployed thinking profile, identical questions, seeds and 768-token caps, alternating arm order. Report fixed denominators, paired wins/losses and separate control results; no raw answer export or production prompt change. Candidate tests and actual Qwen3 inference pending. All 119 sequential requirement IDs reviewed and preserved; 27 checked, 92 outstanding. ACIE-021/023/102 remain open pending actual evidence. No independent intelligence score or release claim.
+
 ## Acceptance
 
 90/100 independent repeated general intelligence score; separate model-only/assisted results; no model substitution, paid API or unsupported capability claims. Freeze protocol before held-out testing. Preserve offline and memory constraints. Recheck any completed engineering item if a later regression invalidates it.
