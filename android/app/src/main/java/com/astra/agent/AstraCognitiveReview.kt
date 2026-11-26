@@ -98,7 +98,7 @@ internal object AstraCognitiveReview {
             submitted.startsWith("Check this state trace:", ignoreCase = true)) {
             val trace = submitted.substringAfter(':').trim()
             val checked = AstraStateTraceVerifier.verify(trace)
-                ?: return Result.Local("I could not verify the complete trace. Use bounded sequential integer assignments, for example: Trace integer assignments: x=2; y=3; x=x+y. What is x? For simultaneous updates use: simultaneous x=y, y=x. No loops, branches or arbitrary code.")
+                ?: return Result.Local("I could not verify the complete trace. Use bounded sequential integer assignments, for example: Trace integer assignments: x=2; y=3; x=x+y. What is x? For simultaneous updates use: simultaneous x=y, y=x. For bounded repetition use: repeat 3 times: x=x+y then y=x-y. At most 24 expanded assignments; no nested loops, branches or arbitrary code.")
             return Result.Local(checkNotNull(AstraStateTraceVerifier.report(checked)))
         }
         if (submitted.length <= 690) {
