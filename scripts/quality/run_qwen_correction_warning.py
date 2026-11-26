@@ -34,7 +34,8 @@ def cases(seed):
                 f'Previous user: "Actually, make it {middle} coins."\n')
         suite.append((f"omitted_{i}", text + BOUNDARY + q, "NO"))
         suite.append((f"control_{i}", text + BOUNDARY + q, "YES"))
-    return suite
+    # Counterbalance order within both domains, not only globally.
+    return suite[:2] + list(reversed(suite[2:4])) + suite[4:6] + list(reversed(suite[6:8]))
 
 
 def build_question(case, fixture, arm):
