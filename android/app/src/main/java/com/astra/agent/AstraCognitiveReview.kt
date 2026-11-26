@@ -74,8 +74,26 @@ internal object AstraCognitiveReview {
             "\nControlled-English interpretation only; class names are treated as distinct literal symbols. No outside facts or synonym assumptions were used."
     }
 
+    private fun conditionalReport(checked: AstraConditionalTraceVerifier.Checked, previous: String?): String? {
+        val verdict = if (previous == null) "result: ${checked.result}." else {
+            if (!Regex("""[+-]?[0-9]{1,19}""").matches(previous)) return null
+            val scalar = previous.removePrefix("+").toBigIntegerOrNull() ?: return null
+            if (scalar == checked.result.toBigInteger()) "correct."
+            else "incorrect; corrected result: ${checked.result}."
+        }
+        return "INDEPENDENT CONDITIONAL CHECK — " + verdict +
+            "\nRecomputed ${checked.iterations} bounded iterations; condition true ${checked.trueBranches} times. " +
+            "Only the explicitly supplied single-counter recurrence was verified; no natural-language translation or arbitrary code was executed."
+    }
+
     fun resolve(raw: String, history: List<AstraChatArchive.Message>): Result {
         val submitted = raw.trim()
+        if (submitted.startsWith("Verify this conditional trace:", ignoreCase = true) ||
+            submitted.startsWith("Check this conditional trace:", ignoreCase = true)) {
+            val checked = AstraConditionalTraceVerifier.verify(submitted.substringAfter(':').trim())
+                ?: return Result.Local("I could not verify the complete conditional trace. Use, for example: Trace conditional counter: x=6; repeat 5 times: if x is even then x=x/2 else x=x*3+1. What is x? Only the supported single-counter grammar and at most 24 iterations are accepted.")
+            return Result.Local(checkNotNull(conditionalReport(checked, null)))
+        }
         if (submitted.startsWith("Verify this state trace:", ignoreCase = true) ||
             submitted.startsWith("Check this state trace:", ignoreCase = true)) {
             val trace = submitted.substringAfter(':').trim()
@@ -140,6 +158,13 @@ internal object AstraCognitiveReview {
             request.matches(original) || AstraInterruptedReply.isIncomplete(answer) ||
             answer.startsWith(HEADER) || answer.startsWith("ASTRA //")
         ) return Result.Local("No complete original answer to audit. Ask the question again.")
+        // Verify an explicit complete recurrence only on an explicit audit.
+        // Unsupported prose and nonnumeric answers retain ordinary review.
+        val conditional = AstraConditionalTraceVerifier.verify(original)
+        if (conditional != null) {
+            val report = conditionalReport(conditional, answer)
+            if (report != null) return Result.Local(report)
+        }
         // A complete owner-supplied trace can be independently recomputed.
         // Do not infer a program from prose or replace a nonnumeric response.
         val trace = AstraStateTraceVerifier.verify(original)
