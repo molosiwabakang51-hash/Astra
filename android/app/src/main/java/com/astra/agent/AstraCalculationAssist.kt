@@ -1,6 +1,7 @@
 package com.astra.agent
 
 import java.math.BigDecimal
+import java.math.BigInteger
 
 /**
  * Explicit owner-authorized, read-only calculator assistance. Qwen may propose
@@ -125,6 +126,52 @@ internal object AstraCalculationAssist {
 
     private class Invalid : RuntimeException()
 
+    /**
+     * Exact reduced fractions permit cancellation of recurring intermediate
+     * divisions without rounding. Final answers still require a bounded,
+     * terminating decimal. No new operators or permitted operands.
+     */
+    private class Rational private constructor(
+        val numerator: BigInteger,
+        val denominator: BigInteger
+    ) {
+        companion object {
+            private val magnitudeLimit = BigInteger.TEN.pow(31)
+            private val componentLimit = BigInteger.TEN.pow(64)
+
+            fun of(n: BigInteger, d: BigInteger): Rational {
+                if (d.signum() == 0) throw Invalid()
+                val divisor = n.gcd(d)
+                val sign = if (d.signum() < 0) BigInteger.valueOf(-1) else BigInteger.ONE
+                val reducedN = n.divide(divisor).multiply(sign)
+                val reducedD = d.divide(divisor).abs()
+                if (reducedN.abs() >= componentLimit || reducedD >= componentLimit ||
+                    reducedN.abs() >= reducedD.multiply(magnitudeLimit)) throw Invalid()
+                return Rational(reducedN, reducedD)
+            }
+
+            fun fromDecimal(value: BigDecimal): Rational =
+                if (value.scale() >= 0) of(value.unscaledValue(), BigInteger.TEN.pow(value.scale()))
+                else of(value.unscaledValue().multiply(BigInteger.TEN.pow(-value.scale())), BigInteger.ONE)
+        }
+
+        fun add(other: Rational): Rational = of(
+            numerator.multiply(other.denominator).add(other.numerator.multiply(denominator)),
+            denominator.multiply(other.denominator))
+        fun subtract(other: Rational): Rational = add(other.negate())
+        fun multiply(other: Rational): Rational =
+            of(numerator.multiply(other.numerator), denominator.multiply(other.denominator))
+        fun divide(other: Rational): Rational =
+            of(numerator.multiply(other.denominator), denominator.multiply(other.numerator))
+        fun negate(): Rational = of(numerator.negate(), denominator)
+        fun decimal(): BigDecimal {
+            val result = BigDecimal(numerator).divide(BigDecimal(denominator)).stripTrailingZeros()
+            if (result.precision() > 40 || result.scale() !in -30..12 ||
+                result.precision() - result.scale() > 31) throw Invalid()
+            return result
+        }
+    }
+
     private class Parser(private val input: String, private val permitted: Set<BigDecimal>) {
         private var pos = 0
         private var operands = 0
@@ -136,46 +183,38 @@ internal object AstraCalculationAssist {
             return true
         }
 
-        private fun bounded(value: BigDecimal): BigDecimal {
-            val normalized = value.stripTrailingZeros()
-            // Bound every intermediate, not just the final output.
-            if (normalized.precision() > 40 || normalized.scale() !in -30..12 ||
-                normalized.precision() - normalized.scale() > 31) throw Invalid()
-            return normalized
-        }
-
         fun parse(): BigDecimal {
             val result = sum(0)
             while (input.getOrNull(pos) == ' ') pos++
             if (pos != input.length || operands !in 2..16) throw Invalid()
-            return result
+            return result.decimal()
         }
 
-        private fun sum(depth: Int): BigDecimal {
+        private fun sum(depth: Int): Rational {
             var value = product(depth)
             while (true) {
                 value = when {
-                    consume('+') -> bounded(value.add(product(depth)))
-                    consume('-') -> bounded(value.subtract(product(depth)))
+                    consume('+') -> value.add(product(depth))
+                    consume('-') -> value.subtract(product(depth))
                     else -> return value
                 }
             }
         }
 
-        private fun product(depth: Int): BigDecimal {
+        private fun product(depth: Int): Rational {
             var value = atom(depth)
             while (true) {
                 value = when {
-                    consume('*') -> bounded(value.multiply(atom(depth)))
-                    consume('/') -> bounded(value.divide(atom(depth)))
+                    consume('*') -> value.multiply(atom(depth))
+                    consume('/') -> value.divide(atom(depth))
                     else -> return value
                 }
             }
         }
 
-        private fun atom(depth: Int): BigDecimal {
+        private fun atom(depth: Int): Rational {
             if (depth > 8) throw Invalid()
-            if (consume('-')) return bounded(atom(depth + 1).negate())
+            if (consume('-')) return atom(depth + 1).negate()
             if (consume('+')) return atom(depth + 1)
             if (consume('(')) {
                 val inner = sum(depth + 1)
@@ -187,7 +226,7 @@ internal object AstraCalculationAssist {
             pos = match.range.last + 1
             val value = match.value.toBigDecimal().stripTrailingZeros()
             if (value !in permitted) throw Invalid()
-            return value
+            return Rational.fromDecimal(value)
         }
     }
 }
