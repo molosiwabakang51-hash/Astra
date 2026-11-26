@@ -444,7 +444,7 @@ internal object AstraConversationContext {
     private fun retrievalSubject(current: String): String {
         // A quoted/ambiguous instruction could itself be the subject.
         // Avoid stripping in those cases, or in internal prompt wrappers.
-        if (current.any { it in listOf('"', '“', '”', 96.toChar(), '<', '>', '\r', '\n') } ||
+        if (current.any { it in listOf('"', '\'', '‘', '’', '“', '”', 96.toChar(), '<', '>', '\r', '\n') } ||
             current.startsWith("SAME-CHAT FOLLOW-UP CONTEXT (")) return current
         val match = terminalScalarFormat.find(current) ?: return current
         return current.substring(0, match.range.first).takeIf { it.isNotBlank() } ?: current
