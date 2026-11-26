@@ -34,7 +34,9 @@ internal object AstraReasoningConsensus {
                 attempt.visible.length !in 1..80) return null
             val scalar = attempt.visible.trim().trimEnd('.', '!').trim()
             if (isInteger) return if (integer.matches(scalar))
-                scalar.toBigIntegerOrNull()?.toString() else null
+                // Kotlin's nullable BigInteger parser rejects leading '+'.
+                // The strict regex has already validated the sign and digits.
+                scalar.removePrefix("+").toBigIntegerOrNull()?.toString() else null
             return if (boolean.matches(scalar))
                 scalar.uppercase(java.util.Locale.ROOT) else null
         }
