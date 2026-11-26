@@ -303,6 +303,24 @@ All 119 sequential ACIE master requirements verified, 27 checked, 92 outstanding
 
 All 119 sequential ACIE master requirements reviewed; 27 checked, 92 outstanding. No broad master tick added from narrow capability checks. Ledger updated on main rather than introducing a new PR solely for reporting. Do not infer model intelligence from deterministic policy checks or repeated calculator cases.
 
+## Session update — production thinking-budget accuracy comparison
+
+Verified #451 merged as ee65a83131e3b240128ade8409556cd4460b67bd and main ledger follow-up 4f021d906cf8a7e4e2929da91c81091415d6140d. Prior session's 524 deterministic consensus selector checks are retained as policy evidence, not model accuracy. #452 corrected head 188dd8ed63d3165521cad03329ba2a72c7c9b79e Python 45847027688 passed, native 45847027616 and Android 45847027709 running at final inspection. #453 Android 45846565744 still running. Both conflict after #451; preserve in-flight results and reconcile only after validation.
+
+Source inspection of AstraGenerationPolicy.maxAnswerTokens confirms advanced thinking uses 1792 tokens while prior CPU profile diagnostic CAPS think=768. Implement budget_transfer experiment on latest main, twelve new seeded public developmental tasks (three each logic, quantity, context and strategy), 24 paired native calls. Identical production system prompt, question, seed, sampling settings, thinking mode and 4096 CPU context; only n_predict differs (768 versus 1792). Alternate arm order, verify native settings and complete stop state, preserve fixed denominators, report strict correctness, incomplete/noncanonical/wrong-scalar results, per-domain counts, matched gains and losses, total tokens and elapsed CPU time. Store exact per-call cap and explicit experiment cap mapping; existing historical caps unchanged. Three evaluator test methods cover reproducibility, matched cap-only payloads, paired losses and gains, native configuration confirmation and incomplete response handling. Dedicated pinned-model native workflow with seed 83712049; existing profile regression remains applicable. No production configuration change or new intelligence score; evaluation pending. Budget parity is not full Android/JNI parity. A larger budget can increase latency without improving accuracy.
+
+### Incremental milestones (not additional master requirements)
+
+- [x] Milestone — ACIE-057: validated explicit inverse-equation solver merged (#451).
+- [x] Milestone — ACIE-029/110: identify discrepancy between previous diagnostic and deployed thinking cap.
+- [x] Milestone — ACIE-029/110/116/117: implement cap-only matched multidomain comparison and regression contracts.
+- [ ] Milestone — ACIE-029/110: measure accuracy and completeness at production cap before changing budget allocation.
+- [ ] Milestone — ACIE-039/065: validate corrected consensus model accuracy and computational cost (#452).
+- [ ] Milestone — ACIE-031/058: validate controlled-language deduction (#453).
+- [ ] Milestone — ACIE-040/118/119: independent broad physical-device assessment and target attainment.
+
+All 119 sequential ACIE master requirements reviewed; 27 checked, 92 outstanding. No new master tick justified; preserve separate developmental and independent assessment results. No neural weights changed.
+
 ## Acceptance
 
 90/100 independent repeated general intelligence score; separate model-only/assisted results; no model substitution, paid API or unsupported capability claims. Freeze protocol before held-out testing. Preserve offline and memory constraints. Recheck any completed engineering item if a later regression invalidates it.
