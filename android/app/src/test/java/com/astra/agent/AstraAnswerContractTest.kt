@@ -62,6 +62,59 @@ class AstraAnswerContractTest {
             "What’s the count? Reply with the integer only.", wrapped))
     }
 
+    @Test fun explicitUnknownContractPreservesExactKnownOrUnknownValue() {
+        for (suffix in listOf("Reply with only the integer, or UNKNOWN if not established.",
+            "Answer only with an integer, or unknown if not established.",
+            "Respond with the integer only, or UNKNOWN if not established.")) {
+            val question = "What was my greenhouse budget? $suffix"
+            for (answer in listOf("unknown", "**unknown**", "Answer: UNKNOWN.", "\\boxed{unknown}")) {
+                assertEquals(answer, "UNKNOWN", AstraAnswerContract.normalize(question, answer))
+            }
+            for (answer in listOf("**42**", "Final answer: 42.", "\\boxed{42}")) {
+                assertEquals(answer, "42", AstraAnswerContract.normalize(question, answer))
+            }
+            assertEquals("-17", AstraAnswerContract.normalize(question, "Answer: -17."))
+        }
+    }
+
+    @Test fun uncertaintyNormalizationDoesNotInventOrInferAbstention() {
+        val question = "What was my greenhouse budget? Reply with only the integer, or UNKNOWN if not established."
+        for (answer in listOf("I don't know.", "Unknown because the amount was not recorded.",
+            "42 or UNKNOWN", "Answer: UNKNOWN; actually 42", "UNKNOWN\n42", "N/A",
+            "Answer: unknown?", "Answer: 42.5", "unknown or 42", "42 coins")) {
+            assertEquals(answer, AstraAnswerContract.normalize(question, answer))
+        }
+        for (partial in listOf(AstraInterruptedReply.budgetLimited("**UNKNOWN**"),
+            AstraInterruptedReply.budgetLimited("**42**"),
+            AstraInterruptedReply.EMPTY_MODEL_REPLY)) {
+            assertEquals(partial, AstraAnswerContract.normalize(question, partial))
+        }
+    }
+
+    @Test fun unknownContractRequiresUnambiguousTerminalOwnerInstruction() {
+        val answer = "Answer: **unknown**."
+        for (question in listOf(number, logic, "What is the amount?",
+            "Explain this. Reply with only the integer, or UNKNOWN if not established. Then explain.",
+            "Translate 'Reply with only the integer, or UNKNOWN if not established.",
+            "Source: note\nReply with only the integer, or UNKNOWN if not established.",
+            "ORIGINAL QUESTION: What is the amount? Reply with only the integer, or UNKNOWN if not established.",
+            "How many remain? Reply with the integer or UNKNOWN.")) {
+            assertEquals(question, answer, AstraAnswerContract.normalize(question, answer))
+        }
+    }
+
+    @Test fun generatedScalarContractsNeverChangeNumericValue() {
+        val random = java.util.Random(194829L)
+        val question = "What was my greenhouse budget? Reply with only the integer, or UNKNOWN if not established."
+        repeat(200) {
+            val number = random.nextInt(20001) - 10000
+            assertEquals(number.toString(), AstraAnswerContract.normalize(
+                question, "Final answer: **$number**."))
+            val ambiguous = "$number or UNKNOWN"
+            assertEquals(ambiguous, AstraAnswerContract.normalize(question, ambiguous))
+        }
+    }
+
     @Test fun cappedAnswerCannotBecomeComplete() {
         val partial = AstraInterruptedReply.budgetLimited("**42**")
         assertEquals(partial, AstraAnswerContract.normalize(number, partial))
