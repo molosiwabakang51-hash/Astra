@@ -153,6 +153,10 @@ Newly checked: concept-aware retrieval integration (#409, Android/Python passed)
 - [ ] ACIE-118 Complete independent physical-device assessment
 - [ ] ACIE-119 Demonstrate repeatable intelligence score of at least 90/100
 
+## Session update — independent assessment freeze evidence (26 November)
+
+Parallel to #426 (Python 45738948900 passed; Android 45738948938 and native CPU 45738948918 still running at verification), add a candidate pre-run commitment to the existing ACIE-v1 assessor. An independent reviewer privately retains a canonical manifest SHA-256 before any run, committing to the frozen configuration and all 800 variant/dimension/rubric-hash tuples across four tracks/forms. Validator compares the supplied externally retained digest and exact planned case set with the final record; separate numerical target from acceptance-record eligibility. Reject altered rubric, variants, config, duplicate IDs and unexpected manifest fields. Preserve existing scoring and legacy uncommitted numerical reports, which cannot be acceptance-record eligible. Three regression tests and procedure documentation added. Digest matching does not establish prior timing or independent review; actual private case authorship, reviewer freeze, physical-device assessment and CI remain outstanding. All 119 sequential IDs verified; 27 checked, 92 open. ACIE-109/118/119 remain unchecked. No change to deployed intelligence, no independent score or release claim.
+
 ## Latest engineering session
 
 All 119 IDs reviewed; 27/119 unchanged. Artifact 15069384240 confirms hard-direct generated 168 vs 287 tokens, both 6/6 complete; compact thinking completed 4/6 vs production 6/6. Most strict failures are noncanonical/ungraded, not proven wrong conclusions. New explicit integer/yes-no format normalizer strips only unambiguous wrappers and leaves model-only, diagnostic, grounded and capped replies unchanged. No claim of improved reasoning score. ACIE-102 remains unchecked pending Android CI and broader native adherence evidence.
