@@ -596,6 +596,71 @@ class AstraConversationContextTest {
         assertFalse(prompt.contains("including a later correction"))
     }
 
+    @Test fun terminalScalarFormatDoesNotChangeHistoricalTopicRanking() {
+        val history = listOf(
+            turn("user", "My fictional greenhouse budget is 900 coins."),
+            turn("user", "Actually, make it 620 coins."),
+            turn("user", "The reply format uses only integer or UNKNOWN if not established."),
+            turn("user", "Actually, make it 740 coins.")
+        ) + (1..15).map {
+            turn("assistant", "Unrelated weather note $it " + "X".repeat(210))
+        }
+        for (question in listOf("What was my greenhouse budget?",
+            "Use the greenhouse budget to plan.")) {
+            val plain = AstraConversationContext.userPrompt(question, history, true)
+                .substringBefore("\nCURRENT USER MESSAGE")
+            assertTrue(plain.contains("make it 620 coins"))
+            if (question.startsWith("What was")) {
+                assertFalse(plain.contains("make it 740 coins"))
+            }
+            for (suffix in listOf("Reply with only the integer.",
+                "Answer only with an integer.",
+                "Respond with the integer only.",
+                "Reply with only the integer, or UNKNOWN if not established.",
+                "Reply YES or NO only.", "Answer with only YES or NO.")) {
+                val full = "$question $suffix"
+                val formatted = AstraConversationContext.userPrompt(full, history, true)
+                assertEquals(suffix, plain, formatted.substringBefore("\nCURRENT USER MESSAGE"))
+                assertTrue(formatted.endsWith(full + "\n/no_think"))
+                assertTrue(formatted.length <= 3010)
+            }
+        }
+    }
+
+    @Test fun formatLanguageAsActualTopicIsNotRemoved() {
+        val history = listOf(
+            turn("user", "My integer reply format uses only UNKNOWN if not established."),
+            turn("user", "Actually, use a complete sentence.")
+        ) + (1..15).map { turn("assistant", "Unrelated weather note $it.") }
+        for (question in listOf("What was my integer reply format?",
+            "What was my earlier 'reply with only the integer' format?")) {
+            val prompt = AstraConversationContext.userPrompt(question, history, true)
+            assertTrue(prompt.contains("integer reply format"))
+            assertTrue(prompt.contains("use a complete sentence"))
+            assertTrue(prompt.endsWith(question + "\n/no_think"))
+        }
+    }
+
+    @Test fun unrelatedFormatTextDoesNotOverrideCorrectedTopicAcrossSeededHistories() {
+        val rng = java.util.Random(649178L)
+        repeat(50) {
+            val initial = 100 + rng.nextInt(900)
+            val corrected = 100 + rng.nextInt(900)
+            val history = listOf(
+                turn("user", "My observatory maintenance budget is $initial coins."),
+                turn("user", "Actually, make it $corrected coins."),
+                turn("user", "Reply with only the integer, or UNKNOWN if not established."),
+                turn("user", "Actually, use the exact decimal.")
+            ) + (1..12).map { turn("assistant", "Unrelated weather note $it.") }
+            val question = "What was my observatory maintenance budget?"
+            val prompt = AstraConversationContext.userPrompt(
+                "$question Reply with only the integer, or UNKNOWN if not established.", history, true)
+            assertTrue(prompt.contains("make it $corrected coins"))
+            assertFalse(prompt.contains("use the exact decimal"))
+            assertFalse(prompt.contains("Previous user: \"Reply with only the integer"))
+        }
+    }
+
     @Test fun truncatedOriginalPremiseIsNotCompleteEvidenceForRelativeAdjustment() {
         val history = listOf(
             turn("user", "My fictional greenhouse budget: " +

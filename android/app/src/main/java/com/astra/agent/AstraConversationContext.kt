@@ -117,7 +117,7 @@ internal object AstraConversationContext {
         // Selected snippets are still untrusted quotes, never instructions.
         val recent = valid.takeLast(3)
         val older = valid.dropLast(recent.size)
-        val keywords = significantWords(current)
+        val keywords = significantWords(retrievalSubject(current))
         // Rank the exact bounded, escaped excerpt that may reach the model.
         // Cache the normal-sized excerpts for repeated topic/owner checks.
         val recoveryQuotes = mutableMapOf<Int, String>()
@@ -432,6 +432,22 @@ internal object AstraConversationContext {
             !word.endsWith("ss") && !word.endsWith("sis") &&
             !word.endsWith("us") -> word.dropLast(1)
         else -> word
+    }
+
+    // Output-contract words are instructions for generation, not evidence
+    // about the historical subject. Strip only a narrow, complete terminal
+    // sentence for ranking. The actual current message is never modified.
+    private val terminalScalarFormat = Regex(
+        """(?i)(?<=[?.!])\s+(?:reply|answer|respond)\s+(?:(?:(?:with\s+only|only\s+with|only)\s+(?:the\s+|an?\s+)?integer|with\s+(?:the\s+|an?\s+)?integer\s+only)(?:,\s*or\s+unknown\s+if\s+not\s+established)?|(?:(?:only\s+|with\s+only\s+|only\s+with\s+)yes\s+or\s+no|(?:with\s+)?yes\s+or\s+no\s+only))[.!?]?$"""
+    )
+
+    private fun retrievalSubject(current: String): String {
+        // A quoted/ambiguous instruction could itself be the subject.
+        // Avoid stripping in those cases, or in internal prompt wrappers.
+        if (current.any { it in listOf('"', '\'', '‘', '’', '“', '”', 96.toChar(), '<', '>', '\r', '\n') } ||
+            current.startsWith("SAME-CHAT FOLLOW-UP CONTEXT (")) return current
+        val match = terminalScalarFormat.find(current) ?: return current
+        return current.substring(0, match.range.first).takeIf { it.isNotBlank() } ?: current
     }
 
     private fun significantWords(text: String): Set<String> =
