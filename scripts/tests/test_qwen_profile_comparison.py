@@ -282,6 +282,45 @@ class QwenProfileComparisonTests(unittest.TestCase):
             comparison.evaluate(42, lambda _: {}, "context_recovery")
         self.assertEqual(len({name for name, _, _, _ in comparison.context_cases(42)}), 8)
 
+    def test_long_context_transfer_is_fresh_and_has_balanced_controls(self):
+        suite = comparison.long_context_cases(42)
+        self.assertEqual(suite, comparison.long_context_cases(42))
+        self.assertNotEqual(suite, comparison.long_context_cases(43))
+        self.assertEqual(len({name for name, _, _, _ in suite}), 10)
+        self.assertTrue(set(name for name, _, _, _ in suite).isdisjoint(
+            name for name, _, _, _ in comparison.context_cases(42)
+            if name not in ("replacement_reasoning", "gap_relative", "control_owner")))
+        self.assertEqual(sum(name.startswith("replacement_") for name, _, _, _ in suite), 4)
+        self.assertEqual(sum(name.startswith("gap_") for name, _, _, _ in suite), 2)
+        self.assertEqual(sum(name.startswith("control_") for name, _, _, _ in suite), 4)
+        self.assertTrue(all(len(history) <= 64 for _, _, _, history in suite))
+        self.assertEqual(sum(role == "user" for role, _ in
+            next(history for name, _, _, history in suite if name == "gap_tail")), 14)
+
+    def test_long_context_transfer_preserves_pairs_and_flags_latest_gap(self):
+        calls = []
+        def fake(payload):
+            calls.append(payload)
+            return dict(generation_settings=payload, stop_type="eos",
+                        truncated=False, tokens_predicted=1, content="NO")
+        def baseline(q, history):
+            return q
+        def revised(q, history):
+            return "[Some linked corrections are omitted, including a later correction.]\n" + q
+        report = comparison.evaluate(42, fake, "context_transfer",
+            context_builders={"baseline": baseline, "recovery": revised})
+        self.assertEqual(len(calls), 20)
+        self.assertEqual(report["matched"], dict(both_correct=2, candidate_only=0,
+                         baseline_only=0, neither=8))
+        self.assertTrue(all(row["correction_tail_notice"] == (row["profile"] == "recovery")
+                            for row in report["cases"]))
+        self.assertTrue(all(row["correction_gap_notice"] == row["correction_tail_notice"]
+                            for row in report["cases"]))
+        for a, b in zip(calls[::2], calls[1::2]):
+            self.assertEqual({k:v for k,v in a.items() if k != "prompt"},
+                             {k:v for k,v in b.items() if k != "prompt"})
+        self.assertIsNone(report["official_ai_rating"])
+
 
 if __name__ == "__main__":
     unittest.main()
