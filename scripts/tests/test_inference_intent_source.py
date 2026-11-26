@@ -20,7 +20,9 @@ class InferenceIntentSourceTest(unittest.TestCase):
         self.assertIn("if (diagnosticIsolated || ownerRequest.isNullOrBlank())", INTENT)
 
     def test_context_does_not_implicitly_search_but_explicit_scope_remains(self):
-        self.assertIn("allowAutomaticReferences = AstraInferenceIntent.allowsAutomaticReferences(", MAIN)
+        self.assertIn("allowAutomaticReferences = calculated == null &&", MAIN)
+        self.assertIn("AstraInferenceIntent.allowsAutomaticReferences(prompt, focusedPrompt)", MAIN)
+        self.assertIn("!memoryGrounded && memoryBrief == null && !allowAutomaticReferences", BRAIN)
         self.assertIn("prompt, focusedPrompt", MAIN)
         self.assertIn("original == focused && !AstraWorkspaceHandoff.isModelDraft(original)", INTENT)
         self.assertIn('allowAutomaticReferences &&\n                        context.getSharedPreferences', BRAIN)
