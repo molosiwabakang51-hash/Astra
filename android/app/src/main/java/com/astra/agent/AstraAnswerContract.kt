@@ -8,6 +8,11 @@ internal object AstraAnswerContract {
     private val integerRequest = Regex(
         """(?i)(?:[?.!]\s+|^)(?:reply|answer|respond)\s+(?:(?:with\s+only|only\s+with|only)\s+(?:the\s+|an?\s+)?integer|with\s+(?:the\s+|an?\s+)?integer\s+only)[.!?]?$"""
     )
+    // Explicit abstention is a valid scalar only when the owner permits
+    // UNKNOWN. Never convert prose or an incomplete generation into it.
+    private val integerOrUnknownRequest = Regex(
+        """(?i)(?:[?.!]\s+|^)(?:reply|answer|respond)\s+(?:(?:with\s+only|only\s+with|only)\s+(?:the\s+|an?\s+)?integer|with\s+(?:the\s+|an?\s+)?integer\s+only),\s*or\s+unknown\s+if\s+not\s+established[.!?]?$"""
+    )
     private val yesNoRequest = Regex(
         """(?i)(?:[?.!]\s+|^)(?:reply|answer|respond)\s+(?:(?:only\s+|with\s+only\s+|only\s+with\s+)yes\s+or\s+no(?:\s+only)?|(?:with\s+)?yes\s+or\s+no\s+only)[.!?]?$"""
     )
@@ -30,7 +35,8 @@ internal object AstraAnswerContract {
             question.contains("ORIGINAL QUESTION:", ignoreCase = true) ||
             question.contains("EARLIER CHAT EXCERPTS", ignoreCase = true)
         ) return visibleAnswer
-        val isInteger = integerRequest.containsMatchIn(question)
+        val allowsUnknown = integerOrUnknownRequest.containsMatchIn(question)
+        val isInteger = allowsUnknown || integerRequest.containsMatchIn(question)
         if (!isInteger && !yesNoRequest.containsMatchIn(question)) return visibleAnswer
         if (AstraInterruptedReply.isIncomplete(visibleAnswer)) return visibleAnswer
         var text = visibleAnswer.trim()
@@ -44,7 +50,8 @@ internal object AstraAnswerContract {
                 else -> boxed.matchEntire(text)?.groupValues?.get(1)?.trim() ?: text
             }
         }
-        return if (isInteger) text.takeIf(integer::matches) ?: visibleAnswer
+        return if (allowsUnknown && text.equals("UNKNOWN", ignoreCase = true)) "UNKNOWN"
+        else if (isInteger) text.takeIf(integer::matches) ?: visibleAnswer
         else if (boolean.matches(text)) text.uppercase(java.util.Locale.ROOT)
         else visibleAnswer
     }
