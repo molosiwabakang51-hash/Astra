@@ -40,9 +40,8 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p evaluation
-          python scripts/quality/run_qwen_profile_comparison.py cpu-build/bin/llama-server --experiment framing --seed 2132437795 > evaluation/framing-comparison.json
-          python scripts/quality/run_qwen_profile_comparison.py cpu-build/bin/llama-server --experiment system --seed 2132437795 > evaluation/system-comparison.json
-          cat evaluation/framing-comparison.json evaluation/system-comparison.json >> "$GITHUB_STEP_SUMMARY"
+          python scripts/quality/run_qwen_profile_comparison.py cpu-build/bin/llama-server --experiment fresh_reasoning > evaluation/fresh-reasoning-comparison.json
+          cat evaluation/fresh-reasoning-comparison.json >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@v6
         with:
           name: qwen3-native-cpu-comparison
