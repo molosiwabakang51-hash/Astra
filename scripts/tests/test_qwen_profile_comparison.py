@@ -358,6 +358,55 @@ class QwenProfileComparisonTests(unittest.TestCase):
                              {k:v for k,v in b.items() if k != "prompt"})
         self.assertIsNone(report["official_ai_rating"])
 
+    def test_production_budget_suite_has_four_domains_and_fixed_denominators(self):
+        suite = comparison.budget_cases(42)
+        self.assertEqual(suite, comparison.budget_cases(42))
+        self.assertNotEqual(suite, comparison.budget_cases(43))
+        self.assertEqual(len({name for name, _, _ in suite}), 12)
+        for domain in ("logic", "quantity", "context", "strategy"):
+            self.assertEqual(sum(name.startswith(domain + "_") for name, _, _ in suite), 3)
+        self.assertEqual(comparison.CAPS["think"], 768)
+
+    def test_production_budget_changes_only_cap_and_keeps_paired_losses(self):
+        calls = []
+        expected = [answer for _, _, answer in comparison.budget_cases(42)]
+        def fake(payload):
+            i = len(calls) // 2
+            calls.append(payload)
+            # Deliberately introduce one paired loss and one paired recovery.
+            cap = payload["n_predict"]
+            correct = (cap == 768 if i == 0 else cap == 1792 if i == 1 else True)
+            return dict(generation_settings=payload, stop_type="eos",
+                        truncated=False, tokens_predicted=1,
+                        content=expected[i] if correct else "WRONG")
+        report = comparison.evaluate(42, fake, "budget_transfer")
+        self.assertEqual(len(calls), 24)
+        self.assertEqual(report["budget_caps"], dict(baseline=768, production_budget=1792))
+        self.assertEqual(report["matched"], dict(both_correct=10, candidate_only=1,
+                         baseline_only=1, neither=0))
+        for i, (a, b) in enumerate(zip(calls[::2], calls[1::2])):
+            self.assertEqual({k:v for k,v in a.items() if k != "n_predict"},
+                             {k:v for k,v in b.items() if k != "n_predict"})
+            self.assertEqual((a["n_predict"], b["n_predict"]),
+                             (768, 1792) if i % 2 == 0 else (1792, 768))
+        for domain in report["by_domain"].values():
+            self.assertEqual(domain["baseline"]["attempted"], 3)
+            self.assertEqual(domain["production_budget"]["attempted"], 3)
+        self.assertIsNone(report["official_ai_rating"])
+
+    def test_production_budget_requires_native_confirmation_and_complete_output(self):
+        def wrong_cap(payload):
+            return dict(generation_settings=dict(payload, n_predict=32), stop_type="eos",
+                        truncated=False, tokens_predicted=1, content="YES")
+        with self.assertRaisesRegex(RuntimeError, "configuration"):
+            comparison.evaluate(42, wrong_cap, "budget_transfer")
+        def limited(payload):
+            return dict(generation_settings=payload, stop_type="limit", truncated=True,
+                        tokens_predicted=payload["n_predict"], content="YES")
+        report = comparison.evaluate(42, limited, "budget_transfer")
+        self.assertEqual(report["matched"]["neither"], 12)
+        self.assertTrue(all(not r["passed"] and not r["complete"] for r in report["cases"]))
+
 
 if __name__ == "__main__":
     unittest.main()
