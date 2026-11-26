@@ -69,6 +69,29 @@ class ScalarFramingTests(unittest.TestCase):
             self.assertEqual(domain["baseline"]["attempted"],4)
             self.assertEqual(domain["framing"]["attempted"],4)
 
+    def test_production_bridge_uses_real_cap_and_filter_for_both_arms(self):
+        calls=[]
+        operations=[]
+        def bridge(operation,value):
+            operations.append((operation,value))
+            if operation=="visible":
+                return "7"
+            return value+(probe.SUFFIX if operation=="framing" else "")+"\n/think"
+        def infer(payload):
+            calls.append(payload)
+            return dict(generation_settings=payload,stop_type="eos",truncated=False,
+                        tokens_predicted=5,content="<think>hidden</think>7")
+        report=probe.evaluate(42,infer,[("arithmetic_a","Question","7")],bridge)
+        self.assertEqual(report["cap"],1792)
+        self.assertTrue(report["production_prompt_bridge"])
+        self.assertEqual(report["matched"]["both_correct"],1)
+        self.assertEqual([op for op,_ in operations],["baseline","visible","framing","visible"])
+        self.assertEqual(calls[0]["n_predict"],1792)
+        self.assertEqual(calls[1]["n_predict"],1792)
+        self.assertEqual({k:v for k,v in calls[0].items() if k!="prompt"},
+                         {k:v for k,v in calls[1].items() if k!="prompt"})
+        self.assertEqual(calls[1]["prompt"].count("/think"),1)
+
     def test_only_prompt_changes_and_paired_regression_is_counted(self):
         calls = []
         suite = [("arithmetic_a", "First question", "7"), ("inverse_b", "Second question", "9")]
