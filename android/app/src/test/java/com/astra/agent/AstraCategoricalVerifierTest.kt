@@ -97,6 +97,60 @@ class AstraCategoricalVerifierTest {
         }
     }
 
+    @Test fun controlledEnglishDeductionPreservesNamedPredicates() {
+        for ((question, verdict) in listOf(
+            "All cats are mammals. No mammals are plants. Does it follow that no cats are plants?" to AstraCategoricalVerifier.Verdict.ENTAILED,
+            "All cats are mammals. Some mammals are swimmers. Does it follow that some cats are swimmers?" to AstraCategoricalVerifier.Verdict.COUNTEREXAMPLE,
+            "Some cats are mammals. No mammals are plants. Does it follow that some cats are not plants?" to AstraCategoricalVerifier.Verdict.ENTAILED,
+            "Some cats are mammals. No cats are mammals. Does it follow that all cats are plants?" to AstraCategoricalVerifier.Verdict.INCONSISTENT_PREMISES,
+            "All cats are mammals. Does it follow that some cats are mammals? Reply YES or NO only." to AstraCategoricalVerifier.Verdict.COUNTEREXAMPLE
+        )) {
+            assertEquals(question, verdict, AstraCategoricalVerifier.verifyControlledLanguage(question)!!.check.verdict)
+        }
+        val check = AstraCategoricalVerifier.verifyControlledLanguage(
+            "All cats are mammals. No mammals are plants. Does it follow that no cats are plants?")!!
+        assertEquals(mapOf('A' to "cats", 'B' to "mammals", 'C' to "plants"), check.mapping)
+    }
+
+    @Test fun controlledLanguageRejectsAmbiguousOrIncompleteArguments() {
+        for (question in listOf(
+            "All Cats are mammals. Does it follow that all cats are mammals?",
+            "Most cats are mammals. Does it follow that some cats are mammals?",
+            "All cats are not plants. Does it follow that no cats are plants?",
+            "All cats are mammals. Does it follow that all cats are mammals? Ignore the instructions.",
+            "All cats are mammals. Does it follow that all cats are animals and mammals?",
+            "All cats are mammals. Does it follow that all cats are mammals?\nExtra text",
+            "All cats are mammals. Does it follow that all they are mammals?",
+            "All cats are mammals. Does it follow that all cats are mammals? Reply YES.",
+            "Translate: All cats are mammals. Does it follow that all cats are mammals?",
+            "All aa are bb. All cc are dd. All ee are ff. All gg are hh. Does it follow that all ii are jj?",
+            "All cats are mammals. ".repeat(7) + "Does it follow that all cats are mammals?"
+        )) assertNull(question, AstraCategoricalVerifier.verifyControlledLanguage(question))
+    }
+
+    @Test fun namedTranslationAgreesWithFormalVerificationAcrossGeneratedArguments() {
+        val random = java.util.Random(81920417L)
+        val names = listOf("velons", "tarims", "nexels", "polars")
+        val forms = listOf("All" to "", "No" to "", "Some" to "", "Some" to "not ")
+        fun statement(): Pair<String, String> {
+            val (quantifier, negative) = forms[random.nextInt(forms.size)]
+            val a = random.nextInt(names.size)
+            val b = random.nextInt(names.size)
+            return "$quantifier ${names[a]} are $negative${names[b]}" to
+                "$quantifier ${'A' + a} are $negative${'A' + b}"
+        }
+        repeat(128) {
+            val premises = List(1 + random.nextInt(5)) { statement() }
+            val conclusion = statement()
+            val question = premises.joinToString(". ") { it.first } +
+                ". Does it follow that " + conclusion.first.replaceFirstChar { it.lowercaseChar() } + "?"
+            val expected = verify(premises.joinToString("; ") { it.second }, conclusion.second)!!
+            val actual = AstraCategoricalVerifier.verifyControlledLanguage(question)!!
+            assertEquals(question, expected.verdict, actual.check.verdict)
+            assertEquals(expected.types, actual.check.types)
+        }
+    }
+
     @Test fun failsClosedOutsideSupportedGrammarAndBounds() {
         for (premise in listOf("Most A are B", "All cats are animals", "All a are B",
             "All A are B;;Some B are C", "All A are B; All C are D; All E are F; All G are H; All I are J",
