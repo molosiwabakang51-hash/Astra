@@ -67,6 +67,51 @@ class ACIEAssessmentTest(unittest.TestCase):
             mutate(r)
             self.assertEqual(gate.evaluate(r)["status"], "INCOMPLETE")
 
+    def test_resource_summary_includes_failed_attempts_and_separate_completion(self):
+        r = record()
+        cases = r["runs"][0]["cases"]
+        for i, case in enumerate(cases, 1):
+            case.update(elapsed_ms=i, peak_ram_bytes=i * 1024)
+        cases[-1].update(outcome="failed", native_generated=False, credits=0,
+                         elapsed_ms=10000)
+        cases[0]["credits"] = 1
+        result = gate.evaluate(r)
+        summary = result["scores"]["A:assisted"]["resources"]
+        self.assertEqual(summary["attempted"], 200)
+        self.assertEqual(summary["completed"], 199)
+        self.assertEqual(summary["failed"], 1)
+        self.assertEqual(summary["all_attempt_latency"], {"p50_ms": 100, "p95_ms": 190})
+        self.assertEqual(summary["completed_latency"], {"p50_ms": 100, "p95_ms": 190})
+        self.assertEqual(summary["max_reported_peak_ram_bytes"], 204800)
+        self.assertEqual((summary["full_credit"], summary["partial_credit"],
+                          summary["zero_credit"]), (198, 1, 1))
+        self.assertEqual(summary["assisted_cases"], 200)
+        self.assertEqual(result["scores"]["A:assisted"]["by_dimension_resources"]
+                         ["creativity"]["failed"], 1)
+
+    def test_all_failed_cases_have_no_completed_latency(self):
+        r = record()
+        for case in r["runs"][0]["cases"]:
+            case.update(outcome="failed", native_generated=False, credits=0)
+        result = gate.evaluate(r)
+        summary = result["scores"]["A:assisted"]["resources"]
+        self.assertEqual(summary["completed_latency"], {"p50_ms": None, "p95_ms": None})
+        self.assertEqual(summary["failed"], 200)
+        self.assertFalse(result["provisional_80_numeric_met"])
+
+    def test_provisional_threshold_does_not_relax_acceptance(self):
+        r = record()
+        for case in r["runs"][0]["cases"][:40]:
+            case["credits"] = 0
+        result = gate.evaluate(r)
+        self.assertEqual(result["scores"]["A:assisted"]["score"], 80)
+        self.assertTrue(result["provisional_80_numeric_met"])
+        self.assertEqual(result["form_score_spread_points"], {"model": 0, "assisted": 20})
+        self.assertFalse(result["target_met"])
+        self.assertFalse(result["acceptance_record_eligible"])
+        r["runs"][0]["cases"][40]["credits"] = 1
+        self.assertFalse(gate.evaluate(r)["provisional_80_numeric_met"])
+
     def test_pinned_model_matches_android(self):
         root = Path(__file__).resolve().parents[2]
         source = (root / "android/app/src/main/java/com/astra/agent/AstraModelImport.kt").read_text()
