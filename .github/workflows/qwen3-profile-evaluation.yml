@@ -20,6 +20,7 @@ on:
           - quantitative_check
           - context_recovery
           - context_transfer
+          - context_uncertainty
           - historical
 permissions:
   contents: read
@@ -48,16 +49,18 @@ jobs:
           src=android/app/src/main/java/com/astra/agent
           kotlinc "$src/AstraAnswerContract.kt" "$src/AstraInterruptedReply.kt" scripts/quality/AcieAnswerContractProbe.kt -include-runtime -d evaluation/answer-contract.jar
       - name: Compile baseline and revised production recovery builders
-        if: github.event_name == 'pull_request' || inputs.suite == 'context_recovery' || inputs.suite == 'context_transfer'
+        if: github.event_name == 'pull_request' || inputs.suite == 'context_recovery' || inputs.suite == 'context_transfer' || inputs.suite == 'context_uncertainty'
         shell: bash
         env:
           SUITE: ${{ inputs.suite }}
         run: |
           set -euo pipefail
           src=android/app/src/main/java/com/astra/agent
-          baseline=136415c342e9272a11173b5ff0d755e4107d1faa
+          baseline=5f4b1723b6fa6594ee21828ad1b01bdd0a2f818d
           if [[ "$SUITE" == context_recovery ]]; then
             baseline=014fa7dc2364ce9cb2cdbf3942f22e6a11e7d548
+          elif [[ "$SUITE" == context_transfer ]]; then
+            baseline=136415c342e9272a11173b5ff0d755e4107d1faa
           fi
           printf '%s\n' "$baseline" > evaluation-baseline.txt
           mkdir -p evaluation/baseline
@@ -95,7 +98,7 @@ jobs:
           python scripts/quality/run_qwen_profile_comparison.py cpu-build/bin/llama-server --experiment context_recovery --seed 71108263 --baseline-context-jar evaluation/baseline-context.jar --candidate-context-jar evaluation/candidate-context.jar > evaluation/context-recovery-comparison.json
           cat evaluation/context-recovery-comparison.json >> "$GITHUB_STEP_SUMMARY"
       - name: Measure long-context transfer against immediately preceding recovery
-        if: github.event_name == 'pull_request' || inputs.suite == 'context_transfer'
+        if: github.event_name == 'workflow_dispatch' && inputs.suite == 'context_transfer'
         shell: bash
         run: |
           set -euo pipefail
@@ -103,6 +106,15 @@ jobs:
           python scripts/quality/run_qwen_profile_comparison.py cpu-build/bin/llama-server --experiment context_transfer --seed 97264137 --baseline-context-jar evaluation/baseline-context.jar --candidate-context-jar evaluation/candidate-context.jar > evaluation/context-transfer-comparison.json
           python -c 'import json, pathlib; p=pathlib.Path("evaluation/context-transfer-comparison.json"); d=json.loads(p.read_text()); d["baseline_commit"]=pathlib.Path("evaluation-baseline.txt").read_text().strip(); p.write_text(json.dumps(d,indent=2)+"\n")'
           cat evaluation/context-transfer-comparison.json >> "$GITHUB_STEP_SUMMARY"
+      - name: Measure recovery uncertainty notice against immediate baseline
+        if: github.event_name == 'pull_request' || inputs.suite == 'context_uncertainty'
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(cat evaluation-baseline.txt)" = 5f4b1723b6fa6594ee21828ad1b01bdd0a2f818d
+          python scripts/quality/run_qwen_profile_comparison.py cpu-build/bin/llama-server --experiment context_transfer --seed 97264137 --baseline-context-jar evaluation/baseline-context.jar --candidate-context-jar evaluation/candidate-context.jar > evaluation/context-uncertainty-comparison.json
+          python -c 'import json, pathlib; p=pathlib.Path("evaluation/context-uncertainty-comparison.json"); d=json.loads(p.read_text()); d["baseline_commit"]=pathlib.Path("evaluation-baseline.txt").read_text().strip(); d["diagnostic_variant"]="context_uncertainty"; p.write_text(json.dumps(d,indent=2)+"\n")'
+          cat evaluation/context-uncertainty-comparison.json >> "$GITHUB_STEP_SUMMARY"
       - name: Reproduce historical model comparisons
         if: github.event_name == 'workflow_dispatch' && inputs.suite == 'historical'
         shell: bash
