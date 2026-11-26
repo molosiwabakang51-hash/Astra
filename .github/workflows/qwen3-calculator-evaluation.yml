@@ -16,9 +16,11 @@ concurrency:
 jobs:
   probe:
     runs-on: ubuntu-24.04
-    timeout-minutes: 35
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
       - uses: actions/setup-python@v6
         with:
           python-version: '3.12'
@@ -31,6 +33,12 @@ jobs:
           mkdir -p evaluation
           src=android/app/src/main/java/com/astra/agent
           kotlinc "$src/AstraCalculationAssist.kt" "$src/AstraInterruptedReply.kt" scripts/quality/AcieCalculatorProbe.kt -include-runtime -d evaluation/calculator-bridge.jar
+          mkdir -p evaluation/baseline
+          baseline=4f0f41b65e5590cdc3f93c700ad006447965fdf3
+          for name in AstraCalculationAssist AstraInterruptedReply; do
+            git show "$baseline:$src/$name.kt" > "evaluation/baseline/$name.kt"
+          done
+          kotlinc evaluation/baseline/*.kt scripts/quality/AcieCalculatorProbe.kt -include-runtime -d evaluation/baseline-calculator-bridge.jar
       - name: Obtain pinned public model and native source
         shell: bash
         run: |
@@ -52,11 +60,15 @@ jobs:
           cat evaluation/calculator-results.json >> "$GITHUB_STEP_SUMMARY"
           python scripts/quality/run_qwen_calculator_probe.py cpu-build/bin/llama-server evaluation/calculator-bridge.jar --fresh --paired > evaluation/calculator-paired-results.json
           cat evaluation/calculator-paired-results.json >> "$GITHUB_STEP_SUMMARY"
+          python scripts/quality/run_qwen_calculator_probe.py cpu-build/bin/llama-server evaluation/calculator-bridge.jar --rational --paired --baseline-bridge evaluation/baseline-calculator-bridge.jar > evaluation/calculator-rational-results.json
+          python -c 'import json,pathlib; p=pathlib.Path("evaluation/calculator-rational-results.json"); d=json.loads(p.read_text()); d["baseline_commit"]="4f0f41b65e5590cdc3f93c700ad006447965fdf3"; p.write_text(json.dumps(d,indent=2)+"\n")'
+          cat evaluation/calculator-rational-results.json >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@v6
         with:
           name: qwen3-calculator-cpu-results
           path: |
             evaluation/calculator-results.json
             evaluation/calculator-paired-results.json
+            evaluation/calculator-rational-results.json
           if-no-files-found: error
           retention-days: 14
