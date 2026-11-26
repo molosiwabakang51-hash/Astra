@@ -50,9 +50,13 @@ jobs:
           set -euo pipefail
           python scripts/quality/run_qwen_calculator_probe.py cpu-build/bin/llama-server evaluation/calculator-bridge.jar > evaluation/calculator-results.json
           cat evaluation/calculator-results.json >> "$GITHUB_STEP_SUMMARY"
+          python scripts/quality/run_qwen_calculator_probe.py cpu-build/bin/llama-server evaluation/calculator-bridge.jar --fresh --paired > evaluation/calculator-paired-results.json
+          cat evaluation/calculator-paired-results.json >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@v6
         with:
           name: qwen3-calculator-cpu-results
-          path: evaluation/calculator-results.json
+          path: |
+            evaluation/calculator-results.json
+            evaluation/calculator-paired-results.json
           if-no-files-found: error
           retention-days: 14
