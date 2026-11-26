@@ -187,7 +187,22 @@ internal object AstraCalculationAssist {
     fun verifiedLinearWorking(question: String, observedAnswer: String): String? =
         solveLinear(question, observedAnswer.trim())
 
-    private fun solveLinear(question: String, observedAnswer: String?): String? {
+    /** Independent audit only: exact fractions, never rounded approximations. */
+    fun auditLinearEquation(question: String, observedAnswer: String): String? =
+        solveLinear(question, observedAnswer.trim(), audit = true)
+
+    private fun auditScalar(text: String): Rational? {
+        val fraction = Regex("""([+-]?[0-9]{1,31})/([+-]?[0-9]{1,31})""").matchEntire(text)
+        if (fraction != null) {
+            val n = fraction.groupValues[1].removePrefix("+").toBigIntegerOrNull() ?: return null
+            val d = fraction.groupValues[2].removePrefix("+").toBigIntegerOrNull() ?: return null
+            return Rational.of(n, d)
+        }
+        if (!Regex("""[+-]?[0-9]{1,31}(?:\.[0-9]{1,12})?""").matches(text)) return null
+        return Rational.fromDecimal(text.removePrefix("+").toBigDecimalOrNull() ?: return null)
+    }
+
+    private fun solveLinear(question: String, observedAnswer: String?, audit: Boolean = false): String? {
         if (question.length !in 12..180 || question.any { it == '\n' || it == '\r' }) return null
         val source = linearRequest.matchEntire(question.trim())?.groupValues?.get(1)?.trim()
             ?: return null
@@ -206,7 +221,17 @@ internal object AstraCalculationAssist {
             if (coefficient.numerator.signum() == 0) {
                 val identity = constant.numerator.signum() == 0
                 val result = if (identity) "Infinitely many solutions." else "No solution."
-                if (observedAnswer == null) result
+                if (audit) {
+                    if (observedAnswer !in setOf("No solution.", "Infinitely many solutions.") &&
+                        (observedAnswer == null || auditScalar(observedAnswer) == null)) return null
+                    // In an identity, a numeric answer is a valid solution but
+                    // does not describe the whole solution set. Avoid calling it false.
+                    if (identity && observedAnswer != result &&
+                        observedAnswer != "No solution.") return null
+                    "INDEPENDENT EQUATION CHECK — " +
+                        (if (observedAnswer == result) "correct." else "incorrect; $result") +
+                        "\n$reduced Exact solution-set verification."
+                } else if (observedAnswer == null) result
                 else if (observedAnswer != result) null
                 else "Verified equation working:\nOriginal: $source\n$reduced\n" +
                     (if (identity) "Both sides reduce to the same expression for every x."
@@ -218,6 +243,17 @@ internal object AstraCalculationAssist {
                 val l = left.coefficient.multiply(solution).add(left.constant)
                 val r = right.coefficient.multiply(solution).add(right.constant)
                 if (l.numerator != r.numerator || l.denominator != r.denominator) return null
+                if (audit) {
+                    val scalar = observedAnswer?.let(::auditScalar)
+                    if (scalar == null && observedAnswer !in setOf("No solution.", "Infinitely many solutions.")) return null
+                    val exact = solution.exactText()
+                    val equal = scalar?.numerator == solution.numerator &&
+                        scalar?.denominator == solution.denominator
+                    return "INDEPENDENT EQUATION CHECK — " +
+                        (if (equal) "correct." else "incorrect; corrected exact result: $exact.") +
+                        "\n$reduced Substitution: left = ${l.exactText()}, right = ${r.exactText()}. " +
+                        "Mathematical equality checked exactly; requested answer format assessed separately."
+                }
                 val result = solution.decimal().toPlainString()
                 if (observedAnswer == null) result
                 else if (observedAnswer != result) null
