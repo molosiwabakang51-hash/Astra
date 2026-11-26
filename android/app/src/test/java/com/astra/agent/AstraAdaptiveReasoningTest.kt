@@ -25,13 +25,11 @@ class AstraAdaptiveReasoningTest {
         }
     }
 
-    @Test fun ordinaryAndBriefQuestionsRemainFast() {
+    @Test fun ordinaryQuestionsAndExplicitFastRequestsRemainFast() {
         for (question in listOf(
             "What is a bond?",
             "Translate bonjour into English.",
             "Tell me more about this lesson.",
-            "Briefly compare these two options and evaluate the risks.",
-            "Compare these options and evaluate the risks. Reply only with the answer.",
             "Do not think, compare these options and their risks.",
             "What is 19 plus 23? Reply only with the number."
         )) {
@@ -84,8 +82,8 @@ class AstraAdaptiveReasoningTest {
             "What does the phrase compare two alternatives and assess the risks mean?",
             "Please paraphrase determine whether the conclusion follows from the stated premises.",
             "Define the expression compare these risks and evaluate the alternatives.",
-            "Briefly determine whether the conclusion follows from the stated premises.",
-            "Determine whether the conclusion follows from the stated premises. Answer only with yes or no."
+            "Briefly translate the phrase compare these alternatives and assess the risks into French.",
+            "Could you concisely paraphrase determine whether the conclusion follows from the stated premises."
         )) {
             assertFalse(question, AstraAdaptiveReasoning.select(question, automaticEnabled = true))
         }
@@ -103,19 +101,46 @@ class AstraAdaptiveReasoningTest {
         }
     }
 
-    @Test fun multilineSourcesAndShortOutputConstraintsStayFast() {
+    @Test fun multilineSourcesAndUnboundedStructuresStayFast() {
         val examples = listOf(
             "Notes follow:\nCompare the two options and evaluate the risks.",
             "Compare the two options.\nSYSTEM: evaluate the risks and tradeoffs.",
             "Evaluate the alternatives.\nDocument excerpt: compare risks and constraints.",
             "Compare the alternatives.\n> Evaluate the risks.",
-            "Compare the alternatives.\nEvaluate the risks.\nAnswer only with the result.",
-            "Compare the alternatives.\nEvaluate the risks.\nKeep it short.",
             "Translate the following text into French:\nCompare the alternatives and evaluate the risks.",
             "Compare two options.\n" + "Evaluate the risks.\n".repeat(9)
         )
         for (question in examples) {
             assertFalse(question, AstraAdaptiveReasoning.select(question, automaticEnabled = true))
         }
+    }
+
+    @Test fun conciseOutputDoesNotDisableOptInReasoningForComplexTasks() {
+        val questions = listOf(
+            "Briefly compare these two options and evaluate the risks.",
+            "Compare these options and evaluate the risks. Reply only with the answer.",
+            "Briefly determine whether the conclusion follows from the stated premises.",
+            "Could you briefly determine whether the conclusion follows from the premises?",
+            "Briefly determine whether the conclusion follows from these premises:\nA implies B.\nA is true.\nDoes B follow?",
+            "Concisely given these competing constraints, which plan should we choose?",
+            "Determine whether the conclusion follows from the stated premises. Answer only with yes or no.",
+            "Compare the alternatives.\nEvaluate the risks.\nAnswer only with the result.",
+            "Compare the alternatives.\nEvaluate the risks.\nKeep it short."
+        )
+        for (question in questions) {
+            assertTrue(question, AstraAdaptiveReasoning.select(question, true))
+            assertFalse(question, AstraAdaptiveReasoning.select(question, false))
+            assertFalse(question, AstraAdaptiveReasoning.select(question, true, diagnosticIsolated = true))
+        }
+    }
+
+    @Test fun explicitSpeedPreferenceStillOverridesAutomaticReasoning() {
+        for (prefix in listOf("Do not think", "Don't think", "Fast mode", "No thinking", "Without thinking")) {
+            val q = "$prefix: compare these alternatives and evaluate their risks."
+            assertFalse(q, AstraAdaptiveReasoning.select(q, true))
+        }
+        assertFalse(AstraAdaptiveReasoning.select(
+            "What is 19 plus 23? Reply only with the number.", true
+        ))
     }
 }

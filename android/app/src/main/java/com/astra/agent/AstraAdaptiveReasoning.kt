@@ -25,7 +25,7 @@ internal object AstraAdaptiveReasoning {
     // Recognize common deductive, counterfactual and consistency tasks
     // without requiring specific subject matter or benchmark answers.
     private val deductive = Regex(
-        """^(?:please )?(?:(?:can|could|would) you )?""" +
+        """^(?:please\s+)?(?:(?:can|could|would)\s+you\s+)?(?:(?:briefly|concisely)\s+)?""" +
             """(?:determine|test|check|examine|evaluate|assess|identify|find|""" +
             """is|does|do|would|what)\b.{0,220}\b""" +
             """(?:premises?|conclusions?|contradictions?|inconsistenc(?:y|ies)|""" +
@@ -36,7 +36,7 @@ internal object AstraAdaptiveReasoning {
         RegexOption.IGNORE_CASE
     )
     private val tradeoffQuestion = Regex(
-        """^(?:given|assuming|under|which|what|how|would|should)\b.{0,260}\b""" +
+        """^(?:(?:briefly|concisely)\s+)?(?:given|assuming|under|which|what|how|would|should)\b.{0,260}\b""" +
             """(?:constraints?|tradeoffs?|alternatives?|opportunity cost|risks?)\b.{0,180}\b""" +
             """(?:choose|prefer|decide|better|best|optimal|recommend|prioriti[sz]e|""" +
             """balance|evaluate|compare|justify)\b""",
@@ -45,15 +45,17 @@ internal object AstraAdaptiveReasoning {
     // Do not interpret a request to translate or define a quoted reasoning
     // phrase as a request to spend the larger reasoning budget.
     private val languageOrQuotation = Regex(
-        """^(?:please )?(?:(?:can|could|would) you )?""" +
+        """^(?:please\s+)?(?:(?:can|could|would)\s+you\s+)?(?:(?:briefly|concisely)\s+)?""" +
             """(?:translate|define|paraphrase|pronounce|rewrite|""" +
             """what does the (?:word|phrase|expression|sentence)|""" +
             """what is the meaning of|explain the (?:word|phrase|expression))\b""",
         RegexOption.IGNORE_CASE
     )
+    // Output length is not a computation-mode instruction. A difficult
+    // task may require private reasoning even when the final answer is short.
+    // Preserve explicit speed/mode preferences rather than inferring them.
     private val explicitFast = Regex(
-        """\b(?:reply only|answer only|just the answer|no explanation|do not explain|""" +
-            """without explanation|do not think|don't think|fast mode)\b""",
+        """\b(?:do not think|don't think|fast mode|no thinking|without thinking)\b""",
         RegexOption.IGNORE_CASE
     )
     private val untrustedSource = Regex(
@@ -63,7 +65,7 @@ internal object AstraAdaptiveReasoning {
     )
 
     private val taskOpening = Regex(
-        """^(?:please )?(?:(?:can|could|would) you )?""" +
+        """^(?:please\s+)?(?:(?:can|could|would)\s+you\s+)?(?:(?:briefly|concisely)\s+)?""" +
             """(?:compare|evaluate|assess|weigh|determine|test|check|examine|""" +
             """identify|find|solve|calculate|derive|prove|plan|choose|""" +
             """given|assuming|under|if|first|is|does|do|would|should|what|which|how)\b""",
@@ -102,8 +104,7 @@ internal object AstraAdaptiveReasoning {
             ) return false
             lines.joinToString(" ")
         } else current
-        if (AstraGenerationPolicy.depth(current) == AstraGenerationPolicy.Depth.BRIEF ||
-            explicitFast.containsMatchIn(current) ||
+        if (explicitFast.containsMatchIn(current) ||
             languageOrQuotation.containsMatchIn(current)
         ) return false
         // Only recognizable multi-constraint tasks trigger expensive thought.
