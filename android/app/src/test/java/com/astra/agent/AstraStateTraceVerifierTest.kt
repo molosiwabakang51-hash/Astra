@@ -63,6 +63,11 @@ class AstraStateTraceVerifierTest {
         assertTrue(audit.answer.contains("incorrect; corrected result: 5."))
         val checked = AstraStateTraceVerifier.verify(q)!!
         assertTrue(AstraStateTraceVerifier.report(checked, "+005")!!.contains("correct."))
+        assertTrue(AstraStateTraceVerifier.report(checked, "005")!!.contains("correct."))
+        assertTrue(AstraStateTraceVerifier.report(checked, "+6")!!.contains("incorrect; corrected result: 5."))
+        assertNull(AstraStateTraceVerifier.report(checked, "++5"))
+        assertNull(AstraStateTraceVerifier.report(checked, "+-5"))
+        assertNull(AstraStateTraceVerifier.report(checked, "+"))
         assertNull(AstraStateTraceVerifier.report(checked, "5 because I think so"))
         assertEquals(AstraCognitiveReview.Result.NotRequested,
             AstraCognitiveReview.resolve(q, emptyList()))
