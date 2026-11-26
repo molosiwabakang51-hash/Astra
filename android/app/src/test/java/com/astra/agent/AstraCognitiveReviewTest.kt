@@ -80,6 +80,22 @@ class AstraCognitiveReviewTest {
         assertTrue(yes.answer.contains("YES. Every assignment"))
     }
 
+    @Test fun namedCategoricalReviewUsesLiteralClassMapping() {
+        val q = "All cats are mammals. No mammals are plants. Does it follow that no cats are plants?"
+        val direct = AstraCognitiveReview.resolve("Verify this categorical argument: $q", emptyList())
+            as AstraCognitiveReview.Result.Local
+        assertTrue(direct.answer.contains("YES."))
+        assertTrue(direct.answer.contains("A=cats, B=mammals, C=plants"))
+        val audit = AstraCognitiveReview.resolve("Verify your answer", pair("model only: $q", "NO"))
+            as AstraCognitiveReview.Result.Local
+        assertTrue(audit.answer.contains("incorrect; corrected result: YES."))
+        assertTrue(audit.answer.contains("No outside facts"))
+        assertEquals(AstraCognitiveReview.Result.NotRequested, AstraCognitiveReview.resolve(q, emptyList()))
+        assertTrue(AstraCognitiveReview.resolve("Verify your answer", pair(
+            "Most cats are mammals. Does it follow that some cats are mammals?", "YES"))
+            is AstraCognitiveReview.Result.Native)
+    }
+
     @Test fun categoricalVerificationRequiresCompleteExplicitOwnerStatement() {
         val q = "Categorical premises: All A are B; Some A are C. Conclusion: Some C are B. Does the conclusion follow?"
         val direct = AstraCognitiveReview.resolve("Verify this categorical argument: $q", emptyList())
