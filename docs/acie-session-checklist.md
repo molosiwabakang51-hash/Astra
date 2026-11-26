@@ -205,6 +205,10 @@ New calculator synthesis contract recognizes explicit terminal numeric-only owne
 
 #429 initial Python 45787483197 and Android 45787483239 failed the same existing static owner-intent assertion (test_inference_intent_source.py line 23). The Android workflow stopped before compilation. Updated the assertion to require both the calculator exclusion and the existing owner-intent reference guard, plus the brain-side isolation check; no relaxation of retrieval safeguards. Initial actual-model run 45787483195 still in progress at review. Fresh CI required. All 119 sequential requirement IDs checked against ledger; 27 integrated engineering items, 92 outstanding. ACIE-078/079/080/082/083/102/110/117 remain unaccepted. No new model-quality or release claim.
 
+## Session update — instruction diagnostic conflict reconciliation
+
+Reconciled all three non-ledger files from #428 (profile evaluator, its tests and workflow) into #429 after confirming each current blob matched its exact original ancestor at 5322a666. Resulting blobs exactly match the validated #428 candidate. Preserve newer master ledger instead of overwriting it. #428 evidence remains neutral (6/8 both arms); candidate authority suffix remains experimental and is not added to production. Fresh combined Python, Android and native CPU checks required before integration. All 119 sequential IDs verified again; 27 checked and 92 outstanding. No new master acceptance or general intelligence rating.
+
 ## Acceptance
 
 90/100 independent repeated general intelligence score; separate model-only/assisted results; no model substitution, paid API or unsupported capability claims. Freeze protocol before held-out testing. Preserve offline and memory constraints. Recheck any completed engineering item if a later regression invalidates it.
