@@ -396,9 +396,27 @@ internal class AstraOnDeviceBrain(
                 val augmentedQuestion = if (bookReferences.isNotEmpty())
                     books?.enrich(question, bookReferences) ?: question
                 else AstraOpenLibrary.enrich(question, openReferences)
+                // Actual Qwen3 CPU transfer: 5/12 -> 11/12 strict, no paired losses.
+                // Keep the measured first-turn integer-only gate. Only an exact
+                // current owner question may acquire internal framing; never
+                // reinterpret an enriched prompt, audit, or synthetic request.
+                val framedQuestion = AstraScalarFraming.prepare(
+                    augmentedQuestion,
+                    thinking = carefulReasoning,
+                    hasHistory = earlierTurns.isNotEmpty(),
+                    isolated = modelOnly || diagnosticIsolated ||
+                        diagnosticMaxTokens != null || diagnosticReasoningOverride != null ||
+                        calculatorSynthesis != null || ownerRequest != finalMessage ||
+                        visibleUserMessage != finalMessage || turns.last().content != finalMessage,
+                    sourceBacked = memoryGrounded || memoryBrief != null ||
+                        explicitBookQuery != null || bookReferences.isNotEmpty() ||
+                        openReferences.isNotEmpty() || augmentedQuestion != finalMessage,
+                    autoLanguage = selectedReplyLanguageId == "auto"
+                )
+                val framingApplied = framedQuestion != augmentedQuestion
                 val requestPrompt = AstraReplyLanguage.prepare(
                     AstraConversationContext.userPrompt(
-                        augmentedQuestion,
+                        framedQuestion,
                         earlierTurns.map {
                             AstraConversationContext.Turn(it.role, it.content)
                         },
@@ -557,7 +575,10 @@ internal class AstraOnDeviceBrain(
                         visibleUserMessage ?: turns.last().content, visibleReply
                     )
                 }
-                if (contractAnswer != publicAnswer) session.invalidate()
+                // Native KV may contain an internal framing instruction not
+                // present in the archived owner message. Rebuild on next turn
+                // instead of allowing a first-turn format hint to persist.
+                if (framingApplied || contractAnswer != publicAnswer) session.invalidate()
                 finish(when {
                     budgetExhausted -> AstraInferenceAttempt.Outcome.TOKEN_LIMIT
                     attributedAnswer.isBlank() -> AstraInferenceAttempt.Outcome.EMPTY_REPLY
