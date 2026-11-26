@@ -322,6 +322,24 @@ Reconcile validated #453 against main 4f021d906cf8a7e4e2929da91c81091415d6140d. 
 
 All 119 sequential ACIE master requirements reviewed, 27 checked and 92 outstanding. No master tick added merely for bounded tests. No new unassisted intelligence rating. Reconcile remaining experimental branches only after their actual results are inspected.
 
+## Session update — merged named deduction and measured reasoning-policy limits
+
+#455 exact head f44c32581d6e05ed025bc9a006acc042332ed82d passed Android 45848844182; squash merged 59d5834854aa2c0e38884098d8d7bdcd0c850078. Explicit controlled-English categorical deduction and independent named-class audit are integrated; unrestricted automatic formalization remains disabled. #452 corrected head 188dd8ed63d3165521cad03329ba2a72c7c9b79e passed Android 45847027709, Python 45847027688 and actual CPU 45847027616. Downloaded and inspected artifact 15133810673, seed 68129371: baseline 9/12 vs candidate 9/12, no changed selections, zero paired gains/losses, any-attempt correct 9/12, 34/36 completed calls. Logic 3/3, quantity 1/3, context 3/3, strategy 2/3 both. Baseline 3223 generated tokens / 226260 ms vs three-pass 10416 / 718329 ms including retries. Reject automatic consensus activation; candidate remains unmerged. Agreement does not establish truth.
+
+#454 head 29c35b07487b92dd772d35141c2f422b7fe7f786 passed Python 45848276724, Android 45848276675, CPU profile 45848276755 and actual budget 45848277146. Downloaded and inspected artifact 15134286861 seed 83712049: 768 vs 1792 token allowance, 8/12 correct both, 11/12 complete both, 8 both correct, zero paired gains/losses, 4 neither; zero confirmed wrong scalars, 3 noncanonical and 1 incomplete per arm. Logic 3/3, quantity 1/3, context 2/3, strategy 2/3 both. 4118 vs 5142 tokens and 335855 vs 399132 ms. No production budget adjustment justified by this small public developmental suite. Artifact 15133895445 inspected: context-tail seed 69401723, baseline 5f4b1723, 4/8 vs 7/8, tail 0/4 vs 3/4, gap 1/1 both, controls 3/3 both, 16/16 complete, no paired losses, no confirmed wrong scalars, 4 vs 1 noncanonical. 1028 vs 857 tokens, 102493 vs 97518 ms. Reproduced prior cases, not independent generalization. Reconciled three exact validated #454 nonledger files onto #455 merge using verified ancestor and resulting blob hashes. PR #456 head 45273ead2d6f12da9aedc68c014b5f6141f3211a opened; combined validation pending. No production settings, automatic routing or weights changed. Prioritize quantitative interpretation and explicit answer contract evaluation over indiscriminate extra reasoning.
+
+### Incremental milestones (not additional master requirements)
+
+- [x] Milestone — ACIE-031/058: merge combined named deduction after Android validation (#455).
+- [x] Milestone — ACIE-039/065/110: inspect actual-model consensus and reject cost-only activation (#452).
+- [x] Milestone — ACIE-029/110: inspect 768/1792 matched budget comparison (#454).
+- [x] Milestone — ACIE-052/117: reproduce historical-tail retrieval gain (#454).
+- [x] Milestone — ACIE-117: reconcile three exact validated diagnostic files and open #456.
+- [ ] Milestone — ACIE-117: complete combined validation and merge diagnostic only (#456).
+- [ ] Milestone — ACIE-040/118/119: independent broad physical-device assessment and target attainment.
+
+All 119 sequential master requirements reviewed, 27 checked, 92 outstanding. No new broad master ticks. No independent general intelligence score or release claim.
+
 ## Acceptance
 
 90/100 independent repeated general intelligence score; separate model-only/assisted results; no model substitution, paid API or unsupported capability claims. Freeze protocol before held-out testing. Preserve offline and memory constraints. Recheck any completed engineering item if a later regression invalidates it.
