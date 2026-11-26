@@ -1,0 +1,244 @@
+"""Equal-call scoped contextual extraction with explicitly unavailable facts."""
+import argparse
+import hashlib
+import json
+import math
+from pathlib import Path
+import random
+import subprocess
+import tempfile
+import time
+import urllib.request
+
+import run_qwen_profile_comparison as native
+
+SEED = 21659873
+CAP = 768
+RECOVERY_COMMIT = "db99d6a8acd78fdbacebe6f6fe7994842ed68448"
+BOUNDARY = "\nCURRENT USER MESSAGE (answer this message, not the excerpts):\n"
+
+
+def cases(seed):
+    rng = random.Random(seed)
+    values = rng.sample(range(101, 999), 16)
+    topics = [("observatory repair budget", "coach fare"),
+              ("school equipment allocation", "museum admission"),
+              ("summer laboratory reserve", "studio rental"),
+              ("community library fund", "storage fee")]
+    suite = []
+    for i, (first, second) in enumerate(topics):
+        a, b, c, d = values[i*4:i*4+4]
+        f1, f2 = f"Actually, make it {b} coins.", f"No, make it {d} coins."
+        unknown = "Actually, I do not know the current amount."
+        prefix = [("user", f"The fictional {first} is {a} coins."),
+                  ("assistant", "Noted."), ("user", f1),
+                  ("user", f"The fictional {second} is {c} coins."),
+                  ("assistant", "Noted.")]
+        tail = [("user", "Dinner needs vegetables."),
+                ("user", "Actually, use spicy rice.")] + [
+                    ("assistant", "Unrelated weather discussion. " + "Rain and clouds. "*12)
+                    for _ in range(12)]
+        op = "sum" if i % 2 == 0 else "difference"
+        relation = "combined total" if op == "sum" else "absolute difference"
+        contract = "Reply with only the integer, or UNKNOWN if not established."
+        q = f"Use the current {first} and {second}. What is their {relation} in coins? {contract}"
+        subs = tuple(f"What is the current {topic} in coins? {contract}"
+                     for topic in (first, second))
+        suite.append(dict(case=f"dual_{i}", question=q, expected=combine(op,(b,d)),
+                          history=prefix+[("user",f2)]+tail, required=(f1,f2),
+                          subquestions=subs, operands=(b,d), operation=op))
+        suite.append(dict(case=f"missing_{i}", question=q, expected="UNKNOWN",
+                          history=prefix+[("user",unknown)]+tail, required=(f1,unknown),
+                          subquestions=subs, operands=(b,"UNKNOWN"), operation=op))
+        single = f"Use the current {first}. How many coins are allocated? {contract}"
+        suite.append(dict(case=f"single_{i}", question=single, expected=b,
+                          history=prefix+[("user",f2)]+tail, required=(f1,),
+                          subquestions=(single,), operands=(b,), operation="identity"))
+    return suite
+
+
+def combine(operation, values):
+    if operation == "identity" and len(values) == 1:
+        return values[0]
+    if operation == "sum" and len(values) == 2:
+        return values[0] + values[1]
+    if operation == "difference" and len(values) == 2:
+        return abs(values[0] - values[1])
+    raise ValueError("Unsupported operation or arity")
+
+
+def scalar(text):
+    if isinstance(text, str) and text.strip().upper() == "UNKNOWN":
+        return "UNKNOWN"
+    # Strict bounded contract, no extracting numbers from prose or reasoning.
+    import re
+    if not isinstance(text, str) or not re.fullmatch(r"[+-]?[0-9]{1,9}", text.strip()):
+        return None
+    return int(text.strip())
+
+
+def prepare(build, item):
+    q = item["question"]
+    prompt = build(q, item["history"])
+    if not prompt.endswith(BOUNDARY + q) or len(prompt) > 3000:
+        raise RuntimeError("Current question changed or context budget exceeded")
+    if "Actually, use spicy rice." in prompt or not all(f in prompt for f in item["required"]):
+        raise RuntimeError("Recovery evidence failed preflight")
+    if "[Some linked corrections are omitted" in prompt:
+        raise RuntimeError("Experiment requires complete excerpts, including explicit unknown facts")
+    head, _ = prompt.rsplit(BOUNDARY, 1)
+    shared = [head + BOUNDARY + sub for sub in item["subquestions"]]
+    scoped = [build(sub, item["history"]) for sub in item["subquestions"]]
+    for prompts in (shared, scoped):
+        for p, sub, required in zip(prompts, item["subquestions"], item["required"]):
+            if not p.endswith(BOUNDARY + sub) or len(p) > 3000:
+                raise RuntimeError("Subquestion changed or exceeds production bound")
+            if required not in p or "Actually, use spicy rice." in p:
+                raise RuntimeError("Required own correction absent or unrelated correction admitted")
+            if "[Some linked corrections are omitted" in p:
+                raise RuntimeError("Explicit-unknown experiment encountered excerpt omission")
+    if item["operation"] == "identity" and (shared != [prompt] or scoped != [prompt]):
+        raise RuntimeError("Single-topic control changed")
+    return {"shared": shared, "scoped": scoped}
+
+
+def evaluate(seed, infer, build, suite=None):
+    suite = cases(seed) if suite is None else suite
+    if len({item["case"] for item in suite}) != len(suite):
+        raise ValueError("Duplicate case IDs")
+    prepared = {item["case"]: prepare(build, item) for item in suite}
+    if not any(prepared[item["case"]]["shared"] != prepared[item["case"]]["scoped"]
+               for item in suite if item["case"].startswith("dual_")):
+        raise RuntimeError("No distinguishing dual-topic recovery fixtures")
+    system = native.system_prompt()
+    settings = native.PROFILES["qwen_think"]
+    rows = []
+    def call(prompt, call_seed):
+        payload = dict(prompt=native.raw_prompt(system, prompt, "think"), n_predict=CAP,
+                       seed=call_seed, cache_prompt=False, stream=False, ignore_eos=False,
+                       repeat_penalty=1.0, presence_penalty=0.0, frequency_penalty=0.0, **settings)
+        started = time.monotonic()
+        reply = infer(payload)
+        elapsed = round((time.monotonic() - started) * 1000)
+        for key, value in dict(settings, seed=call_seed, n_predict=CAP).items():
+            found = reply.get("generation_settings", {}).get(key)
+            if type(found) not in (int,float) or not math.isclose(found, value, rel_tol=1e-6, abs_tol=1e-8):
+                raise RuntimeError("Unverified native settings")
+        stop, truncated, tokens = reply.get("stop_type"), reply.get("truncated"), reply.get("tokens_predicted")
+        if stop not in ("eos","word","limit") or type(truncated) is not bool:
+            raise RuntimeError("Unverified native completion")
+        if type(tokens) is not int or not 0 <= tokens <= CAP + 8:
+            raise RuntimeError("Unverified native token count")
+        complete = stop in ("eos","word") and not truncated
+        value = scalar(native.visible_answer(reply.get("content"))) if complete else None
+        return value, dict(complete=complete, tokens=tokens, elapsed_ms=elapsed,
+                           canonical=value is not None,
+                           prompt_sha256=hashlib.sha256(payload["prompt"].encode()).hexdigest())
+    for i, item in enumerate(suite):
+        case = item["case"]
+        prompts = prepared[case]
+        seed0 = (seed + i*13) % (2**31-1)
+        arms = ("shared","scoped") if i%2 == 0 else ("scoped","shared")
+        for arm in arms:
+            values, records = [], []
+            for j, prompt in enumerate(prompts[arm]):
+                value, record = call(prompt, (seed0+j) % (2**31-1))
+                record["other_correction_retained"] = (len(item["required"]) == 2
+                    and item["required"][1-j] in prompt)
+                record["operand_correct"] = value == item["operands"][j]
+                values.append(value)
+                records.append(record)
+            operand_correct = sum(v == e for v,e in zip(values,item["operands"]))
+            all_operands_correct = operand_correct == len(item["operands"])
+            # An unparseable or incomplete response is not an explicit
+            # abstention. Do not award uncertainty credit to failed inference.
+            result = None
+            if all(v is not None for v in values):
+                result = "UNKNOWN" if "UNKNOWN" in values else combine(item["operation"], values)
+            rows.append(dict(case=case, arm=arm, correct=result == item["expected"],
+                             complete=all(r["complete"] for r in records),
+                             all_operands_correct=all_operands_correct, operand_correct=operand_correct,
+                             explicit_unknown=result=="UNKNOWN", unsupported_numeric=item["expected"]=="UNKNOWN" and type(result) is int,
+                             operand_count=len(item["operands"]), calls=records,
+                             tokens=sum(r["tokens"] for r in records),
+                             elapsed_ms=sum(r["elapsed_ms"] for r in records)))
+    def summary(group):
+        return {arm: dict(attempted=sum(r["arm"]==arm for r in group),
+                          correct=sum(r["correct"] for r in group if r["arm"]==arm),
+                          complete=sum(r["complete"] for r in group if r["arm"]==arm),
+                          calls=sum(len(r["calls"]) for r in group if r["arm"]==arm),
+                          explicit_unknown=sum(r["explicit_unknown"] for r in group if r["arm"]==arm),
+                          unsupported_numeric=sum(r["unsupported_numeric"] for r in group if r["arm"]==arm),
+                          tokens=sum(r["tokens"] for r in group if r["arm"]==arm),
+                          elapsed_ms=sum(r["elapsed_ms"] for r in group if r["arm"]==arm))
+                for arm in ("shared","scoped")}
+    matched = dict(both_correct=0, baseline_only=0, candidate_only=0, neither=0)
+    for item in suite:
+        scores = {r["arm"]: r["correct"] for r in rows if r["case"]==item["case"]}
+        a,b = scores["shared"],scores["scoped"]
+        matched["both_correct" if a and b else "baseline_only" if a else "candidate_only" if b else "neither"] += 1
+    def extraction(arm):
+        dual = [r for r in rows if r["arm"]==arm and r["case"].startswith("dual_")]
+        return dict(correct_operands=sum(r["operand_correct"] for r in dual),
+                    attempted_operands=sum(r["operand_count"] for r in dual),
+                    both_correct=sum(r["all_operands_correct"] for r in dual),
+                    attempted_pairs=len(dual),
+                    other_correction_retained=sum(call["other_correction_retained"] for r in dual for call in r["calls"]),
+                    correct_result_with_wrong_operands=sum(r["correct"] and not r["all_operands_correct"] for r in dual))
+    return dict(status="COMPLETE_SCOPED_UNCERTAINTY_DIAGNOSTIC",seed=seed,cap=CAP,
+                model_sha256=native.MODEL_SHA256, recovery_commit=RECOVERY_COMMIT,
+                system_prompt_sha256=hashlib.sha256(system.encode()).hexdigest(),
+                totals=summary(rows), matched=matched,
+                by_domain={d:summary([r for r in rows if r["case"].startswith(d+"_")]) for d in ("dual","missing","single")},
+                extraction={arm: extraction(arm) for arm in ("shared","scoped")},
+                cases=rows, official_ai_rating=None,
+                scope="Synthetic complete excerpts, including explicit unavailable current values. Both assisted arms use identical oracle decomposition and deterministic computation. Explicit UNKNOWN is distinct from invalid/incomplete output; report unsupported numeric answers and operand correctness. Not autonomous routing or independent evaluation. No raw replies retained.")
+
+
+def run(binary, seed, build):
+    if not native.check_model(native.MODEL_PATH):
+        raise RuntimeError("Unverified model")
+    opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+    command = [str(binary.resolve()), "-m", str(native.MODEL_PATH), "--host", "127.0.0.1",
+               "--port", str(native.PORT), "--ctx-size", str(native.CONTEXT), "--parallel", "1",
+               "--threads", "4", "--batch-size", "256", "--ubatch-size", "256",
+               "--n-gpu-layers", "0", "--no-context-shift"]
+    with tempfile.TemporaryFile() as log:
+        process = subprocess.Popen(command, stdout=log, stderr=log)
+        try:
+            deadline = time.monotonic() + 180
+            while time.monotonic() < deadline:
+                if process.poll() is not None:
+                    raise RuntimeError("Native server exited")
+                try:
+                    if native.request(opener, "/health", timeout=3).get("status") == "ok":
+                        break
+                except (OSError, ValueError):
+                    pass
+                time.sleep(1)
+            else:
+                raise RuntimeError("Native server startup timed out")
+            report = evaluate(seed, lambda payload: native.request(opener, "/completion", payload), build)
+            if not native.check_model(native.MODEL_PATH):
+                raise RuntimeError("Model identity changed")
+            return report
+        finally:
+            if process.poll() is None:
+                process.terminate()
+                try:
+                    process.wait(timeout=10)
+                except subprocess.TimeoutExpired:
+                    process.kill()
+                    process.wait()
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("binary", type=Path)
+    parser.add_argument("--seed", type=int, default=SEED)
+    parser.add_argument("--candidate-context-jar", type=Path, required=True)
+    args = parser.parse_args()
+    if not 0 <= args.seed < 2**31 - 1:
+        parser.error("Invalid seed")
+    build = lambda q, h: native.recovery_prompt(args.candidate_context_jar, q, h)
+    print(json.dumps(run(args.binary, args.seed, build), indent=2, allow_nan=False))
