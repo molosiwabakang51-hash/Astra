@@ -67,8 +67,20 @@ internal object AstraCognitiveReview {
             "This verifies only the submitted formal statements, not their translation from natural language."
     }
 
+    private fun namedCategoricalReport(checked: AstraCategoricalVerifier.NamedCheck, scalar: String?): String {
+        val mapping = checked.mapping.entries.joinToString(", ") { (letter, name) -> "$letter=$name" }
+        return categoricalReport(checked.check, scalar) +
+            "\nExact class mapping: " + mapping +
+            "\nControlled-English interpretation only; class names are treated as distinct literal symbols. No outside facts or synonym assumptions were used."
+    }
+
     fun resolve(raw: String, history: List<AstraChatArchive.Message>): Result {
         val submitted = raw.trim()
+        if (submitted.length <= 690) {
+            val named = confirmedCategorical.matchEntire(submitted)?.groupValues?.get(1)
+                ?.let(AstraCategoricalVerifier::verifyControlledLanguage)
+            if (named != null) return Result.Local(namedCategoricalReport(named, null))
+        }
         if (submitted.length <= 330) {
             val categorical = confirmedCategorical.matchEntire(submitted)?.groupValues?.get(1)
             if (categorical != null) {
@@ -77,7 +89,8 @@ internal object AstraCognitiveReview {
                         "I could not parse the complete categorical argument. Use " +
                             "Categorical premises: All A are B; Some A are C. " +
                             "Conclusion: Some C are B. Does the conclusion follow? " +
-                            "Use only single-letter predicates and All, No, Some, Some ... are not."
+                            "Use single-letter predicates and All, No, Some, Some ... are not. " +
+                            "Or use controlled English: All cats are mammals. No mammals are plants. Does it follow that no cats are plants?"
                     )
                 return Result.Local(categoricalReport(checked, null))
             }
@@ -157,6 +170,10 @@ internal object AstraCognitiveReview {
         val categorical = AstraCategoricalVerifier.verify(original)
         if (categorical != null && scalar in setOf("YES", "NO")) {
             return Result.Local(categoricalReport(categorical, scalar))
+        }
+        val named = AstraCategoricalVerifier.verifyControlledLanguage(original)
+        if (named != null && scalar in setOf("YES", "NO")) {
+            return Result.Local(namedCategoricalReport(named, scalar))
         }
         if (original.length > MAX_QUESTION || answer.length > MAX_ANSWER) {
             return Result.Local(
