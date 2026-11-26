@@ -567,6 +567,46 @@ class AstraConversationContextTest {
         assertFalse(prompt.contains("make it 11 am"))
     }
 
+    @Test fun retainedButTruncatedLatestCorrectionIsNotCompleteEvidence() {
+        val history = listOf(
+            turn("user", "My fictional greenhouse budget is 900 coins."),
+            turn("assistant", "Noted."),
+            turn("user", "Actually, " + "background material ".repeat(40) + "make it 620 coins.")
+        ) + (1..15).map { turn("assistant", "Unrelated weather note $it.") }
+        val question = "What was my greenhouse budget?"
+        val prompt = AstraConversationContext.userPrompt(question, history, true)
+        assertTrue(prompt.contains("Previous user: \"Actually,"))
+        assertFalse(prompt.contains("620 coins"))
+        assertTrue(prompt.contains("including a later correction"))
+        assertTrue(prompt.contains("Do not assume the latest value"))
+        assertTrue(prompt.endsWith(question + "\n/no_think"))
+        assertTrue(prompt.length <= 3010)
+    }
+
+    @Test fun truncatedIntermediateCorrectionRaisesGapNotTail() {
+        val history = listOf(
+            turn("user", "My fictional greenhouse budget is 900 coins."),
+            turn("user", "Actually, " + "background material ".repeat(40) + "increase it by 20 coins."),
+            turn("user", "Actually, increase it by 30 coins.")
+        ) + (1..15).map { turn("assistant", "Unrelated weather note $it.") }
+        val prompt = AstraConversationContext.userPrompt("What was my greenhouse budget?", history, true)
+        assertTrue(prompt.contains("increase it by 30 coins"))
+        assertFalse(prompt.contains("increase it by 20 coins"))
+        assertTrue(prompt.contains("Some linked corrections are omitted."))
+        assertFalse(prompt.contains("including a later correction"))
+    }
+
+    @Test fun completeEscapedCorrectionDoesNotProduceFalseOmissionWarning() {
+        val history = listOf(
+            turn("user", "My fictional greenhouse budget is 900 coins."),
+            turn("user", "Actually, make it 620 coins. \"Confirmed.\"")
+        ) + (1..15).map { turn("assistant", "Unrelated weather note $it.") }
+        val prompt = AstraConversationContext.userPrompt("What was my greenhouse budget?", history, true)
+        assertTrue(prompt.contains("make it 620 coins"))
+        assertTrue(prompt.contains("\\\"Confirmed.\\\""))
+        assertFalse(prompt.contains("Some linked corrections are omitted"))
+    }
+
     @Test fun retainedNewestCorrectionDoesNotImplyMissingTail() {
         val history = listOf(turn("user", "My fictional greenhouse budget is 900 coins.")) +
             (1..5).flatMap {

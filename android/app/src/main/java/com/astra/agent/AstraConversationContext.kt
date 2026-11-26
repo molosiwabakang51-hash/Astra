@@ -284,6 +284,17 @@ internal object AstraConversationContext {
             }
             return selected
         }
+        // Compare the serialized correction with its complete bounded quote.
+        // For long raw corrections avoid allocating an unbounded escaped copy;
+        // anything beyond the excerpt maximum is conservatively incomplete.
+        // An index can be both a correction and a later anchor; include it
+        // whenever it is a correction in ANY registered chain.
+        val correctionIndices = correctionChains.flatMap { (anchor, chain) ->
+            chain.filter { it != anchor }
+        }.toSet()
+        val completeCorrectionQuotes = valid.asSequence()
+            .filter { it.index in correctionIndices && it.value.content.length <= MAX_TURN_CHARS }
+            .associate { it.index to ("Previous user: \"" + quote(it.value.content) + "\"\n") }
         var selected = selectExcerpts(room)
         if (selected.isEmpty()) return AstraOfflinePolicy.modelPrompt(current, thinkingRequested)
         // Assess the actual selected indices, including a newest correction
@@ -292,12 +303,20 @@ internal object AstraConversationContext {
         // may remove a later correction. Never downgrade a warning.
         fun omissionLevel(excerpts: List<Pair<Int, String>>): Int {
             val included = excerpts.map { it.first }.toSet()
+            val incompleteCorrections = excerpts.asSequence().filter { (index, excerpt) ->
+                index in correctionIndices && excerpt != completeCorrectionQuotes[index]
+            }.map { it.first }.toSet()
             var level = 0
             for ((anchorIndex, chain) in correctionChains) {
                 if (chain.none(included::contains)) continue
                 val newest = chain.maxOrNull() ?: continue
                 if (anchorIndex in boundedChains || newest !in included) return 2
-                if (!included.containsAll(chain)) level = 1
+                // An included index does not prove its correction was fully
+                // presented. A bounded excerpt can omit the actual replacement
+                // value or an essential qualification at the end of the turn.
+                if (newest in incompleteCorrections) return 2
+                if (!included.containsAll(chain) ||
+                    chain.any { it != anchorIndex && it in incompleteCorrections }) level = 1
             }
             return level
         }
