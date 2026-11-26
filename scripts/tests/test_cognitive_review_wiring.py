@@ -17,8 +17,12 @@ class CognitiveReviewWiringTests(unittest.TestCase):
         self.assertIn("require(!isolatedReview || (modelOnly && grounding == null))", MAIN)
 
     def test_only_exact_independent_check_and_honest_model_review(self):
-        self.assertIn("AstraVerifiedArithmetic.answer(original)", REVIEW)
-        self.assertIn("actualNumber.compareTo(expectedNumber)", REVIEW)
+        self.assertIn("AstraVerifiedArithmetic.audit(original, answer)", REVIEW)
+        arithmetic = (SRC / "AstraVerifiedArithmetic.kt").read_text()
+        self.assertIn("actualNumerator.multiply(expectedDenominator)", arithmetic)
+        self.assertIn(".compareTo(expectedNumerator.multiply(actualDenominator)) == 0", arithmetic)
+        self.assertLess(REVIEW.index("if (!request.matches("),
+                        REVIEW.index("AstraVerifiedArithmetic.audit(original, answer)"))
         self.assertIn("not independently verified", REVIEW)
         self.assertIn("AstraInterruptedReply.isIncomplete(answer)", REVIEW)
         self.assertIn("history.takeLast(2)", REVIEW)
