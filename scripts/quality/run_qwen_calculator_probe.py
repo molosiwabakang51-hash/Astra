@@ -56,6 +56,19 @@ FRESH_CASES = (
 )
 
 
+# Exact final values despite recurring intermediate quotients. The
+# unsuitable cases retain a fixed denominator and may not earn credit.
+RATIONAL_CASES = (
+    ("cancel", "Evaluate (2/3)*3 exactly. Reply only with the number.", "2"),
+    ("sum_fractions", "Evaluate 1/3+2/3 exactly. Reply only with the number.", "1"),
+    ("negative_cancel", "Evaluate (-1/3)*1.5 exactly. Reply only with the number.", "-0.5"),
+    ("share_recombine", "Share 14 litres equally among 3 vessels, then combine the contents of all 3. How many litres are combined? Reply only with the number.", "14"),
+    ("recurring_final", "Give the exact terminating decimal for 4 divided by 9.", None),
+    ("zero_divisor", "Give the exact numeric value of 8 divided by 0.", None),
+    ("missing_operand", "Divide 15 coins by an unspecified number of people. What is the exact amount per person?", None),
+)
+
+
 def bridge(jar, operation, question, proposal=None):
     values = [question] if proposal is None else [question, proposal]
     data = "\n".join(base64.b64encode(v.encode()).decode("ascii") for v in values) + "\n"
@@ -99,7 +112,7 @@ def synthesis_outcome(answer, complete, computed):
     return "noncanonical_ungraded"
 
 
-def evaluate(infer, invoke, cases=CASES, base_seed=SEED, paired=False):
+def evaluate(infer, invoke, cases=CASES, base_seed=SEED, paired=False, baseline_invoke=None):
     system = native.system_prompt()
     rows = []
     def generate(prompt, cap, seed, mode="direct"):
@@ -137,6 +150,10 @@ def evaluate(infer, invoke, cases=CASES, base_seed=SEED, paired=False):
                    synthesis_complete=False, synthesis_strict_correct=False,
                    planning_tokens=tokens, planning_ms=elapsed,
                    synthesis_tokens=0, synthesis_ms=0)
+        if baseline_invoke is not None:
+            baseline = baseline_invoke("evaluate", question, plan) if complete else None
+            row["baseline_parser_accepted"] = baseline is not None
+            row["baseline_value_correct"] = bool(baseline is not None and eligible and scalar_equal(baseline[0], expected))
         # Test actual application behavior: synthesize even a syntactically
         # valid but semantically wrong calculation, and count it as a failure.
         if valid:
@@ -171,6 +188,17 @@ def evaluate(infer, invoke, cases=CASES, base_seed=SEED, paired=False):
                 planning_incomplete=sum(not r["planning_complete"] for r in rows),
                 cases=rows, official_ai_rating=None,
                 scope="Public developmental CPU probe using production Kotlin calculator, not handset or independent assessment.")
+    if baseline_invoke is not None:
+        matched = dict(both_correct=0, candidate_only=0, baseline_only=0, neither=0)
+        for row in positive:
+            old, new = row["baseline_value_correct"], row["computed_value_correct"]
+            matched["both_correct" if old and new else "baseline_only" if old else "candidate_only" if new else "neither"] += 1
+        report["parser_comparison"] = dict(denominator=len(positive), **matched,
+            baseline_correct=sum(r["baseline_value_correct"] for r in positive),
+            candidate_correct=sum(r["computed_value_correct"] for r in positive),
+            baseline_unsuitable_rejected=sum(not r["baseline_parser_accepted"] for r in negative),
+            candidate_unsuitable_rejected=sum(not r["parser_accepted"] for r in negative),
+            unsuitable_denominator=len(negative))
     if paired:
         arms = dict(direct_only=0, thinking_only=0, both=0, neither=0)
         for row in positive:
@@ -183,7 +211,11 @@ def evaluate(infer, invoke, cases=CASES, base_seed=SEED, paired=False):
     return report
 
 
-def run(binary, jar, fresh=False, paired=False):
+def run(binary, jar, fresh=False, paired=False, rational=False, baseline_jar=None):
+    if rational and (fresh or baseline_jar is None):
+        raise ValueError("Rational probe requires the baseline parser and excludes --fresh")
+    if baseline_jar is not None and not rational:
+        raise ValueError("Baseline parser is supported only for the rational probe")
     if not native.check_model(native.MODEL_PATH):
         raise RuntimeError("Unverified Qwen model")
     opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
@@ -209,7 +241,9 @@ def run(binary, jar, fresh=False, paired=False):
                 raise RuntimeError("Native startup timed out")
             result = evaluate(lambda payload: native.request(opener, "/completion", payload),
                               lambda operation, question, proposal=None: bridge(jar, operation, question, proposal),
-                              FRESH_CASES if fresh else CASES, SEED+101 if fresh else SEED, paired=paired)
+                              RATIONAL_CASES if rational else FRESH_CASES if fresh else CASES,
+                              SEED+307 if rational else SEED+101 if fresh else SEED, paired=paired,
+                              baseline_invoke=(lambda operation, question, proposal=None: bridge(baseline_jar, operation, question, proposal)) if baseline_jar else None)
             if not native.check_model(native.MODEL_PATH):
                 raise RuntimeError("Model identity changed")
             return result
@@ -229,9 +263,11 @@ def main():
     parser.add_argument("bridge", type=Path)
     parser.add_argument("--fresh", action="store_true")
     parser.add_argument("--paired", action="store_true")
+    parser.add_argument("--rational", action="store_true")
+    parser.add_argument("--baseline-bridge", type=Path)
     args = parser.parse_args()
     try:
-        print(json.dumps(run(args.binary, args.bridge, args.fresh, args.paired), indent=2, allow_nan=False))
+        print(json.dumps(run(args.binary, args.bridge, args.fresh, args.paired, args.rational, args.baseline_bridge), indent=2, allow_nan=False))
         return 0
     except (OSError, ValueError, RuntimeError, KeyError, subprocess.SubprocessError):
         print("Calculator CPU probe incomplete; no score awarded.")
