@@ -395,6 +395,26 @@ Both completed diagnostic PRs reported nonmergeable after ledger-only main updat
 
 All 119 sequential ACIE master requirements reviewed, 27 checked and 92 outstanding. No new master tick based on a single developmental comparison. No independent intelligence rating.
 
+## Session update — production-path scalar framing candidate and equation CI
+
+#458 head c02dedd1535b3058b879528e4da2aca6ce0e0d49 Android run 45870050614 completed successfully; job 140082808815 confirms unit tests, APK build, lightweight build and guards passed. Native calculator 45870050633 still running. Do not merge until regression evidence and current mergeability verified. #459 head 1f45958c465d7a2f3d42324853482fcd312cec58 Python 45871315969 passed; context 45871316081, Android 45871315981, budget 45871316029 and framing transfer 45871315983 running at inspection. Rechecked retained artifacts 15141622909 and 15142017482: framing 4/12 to 9/12 strict, five gains zero losses, 0 confirmed wrong scalars both; budget 6/12 both. No new model accuracy claim.
+
+Stacked #460 on #459 exact head to avoid interrupting ongoing evaluation. Added inactive AstraScalarFraming candidate requiring ordinary isolated-from-history, non-diagnostic, non-source-backed thinking turn, automatic reply language, explicit terminal integer-only request with digits, bounded single-line question, excluding quotes, transcript markers, conflicting explanation or fast-mode instructions. No live call site and no default configuration change. Added host bridge AcieScalarFramingProbe.kt using production AstraConversationContext.userPrompt and AstraOfflinePolicy.publicReply; both arms use real Kotlin initial-turn construction, visible filter and production 1792-token cap. Python evaluator retains original 768-token diagnostics by default; explicit --production-bridge enables matched transfer seed 91374521, same settings and fixed denominators. Four Kotlin JVM test methods and one new Python evaluator test. Initial head 23fc703686742c2fd1bb5ade1802adf34f99b9cf native workflow 45871765727 failed one of seven Python tests: system prompt mentions /think, so whole-ChatML marker count was incorrect. Corrected test checks user segment only in 2e5e75f6668a9024ffae53611b8a9815eaac95bb; tightened explanatory conflict rejection in d4b942427a29fd10fccb69594b33424a2d32de25; added 15 compiled bridge canaries before native inference in c48a9eb552485eaa143522e5ab111c0eed493d7e. Revised run 45871884353 pending at final inspection. Stacked PR does not automatically trigger full Android build under current workflow branch filter; must verify Android tests after reconciliation onto main. Host canaries and actual native performance not yet verified. Candidate remains inactive; no weights, new model, paid API, routing or reasoning budget changes. This compares narrowly gated initial-turn CPU inference, not complete Android JNI, real conversation transfer or independent general intelligence.
+
+### Incremental milestones (not additional master requirements)
+
+- [x] Milestone — ACIE-057/083/100: #458 Android tests and APK compilation passed.
+- [x] Milestone — ACIE-102/117: #459 Python regression passed.
+- [x] Milestone — ACIE-102/028/080: implement inactive bounded scalar-framing gate.
+- [x] Milestone — ACIE-107/110: implement production Kotlin prompt and output-filter bridge with matched 1792 cap.
+- [x] Milestone — ACIE-117: diagnose initial test failure, correct user-segment assertion, add compiled bridge canaries and submit revised CI.
+- [ ] Milestone — ACIE-057/083/117: inspect #458 native calculator regression and reconcile merge state.
+- [ ] Milestone — ACIE-102/110/117: inspect #459 actual-model transfer and combined validation.
+- [ ] Milestone — ACIE-102/110/117: verify corrected #460 actual-model workflow, full Android validation and production integration eligibility.
+- [ ] Milestone — ACIE-040/118/119: independent broad physical-device assessment and target attainment.
+
+All 119 sequential ACIE requirements reviewed; 27 checked, 92 outstanding. No new broad master completion from partial validation or inactive code. No independent intelligence rating.
+
 ## Acceptance
 
 90/100 independent repeated general intelligence score; separate model-only/assisted results; no model substitution, paid API or unsupported capability claims. Freeze protocol before held-out testing. Preserve offline and memory constraints. Recheck any completed engineering item if a later regression invalidates it.
