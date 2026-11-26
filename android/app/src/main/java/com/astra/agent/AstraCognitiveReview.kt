@@ -25,6 +25,11 @@ internal object AstraCognitiveReview {
         RegexOption.IGNORE_CASE
     )
 
+    private val confirmedCategorical = Regex(
+        """^(?:verify|check) this categorical argument:\s*(.+)$""",
+        RegexOption.IGNORE_CASE
+    )
+
     sealed interface Result {
         data object NotRequested : Result
         data class Native(val prompt: String) : Result
@@ -43,8 +48,40 @@ internal object AstraCognitiveReview {
             answer.startsWith("Offline model unavailable.")
         ) answer else HEADER + "\n\n" + answer
 
+    private fun categoricalReport(checked: AstraCategoricalVerifier.Check, scalar: String?): String {
+        val detail = when (checked.verdict) {
+            AstraCategoricalVerifier.Verdict.ENTAILED ->
+                (if (scalar == null) "YES." else if (scalar == "YES") "correct."
+                else "incorrect; corrected result: YES.") +
+                    " The conclusion holds in every model of the premises."
+            AstraCategoricalVerifier.Verdict.COUNTEREXAMPLE ->
+                (if (scalar == null) "NO." else if (scalar == "NO") "correct."
+                else "incorrect; corrected result: NO.") +
+                    " Countermodel: " + checked.witness + "."
+            AstraCategoricalVerifier.Verdict.INCONSISTENT_PREMISES ->
+                "The premises are inconsistent. No substantive conclusion is established."
+        }
+        return "INDEPENDENT CATEGORICAL CHECK — " + detail +
+            "\nExamined ${checked.types} possible object membership types locally. " +
+            "Universal premises do not assert existence. " +
+            "This verifies only the submitted formal statements, not their translation from natural language."
+    }
+
     fun resolve(raw: String, history: List<AstraChatArchive.Message>): Result {
         val submitted = raw.trim()
+        if (submitted.length <= 330) {
+            val categorical = confirmedCategorical.matchEntire(submitted)?.groupValues?.get(1)
+            if (categorical != null) {
+                val checked = AstraCategoricalVerifier.verify(categorical)
+                    ?: return Result.Local(
+                        "I could not parse the complete categorical argument. Use " +
+                            "Categorical premises: All A are B; Some A are C. " +
+                            "Conclusion: Some C are B. Does the conclusion follow? " +
+                            "Use only single-letter predicates and All, No, Some, Some ... are not."
+                    )
+                return Result.Local(categoricalReport(checked, null))
+            }
+        }
         if (submitted.length <= 300) {
             val formal = confirmedFormal.matchEntire(submitted)?.groupValues?.get(1)
             if (formal != null) {
@@ -116,6 +153,10 @@ internal object AstraCognitiveReview {
                 "INDEPENDENT LOGICAL CHECK — " + detail +
                     "\nExamined ${logical.assignments} possible truth assignments locally."
             )
+        }
+        val categorical = AstraCategoricalVerifier.verify(original)
+        if (categorical != null && scalar in setOf("YES", "NO")) {
+            return Result.Local(categoricalReport(categorical, scalar))
         }
         if (original.length > MAX_QUESTION || answer.length > MAX_ANSWER) {
             return Result.Local(
