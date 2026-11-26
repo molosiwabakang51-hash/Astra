@@ -33,6 +33,60 @@ class AstraStateTraceVerifierTest {
         }
     }
 
+    @Test fun simultaneousAssignmentsUseSamePreGroupState() {
+        val sequential = "Trace integer assignments: x=2; y=3; x=x+y; y=x-y. What is y?"
+        val simultaneous = "Trace integer assignments: x=2; y=3; simultaneous x=x+y, y=x-y. What is y?"
+        assertEquals("2", AstraStateTraceVerifier.verify(sequential)!!.result)
+        val result = AstraStateTraceVerifier.verify(simultaneous)!!
+        assertEquals("-1", result.result)
+        assertEquals(4, result.steps)
+        assertEquals(1, result.simultaneousGroups)
+        assertTrue(AstraStateTraceVerifier.report(result)!!.contains("1 simultaneous groups"))
+        assertEquals("3", AstraStateTraceVerifier.verify(
+            "Trace integer assignments: x=2; y=3; simultaneous x=y, y=x. What is x?")!!.result)
+        assertEquals("2", AstraStateTraceVerifier.verify(
+            "Trace integer assignments: x=2; y=3; simultaneous y=x, x=y. What is y?")!!.result)
+    }
+
+    @Test fun simultaneousGeneratedTracesAgreeWithSnapshotOracle() {
+        val random = java.util.Random(91826371L)
+        repeat(200) {
+            var x = random.nextInt(41) - 20
+            var y = random.nextInt(41) - 20
+            val statements = mutableListOf("x=$x", "y=$y")
+            repeat(10) {
+                val oldX = x
+                val oldY = y
+                when (random.nextInt(3)) {
+                    0 -> { statements.add("simultaneous x=x+y, y=x-y"); x = oldX + oldY; y = oldX - oldY }
+                    1 -> { statements.add("simultaneous y=x, x=y"); x = oldY; y = oldX }
+                    else -> { statements.add("simultaneous x=x*2, y=y-1"); x = oldX * 2; y = oldY - 1 }
+                }
+            }
+            val question = "Trace integer assignments: " + statements.joinToString("; ") + ". What is y?"
+            val result = AstraStateTraceVerifier.verify(question)!!
+            assertEquals(question, y.toString(), result.result)
+            assertEquals(22, result.steps)
+            assertEquals(10, result.simultaneousGroups)
+        }
+    }
+
+    @Test fun simultaneousGroupsRejectAmbiguityAndRespectGlobalBounds() {
+        for (body in listOf(
+            "x=1; simultaneous x=2, x=3",
+            "x=1; simultaneous y=2, z=y",
+            "x=1; simultaneous x=2",
+            "x=1; simultaneous x=2,",
+            "x=1; x=2,y=3",
+            "x=1; simultaneous x=2, y=run()",
+            "x=1; simultaneous a=1, b=1, c=1, d=1, e=1, f=1, g=1, h=1",
+            "x=1; y=2; " + List(12) { "simultaneous x=y, y=x" }.joinToString("; ")
+        )) {
+            val q = "Trace integer assignments: " + body + ". What is x?"
+            assertNull(q, AstraStateTraceVerifier.verify(q))
+        }
+    }
+
     @Test fun unsupportedOrUnboundedInputsFailClosed() {
         val bad = listOf(
             "x=y; y=3", "x=1; x=x/2", "x=1; x=x+2+3", "x=1; x=(x+2)",
