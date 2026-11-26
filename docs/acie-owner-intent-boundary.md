@@ -1,0 +1,7 @@
+# Current-owner intent and contextual evidence boundary
+
+Reasoning-mode selection and generation-budget policy previously consumed the same prepared prompt that could include quoted prior dialogue, a memory brief, or an explicit book continuation. The production caller now supplies the current owner request separately. The complete prepared question remains unchanged for Qwen, and existing benchmark overrides continue to operate only on their diagnostic prompt. Explicit memory questions retain the evidence budget, while the owner's brevity and detailed-response requests control depth. Existing model-only and diagnostic restrictions are preserved.
+
+Automatically enriched follow-ups and quoted workspace handoffs must not search books or course references using quoted historical AI prose. Such text remains available to Qwen for same-chat reasoning, but automatic reference search is disabled for these routes. Explicit book requests keep their existing separate authorization; an ordinary new request keeps the existing opt-in book preference. This changes retrieval eligibility, not model weights, tool permissions, or the general-intelligence rating.
+
+Five JVM regression methods and two source integration checks cover conflicting prior instructions, explicit reasoning, diagnostic isolation, ordinary and quoted source eligibility, and memory evidence budget. ACIE-023/028/029/097/099 remain pending broader actual-device validation. This is a provenance correction, not evidence of semantic comprehension or general reasoning improvement.

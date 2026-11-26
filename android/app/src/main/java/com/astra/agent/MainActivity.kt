@@ -3572,7 +3572,16 @@ class MainActivity :
                                     visibleUserMessage = displayMessage,
                                     memoryGrounded = grounding != null,
                                     modelOnly = modelOnly,
-                                    memoryBrief = groundedBrief
+                                    memoryBrief = groundedBrief,
+                                    ownerRequest = when {
+                                        isolatedReview -> null
+                                        grounding != null -> grounding.question
+                                        modelOnly || displayMessage.startsWith("ask ai ", ignoreCase = true) -> prompt
+                                        else -> displayMessage
+                                    },
+                                    allowAutomaticReferences = AstraInferenceIntent.allowsAutomaticReferences(
+                                        prompt, focusedPrompt
+                                    )
                                 ) { partial ->
                                     // Compose state and conversation history are
                                     // mutated on the UI thread, not the model thread.
