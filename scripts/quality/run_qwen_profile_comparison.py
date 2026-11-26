@@ -415,7 +415,8 @@ def evaluate(seed, infer, experiment="sampling", normalize=None, context_builder
                            generated_tokens=tokens, elapsed_ms=elapsed)
                 if context_experiment:
                     row["recovery_prompt_sha256"] = hashlib.sha256(active_question.encode()).hexdigest()
-                    row["correction_gap_notice"] = "[Some linked corrections are omitted." in active_question
+                    row["correction_gap_notice"] = "[Some linked corrections are omitted" in active_question
+                    row["correction_tail_notice"] = "[Some linked corrections are omitted, including a later correction." in active_question
                 if normalize is not None:
                     # Separate postprocessing diagnostic, never replace the
                     # raw strict score or give credit to incomplete generation.
