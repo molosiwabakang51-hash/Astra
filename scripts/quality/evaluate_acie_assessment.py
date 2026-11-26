@@ -94,6 +94,29 @@ def freeze_matches(record, manifest, expected_digest):
     return True
 
 
+def resource_summary(cases):
+    """Descriptive nearest-rank percentiles; failures remain visible."""
+    complete = [c for c in cases if c["outcome"] == "complete"]
+    def latency(rows):
+        if not rows:
+            return {"p50_ms": None, "p95_ms": None}
+        values = sorted(c["elapsed_ms"] for c in rows)
+        def percentile(p):
+            return values[(len(values) * p + 99) // 100 - 1]
+        return {"p50_ms": percentile(50), "p95_ms": percentile(95)}
+    return {
+        "attempted": len(cases), "completed": len(complete),
+        "failed": len(cases) - len(complete),
+        "all_attempt_latency": latency(cases),
+        "completed_latency": latency(complete),
+        "max_reported_peak_ram_bytes": max(c["peak_ram_bytes"] for c in cases),
+        "full_credit": sum(c["credits"] == 2 for c in cases),
+        "partial_credit": sum(c["credits"] == 1 for c in cases),
+        "zero_credit": sum(c["credits"] == 0 for c in cases),
+        "assisted_cases": sum(c["assisted"] is True for c in cases),
+    }
+
+
 def evaluate(record, manifest=None, expected_freeze_sha256=None):
     if not isinstance(record, dict) or record.get("protocol") != "ACIE-v1":
         return incomplete("protocol")
@@ -164,11 +187,24 @@ def evaluate(record, manifest=None, expected_freeze_sha256=None):
         results[form + ":" + track] = {"score": total, "dimensions": scores,
                                        "failed": failed, "meets_floors": all(
                                            scores[d] >= floor for d, (_, floor) in DIMENSIONS.items())}
+        results[form + ":" + track]["resources"] = resource_summary(cases)
+        results[form + ":" + track]["by_dimension_resources"] = {
+            d: resource_summary([c for c in cases if c["dimension"] == d])
+            for d in DIMENSIONS}
     freeze_supplied = manifest is not None or expected_freeze_sha256 is not None
     if freeze_supplied and not freeze_matches(record, manifest, expected_freeze_sha256):
         return incomplete("freeze commitment or planned variants mismatch")
     target = all(x["score"] >= 90 and x["meets_floors"] for x in results.values())
+    # Report the owner's provisional threshold separately. Do not weaken
+    # the existing conservative 90-point acceptance rule or dimension floors.
+    provisional_numeric = all(x["score"] >= 80 for x in results.values())
+    form_spread = {track: abs(results["A:" + track]["score"] -
+                             results["B:" + track]["score"])
+                   for track in ("model", "assisted")}
     return {"status": "REVIEWED_ATTESTATIONS", "scores": results,
+            "provisional_80_numeric_met": provisional_numeric,
+            "form_score_spread_points": form_spread,
+            "resource_note": "Nearest-rank descriptive latency, not a confidence interval. No first-token, token-rate, thermal or crash data inferred.",
             "model_only_min": min(results[f + ":model"]["score"] for f in ("A", "B")),
             "assisted_min": min(results[f + ":assisted"]["score"] for f in ("A", "B")),
             "target_met": target, "release_ready": False,
