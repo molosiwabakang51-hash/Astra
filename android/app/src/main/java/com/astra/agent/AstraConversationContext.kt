@@ -284,13 +284,16 @@ internal object AstraConversationContext {
         val result = mutableListOf<IndexedValue<Turn>>()
         for (turn in timeline) {
             if (turn.index <= anchor.index) continue
-            if (turn.index > anchor.index + 6) break
+            if (turn.index > anchor.index + 12) break
             if (turn.value.role != "user") continue
             if (!isCorrection(turn.value.content)) break
             result.add(turn)
-            if (result.size >= 2) break
         }
-        return result
+        // Keep the newest three adjacent corrections, not the first two.
+        // Four bounded excerpts (three corrections and their anchor) fit
+        // within the existing normal history allowance. A shorter prompt
+        // budget may still omit excerpts; this is not a complete transcript.
+        return result.takeLast(3)
     }
 
     // Identifiers such as PRIVATE_BOND_FACT are single tokens, not
