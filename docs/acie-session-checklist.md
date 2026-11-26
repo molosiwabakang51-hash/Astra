@@ -171,6 +171,10 @@ All 119 ACIE IDs reviewed and preserved. #411 Android CI passed and the response
 
 #418 passed Python and Android and merged 3e570fc64d6b22c9dd99685cc25abcc4052fa143. #419 revised calculator branch passed Python 45723825148 and Android 45723825010; conflicts after #418 reconciled here with both current-owner intent and calculator safeguards preserved. Existing source/privacy checks retained. Fresh integration CI required. All 119 IDs reviewed, 27 checked, 92 outstanding; no broad acceptance yet. ACIE-010/016/023/028/029/030/058/059/078/079/080/082/097/099/102/109 remain under validation. No official general intelligence score.
 
+## Session update — verified calculator and broader neural evaluation
+
+#420 passed Python 45725968772 and Android 45725969052 and merged as 1171323fcb98a61bb95559c74a142703ca17e6f2. #421 failed one Kotlin regression 45726062537 (leading brevity modifier blocked anchored reasoning classification); revised head 51c3f0b005a70fed5c26e68e941a3d032fd2ce2c aligns deduction, task-opening, tradeoff and language guards, pending fresh Android verification. New 24-case/48-call breadth experiment uses four equally sized domains, predefined reproducible seed, standard direct/thinking diagnostic configurations, alternating matched order, strict failure accounting and domain-specific denominators. No change to deployed model, prompt, sampling, budgets or default-off adaptation. All 119 IDs reviewed; 27 checked, 92 outstanding. Calculator implementation is merged but actual model-led selection and synthesis still require validation. Broader model and independent handset results are pending. No general intelligence score.
+
 ## Acceptance
 
 90/100 independent repeated general intelligence score; separate model-only/assisted results; no model substitution, paid API or unsupported capability claims. Freeze protocol before held-out testing. Preserve offline and memory constraints. Recheck any completed engineering item if a later regression invalidates it.

@@ -116,6 +116,39 @@ class QwenProfileComparisonTests(unittest.TestCase):
                 self.assertEqual(a["prompt"].replace(comparison.DECOMPOSITION, "", 1),
                                  b["prompt"].replace(comparison.DECOMPOSITION, "", 1))
 
+    def test_breadth_cases_have_fixed_domain_denominators(self):
+        first = comparison.breadth_cases(42)
+        self.assertEqual(first, comparison.breadth_cases(42))
+        self.assertNotEqual(first, comparison.breadth_cases(43))
+        self.assertEqual(len(first), 24)
+        self.assertEqual(len({name for name, _, _ in first}), 24)
+        for domain in ("logic", "quantity", "context", "strategy"):
+            self.assertEqual(sum(name.startswith(domain + "_") for name, _, _ in first), 6)
+        logic = [answer for name, _, answer in first if name.startswith("logic_")]
+        self.assertEqual(logic.count("YES"), logic.count("NO"))
+
+    def test_breadth_modes_are_matched_and_keep_all_failures(self):
+        calls = []
+        def fake(payload):
+            calls.append(payload)
+            return dict(generation_settings=payload, stop_type="limit",
+                        truncated=False, tokens_predicted=1, content="NO")
+        result = comparison.evaluate(42, fake, "breadth")
+        self.assertEqual(len(calls), 48)
+        self.assertEqual(set(result["totals"]), {"direct:standard", "think:standard"})
+        self.assertEqual(result["matched"], dict(both_correct=0, think_only=0, direct_only=0, neither=24))
+        self.assertIsNone(result["official_ai_rating"])
+        for domain in result["by_domain"].values():
+            for mode in domain.values():
+                self.assertEqual(mode, dict(correct=0, complete=0, attempted=6))
+        for index, (a, b) in enumerate(zip(calls[::2], calls[1::2])):
+            self.assertEqual(a["seed"], b["seed"])
+            self.assertEqual(a["prompt"].replace("/no_think", "/think"), b["prompt"].replace("/no_think", "/think"))
+            self.assertEqual(a["n_predict"], 768 if index % 2 else 256)
+            self.assertEqual(b["n_predict"], 256 if index % 2 else 768)
+            self.assertFalse(a["cache_prompt"])
+            self.assertFalse(b["cache_prompt"])
+
     def test_native_comparison_workflow_is_bounded_and_pinned(self):
         source = (comparison.ROOT / ".github/workflows/qwen3-profile-evaluation.yml").read_text()
         for marker in ("runs-on: ubuntu-24.04", "timeout-minutes: 35",
