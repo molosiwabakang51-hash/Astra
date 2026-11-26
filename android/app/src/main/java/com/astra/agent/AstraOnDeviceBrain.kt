@@ -128,6 +128,7 @@ internal class AstraOnDeviceBrain(
         memoryBrief: AstraGroundedMemory.Brief? = null,
         ownerRequest: String? = null,
         allowAutomaticReferences: Boolean = true,
+        calculatorSynthesis: AstraCalculationAssist.Computed? = null,
         onPartial: suspend (String) -> Unit = {}
     ): String = AstraModelOperationGate.withNativeSession {
         mutex.withLock {
@@ -163,6 +164,17 @@ internal class AstraOnDeviceBrain(
                 session.checkTranscript(earlierTurns.size, transcriptTail)
                 val finalMessage = AstraConversationContext.currentUserMessage(turns.last().content)
                 require(finalMessage.isNotEmpty()) { "Message cannot be empty." }
+                // Calculator synthesis is an explicit owner-authorized isolated
+                // inference route, not a diagnostic mode override or retrieval.
+                val calculatorThinking = if (calculatorSynthesis != null) {
+                    require(ownerRequest != null && modelOnly && earlierTurns.isEmpty() &&
+                        !memoryGrounded && memoryBrief == null && !allowAutomaticReferences &&
+                        !diagnosticIsolated && diagnosticReasoningOverride == null &&
+                        diagnosticMaxTokens == null &&
+                        finalMessage == AstraCalculationAssist.synthesisPrompt(ownerRequest, calculatorSynthesis)
+                    ) { "Calculator synthesis requires its exact isolated owner prompt." }
+                    AstraCalculationAssist.prefersThinkingSynthesis(ownerRequest)
+                } else false
                 val policyQuestion = AstraInferenceIntent.policyQuestion(
                     ownerRequest, finalMessage, diagnosticIsolated
                 )
@@ -177,11 +189,11 @@ internal class AstraOnDeviceBrain(
                     "astra", Context.MODE_PRIVATE
                 ).getBoolean("astra_adaptive_reasoning", false)
                 val carefulReasoning = diagnosticReasoningOverride ?:
-                    AstraAdaptiveReasoning.select(
+                    (calculatorThinking || AstraAdaptiveReasoning.select(
                         policyQuestion,
                         automaticEnabled = adaptiveEnabled,
                         diagnosticIsolated = diagnosticIsolated
-                    )
+                    ))
                 val selectedReplyLanguageId = AstraDiagnosticContext.replyLanguage(
                     context.getSharedPreferences(
                         "astra", Context.MODE_PRIVATE
@@ -424,7 +436,7 @@ internal class AstraOnDeviceBrain(
                         hasReferences = memoryGrounded || citedBooks.isNotEmpty() || citedOpenCourse.isNotEmpty(),
                         thinkingRequested = carefulReasoning
                     ),
-                    diagnosticMaxTokens
+                    if (calculatorThinking) AstraCalculationAssist.SYNTHESIS_THINKING_CAP else diagnosticMaxTokens
                 )
                 phase(AstraInferenceAttempt.Phase.TOKEN_GENERATION)
                 AstraInferenceCheckpoint.mark(
