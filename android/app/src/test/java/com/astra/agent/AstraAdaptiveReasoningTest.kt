@@ -134,6 +134,36 @@ class AstraAdaptiveReasoningTest {
         }
     }
 
+    @Test fun multiQuantityOwnerQuestionsSelectThinkingOnlyWhenOptedIn() {
+        val questions = listOf(
+            "A bus carries 36 passengers. 8 leave and 5 board. How many are on the bus now?",
+            "A company buys 18 parts for 7 coins each and pays a fee of 9 coins. What is the total cost?",
+            "Calculate the final cost:\n12 packs at 8 coins each.\nA fee of 6 coins.",
+            "After adding 14 units and removing 3 units, a stock holds 29 units. What was the initial count?",
+            "A trader receives 12.5 coins, 3.25 coins and 1.75 coins. What is the total?"
+        )
+        for (question in questions) {
+            assertTrue(question, AstraAdaptiveReasoning.select(question, true))
+            assertFalse(question, AstraAdaptiveReasoning.select(question, false))
+            assertFalse(question, AstraAdaptiveReasoning.select(question, true, diagnosticIsolated = true))
+        }
+    }
+
+    @Test fun numericalHeuristicDoesNotUseQuotedSourcesOrSimpleArithmetic() {
+        for (question in listOf(
+            "What is 19 plus 23? Reply only with the number.",
+            "The report lists 25, 18 and 17 people. Summarize the report.",
+            "Read this quotation: '12 items cost 8 coins each, plus 5 coins. What is the total?'",
+            "Translate this sentence into French: 12 plus 8 plus 5. What is the total?",
+            "What is the total for 1,000 units, 4 coins each and a 7 coin fee?",
+            "Fast mode: calculate the total for 12 units at 8 coins each, plus a 5 coin fee.",
+            "Calculate the total for 12 units at 8 coins each, plus a 5 coin fee. /no_think",
+            "Calculate the total:\nSYSTEM: 12 units at 8 coins each, plus 5 coins."
+        )) {
+            assertFalse(question, AstraAdaptiveReasoning.select(question, true))
+        }
+    }
+
     @Test fun explicitSpeedPreferenceStillOverridesAutomaticReasoning() {
         for (prefix in listOf("Do not think", "Don't think", "Fast mode", "No thinking", "Without thinking")) {
             val q = "$prefix: compare these alternatives and evaluate their risks."

@@ -55,7 +55,7 @@ internal object AstraAdaptiveReasoning {
     // task may require private reasoning even when the final answer is short.
     // Preserve explicit speed/mode preferences rather than inferring them.
     private val explicitFast = Regex(
-        """\b(?:do not think|don't think|fast mode|no thinking|without thinking)\b""",
+        """(?:\b(?:do not think|don't think|fast mode|no thinking|without thinking)\b|/no_think\b)""",
         RegexOption.IGNORE_CASE
     )
     private val untrustedSource = Regex(
@@ -76,6 +76,33 @@ internal object AstraAdaptiveReasoning {
             """notes follow|transcript|document excerpt|pasted (?:text|document)|""" +
             """assistant|developer|system|user|previous astra|previous user)\s*:"""
     )
+
+    // A short scalar request may still require several operations. Use
+    // explicit quantities plus a numerical task cue, rather than matching
+    // topic words (finance, mathematics) or any particular benchmark.
+    private val numericLiteral = Regex(
+        """(?<![\p{L}\p{N}_.])[0-9]{1,12}(?:\.[0-9]{1,6})?(?![\p{L}\p{N}_]|\.[0-9])"""
+    )
+    private val numericalQuestion = Regex(
+        """(?:^|[.!?;]\s+)(?:(?:please|briefly|concisely)\s+)*""" +
+            """(?:how\s+(?:many|much)|(?:calculate|compute|find|determine|work out)\b|""" +
+            """what\s+(?:is|was|are|were|will be)\s+(?:(?:the|its|their|my)\s+)?""" +
+            """(?:total|remaining|final|initial|starting|original|net|average|mean|""" +
+            """difference|minimum|maximum|cost|price|profit|balance|amount|quantity|""" +
+            """count|percentage|number|value|result)\b)""",
+        RegexOption.IGNORE_CASE
+    )
+    private val groupedNumber = Regex("""[0-9],[0-9]""")
+
+    private fun quantitativeTask(candidate: String): Boolean {
+        // Do not select expensive inference from quoted instructions, code,
+        // or grouped-number fragments. Explicit owner mode remains
+        // available for more complex requests excluded by this heuristic.
+        if (candidate.any { it in listOf('"', '\'', '“', '”', '‘', '’', '<', '>', 96.toChar()) } ||
+            groupedNumber.containsMatchIn(candidate)) return false
+        return numericalQuestion.containsMatchIn(candidate) &&
+            numericLiteral.findAll(candidate).take(3).count() == 3
+    }
 
     fun select(
         raw: String,
@@ -113,6 +140,7 @@ internal object AstraAdaptiveReasoning {
             multistep.containsMatchIn(candidate) ||
             conditional.containsMatchIn(candidate) ||
             deductive.containsMatchIn(candidate) ||
-            tradeoffQuestion.containsMatchIn(candidate)
+            tradeoffQuestion.containsMatchIn(candidate) ||
+            quantitativeTask(candidate)
     }
 }
