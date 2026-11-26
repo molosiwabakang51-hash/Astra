@@ -19,6 +19,7 @@ on:
         options:
           - quantitative_check
           - context_recovery
+          - context_transfer
           - historical
 permissions:
   contents: read
@@ -47,12 +48,18 @@ jobs:
           src=android/app/src/main/java/com/astra/agent
           kotlinc "$src/AstraAnswerContract.kt" "$src/AstraInterruptedReply.kt" scripts/quality/AcieAnswerContractProbe.kt -include-runtime -d evaluation/answer-contract.jar
       - name: Compile baseline and revised production recovery builders
-        if: github.event_name == 'pull_request' || inputs.suite == 'context_recovery'
+        if: github.event_name == 'pull_request' || inputs.suite == 'context_recovery' || inputs.suite == 'context_transfer'
         shell: bash
+        env:
+          SUITE: ${{ inputs.suite }}
         run: |
           set -euo pipefail
           src=android/app/src/main/java/com/astra/agent
-          baseline=014fa7dc2364ce9cb2cdbf3942f22e6a11e7d548
+          baseline=136415c342e9272a11173b5ff0d755e4107d1faa
+          if [[ "$SUITE" == context_recovery ]]; then
+            baseline=014fa7dc2364ce9cb2cdbf3942f22e6a11e7d548
+          fi
+          printf '%s\n' "$baseline" > evaluation-baseline.txt
           mkdir -p evaluation/baseline
           for name in AstraConversationContext AstraOfflinePolicy AstraReasoningMode AstraUnicodeBounds; do
             git show "$baseline:$src/$name.kt" > "evaluation/baseline/$name.kt"
@@ -81,12 +88,21 @@ jobs:
           python scripts/quality/run_qwen_profile_comparison.py cpu-build/bin/llama-server --experiment quantitative_check --seed 50792163 --answer-contract-jar evaluation/answer-contract.jar > evaluation/quantitative-comparison.json
           cat evaluation/quantitative-comparison.json >> "$GITHUB_STEP_SUMMARY"
       - name: Compare restored context with identical model and reasoning profile
-        if: github.event_name == 'pull_request' || inputs.suite == 'context_recovery'
+        if: github.event_name == 'workflow_dispatch' && inputs.suite == 'context_recovery'
         shell: bash
         run: |
           set -euo pipefail
           python scripts/quality/run_qwen_profile_comparison.py cpu-build/bin/llama-server --experiment context_recovery --seed 71108263 --baseline-context-jar evaluation/baseline-context.jar --candidate-context-jar evaluation/candidate-context.jar > evaluation/context-recovery-comparison.json
           cat evaluation/context-recovery-comparison.json >> "$GITHUB_STEP_SUMMARY"
+      - name: Measure long-context transfer against immediately preceding recovery
+        if: github.event_name == 'pull_request' || inputs.suite == 'context_transfer'
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(cat evaluation-baseline.txt)" = 136415c342e9272a11173b5ff0d755e4107d1faa
+          python scripts/quality/run_qwen_profile_comparison.py cpu-build/bin/llama-server --experiment context_transfer --seed 97264137 --baseline-context-jar evaluation/baseline-context.jar --candidate-context-jar evaluation/candidate-context.jar > evaluation/context-transfer-comparison.json
+          python -c 'import json, pathlib; p=pathlib.Path("evaluation/context-transfer-comparison.json"); d=json.loads(p.read_text()); d["baseline_commit"]=pathlib.Path("evaluation-baseline.txt").read_text().strip(); p.write_text(json.dumps(d,indent=2)+"\n")'
+          cat evaluation/context-transfer-comparison.json >> "$GITHUB_STEP_SUMMARY"
       - name: Reproduce historical model comparisons
         if: github.event_name == 'workflow_dispatch' && inputs.suite == 'historical'
         shell: bash
