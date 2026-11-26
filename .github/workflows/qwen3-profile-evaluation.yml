@@ -1,7 +1,7 @@
 name: Actual Qwen3 1.7B CPU profile comparison
 on:
   pull_request:
-    branches: [main]
+    branches: [main, intelligence/acie-tail-evidence-retrieval]
     paths:
       - '.github/workflows/qwen3-profile-evaluation.yml'
       - 'scripts/quality/run_qwen_profile_comparison.py'
@@ -20,6 +20,7 @@ on:
           - quantitative_check
           - context_recovery
           - context_transfer
+          - context_tail
           - historical
 permissions:
   contents: read
@@ -48,16 +49,19 @@ jobs:
           src=android/app/src/main/java/com/astra/agent
           kotlinc "$src/AstraAnswerContract.kt" "$src/AstraInterruptedReply.kt" scripts/quality/AcieAnswerContractProbe.kt -include-runtime -d evaluation/answer-contract.jar
       - name: Compile baseline and revised production recovery builders
-        if: github.event_name == 'pull_request' || inputs.suite == 'context_recovery' || inputs.suite == 'context_transfer'
+        if: github.event_name == 'pull_request' || inputs.suite == 'context_recovery' || inputs.suite == 'context_transfer' || inputs.suite == 'context_tail'
         shell: bash
         env:
           SUITE: ${{ inputs.suite }}
+          BASE_REF: ${{ github.base_ref }}
         run: |
           set -euo pipefail
           src=android/app/src/main/java/com/astra/agent
           baseline=136415c342e9272a11173b5ff0d755e4107d1faa
           if [[ "$SUITE" == context_recovery ]]; then
             baseline=014fa7dc2364ce9cb2cdbf3942f22e6a11e7d548
+          elif [[ "$SUITE" == context_tail || "$BASE_REF" == intelligence/acie-tail-evidence-retrieval ]]; then
+            baseline=5f4b1723b6fa6594ee21828ad1b01bdd0a2f818d
           fi
           printf '%s\n' "$baseline" > evaluation-baseline.txt
           mkdir -p evaluation/baseline
@@ -95,7 +99,7 @@ jobs:
           python scripts/quality/run_qwen_profile_comparison.py cpu-build/bin/llama-server --experiment context_recovery --seed 71108263 --baseline-context-jar evaluation/baseline-context.jar --candidate-context-jar evaluation/candidate-context.jar > evaluation/context-recovery-comparison.json
           cat evaluation/context-recovery-comparison.json >> "$GITHUB_STEP_SUMMARY"
       - name: Measure long-context transfer against immediately preceding recovery
-        if: github.event_name == 'pull_request' || inputs.suite == 'context_transfer'
+        if: (github.event_name == 'pull_request' && github.base_ref == 'main') || inputs.suite == 'context_transfer'
         shell: bash
         run: |
           set -euo pipefail
@@ -103,6 +107,15 @@ jobs:
           python scripts/quality/run_qwen_profile_comparison.py cpu-build/bin/llama-server --experiment context_transfer --seed 97264137 --baseline-context-jar evaluation/baseline-context.jar --candidate-context-jar evaluation/candidate-context.jar > evaluation/context-transfer-comparison.json
           python -c 'import json, pathlib; p=pathlib.Path("evaluation/context-transfer-comparison.json"); d=json.loads(p.read_text()); d["baseline_commit"]=pathlib.Path("evaluation-baseline.txt").read_text().strip(); p.write_text(json.dumps(d,indent=2)+"\n")'
           cat evaluation/context-transfer-comparison.json >> "$GITHUB_STEP_SUMMARY"
+      - name: Compare historical tail retrieval against immediate baseline
+        if: (github.event_name == 'pull_request' && github.base_ref == 'intelligence/acie-tail-evidence-retrieval') || inputs.suite == 'context_tail'
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(cat evaluation-baseline.txt)" = 5f4b1723b6fa6594ee21828ad1b01bdd0a2f818d
+          python scripts/quality/run_qwen_profile_comparison.py cpu-build/bin/llama-server --experiment context_tail --seed 69401723 --baseline-context-jar evaluation/baseline-context.jar --candidate-context-jar evaluation/candidate-context.jar > evaluation/context-tail-comparison.json
+          python -c 'import json,pathlib; p=pathlib.Path("evaluation/context-tail-comparison.json"); d=json.loads(p.read_text()); d["baseline_commit"]=pathlib.Path("evaluation-baseline.txt").read_text().strip(); p.write_text(json.dumps(d,indent=2)+"\n")'
+          cat evaluation/context-tail-comparison.json >> "$GITHUB_STEP_SUMMARY"
       - name: Reproduce historical model comparisons
         if: github.event_name == 'workflow_dispatch' && inputs.suite == 'historical'
         shell: bash
