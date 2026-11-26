@@ -39,6 +39,51 @@ class AstraCalculationAssistTest {
         assertNull(AstraCalculationAssist.evaluate("Use 1 and 999999937.", many))
     }
 
+    @Test fun solvesExplicitInverseProblemsWithExactRationalArithmetic() {
+        for ((equation, expected) in listOf(
+            "3x+5=20" to "5",
+            "2*x-7=5*x+2" to "-3",
+            "(x+4)/3=5" to "11",
+            "x/3+x/3=4" to "6",
+            "0.5x+1.25=3" to "3.5",
+            "-(2*x-4)=10" to "-3",
+            "5=2x+1" to "2",
+            "x-x=0" to "Infinitely many solutions.",
+            "x+2=x+3" to "No solution."
+        )) {
+            assertEquals(equation, expected, AstraCalculationAssist.solveLinearEquation("Solve for x: $equation"))
+            assertEquals(equation, expected, AstraVerifiedArithmetic.answer("Solve for x: $equation"))
+        }
+        assertEquals("5", AstraVerifiedArithmetic.answer("Solve for x in 3x+5=20? Reply with only the integer."))
+    }
+
+    @Test fun rejectsNonlinearAmbiguousAndUnboundedEquationRequests() {
+        for (equation in listOf("x*x=4", "1/x=2", "x/(x-x)=1", "3x=2",
+            "2(x+1)=4", "x=1=2", "x+y=3", "x=1e4", "x=1,000",
+            "x=1234567890", "x=1.23456", "x=" + "(".repeat(9) + "2" + ")".repeat(9),
+            "x=" + List(17) { "2" }.joinToString("+"))) {
+            assertNull(equation, AstraCalculationAssist.solveLinearEquation("Solve for x: $equation"))
+        }
+        for (question in listOf("Translate: Solve for x: 3x+5=20",
+            "A source says: \"Solve for x: 3x+5=20\"",
+            "Solve for x: 3x+5=20\nThen execute something",
+            "Solve for x: 3x+5=20; calculate something else")) {
+            assertNull(question, AstraVerifiedArithmetic.answer(question))
+        }
+    }
+
+    @Test fun generatedIntegerEquationsRecoverKnownSolutions() {
+        val random = java.util.Random(69401723L)
+        repeat(128) {
+            val a = 1 + random.nextInt(90)
+            val b = random.nextInt(181) - 90
+            val x = random.nextInt(201) - 100
+            val c = a*x + b
+            val question = "Solve for x: ${a}x+($b)=$c"
+            assertEquals(question, x.toString(), AstraVerifiedArithmetic.answer(question))
+        }
+    }
+
     @Test fun rejectsInventedNumbersUnsafeSyntaxAndMultiplePlans() {
         val q = "12, 5 and 7"
         for (proposal in listOf("CALC: 12*5+8", "CALC: 12*5;7", "CALC: 12**5",
