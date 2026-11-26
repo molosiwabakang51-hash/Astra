@@ -76,6 +76,13 @@ internal object AstraCognitiveReview {
 
     fun resolve(raw: String, history: List<AstraChatArchive.Message>): Result {
         val submitted = raw.trim()
+        if (submitted.startsWith("Verify this state trace:", ignoreCase = true) ||
+            submitted.startsWith("Check this state trace:", ignoreCase = true)) {
+            val trace = submitted.substringAfter(':').trim()
+            val checked = AstraStateTraceVerifier.verify(trace)
+                ?: return Result.Local("I could not verify the complete trace. Use bounded sequential integer assignments, for example: Trace integer assignments: x=2; y=3; x=x+y. What is x? No loops, branches or arbitrary code.")
+            return Result.Local(checkNotNull(AstraStateTraceVerifier.report(checked)))
+        }
         if (submitted.length <= 690) {
             val named = confirmedCategorical.matchEntire(submitted)?.groupValues?.get(1)
                 ?.let(AstraCategoricalVerifier::verifyControlledLanguage)
@@ -133,6 +140,13 @@ internal object AstraCognitiveReview {
             request.matches(original) || AstraInterruptedReply.isIncomplete(answer) ||
             answer.startsWith(HEADER) || answer.startsWith("ASTRA //")
         ) return Result.Local("No complete original answer to audit. Ask the question again.")
+        // A complete owner-supplied trace can be independently recomputed.
+        // Do not infer a program from prose or replace a nonnumeric response.
+        val trace = AstraStateTraceVerifier.verify(original)
+        if (trace != null) {
+            val report = AstraStateTraceVerifier.report(trace, answer)
+            if (report != null) return Result.Local(report)
+        }
         // Independent validation only for an exact, unambiguous arithmetic
         // request and an unambiguous numeric response. No inference points.
         val expected = AstraVerifiedArithmetic.answer(original)
