@@ -278,6 +278,22 @@ All 119 sequential ACIE requirements verified; 27 master ticks, 92 outstanding. 
 
 All 119 sequential ACIE master requirements reviewed; 27 checked, 92 outstanding. ACIE-029/039/040/055/063/065/088/110/115/116/117 remain open. No master completion or new verified intelligence rating claimed. Reconcile concurrent #451 ledger if it merges first.
 
+## Session update — fix consensus canonicalization regression
+
+#451 Android 45844958657 passed; native calculator 45844958297 still running at inspection. #452 Python 45845542653 passed; Android 45845542499 failed, job 139998108726, one failure in 1,060 tests, AstraReasoningConsensusTest.changesOnlyWhenTwoCompleteRetriesAgreeOnCanonicalScalar line 15. Native 45845542657 still running on old head 7499a976d0c3456c6936f6d02e13c58071a52352 at inspection; its results cannot validate corrected candidate. Reproduced original failure locally in Kotlin: "+020".toBigIntegerOrNull() returns null. Correct strict integer canonicalization by stripping exactly one leading plus after existing regex validation, before BigInteger conversion. Commit a3497fb564628fbb47feb47402c44b629ac5d881. Locally executed nine checks for positive/negative/zero canonicalization and rejection of repeated signs, decimals, scientific notation and overlong integers, all passed. Existing failing Android regression preserved unchanged; full CI and corrected native-model evaluation required. No production wiring or additional model weights. #453 controlled-language deduction candidate head 37ccdfb4251050cc5a30dc8c3a84071855569cf5 Android 45846565744 running. Preserve #451/#453 validation. No merge or new intelligence claim.
+
+### Incremental milestones (not additional master requirements)
+
+- [x] Milestone — ACIE-039/065: implement consensus selection candidate and regression tests.
+- [x] Milestone — ACIE-117: diagnose actual failed Android test using job logs and locally reproduce root cause.
+- [x] Milestone — ACIE-080/117: correct signed integer canonicalization and pass nine local checks.
+- [ ] Milestone — ACIE-039/065/117: complete corrected Android and native evaluations and assess consensus accuracy/cost.
+- [ ] Milestone — ACIE-057: final native validation and merge of #451.
+- [ ] Milestone — ACIE-031/058: validate controlled-language deduction #453.
+- [ ] Milestone — ACIE-118/119: independent physical-device assessment and target attainment.
+
+All 119 sequential ACIE master requirements reviewed, 27 checked, 92 outstanding. No additional master tick; implementation remains experimental. Reconcile concurrent ledger changes before integration.
+
 ## Acceptance
 
 90/100 independent repeated general intelligence score; separate model-only/assisted results; no model substitution, paid API or unsupported capability claims. Freeze protocol before held-out testing. Preserve offline and memory constraints. Recheck any completed engineering item if a later regression invalidates it.
