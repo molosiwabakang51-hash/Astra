@@ -51,9 +51,11 @@ internal object AstraAdaptiveReasoning {
             """what is the meaning of|explain the (?:word|phrase|expression))\b""",
         RegexOption.IGNORE_CASE
     )
+    // Output length is not a computation-mode instruction. A difficult
+    // task may require private reasoning even when the final answer is short.
+    // Preserve explicit speed/mode preferences rather than inferring them.
     private val explicitFast = Regex(
-        """\b(?:reply only|answer only|just the answer|no explanation|do not explain|""" +
-            """without explanation|do not think|don't think|fast mode)\b""",
+        """\b(?:do not think|don't think|fast mode|no thinking|without thinking)\b""",
         RegexOption.IGNORE_CASE
     )
     private val untrustedSource = Regex(
@@ -102,8 +104,7 @@ internal object AstraAdaptiveReasoning {
             ) return false
             lines.joinToString(" ")
         } else current
-        if (AstraGenerationPolicy.depth(current) == AstraGenerationPolicy.Depth.BRIEF ||
-            explicitFast.containsMatchIn(current) ||
+        if (explicitFast.containsMatchIn(current) ||
             languageOrQuotation.containsMatchIn(current)
         ) return false
         // Only recognizable multi-constraint tasks trigger expensive thought.
