@@ -506,6 +506,39 @@ class AstraConversationContextTest {
         assertTrue(prompt.length <= 3010)
     }
 
+    @Test fun omittedLatestCorrectionInSecondaryTopicIsExplicitlyFlagged() {
+        val history = listOf(
+            turn("user", "The fictional museum renovation budget is 900 coins."),
+            turn("assistant", "Noted."),
+            turn("user", "The ferry schedule is 9 am."),
+            turn("assistant", "Noted."),
+            turn("user", "Actually, make it 11 am.")
+        )
+        val question = "Use the museum renovation budget and ferry schedule to plan."
+        val prompt = AstraConversationContext.userPrompt(question, history, true)
+        assertTrue(prompt.contains("museum renovation budget is 900 coins"))
+        assertTrue(prompt.contains("ferry schedule is 9 am"))
+        // The secondary topic's bare correction is not admitted by the
+        // primary-topic correction filter. Never present 9 am as current.
+        assertFalse(prompt.contains("make it 11 am"))
+        assertTrue(prompt.contains("including a later correction"))
+        assertTrue(prompt.contains("Do not assume the latest value"))
+        assertTrue(prompt.endsWith(question + "\n/no_think"))
+        assertTrue(prompt.length <= 3010)
+    }
+
+    @Test fun retainedNewestCorrectionDoesNotImplyMissingTail() {
+        val history = listOf(turn("user", "My fictional greenhouse budget is 900 coins.")) +
+            (1..5).flatMap {
+                listOf(turn("assistant", "Noted."),
+                    turn("user", "Actually, make it ${900-it*10} coins."))
+            } + (1..20).map { turn("assistant", "Unrelated weather note $it.") }
+        val prompt = AstraConversationContext.userPrompt("What was my greenhouse budget?", history, true)
+        assertTrue(prompt.contains("850 coins"))
+        assertTrue(prompt.contains("Some linked corrections are omitted."))
+        assertFalse(prompt.contains("including a later correction"))
+    }
+
     @Test fun missingRelativeAdjustmentsAreFlaggedRatherThanImpliedComplete() {
         val history = listOf(turn("user", "The fictional greenhouse budget is 900 coins.")) +
             listOf(11, 22, 33, 44, 55).flatMap {
