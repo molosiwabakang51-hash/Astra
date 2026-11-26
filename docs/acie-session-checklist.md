@@ -243,6 +243,22 @@ Reconciled all three non-ledger files from #428 (profile evaluator, its tests an
 
 #440 head 8612d671bb2e2a32021660ad2a1877f2fecaaea9 passed Python 45829825032, Android 45829825002 and native CPU 45829825274; artifact 15122832210 inspected. Same ten long-context cases and seed 97264137, pinned immediate baseline 5f4b1723: overall 6/10 vs 5/10, replacements 3/4 vs 1/4, gaps 0/2 vs 1/2 (tail only), controls 3/4 both. Both correct 4, candidate-only 1, baseline-only 2, neither 3; 20/20 complete. Wrong scalar 3 vs 2, noncanonical 1 vs 3 (including two previously correct replacements), 1546 vs 1889 tokens and 163721 vs 190711 ms. Reject combined notice rewrite/relocation for production; existing recovery unchanged. Consider narrowly isolated tail-only candidate as developmental experiment, but do not assume improvement or conflate formatting failures with wrong semantics. All 119 sequential IDs verified; 27 checked, 92 outstanding, no new master requirement completion without broader acceptance evidence. ACIE-031/048/052/057/058/060/062/078/079/080/083/098/104/110/115/117 remain open. No independent rating or release claim.
 
+## Session update — verified historical-tail integration
+
+Main a9be9002686896b472754b64e541a1d3815670a0 includes merged #441; all four combined checks passed (Python 45836593039, Android 45836593057, native logic 45836593460, native arithmetic 45836592845). Repeated rational parser improvement 1/4 to 4/4 and thinking synthesis 4/4; artifact 15127542327. #442 grammar candidate failed to improve faithful formalization (0/7 both direct and grammar); no production activation. #445 preserves diagnostic only; Python 45839157955 and Android 45839157871 passed, native logic 45839157866 running. #446 native translation ablation 45839806938 running. #443 Android 45837607035 and native 45837607056 passed; #444 native 45838812506 passed. Directly inspected ZIP artifact 15127178932, experiment context_tail, seed 69401723, pinned immediate pre-tail baseline 5f4b1723b6fa6594ee21828ad1b01bdd0a2f818d, identical model hash d2387ca2dbfee2ffabce7120d3770dadca0b293052bc2f0e138fdc940d9bc7b5: baseline 4/8 versus candidate 7/8; tail 0/4 versus 3/4, gap 1/1 both, controls 3/3 both. Both correct 4, candidate-only 3, baseline-only 0, neither 1. All 16 completed; no wrong scalar in either arm, noncanonical ungraded 4 versus 1; tokens 1273 versus 935, elapsed CPU milliseconds 111739 versus 89011. These are developmental restored-context CPU results, not live Android or held-out general intelligence. Reconciled four exact tested source/test files from #444 onto current main after verifying original ancestor blob equality; adapt workflow so main-target PRs evaluate tail suite against immediate pre-tail baseline, manual historical comparison preserved. Combined validation pending. No new model weights, no new unrestricted reasoning score. Prioritize actual reasoning improvements over additional generic infrastructure.
+
+### Incremental milestones (not additional master requirements)
+
+- [x] ACIE-057 subtask: merged exact rational intermediate parser; matched 4/4 versus 1/4.
+- [x] ACIE-058 subtask: merged explicitly formalized categorical and propositional verification; bounded logical semantics, not natural-language formalization.
+- [x] ACIE-052 subtask: demonstrate historical-tail retrieval improvement 4/8 to 7/8, no paired losses.
+- [x] ACIE-117 subtask: historical-tail candidate Android and native comparison workflows passed.
+- [ ] ACIE-052 subtask: merge reconciled tail implementation after combined validation.
+- [ ] ACIE-031/078 subtask: establish faithful natural-language formalization improvement; translation ablation running.
+- [ ] ACIE-040/118/119: independently measure generalization on physical device and meet target.
+
+All 119 sequential ACIE requirements verified; 27 master items checked, 92 outstanding. The above subtask ticks document concrete progress without changing master acceptance criteria. Reconcile #445/#446 ledger evidence when integrated; no additional broad master ticks justified yet.
+
 ## Acceptance
 
 90/100 independent repeated general intelligence score; separate model-only/assisted results; no model substitution, paid API or unsupported capability claims. Freeze protocol before held-out testing. Preserve offline and memory constraints. Recheck any completed engineering item if a later regression invalidates it.
