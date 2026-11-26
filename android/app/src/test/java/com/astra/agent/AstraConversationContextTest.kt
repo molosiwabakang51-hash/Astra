@@ -434,6 +434,69 @@ class AstraConversationContextTest {
         assertFalse(restored.contains("chocolate for dessert"))
     }
 
+    @Test fun thirdCorrectionSurvivesRecoveryForRecallAndOrdinaryReasoning() {
+        val earlier = listOf(
+            turn("user", "The fictional workshop budget is 900 coins."),
+            turn("assistant", "Acknowledged."),
+            turn("user", "Actually, make it 800 coins."),
+            turn("assistant", "Noted."),
+            turn("user", "No, make it 700 coins."),
+            turn("assistant", "Understood."),
+            turn("user", "Correction: make it 600 coins.")
+        ) + (1..20).map { turn("assistant", "Unrelated weather comment $it " + "X".repeat(210)) }
+        for (question in listOf("What was my workshop budget?",
+            "Use the workshop budget to estimate remaining funds.")) {
+            val prompt = AstraConversationContext.userPrompt(question, earlier, true)
+            for (value in listOf("900 coins", "800 coins", "700 coins", "600 coins")) {
+                assertTrue(value, prompt.contains(value))
+            }
+            assertTrue(prompt.indexOf("900 coins") < prompt.indexOf("600 coins"))
+            assertFalse(prompt.contains("Some linked corrections are omitted."))
+            assertTrue(prompt.endsWith(question + "\n/no_think"))
+            assertTrue(prompt.length <= 3010)
+        }
+    }
+
+    @Test fun newestCorrectionsTakePriorityInLongerBoundedChain() {
+        val earlier = listOf(turn("user", "The fictional expedition allocation is 900 coins.")) +
+            listOf(800, 700, 600, 500, 400).flatMap {
+                listOf(turn("assistant", "Noted."), turn("user", "Actually, make it $it coins."))
+            } + listOf(turn("user", "I prefer a different dinner menu."),
+                turn("user", "Actually, make it spicy rice.")) +
+            (1..20).map { turn("assistant", "Unrelated weather comment $it " + "X".repeat(210)) }
+        val prompt = AstraConversationContext.userPrompt(
+            "What was my expedition allocation?", earlier, true)
+        for (value in listOf("900 coins", "600 coins", "500 coins", "400 coins")) {
+            assertTrue(value, prompt.contains(value))
+        }
+        assertFalse(prompt.contains("800 coins"))
+        assertFalse(prompt.contains("700 coins"))
+        assertFalse(prompt.contains("spicy rice"))
+        assertTrue(prompt.contains("Some linked corrections are omitted."))
+        assertTrue(prompt.indexOf("600 coins") < prompt.indexOf("400 coins"))
+        assertTrue(prompt.length <= 3010)
+    }
+
+    @Test fun missingRelativeAdjustmentsAreFlaggedRatherThanImpliedComplete() {
+        val history = listOf(turn("user", "The fictional greenhouse budget is 900 coins.")) +
+            listOf(11, 22, 33, 44, 55).flatMap {
+                listOf(turn("assistant", "Noted."),
+                    turn("user", "Actually, increase it by $it coins."))
+            } + (1..20).map { turn("assistant", "Unrelated weather note $it.") }
+        for (question in listOf("What was my greenhouse budget?",
+            "Use the greenhouse budget to estimate the remaining funds.")) {
+            val prompt = AstraConversationContext.userPrompt(question, history, true)
+            assertTrue(prompt.contains("Some linked corrections are omitted."))
+            assertTrue(prompt.contains("If the result depends on missing steps, ask for clarification."))
+            assertTrue(prompt.contains("900 coins"))
+            assertTrue(prompt.contains("increase it by 55 coins"))
+            assertFalse(prompt.contains("increase it by 11 coins"))
+            assertFalse(prompt.contains("increase it by 22 coins"))
+            assertTrue(prompt.endsWith(question + "\n/no_think"))
+            assertTrue(prompt.length <= 3010)
+        }
+    }
+
     @Test fun topicFreeCorrectionIsNotLinkedPastAnUnrelatedOwnerTurn() {
         val earlier = listOf(
             turn("user", "My bond maturity is five years."),

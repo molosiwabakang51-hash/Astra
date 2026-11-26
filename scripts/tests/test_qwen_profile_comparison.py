@@ -248,6 +248,40 @@ class QwenProfileComparisonTests(unittest.TestCase):
         self.assertTrue(all(not row["contract_correct"] for row in failed["cases"]))
 
 
+    def test_recovery_comparison_matches_transcripts_and_inference_settings(self):
+        calls = []
+        inputs = {"baseline": [], "recovery": []}
+        def builder(name):
+            def build(question, history):
+                inputs[name].append((question, history))
+                return name + "\n" + question
+            return build
+        def fake(payload):
+            calls.append(payload)
+            return dict(generation_settings=payload, stop_type="eos",
+                        truncated=False, tokens_predicted=1, content="NO")
+        builders = {name: builder(name) for name in inputs}
+        report = comparison.evaluate(42, fake, "context_recovery", context_builders=builders)
+        self.assertEqual(len(calls), 16)
+        self.assertEqual(inputs["baseline"], inputs["recovery"])
+        self.assertEqual(set(report["totals"]), {"think:baseline", "think:recovery"})
+        self.assertEqual(report["matched"], dict(both_correct=1, candidate_only=0,
+                         baseline_only=0, neither=7))
+        for index, (a, b) in enumerate(zip(calls[::2], calls[1::2])):
+            self.assertEqual({k:v for k,v in a.items() if k != "prompt"},
+                             {k:v for k,v in b.items() if k != "prompt"})
+            self.assertEqual(a["n_predict"], 768)
+            self.assertIn(("recovery" if index % 2 else "baseline") + "\n", a["prompt"])
+        self.assertIsNone(report["official_ai_rating"])
+        self.assertTrue(all("recovery_prompt_sha256" in row for row in report["cases"]))
+
+    def test_recovery_requires_both_builders_and_deterministic_public_histories(self):
+        self.assertEqual(comparison.context_cases(42), comparison.context_cases(42))
+        self.assertNotEqual(comparison.context_cases(42), comparison.context_cases(43))
+        with self.assertRaisesRegex(ValueError, "both production builders"):
+            comparison.evaluate(42, lambda _: {}, "context_recovery")
+        self.assertEqual(len({name for name, _, _, _ in comparison.context_cases(42)}), 8)
+
 
 if __name__ == "__main__":
     unittest.main()
