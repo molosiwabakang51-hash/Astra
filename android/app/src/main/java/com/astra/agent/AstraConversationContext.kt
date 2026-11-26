@@ -23,6 +23,8 @@ internal object AstraConversationContext {
         "\nCURRENT USER MESSAGE (answer this message, not the excerpts):\n"
     private const val CORRECTION_GAP_NOTICE =
         "[Some linked corrections are omitted. If the result depends on missing steps, ask for clarification.]\n"
+    private const val CORRECTION_TAIL_NOTICE =
+        "[Some linked corrections are omitted, including a later correction. Do not assume the latest value; ask for clarification.]\n"
 
     fun systemPrompt(): String =
         "You are Astra, a concise and helpful Android assistant. " +
@@ -259,13 +261,21 @@ internal object AstraConversationContext {
             chain.any(included::contains) &&
                 (anchorIndex in boundedChains || !included.containsAll(chain))
         }
-        if (correctionGap) {
-            selected = selectExcerpts((room - CORRECTION_GAP_NOTICE.length).coerceAtLeast(0))
+        val tailOmitted = correctionChains.any { (anchorIndex, chain) ->
+            anchorIndex in boundedChains && chain.any(included::contains)
+        }
+        val notice = when {
+            tailOmitted -> CORRECTION_TAIL_NOTICE
+            correctionGap -> CORRECTION_GAP_NOTICE
+            else -> ""
+        }
+        if (notice.isNotEmpty()) {
+            selected = selectExcerpts((room - notice.length).coerceAtLeast(0))
             if (selected.isEmpty()) return AstraOfflinePolicy.modelPrompt(current, thinkingRequested)
         }
 
         val composed = HISTORY_HEADER +
-            (if (correctionGap) CORRECTION_GAP_NOTICE else "") +
+            notice +
             selected.sortedBy { it.first }.joinToString("") { it.second } +
             CURRENT_HEADER + current
         // This must be asserted rather than silently truncated by
