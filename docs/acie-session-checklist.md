@@ -437,6 +437,29 @@ All 119 sequential ACIE requirements reviewed; 27 checked, 92 outstanding. No ne
 
 All 119 sequential master requirements reviewed; 27 checked, 92 outstanding. Narrow completed milestone separate from master acceptance. No independent intelligence rating or release claim.
 
+## Session update — validated scalar framing integration and selective recovery
+
+#460 corrected head c48a9eb552485eaa143522e5ab111c0eed493d7e actual CPU 45871884353 completed successfully. Directly inspected artifact 15144341311: production Kotlin bridge, seed 91374521, 1792 cap, strict 5/12 to 11/12, arithmetic 2/4 to 4/4, inverse 0/4 to 4/4, controls 3/4 unchanged (identical prompt hashes for all four). Six candidate-only, zero baseline-only, five both, one neither. All 24 calls complete, zero confirmed wrong scalars, noncanonical 7 to 1, tokens 3837 to 2838, CPU elapsed 303055 to 256168 ms. Developmental transfer, not independent held-out or full Android JNI. #462 head 7828e3ce6d5266f555f2bea4cf641ede7f74dd1b created on main 6b2ba23b13236bd8823cbc56351cd1fc5bf72521; exact validated gate and test blobs transferred before documentation-only comment update. Integrated into AstraOnDeviceBrain request preparation with exact raw/current owner/visible equality, ordinary first turn, existing thinking mode, automatic reply language, no calculator/review/model-only/diagnostics/sources. No reasoning budget or weight change. Invalidate native conversation session after applied framing to avoid retaining a hidden instruction not present in archived user text; possible next-turn reload cost requires handset measurement. Android 45874181982 running. Not merged or active on main yet.
+
+#459 original exact head 1f45958c465d7a2f3d42324853482fcd312cec58 passed all five workflows: Python 45871315969, Android 45871315981, context 45871316081, budget 45871316029 and framing 45871315983. Directly inspected artifact 15143492743: ungated original seed 79218431 at 768 cap 6/12 to 7/12 (two gains, one loss, completion 12/12 to 11/12, 4203 to 4392 tokens, 332659 to 348258 ms), transfer seed 91374521 6/12 to 9/12 (four gains, one loss, all complete, wrong scalar 0 to 1, 3047 to 2754 tokens, 248936 to 230363 ms). Do not activate unrestricted framing or reduce production cap based on these results. Verified no overlap with main updates, exact-head squash merged to main 833a838bb431a16d3bc919c8e47767913c859b04; host-only diagnostic changes, no production activation.
+
+#461 head 97c6f238409aa47e6387523b55e235e975e94ce7 passed Python 45873068592, Android 45873068568 and native 45873068668. Artifact 15143582240 directly inspected: seed 92846173, exact computed values 6/8 to 7/8, one gain zero losses, both reject all 4 unsuitable. Five retries completed (one eligible, four unsuitable). 240 to 1974 tokens, 61900 to 212326 ms. One accepted but semantically wrong eligible plan (revenue) remains unchanged. Reject broad recovery activation: 3.43x total inference time and unnecessary unsuitable retries. #461 mergeability became false after #459 merge; no overlapping changed paths detected, recheck rather than force merge.
+
+#463 head 7e6840ff6bb80a0a480e9449913001df3794da4a stacked on #461 exact head; host-only selective retry gate compiled from calculator bridge, uses existing requestsNumericOnly, at least two distinct bounded numeric literals, no ambiguous comma, strict CALC-shaped rejected proposal. Fresh seed 95172643, 8 eligible and 8 unsuitable including four numeric-only unsuitable controls. Shared broad retry outputs allow counterfactual narrow-policy scoring with missed gains, unsuitable acceptance and projected generation cost, no extra model calls beyond broad experiment; no answer key passed to gate. Six Python test methods and compiled gate canaries; native 45874385343 running. No production retry activation. Stacked CI only covers its diagnostic workflow; require Android validation after integration if production changes eventually justified.
+
+### Incremental milestones (not additional master requirements)
+
+- [x] Milestone — ACIE-102/110/111: verify restricted production-path actual-model result 5/12 to 11/12.
+- [x] Milestone — ACIE-102/080: wire exact gated ordinary first-turn framing in #462; preserve history and source boundaries.
+- [x] Milestone — ACIE-117: inspect original and transfer regressions; merge #459 diagnostics only.
+- [x] Milestone — ACIE-065/078/083: evaluate broad retry; reject live activation due to cost.
+- [x] Milestone — ACIE-028/080/110: implement selective retry diagnostic and adversarial numeric controls (#463).
+- [ ] Milestone — ACIE-102/117: complete #462 Android regression, then merge if validated; measure actual phone latency.
+- [ ] Milestone — ACIE-078/083/117: reconcile #461 and evaluate #463 before any retry activation.
+- [ ] Milestone — ACIE-040/118/119: independent broad physical-device assessment and target attainment.
+
+All 119 sequential master requirements reviewed; 27 checked, 92 outstanding. No new broad acceptance from narrow developmental results. No independent general intelligence rating.
+
 ## Acceptance
 
 90/100 independent repeated general intelligence score; separate model-only/assisted results; no model substitution, paid API or unsupported capability claims. Freeze protocol before held-out testing. Preserve offline and memory constraints. Recheck any completed engineering item if a later regression invalidates it.
