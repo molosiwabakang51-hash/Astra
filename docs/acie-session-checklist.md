@@ -284,6 +284,25 @@ All 119 sequential ACIE requirements verified; 27 master ticks, 92 outstanding. 
 
 All 119 sequential ACIE master requirements verified, 27 checked, 92 outstanding. Narrow verified milestones remain separate from full master acceptance. No new independent general intelligence score or release claim.
 
+## Session update — exact inverse solver merged and corrected consensus locally verified
+
+#451 head da1b7e3bc6ae7650d83371cc691ab35100c9ac2c Android 45844958657 and native calculator 45844958297 both passed. Downloaded and directly inspected artifact 15131742826: historical 8/8 exact computed values, 0/8 direct strict synthesis, 4/4 unsuitable rejected; fresh paired 8/8 exact values, direct 1/8 versus thinking 7/8, 4/4 unsuitable rejected; rational pinned parser comparison 1/4 to 4/4, three gains, zero paired losses, both reject 3/3 unsuitable, direct synthesis 0/4 versus thinking 4/4; no incomplete planning calls. These reproduce earlier calculator diagnostics, not broad new intelligence evidence. #451 squash merged into main ee65a83131e3b240128ade8409556cd4460b67bd. Explicit inverse-equation solving and independent numerical review now integrated; automatic word-problem equation interpretation remains disabled after #449 regression. Historical retrieval remains integrated via #450.
+
+#452 prior Android 45845542499 failed one of 1,060 tests at AstraReasoningConsensusTest.kt:15; corrected plus-sign parsing committed a3497fb564628fbb47feb47402c44b629ac5d881; old native run 45845542657 cancelled. Corrected head 188dd8ed63d3165521cad03329ba2a72c7c9b79e Python 45847027688 passed, Android 45847027709 and native 45847027616 in progress. Independently reproduced Kotlin nullable BigInteger plus-sign behavior locally. Copied exact corrected selector and interruption guard to local JVM environment; verified git hash-object equals source blobs 042fe43c71b4131e46e02b300de111c1e7ce2e71 and 5f2b5158561bfc4dba8577dacd227ae118caa706. Compiled with kotlinc and executed 524/524 deterministic checks: seed 73901822, 128 randomly generated signed integers, four checks each for canonical-equivalent retries, preservation of matching original, disagreement and incomplete retry; eight malformed/overlong/incomplete outputs and four zero/boolean cases. These verify selection policy only, not model accuracy. #453 named categorical deduction head 37ccdfb4251050cc5a30dc8c3a84071855569cf5 Android 45846565744 running. Both #452 and #453 now conflict against main after #451 merge; preserve in-flight tests, reconcile exact validated changes and ledger once results are available. No new experimental branches, no model weights or automatic routing changes, no independent intelligence rating.
+
+### Incremental milestones (not additional master requirements)
+
+- [x] Milestone — ACIE-052: improved historical-tail retrieval merged (#450).
+- [x] Milestone — ACIE-057: exact explicit linear-equation solver and independent numerical audit merged (#451).
+- [x] Milestone — ACIE-117: combined Android and native calculator regression passed for #451.
+- [x] Milestone — ACIE-039/065/080: corrected consensus selection validated locally against 524 deterministic policy cases, exact source blobs verified.
+- [ ] Milestone — ACIE-039/065/110: complete corrected actual-model consensus comparison and assess net accuracy, regressions and cost.
+- [ ] Milestone — ACIE-031/058: validate named controlled-language categorical deduction.
+- [ ] Milestone — ACIE-117: reconcile remaining branches after validation.
+- [ ] Milestone — ACIE-040/118/119: independent broad physical-device assessment and target attainment.
+
+All 119 sequential ACIE master requirements reviewed; 27 checked, 92 outstanding. No broad master tick added from narrow capability checks. Ledger updated on main rather than introducing a new PR solely for reporting. Do not infer model intelligence from deterministic policy checks or repeated calculator cases.
+
 ## Acceptance
 
 90/100 independent repeated general intelligence score; separate model-only/assisted results; no model substitution, paid API or unsupported capability claims. Freeze protocol before held-out testing. Preserve offline and memory constraints. Recheck any completed engineering item if a later regression invalidates it.
