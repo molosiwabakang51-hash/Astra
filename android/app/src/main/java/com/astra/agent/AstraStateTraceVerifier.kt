@@ -57,7 +57,7 @@ internal object AstraStateTraceVerifier {
     fun report(checked: Checked, previous: String? = null): String? {
         val verdict = if (previous == null) "result: ${checked.result}." else {
             if (!Regex("""[+-]?[0-9]{1,19}""").matches(previous)) return null
-            val value = previous.toBigIntegerOrNull() ?: return null
+            val value = previous.removePrefix("+").toBigIntegerOrNull() ?: return null
             if (value == checked.result.toBigInteger()) "correct."
             else "incorrect; corrected result: ${checked.result}."
         }
