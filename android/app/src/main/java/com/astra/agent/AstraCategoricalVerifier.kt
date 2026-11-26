@@ -102,6 +102,9 @@ internal object AstraCategoricalVerifier {
             fun symbol(name: String): Char? {
                 if (name.lowercase(java.util.Locale.ROOT) in reserved) return null
                 if (name in mapping) return mapping[name]
+                // Capitalization-only differences are ambiguous in English:
+                // reject rather than infer either identity or distinction.
+                if (mapping.keys.any { it.equals(name, ignoreCase = true) }) return null
                 if (mapping.size >= 8) return null
                 val next = 'A' + mapping.size
                 mapping[name] = next
