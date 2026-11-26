@@ -72,6 +72,59 @@ class ACIEAssessmentTest(unittest.TestCase):
         source = (root / "android/app/src/main/java/com/astra/agent/AstraModelImport.kt").read_text()
         self.assertIn('ADVANCED_SHA256 = "' + gate.MODEL + '"', source)
 
+    def test_uncommitted_record_cannot_be_acceptance_eligible(self):
+        result = gate.evaluate(record())
+        self.assertTrue(result["target_met"])
+        self.assertFalse(result["freeze_commitment_matched"])
+        self.assertFalse(result["acceptance_record_eligible"])
+
+    def test_freeze_manifest_binds_all_cases_and_configuration(self):
+        r = record()
+        manifest = dict(protocol="ACIE-v1-freeze",
+                        configuration=dict(r["runs"][0]["configuration"]), runs=[])
+        for run in r["runs"]:
+            planned = dict(form=run["form"], track=run["track"], cases=[])
+            for case in run["cases"]:
+                case["rubric_sha256"] = "d"*64
+                planned["cases"].append({k: case[k] for k in
+                    ("variant_id", "dimension", "rubric_sha256")})
+            manifest["runs"].append(planned)
+        digest = gate.manifest_digest(manifest)
+        result = gate.evaluate(r, manifest, digest)
+        self.assertTrue(result["freeze_commitment_matched"])
+        self.assertTrue(result["acceptance_record_eligible"])
+        self.assertFalse(result["release_ready"])
+        self.assertEqual(gate.evaluate(r, manifest, "e"*64)["status"], "INCOMPLETE")
+        self.assertEqual(gate.evaluate(r, manifest)["status"], "INCOMPLETE")
+        self.assertEqual(gate.evaluate(r, None, digest)["status"], "INCOMPLETE")
+        case = r["runs"][0]["cases"][0]
+        for key, changed in (("variant_id", "new_variant"), ("rubric_sha256", "e"*64)):
+            original = case[key]
+            case[key] = changed
+            self.assertEqual(gate.evaluate(r, manifest, digest)["status"], "INCOMPLETE")
+            case[key] = original
+        for run in r["runs"]:
+            run["configuration"]["apk_sha256"] = "e"*64
+        self.assertEqual(gate.evaluate(r, manifest, digest)["status"], "INCOMPLETE")
+
+    def test_manifest_duplicate_variant_and_extra_fields_rejected(self):
+        r = record()
+        manifest = dict(protocol="ACIE-v1-freeze",
+                        configuration=dict(r["runs"][0]["configuration"]), runs=[])
+        for run in r["runs"]:
+            planned = dict(form=run["form"], track=run["track"], cases=[])
+            for case in run["cases"]:
+                case["rubric_sha256"] = "d"*64
+                planned["cases"].append({k: case[k] for k in
+                    ("variant_id", "dimension", "rubric_sha256")})
+            manifest["runs"].append(planned)
+        case = manifest["runs"][0]["cases"][0]
+        case["private_prompt"] = "must not be in manifest"
+        self.assertEqual(gate.evaluate(r, manifest, gate.manifest_digest(manifest))["status"], "INCOMPLETE")
+        del case["private_prompt"]
+        case["variant_id"] = manifest["runs"][1]["cases"][0]["variant_id"]
+        self.assertEqual(gate.evaluate(r, manifest, gate.manifest_digest(manifest))["status"], "INCOMPLETE")
+
 
 if __name__ == "__main__":
     unittest.main()
