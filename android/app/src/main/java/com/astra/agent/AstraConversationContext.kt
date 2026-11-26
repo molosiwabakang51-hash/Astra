@@ -284,16 +284,13 @@ internal object AstraConversationContext {
             }
             return selected
         }
-        // Compare the serialized correction with its complete bounded quote.
-        // For long raw corrections avoid allocating an unbounded escaped copy;
+        // Every registered chain member is a reasoning premise, including
+        // the original anchor. A relative correction cannot reconstruct a
+        // missing base value. Avoid allocating an unbounded escaped copy:
         // anything beyond the excerpt maximum is conservatively incomplete.
-        // An index can be both a correction and a later anchor; include it
-        // whenever it is a correction in ANY registered chain.
-        val correctionIndices = correctionChains.flatMap { (anchor, chain) ->
-            chain.filter { it != anchor }
-        }.toSet()
-        val completeCorrectionQuotes = valid.asSequence()
-            .filter { it.index in correctionIndices && it.value.content.length <= MAX_TURN_CHARS }
+        val chainIndices = correctionChains.values.flatten().toSet()
+        val completeChainQuotes = valid.asSequence()
+            .filter { it.index in chainIndices && it.value.content.length <= MAX_TURN_CHARS }
             .associate { it.index to ("Previous user: \"" + quote(it.value.content) + "\"\n") }
         var selected = selectExcerpts(room)
         if (selected.isEmpty()) return AstraOfflinePolicy.modelPrompt(current, thinkingRequested)
@@ -303,8 +300,8 @@ internal object AstraConversationContext {
         // may remove a later correction. Never downgrade a warning.
         fun omissionLevel(excerpts: List<Pair<Int, String>>): Int {
             val included = excerpts.map { it.first }.toSet()
-            val incompleteCorrections = excerpts.asSequence().filter { (index, excerpt) ->
-                index in correctionIndices && excerpt != completeCorrectionQuotes[index]
+            val incompleteChainMembers = excerpts.asSequence().filter { (index, excerpt) ->
+                index in chainIndices && excerpt != completeChainQuotes[index]
             }.map { it.first }.toSet()
             var level = 0
             for ((anchorIndex, chain) in correctionChains) {
@@ -314,9 +311,11 @@ internal object AstraConversationContext {
                 // An included index does not prove its correction was fully
                 // presented. A bounded excerpt can omit the actual replacement
                 // value or an essential qualification at the end of the turn.
-                if (newest in incompleteCorrections) return 2
+                if (newest in incompleteChainMembers) return 2
+                // A truncated original premise is an intermediate evidence
+                // gap, not proof that a later correction itself is absent.
                 if (!included.containsAll(chain) ||
-                    chain.any { it != anchorIndex && it in incompleteCorrections }) level = 1
+                    chain.any(incompleteChainMembers::contains)) level = 1
             }
             return level
         }
