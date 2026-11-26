@@ -6,6 +6,7 @@ Compare the prior and Qwen-recommended profiles on identical prompts and seeds.
 No tool-assisted answers, private inputs, paid API or saved reasoning traces.
 """
 import argparse
+import base64
 import hashlib
 import json
 import math
@@ -225,7 +226,19 @@ def request(opener, path, payload=None, timeout=180):
     return json.loads(body)
 
 
-def evaluate(seed, infer, experiment="sampling"):
+def answer_contract(jar, question, visible):
+    """Run the production Kotlin normalizer without passing an expected answer."""
+    data = "\n".join(base64.b64encode(v.encode()).decode("ascii")
+                     for v in (question, visible)) + "\n"
+    result = subprocess.run(["java", "-jar", str(jar)], input=data, text=True,
+                            capture_output=True, check=True, timeout=15)
+    lines = result.stdout.splitlines()
+    if len(lines) != 1:
+        raise RuntimeError("Invalid answer contract bridge response")
+    return base64.b64decode(lines[0], validate=True).decode("utf-8")
+
+
+def evaluate(seed, infer, experiment="sampling", normalize=None):
     if experiment not in ("sampling", "framing", "system", "fresh_reasoning", "breadth", "authority", "quantitative_check"):
         raise ValueError("Unknown experiment")
     system = system_prompt()
@@ -300,9 +313,19 @@ def evaluate(seed, infer, experiment="sampling"):
                 failure = ("pass" if passed else "incomplete" if not complete else
                            "no_visible_answer" if not visible else
                            "wrong_scalar" if scalar else "noncanonical_ungraded")
-                rows.append(dict(case=case, mode=mode, profile=name, seed=call_seed,
-                                 passed=passed, complete=complete, stop=stop, failure=failure,
-                                 generated_tokens=tokens, elapsed_ms=elapsed))
+                row = dict(case=case, mode=mode, profile=name, seed=call_seed,
+                           passed=passed, complete=complete, stop=stop, failure=failure,
+                           generated_tokens=tokens, elapsed_ms=elapsed)
+                if normalize is not None:
+                    # Separate postprocessing diagnostic, never replace the
+                    # raw strict score or give credit to incomplete generation.
+                    formatted = normalize(question, visible) if complete and visible else visible
+                    formatted_ok = complete and formatted.rstrip(".!").casefold() == expected.casefold()
+                    row["contract_changed"] = formatted != visible
+                    row["contract_correct"] = formatted_ok
+                    row["contract_recovered"] = formatted_ok and not passed
+                    row["contract_lost"] = passed and not formatted_ok
+                rows.append(row)
     totals = {}
     for mode in CAPS:
         for profile in arms(mode):
@@ -314,6 +337,18 @@ def evaluate(seed, infer, experiment="sampling"):
                 generated_tokens=sum(x["generated_tokens"] for x in group),
                 failures={label: sum(x["failure"] == label for x in group) for label in
                           ("incomplete", "no_visible_answer", "wrong_scalar", "noncanonical_ungraded")})
+    contract_audit = None
+    if normalize is not None:
+        contract_audit = {}
+        for key in totals:
+            mode, profile = key.split(":", 1)
+            group = [row for row in rows if row["mode"] == mode and row["profile"] == profile]
+            contract_audit[key] = dict(attempted=len(group),
+                strict_correct=sum(row["passed"] for row in group),
+                contract_correct=sum(row["contract_correct"] for row in group),
+                changed=sum(row["contract_changed"] for row in group),
+                recovered=sum(row["contract_recovered"] for row in group),
+                lost=sum(row["contract_lost"] for row in group))
     by_domain, matched = {}, {}
     if experiment == "breadth":
         # Keep the denominator fixed; no filtering incomplete or noncanonical responses.
@@ -351,11 +386,12 @@ def evaluate(seed, infer, experiment="sampling"):
                 compact_prompt_sha256=hashlib.sha256(COMPACT_SYSTEM.encode()).hexdigest(),
                 authority_candidate_sha256=hashlib.sha256((system + AUTHORITY_RULE).encode()).hexdigest() if experiment == "authority" else None,
                 quantitative_candidate_sha256=hashlib.sha256((system + QUANTITATIVE_CHECK).encode()).hexdigest() if experiment == "quantitative_check" else None,
-                totals=totals, cases=rows, by_domain=by_domain, matched=matched, official_ai_rating=None,
+                totals=totals, cases=rows, by_domain=by_domain, matched=matched,
+                answer_contract_audit=contract_audit, official_ai_rating=None,
                 scope=f"{len(suite)} synthetic single-turn problems per mode; CPU server, not Android JNI or independent held-out review.")
 
 
-def run(binary, seed, experiment="sampling"):
+def run(binary, seed, experiment="sampling", normalize=None):
     if not check_model(MODEL_PATH):
         raise RuntimeError("Unverified or unavailable Qwen3 1.7B GGUF")
     opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
@@ -378,7 +414,7 @@ def run(binary, seed, experiment="sampling"):
                 time.sleep(1)
             else:
                 raise RuntimeError("Native server startup timed out")
-            result = evaluate(seed, lambda payload: request(opener, "/completion", payload), experiment)
+            result = evaluate(seed, lambda payload: request(opener, "/completion", payload), experiment, normalize)
             if not check_model(MODEL_PATH):
                 raise RuntimeError("Model identity changed during comparison")
             return result
@@ -397,14 +433,16 @@ def main():
     parser.add_argument("binary", type=Path)
     parser.add_argument("--seed", type=int)
     parser.add_argument("--experiment", choices=("sampling", "framing", "system", "fresh_reasoning", "breadth", "authority", "quantitative_check"), default="sampling")
+    parser.add_argument("--answer-contract-jar", type=Path)
     args = parser.parse_args()
     seed = args.seed if args.seed is not None else secrets.randbelow(2**31 - 1)
     if not 0 <= seed < 2**31 - 1:
         parser.error("seed outside allowed range")
     try:
-        print(json.dumps(run(args.binary, seed, args.experiment), indent=2, allow_nan=False))
+        normalize = (lambda q, a: answer_contract(args.answer_contract_jar, q, a)) if args.answer_contract_jar else None
+        print(json.dumps(run(args.binary, seed, args.experiment, normalize), indent=2, allow_nan=False))
         return 0
-    except (OSError, ValueError, RuntimeError, KeyError, IndexError):
+    except (OSError, ValueError, RuntimeError, KeyError, IndexError, subprocess.SubprocessError):
         print("Native CPU comparison incomplete; no score awarded.", file=sys.stderr)
         return 1
 

@@ -223,6 +223,31 @@ class QwenProfileComparisonTests(unittest.TestCase):
             self.assertEqual(a["n_predict"], 768)
             self.assertEqual(a["temperature"], 0.6)
 
+    def test_contract_audit_preserves_strict_credit_and_skips_incomplete(self):
+        calls = []
+        def fake(payload):
+            return dict(generation_settings=payload, stop_type="eos",
+                        truncated=False, tokens_predicted=4, content="Answer: NO")
+        def normalize(question, visible):
+            calls.append((question, visible))
+            return "NO" if visible == "Answer: NO" else visible
+        result = comparison.evaluate(42, fake, "quantitative_check", normalize)
+        self.assertEqual(len(calls), 24)
+        self.assertTrue(all(visible == "Answer: NO" for _, visible in calls))
+        for arm, raw in result["totals"].items():
+            self.assertEqual(raw["correct"], 0)
+            self.assertEqual(result["answer_contract_audit"][arm], dict(
+                attempted=12, strict_correct=0, contract_correct=2,
+                changed=12, recovered=2, lost=0))
+        def capped(payload):
+            return dict(generation_settings=payload, stop_type="limit",
+                        truncated=False, tokens_predicted=4, content="Answer: NO")
+        calls.clear()
+        failed = comparison.evaluate(42, capped, "quantitative_check", normalize)
+        self.assertFalse(calls)
+        self.assertTrue(all(not row["contract_correct"] for row in failed["cases"]))
+
+
 
 if __name__ == "__main__":
     unittest.main()
