@@ -159,6 +159,35 @@ def authority_cases(seed):
     ]
 
 
+# Candidate numerical self-check instruction; not a deployed system change.
+QUANTITATIVE_CHECK = (" For quantitative questions, identify the unknown and derive its equation "
+                      "from the supplied facts. Recompute using a different grouping or substitute "
+                      "the result back into the original conditions; check units. If the facts do "
+                      "not determine an answer, do not invent a missing quantity. "
+                      "Keep the requested final answer format; for other tasks follow the normal instructions.")
+
+
+def quantitative_cases(seed):
+    """Twelve fresh public tasks: arithmetic, inverse reasoning, and controls."""
+    rng = random.Random(seed)
+    a, b, c = rng.randint(12, 25), rng.randint(3, 7), rng.randint(2, 5)
+    x, y, z = rng.randint(8, 17), rng.randint(2, 6), rng.randint(3, 8)
+    return [
+        ("arithmetic_stock", f"A shop receives {a} crates of {b} items, sells {c} full crates, and loses {z} loose items. How many items remain? Reply with only the integer.", str((a-c)*b-z)),
+        ("arithmetic_cost", f"A school buys {a} notebooks at {b} coins each. It receives a discount of {x} coins on the total and pays {z} coins for delivery. What is the final cost? Reply with only the integer.", str(a*b-x+z)),
+        ("arithmetic_average", f"Four measurements are {x}, {x+2*y}, {x+4*y}, and {x+6*y}. What is their arithmetic mean? Reply with only the integer.", str(x+3*y)),
+        ("arithmetic_capacity", f"A container holds {b} items. There are {a*b+c} items, and each item must be placed in exactly one container. What is the minimum number of containers? Reply with only the integer.", str((a*b+c+b-1)//b)),
+        ("inverse_balance", f"After depositing {x} coins and withdrawing {y} coins, a balance is {a+x-y} coins. What was the starting balance? Reply with only the integer.", str(a)),
+        ("inverse_equation", f"A number multiplied by {b}, then increased by {z}, equals {x*b+z}. What is the number? Reply with only the integer.", str(x)),
+        ("inverse_unit", f"A total bill of {a*b+z} coins covers {a} identical items and one delivery fee of {z} coins. What is the price of one item? Reply with only the integer.", str(b)),
+        ("inverse_remaining", f"A warehouse initially holds only full crates of {b} items each. After selling {c} full crates it has {(a-c)*b} items left. How many crates did it hold initially? Reply with only the integer.", str(a)),
+        ("control_missing", f"A tank contains {a} litres. An unspecified amount is removed. Can the exact remaining volume be determined? Reply YES or NO only.", "NO"),
+        ("control_units", f"A journey takes {b} hours at constant speed. The speed is not given. Can the exact distance be determined? Reply YES or NO only.", "NO"),
+        ("control_logic", "Every sealed package is labelled. This package is sealed. Must it be labelled? Reply YES or NO only.", "YES"),
+        ("control_quote", "A notice says: 'The library opens on Monday.' On which day does the notice say it opens? Reply only with the day name.", "Monday"),
+    ]
+
+
 def raw_prompt(system, question, mode, *, hard_direct=False):
     if mode not in CAPS:
         raise ValueError("Unknown mode")
@@ -197,10 +226,12 @@ def request(opener, path, payload=None, timeout=180):
 
 
 def evaluate(seed, infer, experiment="sampling"):
-    if experiment not in ("sampling", "framing", "system", "fresh_reasoning", "breadth", "authority"):
+    if experiment not in ("sampling", "framing", "system", "fresh_reasoning", "breadth", "authority", "quantitative_check"):
         raise ValueError("Unknown experiment")
     system = system_prompt()
     def arms(mode):
+        if experiment == "quantitative_check":
+            return ["baseline", "quantitative_check"] if mode == "think" else []
         if experiment == "authority":
             return ["baseline", "authority_rule"] if mode == "think" else []
         if experiment == "breadth":
@@ -217,13 +248,16 @@ def evaluate(seed, infer, experiment="sampling"):
             return PROFILES[name], system, False
         if experiment == "authority":
             return PROFILES["qwen_think"], system + (AUTHORITY_RULE if name == "authority_rule" else ""), False
+        if experiment == "quantitative_check":
+            return PROFILES["qwen_think"], system + (QUANTITATIVE_CHECK if name == "quantitative_check" else ""), False
         if experiment in ("fresh_reasoning", "breadth"):
             return PROFILES["qwen_" + mode], system, name == "hard_direct"
         # Keep sampling constant across each experimental pair. Legacy
         # thinking is the better exploratory baseline, not a deployed change.
         return PROFILES["legacy"], (COMPACT_SYSTEM if name == "compact" else system), name == "hard_direct"
     rows = []
-    suite = (authority_cases(seed) if experiment == "authority" else
+    suite = (quantitative_cases(seed) if experiment == "quantitative_check" else
+             authority_cases(seed) if experiment == "authority" else
              breadth_cases(seed) if experiment == "breadth" else
              fresh_cases(seed) if experiment == "fresh_reasoning" else cases(seed))
     for index, (case, question, expected) in enumerate(suite):
@@ -296,8 +330,10 @@ def evaluate(seed, infer, experiment="sampling"):
             key = ("both_correct" if scores["think"] and scores["direct"] else
                    "think_only" if scores["think"] else "direct_only" if scores["direct"] else "neither")
             matched[key] += 1
-    if experiment == "authority":
-        for domain in ("quote", "control"):
+    if experiment in ("authority", "quantitative_check"):
+        domains = ("quote", "control") if experiment == "authority" else ("arithmetic", "inverse", "control")
+        candidate = "authority_rule" if experiment == "authority" else "quantitative_check"
+        for domain in domains:
             by_domain[domain] = {}
             for arm in arms("think"):
                 group = [x for x in rows if x["profile"] == arm and x["case"].startswith(domain + "_")]
@@ -307,13 +343,14 @@ def evaluate(seed, infer, experiment="sampling"):
         matched = dict(both_correct=0, candidate_only=0, baseline_only=0, neither=0)
         for case, _, _ in suite:
             scores = {x["profile"]: x["passed"] for x in rows if x["case"] == case}
-            a, b = scores["baseline"], scores["authority_rule"]
+            a, b = scores["baseline"], scores[candidate]
             matched["both_correct" if a and b else "baseline_only" if a else "candidate_only" if b else "neither"] += 1
     return dict(status="COMPLETE_CPU_DIAGNOSTIC", experiment=experiment, seed=seed, model_sha256=MODEL_SHA256,
                 context_tokens=CONTEXT, caps=CAPS,
                 system_prompt_sha256=hashlib.sha256(system.encode()).hexdigest(),
                 compact_prompt_sha256=hashlib.sha256(COMPACT_SYSTEM.encode()).hexdigest(),
                 authority_candidate_sha256=hashlib.sha256((system + AUTHORITY_RULE).encode()).hexdigest() if experiment == "authority" else None,
+                quantitative_candidate_sha256=hashlib.sha256((system + QUANTITATIVE_CHECK).encode()).hexdigest() if experiment == "quantitative_check" else None,
                 totals=totals, cases=rows, by_domain=by_domain, matched=matched, official_ai_rating=None,
                 scope=f"{len(suite)} synthetic single-turn problems per mode; CPU server, not Android JNI or independent held-out review.")
 
@@ -359,7 +396,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("binary", type=Path)
     parser.add_argument("--seed", type=int)
-    parser.add_argument("--experiment", choices=("sampling", "framing", "system", "fresh_reasoning", "breadth", "authority"), default="sampling")
+    parser.add_argument("--experiment", choices=("sampling", "framing", "system", "fresh_reasoning", "breadth", "authority", "quantitative_check"), default="sampling")
     args = parser.parse_args()
     seed = args.seed if args.seed is not None else secrets.randbelow(2**31 - 1)
     if not 0 <= seed < 2**31 - 1:

@@ -6,6 +6,15 @@ on:
       - '.github/workflows/qwen3-profile-evaluation.yml'
       - 'scripts/quality/run_qwen_profile_comparison.py'
   workflow_dispatch:
+    inputs:
+      suite:
+        description: Evaluation suite
+        required: true
+        type: choice
+        default: quantitative_check
+        options:
+          - quantitative_check
+          - historical
 permissions:
   contents: read
 concurrency:
@@ -35,14 +44,23 @@ jobs:
           set -euo pipefail
           cmake -S cpu-llama -B cpu-build -G Ninja -DCMAKE_BUILD_TYPE=Release -DLLAMA_BUILD_TESTS=OFF -DLLAMA_BUILD_EXAMPLES=OFF -DLLAMA_BUILD_TOOLS=ON -DLLAMA_BUILD_SERVER=ON -DLLAMA_BUILD_UI=OFF -DLLAMA_USE_PREBUILT_UI=OFF -DGGML_CUDA=OFF
           cmake --build cpu-build --target llama-server --parallel 4
-      - name: Compare real model-generated answers
+      - name: Compare quantitative reasoning and verification
+        if: github.event_name == 'pull_request' || inputs.suite == 'quantitative_check'
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p evaluation
+          python scripts/quality/run_qwen_profile_comparison.py cpu-build/bin/llama-server --experiment quantitative_check --seed 50792163 > evaluation/quantitative-comparison.json
+          cat evaluation/quantitative-comparison.json >> "$GITHUB_STEP_SUMMARY"
+      - name: Reproduce historical model comparisons
+        if: github.event_name == 'workflow_dispatch' && inputs.suite == 'historical'
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p evaluation
           python scripts/quality/run_qwen_profile_comparison.py cpu-build/bin/llama-server --experiment breadth --seed 147806239 > evaluation/breadth-comparison.json
           python scripts/quality/run_qwen_profile_comparison.py cpu-build/bin/llama-server --experiment authority --seed 69173217 > evaluation/authority-comparison.json
-          cat evaluation/authority-comparison.json >> "$GITHUB_STEP_SUMMARY"
+          cat evaluation/breadth-comparison.json evaluation/authority-comparison.json >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@v6
         with:
           name: qwen3-native-cpu-comparison
