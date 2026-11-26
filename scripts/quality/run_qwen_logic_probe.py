@@ -15,6 +15,14 @@ import run_qwen_profile_comparison as native
 
 SEED = 84620917
 CAP = 768
+# Syntax only: no case-dependent symbols, premise count or correct answer.
+# The production parser and semantic verifier still decide acceptance.
+GRAMMAR = r'''root ::= "NONE" | "FORM: " expr ("; " expr){0,5} " => " expr
+expr ::= atom ((" & " | " | " | " -> ") atom)*
+atom ::= [A-Z] | "!" atom | "(" expr ")"
+'''
+GRAMMAR_CANARY = "ACIE_GRAMMAR_CANARY"
+
 # Mapping is supplied to the model; formal answers and verdicts are evaluator-only.
 CASES = (
     ("modus_ponens", "A = the lamp is on; B = the room is lit.",
@@ -96,19 +104,25 @@ def equivalent(verify, left, right):
     return verify(formal(("A | !A",), f"(({left}) -> ({right})) & (({right}) -> ({left}))")) == "ENTAILED"
 
 
-def evaluate(infer, verify, cases=CASES):
+def evaluate(infer, verify, cases=CASES, experiment="modes"):
+    if experiment not in ("modes", "grammar"):
+        raise ValueError("Unknown logic experiment")
+    arms = ("direct", "grammar") if experiment == "grammar" else ("direct", "think")
     system = native.system_prompt()
     rows = []
     for index, (name, mapping, argument, expected_p, expected_c, expected_v) in enumerate(cases):
         eligible = expected_p is not None
         symbols = set(re.findall(r"\b([A-Z]) =", mapping))
-        for mode in (("direct", "think") if index % 2 == 0 else ("think", "direct")):
-            settings = native.PROFILES["qwen_" + mode]
+        for mode in (arms if index % 2 == 0 else arms[::-1]):
+            sampling_mode = "direct" if mode == "grammar" else mode
+            settings = native.PROFILES["qwen_" + sampling_mode]
             seed = SEED + index * 13
-            payload = dict(prompt=native.raw_prompt(system, planning_prompt(mapping, argument), mode),
+            payload = dict(prompt=native.raw_prompt(system, planning_prompt(mapping, argument), sampling_mode),
                            n_predict=CAP, seed=seed, cache_prompt=False, stream=False,
                            ignore_eos=False, repeat_penalty=1.0, presence_penalty=0.0,
                            frequency_penalty=0.0, **settings)
+            if mode == "grammar":
+                payload["grammar"] = GRAMMAR
             start = time.monotonic()
             reply = infer(payload)
             ms = round((time.monotonic() - start) * 1000)
@@ -124,6 +138,10 @@ def evaluate(infer, verify, cases=CASES):
                 raise RuntimeError("Unverified token count")
             complete = stop in ("eos", "word") and not truncated
             visible = native.visible_answer(reply.get("content"))
+            # A constrained response must not rely on stripping hidden thought.
+            raw = reply.get("content")
+            if mode == "grammar" and (not isinstance(raw, str) or raw.strip() != visible):
+                visible = ""
             parsed = parse(visible, symbols) if complete else None
             verdict = verify(formal(*parsed)) if parsed is not None else "REJECT"
             accepted = verdict != "REJECT"
@@ -139,7 +157,7 @@ def evaluate(infer, verify, cases=CASES):
                              faithful_and_correct=fidelity and verdict == expected_v,
                              tokens=tokens, elapsed_ms=ms))
     totals = {}
-    for mode in ("direct", "think"):
+    for mode in arms:
         group = [r for r in rows if r["mode"] == mode]
         good = [r for r in group if r["eligible"]]
         bad = [r for r in group if not r["eligible"]]
@@ -151,21 +169,36 @@ def evaluate(infer, verify, cases=CASES):
                             faithful_and_correct=sum(r["faithful_and_correct"] for r in good),
                             unsuitable_explicit_none=sum(r["explicit_none"] for r in bad),
                             unsuitable_accepted=sum(r["accepted"] for r in bad))
-    matched = dict(both=0, direct_only=0, thinking_only=0, neither=0)
+    candidate_only = "grammar_only" if experiment == "grammar" else "thinking_only"
+    matched = {"both": 0, "direct_only": 0, candidate_only: 0, "neither": 0}
     for name, _, _, expected_p, _, _ in cases:
         if expected_p is None:
             continue
         pair = {r["mode"]: r["faithful_and_correct"] for r in rows if r["case"] == name}
-        a, b = pair["direct"], pair["think"]
-        matched["both" if a and b else "direct_only" if a else "thinking_only" if b else "neither"] += 1
-    return dict(status="COMPLETE_LOGIC_CPU_DIAGNOSTIC", seed=SEED, cap=CAP,
+        a, b = pair[arms[0]], pair[arms[1]]
+        matched["both" if a and b else "direct_only" if a else candidate_only if b else "neither"] += 1
+    return dict(status="COMPLETE_LOGIC_CPU_DIAGNOSTIC", experiment=experiment, seed=SEED, cap=CAP,
+                grammar_sha256=hashlib.sha256(GRAMMAR.encode()).hexdigest() if experiment == "grammar" else None,
                 model_sha256=native.MODEL_SHA256,
                 system_prompt_sha256=hashlib.sha256(system.encode()).hexdigest(),
                 totals=totals, matched=matched, cases=rows, official_ai_rating=None,
                 scope="Public synthetic supplied-mapping formalization; not arbitrary language, live Android or independent assessment.")
 
 
-def run(binary, jar):
+def grammar_canary(infer):
+    """Fail closed if the server does not honor a simple unrelated grammar."""
+    payload = dict(prompt=native.raw_prompt(native.system_prompt(), "Reply only NO.", "direct"),
+                   grammar='root ::= "' + GRAMMAR_CANARY + '"',
+                   n_predict=64, seed=SEED, cache_prompt=False, stream=False,
+                   ignore_eos=False, **native.PROFILES["qwen_direct"])
+    response = infer(payload)
+    if (response.get("content", "").strip() != GRAMMAR_CANARY or
+            response.get("stop_type") not in ("eos", "word") or
+            response.get("truncated") is not False):
+        raise RuntimeError("Native grammar enforcement canary failed")
+
+
+def run(binary, jar, experiment="modes"):
     if not native.check_model(native.MODEL_PATH):
         raise RuntimeError("Unverified model")
     opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
@@ -188,8 +221,12 @@ def run(binary, jar):
                 time.sleep(1)
             else:
                 raise RuntimeError("Native startup timed out")
-            result = evaluate(lambda payload: native.request(opener, "/completion", payload),
-                              lambda question: bridge(jar, question))
+            infer = lambda payload: native.request(opener, "/completion", payload)
+            if experiment == "grammar":
+                grammar_canary(infer)
+            result = evaluate(infer, lambda question: bridge(jar, question), experiment=experiment)
+            if experiment == "grammar":
+                result["grammar_canary_passed"] = True
             if not native.check_model(native.MODEL_PATH):
                 raise RuntimeError("Model identity changed")
             return result
@@ -207,5 +244,6 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("binary", type=Path)
     parser.add_argument("bridge", type=Path)
+    parser.add_argument("--experiment", choices=("modes", "grammar"), default="modes")
     args = parser.parse_args()
-    print(json.dumps(run(args.binary, args.bridge), indent=2, allow_nan=False))
+    print(json.dumps(run(args.binary, args.bridge, args.experiment), indent=2, allow_nan=False))
