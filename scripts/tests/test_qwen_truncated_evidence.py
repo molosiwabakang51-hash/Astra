@@ -37,6 +37,18 @@ class TruncatedEvidenceTests(unittest.TestCase):
                 self.assertTrue(any(role == "user" and fragments[0] in text for role, text in history))
                 self.assertEqual(expected, "YES" if case.startswith("control_") else "NO")
 
+    def test_production_warning_literals_share_detection_prefix(self):
+        # The latest notice uses a comma, not the intermediate notice's period.
+        # The detector must recognize both exact production literals.
+        production = probe.native.SYSTEM_PATH.read_text(encoding="utf-8")
+        intermediate = "[Some linked corrections are omitted. If the result depends on missing steps, ask for clarification.]"
+        latest = "[Some linked corrections are omitted, including a later correction. Do not assume the latest value; ask for clarification.]"
+        for notice in (intermediate, latest):
+            self.assertIn(notice, production)
+            self.assertIn(probe.GAP, notice)
+        self.assertNotIn(probe.TAIL, intermediate)
+        self.assertIn(probe.TAIL, latest)
+
     def test_preflight_rejects_false_warnings_and_missing_fixture_distinction(self):
         suite = probe.cases(19)
         good = self.builders(suite)
