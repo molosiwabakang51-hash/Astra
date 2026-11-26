@@ -460,6 +460,31 @@ All 119 sequential master requirements reviewed; 27 checked, 92 outstanding. Nar
 
 All 119 sequential master requirements reviewed; 27 checked, 92 outstanding. No new broad acceptance from narrow developmental results. No independent general intelligence rating.
 
+
+## Session update — integrated framing and rejected candidate strategies (26 November)
+
+General-AI-only scope under #308 and #315; preserve #313 without expansion. The minimum provisional target is independently supported 80/100, preferred 90/100. No change to canonical parent acceptance.
+
+- #464: reconciled exact restricted scalar-framing implementation, Android run 45876310765 passed, squash merged to main as 03d1b9fa14f4801f1d1a4fa8b1b26e043a61e83b. Prior actual-model evidence 5/12 to 11/12 (restricted diagnostic); no physical-device latency claim.
+- #452: actual CPU artifact 15133810673 documented in discussion; 9/12 to 9/12, approximately 3.17x CPU time. Do not activate multi-attempt consensus by default.
+- #463: actual CPU artifact 15144328030; 7/8 eligible correct and 1/8 unsuitable accepted in each arm. Narrow retry projected 89603 vs baseline 73107 ms without accuracy gain. Reject both recovery policies.
+- #465: actual CPU artifact 15146711416, seed 97261531; 24/24 complete; overall 6/12 to 5/12, state-trace subset 2/8 to 1/8, controls 4/4 both, 1 paired gain and 2 losses, 4114 to 3686 tokens, 330647 to 299818 ms. Python 45876695599, Android 45876695810 and actual CPU 45876695799 passed. Host-only diagnostic merged as 177dc108bc91a0467919eccaa732be99fd139a57. Reject live prompt activation.
+- #466: actual CPU artifact 15145344694, seed 68219457; 32/32 complete; eligible correct 7/8 to 1/8, unsuitable accepted 2/8 to 0/8, explicit NONE 0 in both arms, 277 to 950 tokens, 150126 to 211867 ms. Python 45876940403, Android 45876940284 and actual CPU 45876940383 passed. Host-only diagnostic merged as 29b0e25705999fc7f6ed8b03150795a1a089cc5f. Reject expanded planning prompt; fewer inappropriate accepted plans does not demonstrate understanding when legitimate plans are also rejected.
+- #467: controlled integer state verifier and explicit audit candidate. Initial Android 45877329687 had 1 failed of 1073 tests (+005 parsing). Corrected exact head 5416adfd07cf7e37b0d05854560611ce0f2ab687 removes explicit plus only after strict scalar validation and adds regressions. Android 45878094317 still running at inspection; no merge or real-device claim.
+
+### Incremental milestones (not additional master requirements)
+
+- [x] Milestone — ACIE-102/117: integrate validated scalar framing on main after fresh Android CI.
+- [x] Milestone — ACIE-039/065: inspect consensus results and reject default activation.
+- [x] Milestone — ACIE-028/080/110: inspect selective recovery results and reject activation.
+- [x] Milestone — ACIE-030/034/110: complete paired program-state diagnostic and retain test infrastructure.
+- [x] Milestone — ACIE-020/078/080: complete semantic sufficiency diagnostic and retain test infrastructure.
+- [x] Milestone — ACIE-056/057/065: implement bounded state-trace verification and signed-scalar correction.
+- [ ] Milestone — ACIE-056/057/065: verify corrected Android CI and integrate state trace if checks pass.
+- [ ] Milestone — ACIE-040/118/119: independent held-out and physical-device assessment; earn target score.
+
+All 119 sequential ACIE requirements reconciled: 27 engineering items checked, 92 outstanding. All 119 canonical release parents remain unchecked at last verification. Narrow engineering milestones, including successful host-only diagnostics, are not broad capability acceptance or a general intelligence score.
+
 ## Acceptance
 
 90/100 independent repeated general intelligence score; separate model-only/assisted results; no model substitution, paid API or unsupported capability claims. Freeze protocol before held-out testing. Preserve offline and memory constraints. Recheck any completed engineering item if a later regression invalidates it.
