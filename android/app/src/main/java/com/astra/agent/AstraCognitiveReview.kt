@@ -172,6 +172,11 @@ internal object AstraCognitiveReview {
             val report = AstraStateTraceVerifier.report(trace, answer)
             if (report != null) return Result.Local(report)
         }
+        // Exact affine equations may have nonterminating decimal solutions.
+        // Compare fractions rather than approximations, only on explicit review.
+        AstraCalculationAssist.auditLinearEquation(original, answer)?.let {
+            return Result.Local(it)
+        }
         // Independent validation only for an exact, unambiguous arithmetic
         // request and an unambiguous numeric response. No inference points.
         val expected = AstraVerifiedArithmetic.answer(original)
