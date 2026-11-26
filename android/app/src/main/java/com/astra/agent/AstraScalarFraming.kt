@@ -1,7 +1,8 @@
 package com.astra.agent
 
 /**
- * Experimental, deliberately inactive until native transfer evidence.
+ * Restricted first-turn framing validated in paired actual-model CPU transfer.
+ * Android integration must preserve the exact ordinary owner request.
  * Only explicit integer-only requests in isolated, ordinary thinking turns
  * qualify. Never modify a model-only, source-backed, diagnostic or follow-up
  * prompt. This changes format framing, not answer value or reasoning budget.
