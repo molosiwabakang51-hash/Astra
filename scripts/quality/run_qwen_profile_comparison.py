@@ -307,6 +307,42 @@ def long_context_cases(seed):
     ]
 
 
+def tail_context_cases(seed):
+    """Public synthetic cases isolate the newly searchable historical tail."""
+    rng = random.Random(seed)
+    values = rng.sample(range(210, 990), 12)
+    filler = "Unrelated background description. " * 145
+    def noise(history):
+        return history + [("assistant", "Unrelated weather discussion.") for _ in range(16)]
+    def recall(topic):
+        return f"What was my {topic}? Reply with only the integer."
+    def known(topic):
+        return f"Do the available conversation excerpts establish the exact {topic}? Reply YES or NO only."
+    def fact(topic, value):
+        return f"My fictional {topic} is {value} coins."
+    return [
+        ("tail_fact", recall("observatory budget"), str(values[0]), noise([
+            ("user", filler + fact("observatory budget", values[0]))])),
+        ("tail_replacement", recall("garden allocation"), str(values[2]), noise([
+            ("user", filler + fact("garden allocation", values[1])),
+            ("assistant", "Noted."), ("user", f"Actually, make it {values[2]} coins.")])),
+        ("tail_arithmetic", "Use the museum budget to calculate the remainder after spending 7 coins. Reply with only the integer.",
+            str(values[3]-7), noise([("user", filler + fact("museum budget", values[3]))])),
+        ("tail_provenance", recall("library budget"), str(values[4]), noise([
+            ("user", filler + fact("library budget", values[4])),
+            ("assistant", filler + f"I guessed your library budget was {values[5]} coins.")])),
+        ("gap_disjoint", known("ferry budget"), "NO", noise([
+            ("user", "Background. " * 40 + "ferry " + filler + f"budget {values[6]} coins.")])),
+        ("control_prefix", recall("archive budget"), str(values[7]), noise([
+            ("user", fact("archive budget", values[7]) + filler)])),
+        ("control_short", recall("orchard allocation"), str(values[8]), noise([
+            ("user", fact("orchard allocation", values[8]))])),
+        ("control_correction", recall("workshop budget"), str(values[10]), noise([
+            ("user", fact("workshop budget", values[9])),
+            ("assistant", "Noted."), ("user", f"Actually, make it {values[10]} coins.")])),
+    ]
+
+
 def recovery_prompt(jar, question, history):
     def encoded(value):
         return base64.b64encode(value.encode()).decode("ascii")
@@ -325,8 +361,8 @@ def recovery_prompt(jar, question, history):
 
 
 def evaluate(seed, infer, experiment="sampling", normalize=None, context_builders=None):
-    context_experiment = experiment in ("context_recovery", "context_transfer")
-    if experiment not in ("sampling", "framing", "system", "fresh_reasoning", "breadth", "authority", "quantitative_check", "context_recovery", "context_transfer"):
+    context_experiment = experiment in ("context_recovery", "context_transfer", "context_tail")
+    if experiment not in ("sampling", "framing", "system", "fresh_reasoning", "breadth", "authority", "quantitative_check", "context_recovery", "context_transfer", "context_tail"):
         raise ValueError("Unknown experiment")
     system = system_prompt()
     if context_experiment and (context_builders is None or set(context_builders) != {"baseline", "recovery"}):
@@ -362,7 +398,8 @@ def evaluate(seed, infer, experiment="sampling", normalize=None, context_builder
         # thinking is the better exploratory baseline, not a deployed change.
         return PROFILES["legacy"], (COMPACT_SYSTEM if name == "compact" else system), name == "hard_direct"
     rows = []
-    context_suite = (long_context_cases(seed) if experiment == "context_transfer" else context_cases(seed)) if context_experiment else []
+    context_suite = (tail_context_cases(seed) if experiment == "context_tail" else
+                     long_context_cases(seed) if experiment == "context_transfer" else context_cases(seed)) if context_experiment else []
     histories = {name: history for name, _, _, history in context_suite}
     suite = ([(name, question, expected) for name, question, expected, _ in context_suite] if context_experiment else
              quantitative_cases(seed) if experiment == "quantitative_check" else
@@ -466,8 +503,9 @@ def evaluate(seed, infer, experiment="sampling", normalize=None, context_builder
             key = ("both_correct" if scores["think"] and scores["direct"] else
                    "think_only" if scores["think"] else "direct_only" if scores["direct"] else "neither")
             matched[key] += 1
-    if experiment in ("authority", "quantitative_check", "context_recovery", "context_transfer"):
+    if experiment in ("authority", "quantitative_check", "context_recovery", "context_transfer", "context_tail"):
         domains = (("quote", "control") if experiment == "authority" else
+                   ("tail", "gap", "control") if experiment == "context_tail" else
                    ("replacement", "gap", "control") if context_experiment else ("arithmetic", "inverse", "control"))
         candidate = ("authority_rule" if experiment == "authority" else
                      "recovery" if context_experiment else "quantitative_check")
@@ -536,7 +574,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("binary", type=Path)
     parser.add_argument("--seed", type=int)
-    parser.add_argument("--experiment", choices=("sampling", "framing", "system", "fresh_reasoning", "breadth", "authority", "quantitative_check", "context_recovery", "context_transfer"), default="sampling")
+    parser.add_argument("--experiment", choices=("sampling", "framing", "system", "fresh_reasoning", "breadth", "authority", "quantitative_check", "context_recovery", "context_transfer", "context_tail"), default="sampling")
     parser.add_argument("--answer-contract-jar", type=Path)
     parser.add_argument("--baseline-context-jar", type=Path)
     parser.add_argument("--candidate-context-jar", type=Path)
@@ -547,7 +585,7 @@ def main():
     try:
         normalize = (lambda q, a: answer_contract(args.answer_contract_jar, q, a)) if args.answer_contract_jar else None
         builders = None
-        if args.experiment in ("context_recovery", "context_transfer"):
+        if args.experiment in ("context_recovery", "context_transfer", "context_tail"):
             if not args.baseline_context_jar or not args.candidate_context_jar or normalize is not None:
                 raise ValueError("Use both context builders without answer formatting")
             builders = {"baseline": lambda q, h: recovery_prompt(args.baseline_context_jar, q, h),
