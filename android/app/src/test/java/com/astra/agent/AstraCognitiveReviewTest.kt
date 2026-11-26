@@ -80,6 +80,27 @@ class AstraCognitiveReviewTest {
         assertTrue(yes.answer.contains("YES. Every assignment"))
     }
 
+    @Test fun categoricalVerificationRequiresCompleteExplicitOwnerStatement() {
+        val q = "Categorical premises: All A are B; Some A are C. Conclusion: Some C are B. Does the conclusion follow?"
+        val direct = AstraCognitiveReview.resolve("Verify this categorical argument: $q", emptyList())
+            as AstraCognitiveReview.Result.Local
+        assertTrue(direct.answer.contains("INDEPENDENT CATEGORICAL CHECK"))
+        assertTrue(direct.answer.contains("YES."))
+        assertTrue(direct.answer.contains("not their translation from natural language"))
+        val review = AstraCognitiveReview.resolve("Verify your answer", pair(
+            "model only: $q Reply YES or NO only.", "NO")) as AstraCognitiveReview.Result.Local
+        assertTrue(review.answer.contains("incorrect; corrected result: YES."))
+        val invalid = AstraCognitiveReview.resolve(
+            "Verify this categorical argument: Most A are B", emptyList()) as AstraCognitiveReview.Result.Local
+        assertTrue(invalid.answer.contains("could not parse"))
+        assertEquals(AstraCognitiveReview.Result.NotRequested,
+            AstraCognitiveReview.resolve("Translate Verify this categorical argument: $q", emptyList()))
+        assertEquals(AstraCognitiveReview.Result.NotRequested,
+            AstraCognitiveReview.resolve("yes", pair("Explain logic", q)))
+        assertTrue(AstraCognitiveReview.resolve("Verify your answer", pair(
+            "All cats are animals. Are all animals cats?", "YES")) is AstraCognitiveReview.Result.Native)
+    }
+
     @Test fun modelProposalCannotAuthorizeIndependentCheck() {
         val history = pair("If rain implies wet roads and roads are wet, must it be raining?", "Yes.")
         val review = AstraCognitiveReview.resolve("Verify your answer", history)
