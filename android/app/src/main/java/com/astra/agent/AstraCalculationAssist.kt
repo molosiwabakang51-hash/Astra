@@ -59,6 +59,17 @@ internal object AstraCalculationAssist {
             question.none { it in listOf('\r', '\n', '"', '\'', '“', '”', '‘', '’', '<', '>', 96.toChar()) } &&
             numericOnly.containsMatchIn(question.trim())
 
+    // The paired CPU probe improved strict numeric synthesis from 1/8 to
+    // 7/8 with thinking. Limit this route to the tested explicit format,
+    // preserve deliberate speed preferences, and keep the measured cap.
+    const val SYNTHESIS_THINKING_CAP = 768
+    private val explicitFast = Regex(
+        """(?i)(?:\b(?:do not think|don't think|fast mode|no thinking|without thinking)\b|/no_think\b)"""
+    )
+
+    fun prefersThinkingSynthesis(question: String): Boolean =
+        requestsNumericOnly(question) && !explicitFast.containsMatchIn(question)
+
     fun synthesisPrompt(question: String, computed: Computed): String {
         require(question.length in 1..MAX_QUESTION)
         return "Answer the original quoted question using the independently computed arithmetic result below. " +
