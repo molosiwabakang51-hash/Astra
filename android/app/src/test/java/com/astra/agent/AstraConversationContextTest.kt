@@ -477,6 +477,35 @@ class AstraConversationContextTest {
         assertTrue(prompt.length <= 3010)
     }
 
+    @Test fun eightCorrectionsRecoverTheMostRecentWithinExtendedWindow() {
+        val history = listOf(turn("user", "My fictional telescope budget is 900 coins.")) +
+            (1..8).flatMap {
+                listOf(turn("assistant", "Noted."), turn("user", "Actually, make it ${900-it*10} coins."))
+            } + (1..20).map { turn("assistant", "Unrelated weather note $it.") }
+        val prompt = AstraConversationContext.userPrompt("What was my telescope budget?", history, true)
+        assertTrue(prompt.contains("820 coins"))
+        assertTrue(prompt.contains("830 coins"))
+        assertTrue(prompt.contains("840 coins"))
+        assertFalse(prompt.contains("890 coins"))
+        assertTrue(prompt.contains("Some linked corrections are omitted."))
+        assertFalse(prompt.contains("including a later correction"))
+        assertTrue(prompt.length <= 3010)
+    }
+
+    @Test fun knownContinuationBeyondScanWarnsAgainstAssumingLatestValue() {
+        val history = listOf(turn("user", "My fictional telescope budget is 900 coins.")) +
+            (1..13).flatMap {
+                listOf(turn("assistant", "Noted."), turn("user", "Actually, make it ${900-it*10} coins."))
+            } + (1..20).map { turn("assistant", "Unrelated weather note $it.") }
+        val prompt = AstraConversationContext.userPrompt("What was my telescope budget?", history, true)
+        assertTrue(prompt.contains("780 coins"))
+        assertFalse(prompt.contains("770 coins"))
+        assertTrue(prompt.contains("including a later correction"))
+        assertTrue(prompt.contains("Do not assume the latest value"))
+        assertTrue(prompt.endsWith("What was my telescope budget?\n/no_think"))
+        assertTrue(prompt.length <= 3010)
+    }
+
     @Test fun missingRelativeAdjustmentsAreFlaggedRatherThanImpliedComplete() {
         val history = listOf(turn("user", "The fictional greenhouse budget is 900 coins.")) +
             listOf(11, 22, 33, 44, 55).flatMap {
