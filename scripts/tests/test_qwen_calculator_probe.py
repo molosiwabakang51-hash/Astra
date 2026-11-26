@@ -55,6 +55,46 @@ class CalculatorProbeTests(unittest.TestCase):
         self.assertFalse(probe.scalar_equal("12.5 or 13", "12.5"))
         self.assertFalse(probe.scalar_equal("1e2", "100"))
 
+    def test_synthesis_failure_categories(self):
+        for answer, complete, expected in [
+            ("12.50", True, "matches_calculation"),
+            ("13", True, "numeric_disagreement"),
+            ("MISMATCH", True, "mismatch"),
+            ("Answer: 12.5", True, "noncanonical_ungraded"),
+            ("", True, "no_visible_answer"),
+            ("12.5", False, "incomplete"),
+        ]:
+            self.assertEqual(probe.synthesis_outcome(answer, complete, "12.5"), expected)
+
+    def test_paired_modes_share_calculation_and_fixed_denominator(self):
+        calls = []
+        cases = (("correct", "first question", "100"),
+                 ("wrong", "second question", "100"),
+                 ("rejected", "third question", "100"))
+        def fake(payload):
+            calls.append(payload)
+            return dict(generation_settings=payload, stop_type="eos",
+                        truncated=False, tokens_predicted=1, content="100")
+        def invoke(operation, question, proposal=None):
+            if operation == "plan":
+                return question
+            if question == "third question":
+                return None
+            return ("100" if question == "first question" else "999", "same synthesis prompt")
+        result = probe.evaluate(fake, invoke, cases=cases, paired=True)
+        self.assertEqual(len(calls), 7)
+        for a, b in ((calls[1], calls[2]), (calls[4], calls[5])):
+            self.assertEqual(a["seed"], b["seed"])
+            self.assertEqual(a["n_predict"], b["n_predict"])
+            self.assertNotEqual(a["prompt"], b["prompt"])
+        self.assertEqual(result["paired_synthesis"],
+                         dict(denominator=3, direct_only=0, thinking_only=0,
+                              both=1, neither=2, thinking_strict_correct=1,
+                              thinking_attempted=2))
+        self.assertEqual(result["cases"][1]["thinking_synthesis"]["outcome"],
+                         "numeric_disagreement")
+        self.assertNotIn("thinking_synthesis", result["cases"][2])
+
 
 if __name__ == "__main__":
     unittest.main()
