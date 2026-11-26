@@ -191,6 +191,38 @@ class QwenProfileComparisonTests(unittest.TestCase):
             self.assertEqual(a["n_predict"], 768)
             self.assertEqual(a["temperature"], 0.6)
 
+    def test_quantitative_suite_has_reproducible_balanced_domains(self):
+        cases = comparison.quantitative_cases(42)
+        self.assertEqual(cases, comparison.quantitative_cases(42))
+        self.assertNotEqual(cases, comparison.quantitative_cases(43))
+        self.assertEqual(len({name for name, _, _ in cases}), 12)
+        for domain in ("arithmetic", "inverse", "control"):
+            self.assertEqual(sum(name.startswith(domain + "_") for name, _, _ in cases), 4)
+
+    def test_quantitative_candidate_changes_only_system_prompt(self):
+        calls = []
+        def fake(payload):
+            calls.append(payload)
+            return dict(generation_settings=payload, stop_type="eos",
+                        truncated=False, tokens_predicted=1, content="NO")
+        report = comparison.evaluate(42, fake, "quantitative_check")
+        self.assertEqual(len(calls), 24)
+        self.assertEqual(set(report["totals"]), {"think:baseline", "think:quantitative_check"})
+        self.assertEqual(report["matched"], dict(both_correct=2, candidate_only=0,
+                         baseline_only=0, neither=10))
+        self.assertIsNone(report["official_ai_rating"])
+        for group in report["by_domain"].values():
+            self.assertTrue(all(row["attempted"] == 4 for row in group.values()))
+        for i, (a, b) in enumerate(zip(calls[::2], calls[1::2])):
+            self.assertEqual({k:v for k,v in a.items() if k != "prompt"},
+                             {k:v for k,v in b.items() if k != "prompt"})
+            baseline, candidate = (b, a) if i % 2 else (a, b)
+            self.assertNotIn(comparison.QUANTITATIVE_CHECK, baseline["prompt"])
+            self.assertEqual(baseline["prompt"],
+                             candidate["prompt"].replace(comparison.QUANTITATIVE_CHECK, "", 1))
+            self.assertEqual(a["n_predict"], 768)
+            self.assertEqual(a["temperature"], 0.6)
+
 
 if __name__ == "__main__":
     unittest.main()
