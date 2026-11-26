@@ -1,5 +1,7 @@
 """Validate ACIE v1 independent review records. Does not execute or grade Qwen."""
 import argparse
+import hashlib
+import hmac
 import json
 import re
 from pathlib import Path
@@ -35,7 +37,64 @@ def valid_config(config):
             isinstance(config["device_label"], str) and OPAQUE.fullmatch(config["device_label"]))
 
 
-def evaluate(record):
+def manifest_digest(manifest):
+    """Canonical commitment to opaque identifiers and private rubric digests."""
+    raw = json.dumps(manifest, sort_keys=True, separators=(",", ":"),
+                     ensure_ascii=True, allow_nan=False).encode("utf-8")
+    return hashlib.sha256(raw).hexdigest()
+
+
+def freeze_matches(record, manifest, expected_digest):
+    """Verify binding to an externally retained commitment, not its timestamp."""
+    if (not isinstance(expected_digest, str) or not HEX.fullmatch(expected_digest)
+            or not isinstance(manifest, dict)
+            or set(manifest) != {"protocol", "configuration", "runs"}
+            or manifest["protocol"] != "ACIE-v1-freeze"
+            or not valid_config(manifest["configuration"])):
+        return False
+    try:
+        if not hmac.compare_digest(manifest_digest(manifest), expected_digest):
+            return False
+    except (ValueError, TypeError, RecursionError):
+        return False
+    planned = manifest["runs"]
+    if not isinstance(planned, list) or len(planned) != 4:
+        return False
+    indexed, seen_variants = {}, set()
+    for run in planned:
+        if not isinstance(run, dict) or set(run) != {"form", "track", "cases"}:
+            return False
+        if not isinstance(run["form"], str) or not isinstance(run["track"], str):
+            return False
+        key = (run["form"], run["track"])
+        if key not in TRACKS or key in indexed:
+            return False
+        cases = run["cases"]
+        if not isinstance(cases, list) or len(cases) != 200:
+            return False
+        by_id = {}
+        for case in cases:
+            if not isinstance(case, dict) or set(case) != {"variant_id", "dimension", "rubric_sha256"}:
+                return False
+            ident, dim, digest = case["variant_id"], case["dimension"], case["rubric_sha256"]
+            if (not isinstance(ident, str) or not OPAQUE.fullmatch(ident)
+                    or ident in seen_variants or not isinstance(dim, str) or dim not in DIMENSIONS
+                    or not isinstance(digest, str) or not HEX.fullmatch(digest)):
+                return False
+            seen_variants.add(ident)
+            by_id[ident] = (dim, digest)
+        indexed[key] = by_id
+    for run in record["runs"]:
+        if run["configuration"] != manifest["configuration"]:
+            return False
+        planned_cases = indexed[(run["form"], run["track"])]
+        actual_cases = {c["variant_id"]: (c["dimension"], c.get("rubric_sha256")) for c in run["cases"]}
+        if actual_cases != planned_cases:
+            return False
+    return True
+
+
+def evaluate(record, manifest=None, expected_freeze_sha256=None):
     if not isinstance(record, dict) or record.get("protocol") != "ACIE-v1":
         return incomplete("protocol")
     runs = record.get("runs")
@@ -105,20 +164,28 @@ def evaluate(record):
         results[form + ":" + track] = {"score": total, "dimensions": scores,
                                        "failed": failed, "meets_floors": all(
                                            scores[d] >= floor for d, (_, floor) in DIMENSIONS.items())}
+    freeze_supplied = manifest is not None or expected_freeze_sha256 is not None
+    if freeze_supplied and not freeze_matches(record, manifest, expected_freeze_sha256):
+        return incomplete("freeze commitment or planned variants mismatch")
     target = all(x["score"] >= 90 and x["meets_floors"] for x in results.values())
     return {"status": "REVIEWED_ATTESTATIONS", "scores": results,
             "model_only_min": min(results[f + ":model"]["score"] for f in ("A", "B")),
             "assisted_min": min(results[f + ":assisted"]["score"] for f in ("A", "B")),
             "target_met": target, "release_ready": False,
-            "note": "Attestations only. Device, independence, rubric quality and outcomes not authenticated."}
+            "freeze_commitment_matched": freeze_supplied,
+            "acceptance_record_eligible": target and freeze_supplied,
+            "note": "Attestations only. Commitment match does not prove pre-run timing, device behavior, independence, rubric quality or outcomes."}
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("record", type=Path)
+    parser.add_argument("--freeze-manifest", type=Path)
+    parser.add_argument("--expected-freeze-sha256")
     args = parser.parse_args()
     try:
-        result = evaluate(json.loads(args.record.read_text(encoding="utf-8")))
+        manifest = json.loads(args.freeze_manifest.read_text(encoding="utf-8")) if args.freeze_manifest else None
+        result = evaluate(json.loads(args.record.read_text(encoding="utf-8")), manifest, args.expected_freeze_sha256)
     except (OSError, ValueError, RecursionError):
         result = incomplete("unreadable review record")
     print(json.dumps(result, indent=2))
