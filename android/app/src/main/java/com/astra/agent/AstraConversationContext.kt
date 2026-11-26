@@ -22,9 +22,9 @@ internal object AstraConversationContext {
     private const val CURRENT_HEADER =
         "\nCURRENT USER MESSAGE (answer this message, not the excerpts):\n"
     private const val CORRECTION_GAP_NOTICE =
-        "[Some linked corrections are omitted. If the result depends on missing steps, ask for clarification.]\n"
+        "[Some linked corrections are omitted. A complete replacement may establish the value, but if calculation depends on omitted changes, the exact result is unknown. If the result depends on missing steps, ask for clarification.]\n"
     private const val CORRECTION_TAIL_NOTICE =
-        "[Some linked corrections are omitted, including a later correction. Do not assume the latest value; ask for clarification.]\n"
+        "[Some linked corrections are omitted, including a later correction. The latest value is not established by these excerpts. Do not assume the latest value; ask for clarification.]\n"
 
     fun systemPrompt(): String =
         "You are Astra, a concise and helpful Android assistant. " +
@@ -274,10 +274,11 @@ internal object AstraConversationContext {
             if (selected.isEmpty()) return AstraOfflinePolicy.modelPrompt(current, thinkingRequested)
         }
 
+        // Put app-owned recovery status after the historical quotations,
+        // immediately before the actual question, not inside a quoted turn.
         val composed = HISTORY_HEADER +
-            notice +
             selected.sortedBy { it.first }.joinToString("") { it.second } +
-            CURRENT_HEADER + current
+            notice + CURRENT_HEADER + current
         // This must be asserted rather than silently truncated by
         // modelPrompt: the actual user question is always at the end.
         check(composed.length <= MAX_USER_PROMPT) {
