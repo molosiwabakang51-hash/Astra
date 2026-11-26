@@ -381,6 +381,31 @@ internal object AstraConversationContext {
         val continuesBeyondScan: Boolean
     )
 
+    // A correction marker is not enough to establish its referent. Only
+    // recognize a narrow explicit named assertion with at least two topic
+    // terms. Pronoun-only, quoted, ambiguous and relative corrections retain
+    // the existing adjacency rule.
+    private val namedCorrectionAssertion = Regex(
+        """(?i)^(?:actually|correction|instead|rather|sorry|i meant)\s*[, :;]+\s*(?:my|our|the)\s+([\p{L}][\p{L}\p{N}_ -]{2,90}?)\s+(?:is|are|was|were)\s+.+$"""
+    )
+
+    private fun explicitlyDifferentCorrection(
+        anchor: IndexedValue<Turn>, correction: IndexedValue<Turn>
+    ): Boolean {
+        val text = correction.value.content.trim()
+        if (text.length > 250 || text.any { it.isISOControl() || it == '"' || it == '\'' ||
+                it == '“' || it == '”' || it == '‘' || it == '’' || it == 96.toChar() }) return false
+        val subject = namedCorrectionAssertion.matchEntire(text)?.groupValues?.get(1) ?: return false
+        val namedTerms = significantWords(subject)
+        if (namedTerms.size < 2) return false
+        // Compare the named subject with the original owner statement,
+        // not the numerical values in the correction or the current query.
+        // The bounded scan intentionally avoids guessing at long anchors.
+        if (anchor.value.content.length > 250) return false
+        val anchorTerms = significantWords(anchor.value.content)
+        return anchorTerms.size >= 2 && namedTerms.none(anchorTerms::contains)
+    }
+
     private fun relatedCorrections(
         anchor: IndexedValue<Turn>,
         timeline: List<IndexedValue<Turn>>
@@ -394,6 +419,7 @@ internal object AstraConversationContext {
             // A distant owner statement is not evidence of an adjacent
             // correction, even when no other owner message intervenes.
             if (turn.index - previousOwnerIndex > 12 || !isCorrection(turn.value.content)) break
+            if (explicitlyDifferentCorrection(anchor, turn)) break
             if (turn.index > anchor.index + CORRECTION_SCAN) {
                 // Inspect at most one additional owner statement to mark
                 // known continuation; do not silently treat a bounded chain
