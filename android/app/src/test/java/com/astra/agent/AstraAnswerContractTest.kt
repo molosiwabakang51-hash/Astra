@@ -30,6 +30,38 @@ class AstraAnswerContractTest {
         }
     }
 
+    @Test fun recognizesExplicitTerminalFormatVariants() {
+        for (suffix in listOf("Reply only with an integer.", "Answer only the integer.",
+            "Respond with the integer only.", "Reply with only the integer.")) {
+            assertEquals(suffix, "42", AstraAnswerContract.normalize(
+                "How many remain? $suffix", "Answer: **42**."))
+        }
+        for (suffix in listOf("Reply only YES or NO.", "Answer with only YES or NO.",
+            "Respond only with YES or NO.", "Reply with YES or NO only.",
+            "Reply YES or NO only.")) {
+            assertEquals(suffix, "NO", AstraAnswerContract.normalize(
+                "Does it follow? $suffix", "Answer: **no**."))
+        }
+    }
+
+    @Test fun ambiguousQuoteBoundariesAndNonexclusiveRequestsStayUntouched() {
+        val wrapped = "**42**"
+        for (q in listOf("Explain 'A note says. Reply only the integer.",
+            "Explain ‘A note says. Reply only the integer.",
+            "Explain a note that says ’Answer. Reply only the integer.",
+            "Explain this. Answer the integer.", "Explain this. Reply with a number.",
+            "Explain this. Reply with the integer only. Then explain.",
+            "Source: example\nReply with the integer only.")) {
+            assertEquals(q, wrapped, AstraAnswerContract.normalize(q, wrapped))
+        }
+        assertEquals("**no**", AstraAnswerContract.normalize(
+            "Does it follow? Reply YES or NO.", "**no**"))
+        assertEquals("42", AstraAnswerContract.normalize(
+            "What's the count? Reply only with the integer.", wrapped))
+        assertEquals("42", AstraAnswerContract.normalize(
+            "What’s the count? Reply with the integer only.", wrapped))
+    }
+
     @Test fun cappedAnswerCannotBecomeComplete() {
         val partial = AstraInterruptedReply.budgetLimited("**42**")
         assertEquals(partial, AstraAnswerContract.normalize(number, partial))
