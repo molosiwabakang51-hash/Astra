@@ -321,6 +321,43 @@ class QwenProfileComparisonTests(unittest.TestCase):
                              {k:v for k,v in b.items() if k != "prompt"})
         self.assertIsNone(report["official_ai_rating"])
 
+    def test_tail_context_suite_is_bounded_and_reproducible(self):
+        suite = comparison.tail_context_cases(42)
+        self.assertEqual(suite, comparison.tail_context_cases(42))
+        self.assertNotEqual(suite, comparison.tail_context_cases(43))
+        self.assertEqual(len({name for name, _, _, _ in suite}), 8)
+        self.assertEqual(sum(name.startswith("tail_") for name, _, _, _ in suite), 4)
+        self.assertEqual(sum(name.startswith("gap_") for name, _, _, _ in suite), 1)
+        self.assertEqual(sum(name.startswith("control_") for name, _, _, _ in suite), 3)
+        self.assertTrue(all(len(history) <= 64 for _, _, _, history in suite))
+        self.assertTrue(all(len(content.encode()) < 10000
+                            for _, _, _, history in suite for _, content in history))
+        for name, _, _, history in suite:
+            if name.startswith("tail_"):
+                self.assertGreater(len(history[0][1]), 4000)
+
+    def test_tail_context_comparison_preserves_pairing_and_denominators(self):
+        calls = []
+        def fake(payload):
+            calls.append(payload)
+            return dict(generation_settings=payload, stop_type="eos",
+                        truncated=False, tokens_predicted=1, content="NO")
+        def baseline(q, history):
+            return q
+        def revised(q, history):
+            return "Synthetic recovered context. " + q
+        report = comparison.evaluate(42, fake, "context_tail",
+            context_builders={"baseline": baseline, "recovery": revised})
+        self.assertEqual(len(calls), 16)
+        self.assertEqual(report["matched"], dict(both_correct=1, candidate_only=0,
+                         baseline_only=0, neither=7))
+        self.assertEqual(report["by_domain"]["tail"]["baseline"]["attempted"], 4)
+        self.assertEqual(report["by_domain"]["gap"]["recovery"]["attempted"], 1)
+        for a, b in zip(calls[::2], calls[1::2]):
+            self.assertEqual({k:v for k,v in a.items() if k != "prompt"},
+                             {k:v for k,v in b.items() if k != "prompt"})
+        self.assertIsNone(report["official_ai_rating"])
+
 
 if __name__ == "__main__":
     unittest.main()
