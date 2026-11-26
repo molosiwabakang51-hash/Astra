@@ -16,6 +16,29 @@ class AstraCalculationAssistTest {
         assertEquals("-7", AstraCalculationAssist.evaluate("5 and 12", "CALC: 5-12")!!.result)
     }
 
+    @Test fun recurringIntermediatesCancelExactlyWithoutRounding() {
+        assertEquals("2", AstraCalculationAssist.evaluate("Divide 2 by 3 then multiply by 3.",
+            "CALC: (2/3)*3")!!.result)
+        assertEquals("1", AstraCalculationAssist.evaluate("Add 1/3 and 2/3.",
+            "CALC: 1/3+2/3")!!.result)
+        assertEquals("-0.5", AstraCalculationAssist.evaluate("Divide -1 by 3 and multiply by 1.5.",
+            "CALC: -1/3*1.5")!!.result)
+        assertEquals("0", AstraCalculationAssist.evaluate("Subtract 1/7 from itself.",
+            "CALC: 1/7-1/7")!!.result)
+    }
+
+    @Test fun rationalIntermediatesDoNotRelaxFinalOrResourceLimits() {
+        assertNull(AstraCalculationAssist.evaluate("Divide 2 by 3.", "CALC: 2/3"))
+        assertNull(AstraCalculationAssist.evaluate("Use 2 and 3.", "CALC: 2/(3-3)"))
+        assertNull(AstraCalculationAssist.evaluate("Use 2 and 3.", "CALC: 2/3*4"))
+        assertNull(AstraCalculationAssist.evaluate("Use 2 and 999999999.",
+            "CALC: 999999999*999999999*999999999*999999999/999999999"))
+        assertNull(AstraCalculationAssist.evaluate("Use 1 and 100000000.",
+            "CALC: 1/100000000/100000000"))
+        val many = "CALC: 1/" + List(8) { "999999937" }.joinToString("/")
+        assertNull(AstraCalculationAssist.evaluate("Use 1 and 999999937.", many))
+    }
+
     @Test fun rejectsInventedNumbersUnsafeSyntaxAndMultiplePlans() {
         val q = "12, 5 and 7"
         for (proposal in listOf("CALC: 12*5+8", "CALC: 12*5;7", "CALC: 12**5",
