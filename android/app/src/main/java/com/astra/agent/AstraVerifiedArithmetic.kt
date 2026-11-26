@@ -39,6 +39,7 @@ internal object AstraVerifiedArithmetic {
      * assistant reply as evidence that the arithmetic was correct.
      */
     fun verifiedWorking(originalQuestion: String, observedAnswer: String): String? {
+        AstraCalculationAssist.verifiedLinearWorking(originalQuestion, observedAnswer)?.let { return it }
         val result = answer(originalQuestion) ?: return null
         if (result != observedAnswer.trim() ||
             result == "Division by zero is undefined."
