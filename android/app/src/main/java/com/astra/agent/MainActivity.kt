@@ -3651,7 +3651,10 @@ class MainActivity :
                                         response + "\n\n" + groundedFooter
                                 } else if (calculated != null) {
                                     "CALCULATOR-ASSISTED AI INTERPRETATION\n\n" +
-                                        response + "\n\n" + calculated.footer()
+                                        response + "\n\n" +
+                                        (AstraCalculationAssist.synthesisWarning(
+                                            calculationQuestion.orEmpty(), calculated, response
+                                        )?.let { "$it\n\n" } ?: "") + calculated.footer()
                                 } else if (isolatedReview) AstraCognitiveReview.label(response)
                                 else response
                                 history[target] = ChatMessage("Astra", visibleResponse)

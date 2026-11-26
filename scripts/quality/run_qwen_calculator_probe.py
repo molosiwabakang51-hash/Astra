@@ -21,6 +21,8 @@ import run_qwen_profile_comparison as native
 
 SEED = 81426791
 
+# Keep historical cases reproducible; a second fresh suite tests transfer.
+
 # Expected values are evaluator-only and never passed to the model.
 CASES = (
     ("total", "There are 13 packs costing 7 coins each and a fee of 9 coins. What is the total? Reply only with the number.", "100"),
@@ -35,6 +37,22 @@ CASES = (
     ("unsupported", "Which of the two novels has the more convincing narrator? No text or other information is provided.", None),
     ("repeating", "Give the exact terminating decimal for 2 divided by 3.", None),
     ("ambiguous", "Add 1,25 and 5. The comma notation is not defined.", None),
+)
+
+
+FRESH_CASES = (
+    ("fresh_cost", "Buy 9 trays at 6 coins per tray and pay a 4 coin fee. What is the total cost? Reply only with the number.", "58"),
+    ("fresh_stock", "A cupboard holds 16 boxes of 8 pencils. Remove 3 boxes. How many pencils remain? Answer with only the integer.", "104"),
+    ("fresh_decimal", "Buy 3 litres at 1.25 coins per litre and pay 0.50 coins extra. What is the total? Reply only with the number.", "4.25"),
+    ("fresh_division", "Share 45 litres equally among 8 vessels. How many litres per vessel? Reply only with the number.", "5.625"),
+    ("fresh_profit", "Sales were 172 coins and costs were 93 coins and 28 coins. What was the profit? Reply only with the number.", "51"),
+    ("fresh_order", "Begin with 11, subtract 4, then multiply by 6. What is the result? Reply only with the number.", "42"),
+    ("fresh_negative", "A balance starts at 9 coins and decreases by 24 coins. What is the balance? Reply only with the number.", "-15"),
+    ("fresh_rate", "Travel 42 kilometres in 4 hours at constant speed. What is the speed? Reply only with the number.", "10.5"),
+    ("fresh_missing", "A garden has 13 plants. The price of each is unknown. What is the total price?", None),
+    ("fresh_not_math", "Which of two unread articles is better supported by evidence?", None),
+    ("fresh_nonterminating", "Give the exact terminating decimal for 5 divided by 7.", None),
+    ("fresh_comma", "Add 2,50 and 7. The comma convention is unspecified.", None),
 )
 
 
@@ -65,7 +83,7 @@ def scalar_equal(answer, expected):
         return False
 
 
-def evaluate(infer, invoke):
+def evaluate(infer, invoke, cases=CASES, base_seed=SEED):
     system = native.system_prompt()
     rows = []
     def generate(prompt, cap, seed):
@@ -90,8 +108,8 @@ def evaluate(infer, invoke):
         complete = stop in ("eos", "word") and not truncated
         return native.visible_answer(reply.get("content")), complete, tokens, elapsed
 
-    for i, (case, question, expected) in enumerate(CASES):
-        seed = SEED + i*13
+    for i, (case, question, expected) in enumerate(cases):
+        seed = base_seed + i*13
         plan, complete, tokens, elapsed = generate(invoke("plan", question), 128, seed)
         parsed = invoke("evaluate", question, plan) if complete else None
         eligible = expected is not None
@@ -113,7 +131,7 @@ def evaluate(infer, invoke):
         rows.append(row)
     positive = [r for r in rows if r["eligible"]]
     negative = [r for r in rows if not r["eligible"]]
-    return dict(status="COMPLETE_CALCULATOR_CPU_DIAGNOSTIC", seed=SEED,
+    return dict(status="COMPLETE_CALCULATOR_CPU_DIAGNOSTIC", seed=base_seed,
                 model_sha256=native.MODEL_SHA256,
                 system_prompt_sha256=hashlib.sha256(system.encode()).hexdigest(),
                 eligible=len(positive), unsuitable=len(negative),
@@ -126,7 +144,7 @@ def evaluate(infer, invoke):
                 scope="Public developmental CPU probe using production Kotlin calculator, not handset or independent assessment.")
 
 
-def run(binary, jar):
+def run(binary, jar, fresh=False):
     if not native.check_model(native.MODEL_PATH):
         raise RuntimeError("Unverified Qwen model")
     opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
@@ -151,7 +169,8 @@ def run(binary, jar):
             else:
                 raise RuntimeError("Native startup timed out")
             result = evaluate(lambda payload: native.request(opener, "/completion", payload),
-                              lambda operation, question, proposal=None: bridge(jar, operation, question, proposal))
+                              lambda operation, question, proposal=None: bridge(jar, operation, question, proposal),
+                              FRESH_CASES if fresh else CASES, SEED+101 if fresh else SEED)
             if not native.check_model(native.MODEL_PATH):
                 raise RuntimeError("Model identity changed")
             return result
@@ -169,9 +188,10 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("binary", type=Path)
     parser.add_argument("bridge", type=Path)
+    parser.add_argument("--fresh", action="store_true")
     args = parser.parse_args()
     try:
-        print(json.dumps(run(args.binary, args.bridge), indent=2, allow_nan=False))
+        print(json.dumps(run(args.binary, args.bridge, args.fresh), indent=2, allow_nan=False))
         return 0
     except (OSError, ValueError, RuntimeError, KeyError, subprocess.SubprocessError):
         print("Calculator CPU probe incomplete; no score awarded.")
