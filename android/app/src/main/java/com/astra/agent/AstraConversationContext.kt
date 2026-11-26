@@ -388,38 +388,65 @@ internal object AstraConversationContext {
      * Vague follow-ups and isolated word matches retain the old prefix.
      */
     private fun focusedQuote(raw: String, keywords: Set<String>, limit: Int): String {
-        val boundedRaw = AstraUnicodeBounds.prefix(raw, 2_000)
+        val scanUnits = 2_000
+        val head = AstraUnicodeBounds.prefix(raw, scanUnits)
         fun safeQuote(value: String, size: Int): String {
             val escaped = AstraUnicodeBounds.prefix(quote(value), size)
             return if (escaped.takeLastWhile { it == '\\' }.length % 2 != 0)
                 escaped.dropLast(1) else escaped
         }
-        var best = safeQuote(boundedRaw, limit)
-        if (keywords.size < 2 || boundedRaw.length <= limit || limit < 50) return best
+        var best = safeQuote(head, limit)
+        if (keywords.size < 2 || raw.length <= limit || limit < 50) return best
         fun hits(value: String): Int =
             keywords.count(significantWords(value)::contains)
         var bestHits = hits(best)
         if (bestHits == keywords.size) return best
-        val matches = topicWords.findAll(boundedRaw).filter {
-            stem(it.value.lowercase(java.util.Locale.ROOT)) in keywords
-        }.toList()
-        if (matches.size < 2) return best
-        // Fixed per-turn search bound, including later occurrences when a
-        // long message repeats the same topic many times.
-        val sampled = (matches.take(16) + matches.takeLast(8)).distinctBy { it.range.first }
-        for (match in sampled) {
-            for (start in listOf((match.range.first - 40).coerceAtLeast(0), match.range.first)) {
-                if (start == 0) continue
-                val value = AstraUnicodeBounds.slice(
-                    boundedRaw, start, minOf(boundedRaw.length, start + limit)
-                )
-                val candidate = "… " + safeQuote(value, limit - 2)
-                val score = hits(candidate)
-                if (score >= 2 && score > bestHits) {
-                    best = candidate
-                    bestHits = score
+
+        // Scan a bounded head and tail independently. Do not concatenate
+        // disjoint passages, which could create a false topical match.
+        // For a long turn the middle remains intentionally unsearched.
+        val regions = mutableListOf(0 to head)
+        if (raw.length > scanUnits) {
+            var start = raw.length - scanUnits
+            if (start > 0 && raw[start].isLowSurrogate() && raw[start - 1].isHighSurrogate()) {
+                start++
+            }
+            // Avoid treating the suffix of a cut word/identifier as a
+            // complete topic word. Skip only inside the bounded tail.
+            fun wordChar(c: Char) = c.isLetterOrDigit() || c == '_' ||
+                c.isHighSurrogate() || c.isLowSurrogate()
+            if (start > 0 && wordChar(raw[start - 1])) {
+                while (start < raw.length && wordChar(raw[start])) start++
+            }
+            if (start < raw.length) regions.add(start to raw.substring(start))
+        }
+        for ((offset, region) in regions) {
+            val matches = topicWords.findAll(region).filter {
+                stem(it.value.lowercase(java.util.Locale.ROOT)) in keywords &&
+                    // A cut token at the end of the head is not a word.
+                    !(offset + it.range.last + 1 < raw.length &&
+                      it.range.last == region.lastIndex &&
+                      (raw[offset + it.range.last + 1].isLetterOrDigit() ||
+                       raw[offset + it.range.last + 1] == '_'))
+            }.toList()
+            if (matches.size < 2) continue
+            // At most 24 occurrences per region, at most two windows each.
+            val sampled = (matches.take(16) + matches.takeLast(8)).distinctBy { it.range.first }
+            for (match in sampled) {
+                for (start in listOf((match.range.first - 40).coerceAtLeast(0), match.range.first)) {
+                    if (offset + start == 0) continue
+                    val value = AstraUnicodeBounds.slice(
+                        region, start, minOf(region.length, start + limit)
+                    )
+                    val candidate = "… " + safeQuote(value, limit - 2)
+                    val score = hits(candidate)
+                    if (score >= 2 && score > bestHits) {
+                        best = candidate
+                        bestHits = score
+                    }
                 }
             }
+            if (bestHits == keywords.size) break
         }
         return best
     }
