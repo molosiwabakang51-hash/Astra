@@ -32,7 +32,7 @@ internal object AstraCategoricalVerifier {
     }
 
     private val request = Regex(
-        """^Categorical premises: ([A-Z a-z;]+)\. Conclusion: ([A-Z a-z]+)\. Does the conclusion follow\?$"""
+        """^Categorical premises: ([A-Z a-z;]+)\. Conclusion: ([A-Z a-z]+)\. Does the conclusion follow\?(?: Reply YES or NO only\.)?$"""
     )
     private val all = Regex("""All ([A-Z]) are ([A-Z])""")
     private val none = Regex("""No ([A-Z]) are ([A-Z])""")
