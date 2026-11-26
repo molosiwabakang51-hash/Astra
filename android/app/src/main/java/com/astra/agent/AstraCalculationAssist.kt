@@ -249,10 +249,12 @@ internal object AstraCalculationAssist {
                     val exact = solution.exactText()
                     val equal = scalar?.numerator == solution.numerator &&
                         scalar?.denominator == solution.denominator
+                    val correction = if (solution.denominator == BigInteger.ONE)
+                        "incorrect; corrected result: $exact." else "incorrect; corrected exact result: $exact."
                     return "INDEPENDENT EQUATION CHECK — " +
-                        (if (equal) "correct." else "incorrect; corrected exact result: $exact.") +
+                        (if (equal) "correct." else correction) +
                         "\n$reduced Substitution: left = ${l.exactText()}, right = ${r.exactText()}. " +
-                        "Mathematical equality checked exactly; requested answer format assessed separately."
+                        "Mathematical equality checked exactly; answer-format compliance was not checked."
                 }
                 val result = solution.decimal().toPlainString()
                 if (observedAnswer == null) result
