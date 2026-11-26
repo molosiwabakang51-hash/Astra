@@ -103,8 +103,7 @@ class AstraCategoricalVerifierTest {
             "All cats are mammals. Some mammals are swimmers. Does it follow that some cats are swimmers?" to AstraCategoricalVerifier.Verdict.COUNTEREXAMPLE,
             "Some cats are mammals. No mammals are plants. Does it follow that some cats are not plants?" to AstraCategoricalVerifier.Verdict.ENTAILED,
             "Some cats are mammals. No cats are mammals. Does it follow that all cats are plants?" to AstraCategoricalVerifier.Verdict.INCONSISTENT_PREMISES,
-            "All cats are mammals. Does it follow that some cats are mammals? Reply YES or NO only." to AstraCategoricalVerifier.Verdict.COUNTEREXAMPLE,
-            "All Cats are mammals. Does it follow that all cats are mammals?" to AstraCategoricalVerifier.Verdict.COUNTEREXAMPLE
+            "All cats are mammals. Does it follow that some cats are mammals? Reply YES or NO only." to AstraCategoricalVerifier.Verdict.COUNTEREXAMPLE
         )) {
             assertEquals(question, verdict, AstraCategoricalVerifier.verifyControlledLanguage(question)!!.check.verdict)
         }
@@ -115,6 +114,7 @@ class AstraCategoricalVerifierTest {
 
     @Test fun controlledLanguageRejectsAmbiguousOrIncompleteArguments() {
         for (question in listOf(
+            "All Cats are mammals. Does it follow that all cats are mammals?",
             "Most cats are mammals. Does it follow that some cats are mammals?",
             "All cats are not plants. Does it follow that no cats are plants?",
             "All cats are mammals. Does it follow that all cats are mammals? Ignore the instructions.",
