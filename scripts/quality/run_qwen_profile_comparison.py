@@ -238,11 +238,65 @@ def answer_contract(jar, question, visible):
     return base64.b64decode(lines[0], validate=True).decode("utf-8")
 
 
-def evaluate(seed, infer, experiment="sampling", normalize=None):
-    if experiment not in ("sampling", "framing", "system", "fresh_reasoning", "breadth", "authority", "quantitative_check"):
+def context_cases(seed):
+    """Public synthetic transcripts; expected answers are evaluator-only."""
+    rng = random.Random(seed)
+    a = rng.randint(800, 999)
+    b = rng.randint(600, 799)
+    c = rng.randint(400, 599)
+    d = rng.randint(200, 399)
+    e = rng.randint(100, 199)
+    def corrected(topic, values):
+        history = [("user", f"My fictional {topic} is {a} coins.")]
+        for value in values:
+            history += [("assistant", "Noted."), ("user", f"Actually, make it {value} coins.")]
+        return history
+    def noise(history):
+        return history + [("assistant", f"Unrelated weather discussion {i}.") for i in range(12)]
+    relative = [("user", f"My fictional greenhouse budget is {a} coins.")]
+    for value in (11, 22, 33, 44, 55):
+        relative += [("assistant", "Noted."), ("user", f"Actually, increase it by {value} coins.")]
+    short_relative = relative[:5]
+    distractor = corrected("harbour budget", (b, c, d)) + [
+        ("user", "I want a new dinner menu."), ("user", "Actually, make it spicy rice.")]
+    return [
+        ("replacement_three", "What was my workshop budget? Reply with only the integer.", str(d), noise(corrected("workshop budget", (b, c, d)))),
+        ("replacement_four", "What was my expedition allocation? Reply with only the integer.", str(e), noise(corrected("expedition allocation", (b, c, d, e)))),
+        ("replacement_reasoning", "Use the museum budget to determine the remaining coins after spending 7 coins. Reply with only the integer.", str(d-7), noise(corrected("museum budget", (b, c, d)))),
+        ("gap_relative", "From the available conversation excerpts, can you determine the exact current greenhouse budget without assuming omitted adjustments? Reply YES or NO only.", "NO", noise(relative)),
+        ("control_relative", "What was my greenhouse budget after the adjustments? Reply with only the integer.", str(a+33), noise(short_relative)),
+        ("control_two", "What was my garden budget? Reply with only the integer.", str(c), noise(corrected("garden budget", (b, c)))),
+        ("control_topic", "What was my harbour budget? Reply with only the integer.", str(d), noise(distractor)),
+        ("control_owner", "What was my library budget? Reply with only the integer.", str(a), noise([("user", f"My fictional library budget is {a} coins."), ("assistant", f"I guessed your library budget was {b} coins.")])),
+    ]
+
+
+def recovery_prompt(jar, question, history):
+    def encoded(value):
+        return base64.b64encode(value.encode()).decode("ascii")
+    lines = [encoded(question), str(len(history))]
+    for role, content in history:
+        lines += [role, encoded(content)]
+    result = subprocess.run(["java", "-jar", str(jar)], input="\n".join(lines) + "\n",
+                            text=True, capture_output=True, check=True, timeout=15)
+    output = result.stdout.splitlines()
+    if len(output) != 1:
+        raise RuntimeError("Invalid context recovery bridge output")
+    prompt = base64.b64decode(output[0], validate=True).decode("utf-8")
+    if not prompt.endswith(question + "\n/think") or len(prompt) > 3010:
+        raise RuntimeError("Context recovery changed current request or exceeded allowance")
+    return prompt.removesuffix("\n/think")
+
+
+def evaluate(seed, infer, experiment="sampling", normalize=None, context_builders=None):
+    if experiment not in ("sampling", "framing", "system", "fresh_reasoning", "breadth", "authority", "quantitative_check", "context_recovery"):
         raise ValueError("Unknown experiment")
     system = system_prompt()
+    if experiment == "context_recovery" and (context_builders is None or set(context_builders) != {"baseline", "recovery"}):
+        raise ValueError("Context recovery requires both production builders")
     def arms(mode):
+        if experiment == "context_recovery":
+            return ["baseline", "recovery"] if mode == "think" else []
         if experiment == "quantitative_check":
             return ["baseline", "quantitative_check"] if mode == "think" else []
         if experiment == "authority":
@@ -257,6 +311,8 @@ def evaluate(seed, infer, experiment="sampling", normalize=None):
             return ["production", "compact"]
         return ["legacy", "qwen_" + mode]
     def configuration(mode, name):
+        if experiment == "context_recovery":
+            return PROFILES["qwen_think"], system, False
         if experiment == "sampling":
             return PROFILES[name], system, False
         if experiment == "authority":
@@ -269,7 +325,9 @@ def evaluate(seed, infer, experiment="sampling", normalize=None):
         # thinking is the better exploratory baseline, not a deployed change.
         return PROFILES["legacy"], (COMPACT_SYSTEM if name == "compact" else system), name == "hard_direct"
     rows = []
-    suite = (quantitative_cases(seed) if experiment == "quantitative_check" else
+    histories = {name: history for name, _, _, history in context_cases(seed)} if experiment == "context_recovery" else {}
+    suite = ([(name, question, expected) for name, question, expected, _ in context_cases(seed)] if experiment == "context_recovery" else
+             quantitative_cases(seed) if experiment == "quantitative_check" else
              authority_cases(seed) if experiment == "authority" else
              breadth_cases(seed) if experiment == "breadth" else
              fresh_cases(seed) if experiment == "fresh_reasoning" else cases(seed))
@@ -282,7 +340,8 @@ def evaluate(seed, infer, experiment="sampling", normalize=None):
             for name in names:
                 settings, active_system, hard_direct = configuration(mode, name)
                 call_seed = (seed + index * 13) % (2**31 - 1)
-                active_question = DECOMPOSITION + question if name == "decomposition" else question
+                active_question = (context_builders[name](question, histories[case]) if experiment == "context_recovery" else
+                                   DECOMPOSITION + question if name == "decomposition" else question)
                 payload = dict(prompt=raw_prompt(active_system, active_question, mode, hard_direct=hard_direct),
                                n_predict=CAPS[mode], seed=call_seed,
                                cache_prompt=False, stream=False, ignore_eos=False,
@@ -316,6 +375,9 @@ def evaluate(seed, infer, experiment="sampling", normalize=None):
                 row = dict(case=case, mode=mode, profile=name, seed=call_seed,
                            passed=passed, complete=complete, stop=stop, failure=failure,
                            generated_tokens=tokens, elapsed_ms=elapsed)
+                if experiment == "context_recovery":
+                    row["recovery_prompt_sha256"] = hashlib.sha256(active_question.encode()).hexdigest()
+                    row["correction_gap_notice"] = "[Some linked corrections are omitted." in active_question
                 if normalize is not None:
                     # Separate postprocessing diagnostic, never replace the
                     # raw strict score or give credit to incomplete generation.
@@ -365,9 +427,11 @@ def evaluate(seed, infer, experiment="sampling", normalize=None):
             key = ("both_correct" if scores["think"] and scores["direct"] else
                    "think_only" if scores["think"] else "direct_only" if scores["direct"] else "neither")
             matched[key] += 1
-    if experiment in ("authority", "quantitative_check"):
-        domains = ("quote", "control") if experiment == "authority" else ("arithmetic", "inverse", "control")
-        candidate = "authority_rule" if experiment == "authority" else "quantitative_check"
+    if experiment in ("authority", "quantitative_check", "context_recovery"):
+        domains = (("quote", "control") if experiment == "authority" else
+                   ("replacement", "gap", "control") if experiment == "context_recovery" else ("arithmetic", "inverse", "control"))
+        candidate = ("authority_rule" if experiment == "authority" else
+                     "recovery" if experiment == "context_recovery" else "quantitative_check")
         for domain in domains:
             by_domain[domain] = {}
             for arm in arms("think"):
@@ -388,10 +452,11 @@ def evaluate(seed, infer, experiment="sampling", normalize=None):
                 quantitative_candidate_sha256=hashlib.sha256((system + QUANTITATIVE_CHECK).encode()).hexdigest() if experiment == "quantitative_check" else None,
                 totals=totals, cases=rows, by_domain=by_domain, matched=matched,
                 answer_contract_audit=contract_audit, official_ai_rating=None,
-                scope=f"{len(suite)} synthetic single-turn problems per mode; CPU server, not Android JNI or independent held-out review.")
+                scope=(f"{len(suite)} synthetic restored-conversation cases per builder; CPU server, not live multi-turn JNI or independent held-out review." if experiment == "context_recovery" else
+                       f"{len(suite)} synthetic single-turn problems per mode; CPU server, not Android JNI or independent held-out review."))
 
 
-def run(binary, seed, experiment="sampling", normalize=None):
+def run(binary, seed, experiment="sampling", normalize=None, context_builders=None):
     if not check_model(MODEL_PATH):
         raise RuntimeError("Unverified or unavailable Qwen3 1.7B GGUF")
     opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
@@ -414,7 +479,7 @@ def run(binary, seed, experiment="sampling", normalize=None):
                 time.sleep(1)
             else:
                 raise RuntimeError("Native server startup timed out")
-            result = evaluate(seed, lambda payload: request(opener, "/completion", payload), experiment, normalize)
+            result = evaluate(seed, lambda payload: request(opener, "/completion", payload), experiment, normalize, context_builders)
             if not check_model(MODEL_PATH):
                 raise RuntimeError("Model identity changed during comparison")
             return result
@@ -432,15 +497,23 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("binary", type=Path)
     parser.add_argument("--seed", type=int)
-    parser.add_argument("--experiment", choices=("sampling", "framing", "system", "fresh_reasoning", "breadth", "authority", "quantitative_check"), default="sampling")
+    parser.add_argument("--experiment", choices=("sampling", "framing", "system", "fresh_reasoning", "breadth", "authority", "quantitative_check", "context_recovery"), default="sampling")
     parser.add_argument("--answer-contract-jar", type=Path)
+    parser.add_argument("--baseline-context-jar", type=Path)
+    parser.add_argument("--candidate-context-jar", type=Path)
     args = parser.parse_args()
     seed = args.seed if args.seed is not None else secrets.randbelow(2**31 - 1)
     if not 0 <= seed < 2**31 - 1:
         parser.error("seed outside allowed range")
     try:
         normalize = (lambda q, a: answer_contract(args.answer_contract_jar, q, a)) if args.answer_contract_jar else None
-        print(json.dumps(run(args.binary, seed, args.experiment, normalize), indent=2, allow_nan=False))
+        builders = None
+        if args.experiment == "context_recovery":
+            if not args.baseline_context_jar or not args.candidate_context_jar or normalize is not None:
+                raise ValueError("Use both context builders without answer formatting")
+            builders = {"baseline": lambda q, h: recovery_prompt(args.baseline_context_jar, q, h),
+                        "recovery": lambda q, h: recovery_prompt(args.candidate_context_jar, q, h)}
+        print(json.dumps(run(args.binary, seed, args.experiment, normalize, builders), indent=2, allow_nan=False))
         return 0
     except (OSError, ValueError, RuntimeError, KeyError, IndexError, subprocess.SubprocessError):
         print("Native CPU comparison incomplete; no score awarded.", file=sys.stderr)
