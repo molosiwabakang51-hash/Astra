@@ -661,6 +661,63 @@ class AstraConversationContextTest {
         }
     }
 
+    @Test fun explicitlyDifferentNamedCorrectionEndsPreviousChain() {
+        val rng = java.util.Random(829174L)
+        repeat(50) {
+            val budget = 1000 + rng.nextInt(100)
+            val revised = 700 + rng.nextInt(100)
+            val fare = 30 + rng.nextInt(20)
+            val newFare = 60 + rng.nextInt(20)
+            val history = listOf(
+                turn("user", "My museum renovation budget is $budget coins."),
+                turn("user", "Actually, make it $revised coins."),
+                turn("user", "Actually, my ferry passenger limit is $fare people."),
+                turn("user", "No, make it $newFare people.")
+            ) + (1..15).map { turn("assistant", "Unrelated weather note $it.") }
+            for (question in listOf("What was my museum renovation budget?",
+                "Use the museum renovation budget to plan.")) {
+                val prompt = AstraConversationContext.userPrompt(question, history, true)
+                assertTrue(prompt.contains("make it $revised coins"))
+                assertFalse(prompt.contains("make it $newFare people"))
+                assertFalse(prompt.contains("ferry passenger limit"))
+                assertTrue(prompt.endsWith(question + "\n/no_think"))
+                assertTrue(prompt.length <= 3010)
+            }
+            val question = "What was my ferry passenger limit?"
+            val prompt = AstraConversationContext.userPrompt(question, history, true)
+            assertTrue(prompt.contains("ferry passenger limit is $fare people"))
+            assertTrue(prompt.contains("make it $newFare people"))
+            assertFalse(prompt.contains("make it $revised coins"))
+        }
+    }
+
+    @Test fun sameNamedSubjectAndRelativeCorrectionsRemainLinked() {
+        val history = listOf(
+            turn("user", "My museum renovation budget is 900 coins."),
+            turn("user", "Actually, my museum renovation budget is 820 coins."),
+            turn("user", "No, make it 740 coins."),
+            turn("user", "Actually, increase it by 15 coins.")
+        ) + (1..15).map { turn("assistant", "Unrelated weather note $it.") }
+        val question = "What was my museum renovation budget?"
+        val prompt = AstraConversationContext.userPrompt(question, history, true)
+        assertTrue(prompt.contains("budget is 820 coins"))
+        assertTrue(prompt.contains("make it 740 coins"))
+        assertTrue(prompt.contains("increase it by 15 coins"))
+        assertFalse(prompt.contains("Some linked corrections are omitted"))
+    }
+
+    @Test fun partialSubjectOverlapDoesNotSpeculativelyBreakCorrectionChain() {
+        val history = listOf(
+            turn("user", "My museum renovation budget is 900 coins."),
+            turn("user", "Actually, my museum repair allocation is 800 coins."),
+            turn("user", "No, make it 720 coins.")
+        ) + (1..15).map { turn("assistant", "Unrelated weather note $it.") }
+        val prompt = AstraConversationContext.userPrompt(
+            "What was my museum renovation budget?", history, true)
+        assertTrue(prompt.contains("museum repair allocation is 800 coins"))
+        assertTrue(prompt.contains("make it 720 coins"))
+    }
+
     @Test fun truncatedOriginalPremiseIsNotCompleteEvidenceForRelativeAdjustment() {
         val history = listOf(
             turn("user", "My fictional greenhouse budget: " +
