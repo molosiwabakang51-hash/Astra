@@ -255,16 +255,33 @@ On new branch from merged main 9f517fe9035445901b9a014c0a758d1f3e47164c, add bou
 
 ### Incremental milestones (not additional master requirements)
 
-- [x] ACIE-057 subtask: merged exact rational intermediate arithmetic; previous matched 4/4 vs 1/4.
-- [x] ACIE-058 subtask: merged explicit formal categorical deduction engine.
-- [x] ACIE-052 subtask: verified historical-tail candidate 7/8 vs 4/8; combined integration pending #447.
-- [x] ACIE-117 subtask: integrated reproducible host-only logic diagnostics without activating unsuccessful grammar strategy.
-- [x] ACIE-057 subtask: implement explicit inverse equation solver and independent answer audit candidate; CI pending.
-- [ ] ACIE-057 subtask: validate and integrate equation solver.
-- [ ] ACIE-031/078 subtask: demonstrate faithful arbitrary-language logical or mathematical formalization.
+- [x] Milestone — ACIE-057 subtask: merged exact rational intermediate arithmetic; previous matched 4/4 vs 1/4.
+- [x] Milestone — ACIE-058 subtask: merged explicit formal categorical deduction engine.
+- [x] Milestone — ACIE-052 subtask: verified historical-tail candidate 7/8 vs 4/8; combined integration pending #447.
+- [x] Milestone — ACIE-117 subtask: integrated reproducible host-only logic diagnostics without activating unsuccessful grammar strategy.
+- [x] Milestone — ACIE-057 subtask: implement explicit inverse equation solver and independent answer audit candidate; CI pending.
+- [ ] Milestone — ACIE-057 subtask: validate and integrate equation solver.
+- [ ] Milestone — ACIE-031/078 subtask: demonstrate faithful arbitrary-language logical or mathematical formalization.
 - [ ] ACIE-118/119: independent physical-device acceptance and general intelligence target.
 
 All 119 sequential master requirements verified, 27 checked, 92 outstanding. ACIE-031/034/057/065/077/078/080/083/117 remain open for broader evidence. The candidate expands assisted mathematical problem-solving rather than neural model intelligence. No new master tick or general intelligence rating claimed.
+
+## Session update — model-led inverse word-problem solving
+
+Parent #448 head bd4cd6ba3af17ea8c50a23218972b08e00850a2d Android 45841805512 and calculator CPU 45841805703 in progress at inspection. #446 native translation 45839806938 and #447 Android 45841050138 / native 45841050102 in progress; #447 Python 45841050116 passed, #447 conflicted following #445 merge. Preserve parent CI. Stacked candidate from exact #448 head implements model-proposed single-linear-equation translation, strict EQ grammar, existing exact rational solver, only numeric literals present in original owner question, at least two numeric literals, rejection of quote/multiline/ambiguous/comma/incomplete/unsupported and nonunique/nonterminating results. Candidate is not wired into automatic app dispatch; model-only routing unchanged. Semantic validity remains unproven even for an exact solution. Host bridge runs actual candidate Kotlin methods. Fresh seeded eleven-case suite: six inverse, two arithmetic/decimal controls, three unsuitable; compare unassisted thinking with one model equation proposal plus independent solving, identical 768 token cap, seed, thinking profile and alternating order. Report fixed denominators, matched losses/gains, unsuitable numeric acceptance, explicit abstention, tokens/latency, no generated text or private deliberation. Two JVM regression methods and three evaluator tests cover literal checking, known correct/incorrect interpretations, strict boundaries, pairing, incomplete calls and unsuitable acceptance. Dedicated native workflow on dependent base; no interruption to #448. All CI pending; no claim of actual intelligence gain until evaluation. No paid API, model substitution, training, or production auto-activation.
+
+### Incremental milestones (not additional master requirements)
+
+- [x] Milestone — ACIE-057: exact affine solver candidate implemented in #448.
+- [x] Milestone — ACIE-078/079: model-led equation interpretation candidate implemented.
+- [x] Milestone — ACIE-080/083: literal validation and exact independent solving implemented for proposed equations.
+- [x] Milestone — ACIE-084/117: matched assisted-versus-unassisted inverse diagnostic implemented.
+- [ ] Milestone — ACIE-057: validate and merge parent equation solver.
+- [ ] Milestone — ACIE-078/082/083: demonstrate measured word-problem gains without unsafe answers, then assess production authorization and synthesis.
+- [ ] Milestone — ACIE-052: reconcile validated tail candidate and its combined checks.
+- [ ] Milestone — ACIE-118/119: independent physical-device assessment and target attainment.
+
+Verified all 119 sequential requirements, 27 checked, 92 outstanding. ACIE-031/034/057/078/079/080/082/083/084/117 remain open. No new broad master tick or independent general intelligence score. Milestone prefixes are distinct from master requirement rows so automatic counts do not double count completed subtasks.
 
 ## Acceptance
 
