@@ -1,0 +1,59 @@
+name: Actual Qwen3 inverse word problems
+on:
+  pull_request:
+    branches: [main, intelligence/acie-exact-linear-equations]
+    paths:
+      - '.github/workflows/qwen3-equation-evaluation.yml'
+      - 'scripts/quality/run_qwen_equation_probe.py'
+      - 'scripts/quality/AcieEquationProbe.kt'
+      - 'scripts/tests/test_qwen_equation_probe.py'
+      - 'android/app/src/main/java/com/astra/agent/AstraCalculationAssist.kt'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: astra-qwen-equation-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  probe:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Verify evaluator and compile production candidate equation solver
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m unittest discover -s scripts/tests -p test_qwen_equation_probe.py -v
+          command -v kotlinc
+          mkdir -p evaluation
+          src=android/app/src/main/java/com/astra/agent
+          kotlinc "$src/AstraCalculationAssist.kt" "$src/AstraInterruptedReply.kt" scripts/quality/AcieEquationProbe.kt -include-runtime -d evaluation/equation-bridge.jar
+      - name: Obtain pinned public model and native source
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -c 'import sys; sys.path.insert(0, "scripts"); from prepare_offline_android import prepare_model; prepare_model()'
+          git clone --depth 1 --branch b12248 https://github.com/ggml-org/llama.cpp.git cpu-llama
+          [[ "$(git -C cpu-llama rev-parse HEAD)" == 3837bf0* ]]
+      - name: Compile native CPU inference server
+        shell: bash
+        run: |
+          set -euo pipefail
+          cmake -S cpu-llama -B cpu-build -G Ninja -DCMAKE_BUILD_TYPE=Release -DLLAMA_BUILD_TESTS=OFF -DLLAMA_BUILD_EXAMPLES=OFF -DLLAMA_BUILD_TOOLS=ON -DLLAMA_BUILD_SERVER=ON -DLLAMA_BUILD_UI=OFF -DLLAMA_USE_PREBUILT_UI=OFF -DGGML_CUDA=OFF
+          cmake --build cpu-build --target llama-server --parallel 4
+      - name: Compare unassisted thinking with equation-assisted solving
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/quality/run_qwen_equation_probe.py cpu-build/bin/llama-server evaluation/equation-bridge.jar > evaluation/equation-results.json
+          cat evaluation/equation-results.json >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v6
+        with:
+          name: qwen3-equation-cpu-results
+          path: evaluation/equation-results.json
+          if-no-files-found: error
+          retention-days: 14
