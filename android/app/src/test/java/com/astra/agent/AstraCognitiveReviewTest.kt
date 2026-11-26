@@ -17,6 +17,18 @@ class AstraCognitiveReviewTest {
         assertTrue(good.answer.contains("correct."))
     }
 
+    @Test fun independentlyChecksExplicitLinearEquationAnswers() {
+        val q = "Solve for x: 2*x-7=5*x+2"
+        val bad = AstraCognitiveReview.resolve("Verify your answer",
+            pair("model only: $q", "3")) as AstraCognitiveReview.Result.Local
+        assertTrue(bad.answer.contains("incorrect; corrected result: -3"))
+        val good = AstraCognitiveReview.resolve("Verify your answer",
+            pair(q, "-3.00")) as AstraCognitiveReview.Result.Local
+        assertTrue(good.answer.contains("correct."))
+        assertTrue(AstraCognitiveReview.resolve("Verify your answer",
+            pair("Solve for x: x*x=4", "2")) is AstraCognitiveReview.Result.Native)
+    }
+
     @Test fun arbitraryDomainIsReviewedByModelNotScriptedConfession() {
         val history = pair("Unrelated old question", "SECRET_OLDER") +
             pair("Does this conclusion follow from all the premises?", "Yes, always.")
