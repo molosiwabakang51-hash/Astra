@@ -15,6 +15,21 @@ fun main(args: Array<String>) {
     }
     val question = decode()
     when (args[0]) {
+        "retry_gate" -> {
+            // Host-only candidate. A numeric-format request is not proof
+            // of solvability. Exclude ambiguous number notation and
+            // questions with fewer than two distinct bounded literals.
+            val literal = Regex("""(?<![\p{L}\p{N}_.])[0-9]{1,9}(?:\.[0-9]{1,4})?(?![\p{L}\p{N}_]|\.[0-9])""")
+            val values = literal.findAll(question).map {
+                it.value.toBigDecimal().stripTrailingZeros()
+            }.toSet()
+            val proposal = decode().trim()
+            val syntax = Regex("""CALC: [0-9 .()+*/-]{1,120}""").matches(proposal)
+            val allowed = AstraCalculationAssist.requestsNumericOnly(question) &&
+                !Regex("""[0-9],[0-9]""").containsMatchIn(question) &&
+                values.size >= 2 && syntax
+            println(if (allowed) "ALLOW" else "REJECT")
+        }
         "plan" -> emit(AstraCalculationAssist.planningPrompt(question))
         "evaluate" -> {
             val result = AstraCalculationAssist.evaluate(question, decode())

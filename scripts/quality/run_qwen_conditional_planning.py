@@ -38,13 +38,23 @@ def cases(seed):
         ("unsuitable_nonnumeric",f"A text has {a} pages and another has {b} pages. Which has more accurate factual claims?",None),
     ]
 
+def selective_cases(seed):
+    # Deliberately include unsuitable questions with exactly the same output
+    # contract as eligible questions, including two or more numeric literals.
+    return cases(seed) + [
+        ("unsuitable_numeric_missing","A vehicle travels 12 hours over 3 days. Distance is not given. What was its exact average speed? Reply only with the number.",None),
+        ("unsuitable_numeric_zero","What is the exact numeric value of 7 divided by 0? Reply only with the number.",None),
+        ("unsuitable_numeric_comma","Add 2,50 and 7. The comma convention is not specified. Reply only with the number.",None),
+        ("unsuitable_numeric_recurring","What is the exact terminating decimal for 5 divided by 7? Reply only with the number.",None),
+    ]
+
 def should_retry(complete, proposal, parsed):
     # Never reinterpret an explicit abstention, incomplete answer, or an
     # accepted expression as permission to search for a different answer.
     return complete and parsed is None and bool(proposal.strip()) and proposal.strip() != "NONE"
 
-def evaluate(infer, invoke, seed=SEED, suite=None):
-    suite=cases(seed) if suite is None else suite
+def evaluate(infer, invoke, seed=SEED, suite=None, selective=False):
+    suite=(selective_cases(seed) if selective else cases(seed)) if suite is None else suite
     system=native.system_prompt()
     rows=[]
     def generate(prompt,mode,cap,call_seed):
@@ -71,6 +81,7 @@ def evaluate(infer, invoke, seed=SEED, suite=None):
         first,done,tokens,ms=generate(prompt,"direct",128,(seed+i*13)%(2**31-1))
         old=invoke("evaluate",question,first) if done else None
         retry=should_retry(done,first,old)
+        narrow_retry=retry and bool(invoke("retry_gate",question,first)) if selective else False
         candidate=old
         retry_done=None
         retry_none=False
@@ -87,6 +98,10 @@ def evaluate(infer, invoke, seed=SEED, suite=None):
                          candidate_correct=bool(eligible and candidate is not None and calc.scalar_equal(candidate[0],expected)),
                          baseline_complete=done,baseline_none=done and first.strip()=="NONE",
                          retried=retry,retry_complete=retry_done,retry_none=retry_none,
+                         narrow_retried=narrow_retry,
+                         narrow_accepted=(candidate if narrow_retry else old) is not None,
+                         narrow_correct=bool(eligible and (candidate if narrow_retry else old) is not None and calc.scalar_equal((candidate if narrow_retry else old)[0],expected)),
+                         narrow_tokens=tokens+(rt if narrow_retry else 0),narrow_ms=ms+(rm if narrow_retry else 0),
                          baseline_tokens=tokens,candidate_tokens=tokens+rt,
                          baseline_ms=ms,candidate_ms=ms+rm))
     positive=[r for r in rows if r["eligible"]]
@@ -108,10 +123,16 @@ def evaluate(infer, invoke, seed=SEED, suite=None):
                 candidate_tokens=sum(r["candidate_tokens"] for r in rows),
                 baseline_ms=sum(r["baseline_ms"] for r in rows),
                 candidate_ms=sum(r["candidate_ms"] for r in rows),
+                selective_policy=(dict(correct=sum(r["narrow_correct"] for r in positive),
+                    unsuitable_accepted=sum(r["narrow_accepted"] for r in negative),
+                    eligible_retries=sum(r["narrow_retried"] for r in positive),
+                    unsuitable_retries=sum(r["narrow_retried"] for r in negative),
+                    missed_broad_gains=sum(r["candidate_correct"] and not r["narrow_correct"] for r in positive),
+                    tokens=sum(r["narrow_tokens"] for r in rows),ms=sum(r["narrow_ms"] for r in rows)) if selective else None),
                 cases=rows,official_ai_rating=None,
                 scope="Public developmental tool-planning cases. Conditional second thinking call; different mode, seed and cap by design. Exact values do not certify semantic interpretation. No synthesis or live routing.")
 
-def run(binary,jar,seed):
+def run(binary,jar,seed,selective=False):
     if not native.check_model(native.MODEL_PATH):
         raise RuntimeError("Unverified model")
     opener=urllib.request.build_opener(urllib.request.ProxyHandler({}))
@@ -134,7 +155,7 @@ def run(binary,jar,seed):
             else:
                 raise RuntimeError("Native server startup timed out")
             result=evaluate(lambda p:native.request(opener,"/completion",p),
-                            lambda operation,q,proposal=None:calc.bridge(jar,operation,q,proposal),seed)
+                            lambda operation,q,proposal=None:calc.bridge(jar,operation,q,proposal),seed,selective=selective)
             if not native.check_model(native.MODEL_PATH):
                 raise RuntimeError("Model identity changed")
             return result
@@ -152,7 +173,8 @@ if __name__=="__main__":
     parser.add_argument("binary",type=Path)
     parser.add_argument("bridge",type=Path)
     parser.add_argument("--seed",type=int,default=SEED)
+    parser.add_argument("--selective",action="store_true")
     args=parser.parse_args()
     if not 0<=args.seed<2**31-1:
         parser.error("Invalid seed")
-    print(json.dumps(run(args.binary,args.bridge,args.seed),indent=2,allow_nan=False))
+    print(json.dumps(run(args.binary,args.bridge,args.seed,args.selective),indent=2,allow_nan=False))

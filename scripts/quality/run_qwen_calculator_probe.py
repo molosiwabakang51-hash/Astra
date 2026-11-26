@@ -77,6 +77,8 @@ def bridge(jar, operation, question, proposal=None):
     lines = result.stdout.splitlines()
     def decode(line):
         return base64.b64decode(line, validate=True).decode("utf-8")
+    if operation == "retry_gate" and lines in (["ALLOW"], ["REJECT"]):
+        return lines == ["ALLOW"]
     if operation == "plan" and len(lines) == 1:
         return decode(lines[0])
     if operation == "evaluate" and lines == ["REJECT"]:

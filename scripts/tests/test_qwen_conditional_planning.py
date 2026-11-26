@@ -58,6 +58,39 @@ class ConditionalPlanningTests(unittest.TestCase):
         self.assertIsNone(report["official_ai_rating"])
         self.assertTrue(all("proposal" not in row for row in report["cases"]))
 
+    def test_selective_policy_uses_shared_retry_and_reports_missed_gains(self):
+        suite=[("eligible_a","Q1","7"),("eligible_b","Q2","8"),("unsuitable_a","Q3",None)]
+        replies=iter(["bad","CALC: 7","bad","CALC: 8","bad","CALC: 7"])
+        calls=[]
+        def infer(payload):
+            calls.append(payload)
+            return dict(generation_settings=payload,stop_type="eos",truncated=False,
+                        tokens_predicted=5,content=next(replies))
+        def invoke(operation,question,proposal=None):
+            if operation=="plan":
+                return question
+            if operation=="retry_gate":
+                self.assertEqual(proposal,"bad")
+                return question=="Q1"
+            return (proposal[-1],"synthesis") if proposal.startswith("CALC:") else None
+        result=probe.evaluate(infer,invoke,42,suite,selective=True)
+        narrow=result["selective_policy"]
+        self.assertEqual(len(calls),6)
+        self.assertEqual(result["candidate_correct"],2)
+        self.assertEqual(narrow["correct"],1)
+        self.assertEqual(narrow["missed_broad_gains"],1)
+        self.assertEqual(narrow["unsuitable_accepted"],0)
+        self.assertEqual(result["candidate_unsuitable_accepted"],1)
+        self.assertEqual(narrow["tokens"],20)
+
+    def test_selective_suite_includes_numeric_only_unsuitable_controls(self):
+        suite=probe.selective_cases(42)
+        self.assertEqual(len(suite),16)
+        self.assertEqual(sum(v is None for _,_,v in suite),8)
+        self.assertEqual(sum(n.startswith("unsuitable_numeric_") and
+                             q.endswith("Reply only with the number.") and v is None
+                             for n,q,v in suite),4)
+
     def test_incomplete_plan_never_evaluated_or_retried(self):
         def infer(payload):
             return dict(generation_settings=payload,stop_type="limit",truncated=True,

@@ -1,11 +1,13 @@
 name: Actual Qwen3 conditional calculator planning
 on:
   pull_request:
-    branches: [main]
+    branches: [main, intelligence/acie-conditional-calculator-planning]
     paths:
       - '.github/workflows/qwen3-conditional-planning.yml'
       - 'scripts/quality/run_qwen_conditional_planning.py'
       - 'scripts/tests/test_qwen_conditional_planning.py'
+      - 'scripts/quality/AcieCalculatorProbe.kt'
+      - 'scripts/quality/run_qwen_calculator_probe.py'
   workflow_dispatch:
 permissions:
   contents: read
@@ -32,6 +34,22 @@ jobs:
           mkdir -p evaluation
           src=android/app/src/main/java/com/astra/agent
           kotlinc "$src/AstraCalculationAssist.kt" "$src/AstraInterruptedReply.kt" scripts/quality/AcieCalculatorProbe.kt -include-runtime -d evaluation/calculator-bridge.jar
+      - name: Check compiled selective retry gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          PYTHONPATH=scripts/quality python - <<'PY'
+          from pathlib import Path
+          from run_qwen_calculator_probe import bridge
+          jar=Path("evaluation/calculator-bridge.jar")
+          q="There are 12 items costing 5 each. What is the cost? Reply only with the number."
+          assert bridge(jar,"retry_gate",q,"CALC: 12*6") is True
+          for question,proposal in [(q,"NONE"),(q,"Answer: 60"),
+              ("Add 2,50 and 7. Reply only with the number.","CALC: 2+7"),
+              ("A shop buys 12 items. What is its cost? Reply only with the number.","CALC: 12*12"),
+              ("A shop buys 12 items costing 5 coins each. What is its cost?","CALC: 12*6")]:
+              assert bridge(jar,"retry_gate",question,proposal) is False
+          PY
       - name: Obtain pinned public model and native source
         shell: bash
         run: |
@@ -49,7 +67,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          python scripts/quality/run_qwen_conditional_planning.py cpu-build/bin/llama-server evaluation/calculator-bridge.jar --seed 92846173 > evaluation/conditional-planning.json
+          python scripts/quality/run_qwen_conditional_planning.py cpu-build/bin/llama-server evaluation/calculator-bridge.jar --seed 95172643 --selective > evaluation/conditional-planning.json
           cat evaluation/conditional-planning.json >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@v6
         with:
