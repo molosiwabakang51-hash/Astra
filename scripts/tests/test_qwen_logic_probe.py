@@ -115,6 +115,41 @@ class LogicProbeTests(unittest.TestCase):
         self.assertEqual(result["totals"]["grammar"]["syntax_accepted"], 0)
         self.assertIsNone(probe.parse("FORM: Z => Z", {"A"}))
 
+    def test_translation_prompt_changes_only_instruction_not_sampling(self):
+        cases = (("valid", "A = p; B = q.", "Argument", ("A",), "A", "ENTAILED"),
+                 ("unsuitable", "A = p; B = q.", "Unknown", None, None, None))
+        calls = []
+        def infer(payload):
+            calls.append(payload)
+            return dict(generation_settings=payload, stop_type="eos",
+                        truncated=False, tokens_predicted=4, content="NONE")
+        def verify(question):
+            self.fail("Abstentions must not reach the verifier")
+        result = probe.evaluate(infer, verify, cases, experiment="translation")
+        self.assertEqual(len(calls), 4)
+        for a, b in zip(calls[::2], calls[1::2]):
+            self.assertEqual({k:v for k,v in a.items() if k != "prompt"},
+                             {k:v for k,v in b.items() if k != "prompt"})
+            self.assertNotEqual(a["prompt"], b["prompt"])
+            self.assertNotIn("grammar", a)
+            self.assertNotIn("grammar", b)
+        self.assertEqual(result["matched"], dict(both=0, baseline_only=0,
+                         translation_only=0, neither=1))
+        for arm in ("baseline", "translation"):
+            self.assertEqual(result["totals"][arm]["eligible_false_abstention"], 1)
+            self.assertEqual(result["totals"][arm]["unsuitable_explicit_none"], 1)
+        self.assertIsNone(result["official_ai_rating"])
+
+    def test_translation_example_is_disjoint_and_invalid_arguments_are_translatable(self):
+        for _, mapping, argument, _, _, _ in probe.CASES:
+            prompt = probe.translation_prompt(mapping, argument)
+            self.assertIn("An invalid or contradictory argument can still be translated.", prompt)
+            self.assertIn("FORM: P; Q => P & Q.", prompt)
+            self.assertIn(mapping, prompt)
+            self.assertIn(argument, prompt)
+            self.assertNotIn("COUNTEREXAMPLE", prompt)
+        self.assertIsNone(probe.parse("FORM: P; Q => P & Q", {"A", "B"}))
+
 
 if __name__ == "__main__":
     unittest.main()
