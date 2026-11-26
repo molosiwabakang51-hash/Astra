@@ -356,6 +356,26 @@ All 119 sequential master requirements reviewed, 27 checked, 92 outstanding. No 
 
 All 119 sequential requirements reviewed; 27 checked, 92 outstanding. No new master acceptance claim from implementation alone. No independent intelligence score.
 
+## Session update — verified historical regression and explicit equation working
+
+#456 head 45273ead2d6f12da9aedc68c014b5f6141f3211a Python 45868123125, Android 45868122899 and actual context CPU 45868122902 passed; budget native 45868122976 still running at inspection. Downloaded and directly inspected artifact 15141721851, seed 69401723, pinned baseline 5f4b1723b6fa6594ee21828ad1b01bdd0a2f818d: baseline 4/8 vs recovery 7/8 strict, tail 0/4 vs 3/4, gap 1/1 both, controls 3/3 both, both correct 4, candidate-only 3, baseline-only 0, neither 1; all 16 completed. Zero confirmed wrong scalar both, noncanonical 4 vs 1, tokens 1273 vs 935, elapsed 113619 vs 90996 ms. Reproduces existing public developmental cases, not independent generalization. Compared original #456 base 59d5834854aa2c0e38884098d8d7bdcd0c850078 with main at inspection; only ledger changed in two commits, no competing code modifications. GitHub still reports nonmergeable; preserve current runs and reconcile only after completed budget evidence. #457 Python 45868844045 passed; native 45868844216 job 140078660092 passed contract tests and compiled exact model/native runtime, actual matched inference running. Android 45868843991 running. No candidate activation yet.
+
+#458 head c02dedd1535b3058b879528e4da2aca6ce0e0d49 created on main c726d786d57617c768f75e81004f92fb25eec3a1. Refactor existing bounded affine solver to reuse its independently computed coefficients and substitution values for a verified-working report only when the observed prior answer exactly matches the recomputed canonical result. Preserve existing numeric outputs, exact rational intermediate arithmetic, terminating final decimal requirements and syntax/resource bounds. Report collected coefficient and constant, division and exact equal original-side values; distinguish identities and contradictory equations. Connect to existing AstraVerifiedArithmetic.verifiedWorking path; reject mismatching, incomplete or ambiguous prior answers and unsupported equations. Four new regression methods including 128 seeded variable-on-both-sides equations and wrong-answer refusal, plus rational, negative and zero-coefficient cases. Android 45870050614 and calculator CPU 45870050633 running. No merge, unrestricted mathematical interpretation, model weights, prompt or default routing changes claimed. This is deterministic assisted explanation capability, not unassisted model quality.
+
+### Incremental milestones (not additional master requirements)
+
+- [x] Milestone — ACIE-117: verify #456 Python, Android and historical-context native regression.
+- [x] Milestone — ACIE-052: inspect reproduced 4/8 to 7/8 recovery result with zero paired losses.
+- [x] Milestone — ACIE-102/111: verify #457 Python and native contract checks.
+- [x] Milestone — ACIE-057/083/100: implement verified explanation of explicit affine equations and refusal to certify mismatching prior results (#458).
+- [x] Milestone — ACIE-117: implement four equation-working regression methods including 128 generated equations.
+- [ ] Milestone — ACIE-117: finish #456 native budget and reconcile merge state.
+- [ ] Milestone — ACIE-102/110/111: inspect #457 actual-model framing comparison.
+- [ ] Milestone — ACIE-057/083/100: validate #458 Android and calculator native regression before integration.
+- [ ] Milestone — ACIE-040/118/119: independent broad physical-device assessment and target attainment.
+
+All 119 sequential ACIE master requirements reviewed, 27 checked and 92 outstanding. No new broad master acceptance claimed. No independent intelligence rating.
+
 ## Acceptance
 
 90/100 independent repeated general intelligence score; separate model-only/assisted results; no model substitution, paid API or unsupported capability claims. Freeze protocol before held-out testing. Preserve offline and memory constraints. Recheck any completed engineering item if a later regression invalidates it.
