@@ -83,12 +83,28 @@ def scalar_equal(answer, expected):
         return False
 
 
-def evaluate(infer, invoke, cases=CASES, base_seed=SEED):
+def synthesis_outcome(answer, complete, computed):
+    """Classify output without exporting text or inferring correctness from prose."""
+    if not complete:
+        return "incomplete"
+    if not answer.strip():
+        return "no_visible_answer"
+    if answer.strip() == "MISMATCH":
+        return "mismatch"
+    candidate = answer.strip().rstrip(".!")
+    if scalar_equal(candidate, computed):
+        return "matches_calculation"
+    if re.fullmatch(r"[+-]?[0-9]{1,40}(?:\.[0-9]{1,12})?", candidate):
+        return "numeric_disagreement"
+    return "noncanonical_ungraded"
+
+
+def evaluate(infer, invoke, cases=CASES, base_seed=SEED, paired=False):
     system = native.system_prompt()
     rows = []
-    def generate(prompt, cap, seed):
-        settings = native.PROFILES["qwen_direct"]
-        payload = dict(prompt=native.raw_prompt(system, prompt, "direct"),
+    def generate(prompt, cap, seed, mode="direct"):
+        settings = native.PROFILES["qwen_" + mode]
+        payload = dict(prompt=native.raw_prompt(system, prompt, mode),
                        n_predict=cap, seed=seed, cache_prompt=False, stream=False,
                        ignore_eos=False, repeat_penalty=1.0, presence_penalty=0.0,
                        frequency_penalty=0.0, **settings)
@@ -124,14 +140,27 @@ def evaluate(infer, invoke, cases=CASES, base_seed=SEED):
         # Test actual application behavior: synthesize even a syntactically
         # valid but semantically wrong calculation, and count it as a failure.
         if valid:
-            answer, done, used, duration = generate(parsed[1], 768, seed+1)
-            row.update(synthesis_attempted=True, synthesis_complete=done,
-                       synthesis_strict_correct=bool(correct and done and scalar_equal(answer.rstrip(".!"), expected)),
-                       synthesis_tokens=used, synthesis_ms=duration)
+            # Same plan, synthesis prompt, seed and cap in both arms.
+            # Alternate order to reduce systematic runtime-order bias.
+            modes = ("direct", "think") if i % 2 == 0 else ("think", "direct")
+            results = {}
+            for mode in (modes if paired else ("direct",)):
+                answer, done, used, duration = generate(parsed[1], 768, seed+1, mode)
+                results[mode] = dict(complete=done,
+                    strict_correct=bool(correct and done and scalar_equal(answer.rstrip(".!"), expected)),
+                    outcome=synthesis_outcome(answer, done, parsed[0]),
+                    tokens=used, ms=duration)
+            direct = results["direct"]
+            row.update(synthesis_attempted=True, synthesis_complete=direct["complete"],
+                       synthesis_strict_correct=direct["strict_correct"],
+                       synthesis_outcome=direct["outcome"],
+                       synthesis_tokens=direct["tokens"], synthesis_ms=direct["ms"])
+            if paired:
+                row["thinking_synthesis"] = results["think"]
         rows.append(row)
     positive = [r for r in rows if r["eligible"]]
     negative = [r for r in rows if not r["eligible"]]
-    return dict(status="COMPLETE_CALCULATOR_CPU_DIAGNOSTIC", seed=base_seed,
+    report = dict(status="COMPLETE_CALCULATOR_CPU_DIAGNOSTIC", seed=base_seed,
                 model_sha256=native.MODEL_SHA256,
                 system_prompt_sha256=hashlib.sha256(system.encode()).hexdigest(),
                 eligible=len(positive), unsuitable=len(negative),
@@ -142,9 +171,19 @@ def evaluate(infer, invoke, cases=CASES, base_seed=SEED):
                 planning_incomplete=sum(not r["planning_complete"] for r in rows),
                 cases=rows, official_ai_rating=None,
                 scope="Public developmental CPU probe using production Kotlin calculator, not handset or independent assessment.")
+    if paired:
+        arms = dict(direct_only=0, thinking_only=0, both=0, neither=0)
+        for row in positive:
+            direct = row["synthesis_strict_correct"]
+            think = row.get("thinking_synthesis", {}).get("strict_correct", False)
+            arms["both" if direct and think else "direct_only" if direct else "thinking_only" if think else "neither"] += 1
+        report["paired_synthesis"] = dict(denominator=len(positive), **arms,
+            thinking_strict_correct=arms["both"]+arms["thinking_only"],
+            thinking_attempted=sum("thinking_synthesis" in r for r in rows))
+    return report
 
 
-def run(binary, jar, fresh=False):
+def run(binary, jar, fresh=False, paired=False):
     if not native.check_model(native.MODEL_PATH):
         raise RuntimeError("Unverified Qwen model")
     opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
@@ -170,7 +209,7 @@ def run(binary, jar, fresh=False):
                 raise RuntimeError("Native startup timed out")
             result = evaluate(lambda payload: native.request(opener, "/completion", payload),
                               lambda operation, question, proposal=None: bridge(jar, operation, question, proposal),
-                              FRESH_CASES if fresh else CASES, SEED+101 if fresh else SEED)
+                              FRESH_CASES if fresh else CASES, SEED+101 if fresh else SEED, paired=paired)
             if not native.check_model(native.MODEL_PATH):
                 raise RuntimeError("Model identity changed")
             return result
@@ -189,9 +228,10 @@ def main():
     parser.add_argument("binary", type=Path)
     parser.add_argument("bridge", type=Path)
     parser.add_argument("--fresh", action="store_true")
+    parser.add_argument("--paired", action="store_true")
     args = parser.parse_args()
     try:
-        print(json.dumps(run(args.binary, args.bridge, args.fresh), indent=2, allow_nan=False))
+        print(json.dumps(run(args.binary, args.bridge, args.fresh, args.paired), indent=2, allow_nan=False))
         return 0
     except (OSError, ValueError, RuntimeError, KeyError, subprocess.SubprocessError):
         print("Calculator CPU probe incomplete; no score awarded.")
