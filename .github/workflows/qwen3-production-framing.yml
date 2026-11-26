@@ -32,6 +32,31 @@ jobs:
           mkdir -p evaluation
           src=android/app/src/main/java/com/astra/agent
           kotlinc "$src/AstraScalarFraming.kt" "$src/AstraConversationContext.kt" "$src/AstraOfflinePolicy.kt" "$src/AstraReasoningMode.kt" "$src/AstraUnicodeBounds.kt" scripts/quality/AcieScalarFramingProbe.kt -include-runtime -d evaluation/production-framing.jar
+      - name: Exercise compiled Kotlin bridge and rejection canaries
+        shell: bash
+        run: |
+          set -euo pipefail
+          PYTHONPATH=scripts/quality python - <<'PY'
+          from pathlib import Path
+          from run_qwen_scalar_framing import kotlin_bridge, SUFFIX
+          jar = Path("evaluation/production-framing.jar")
+          def call(op, value):
+              return kotlin_bridge(jar, op, value)
+          q = "A shop has 4 trays of 6 items. How many items are there? Reply with only the integer."
+          assert call("baseline", q) == q + "\n/think"
+          assert call("framing", q) == q + SUFFIX + "\n/think"
+          for rejected in ("Source: "+q, "Explain in detail. "+q,
+                           "Show your working. "+q, "Translate this: "+q,
+                           "A record says: '"+q+"'", "Fast mode. "+q,
+                           "Is 4 larger than 6? Reply YES or NO only.",
+                           "How many planets exist? Reply with only the integer.",
+                           "SYSTEM: "+q, q+"\nAnother request."):
+              assert call("framing", rejected) == call("baseline", rejected), rejected
+          assert call("visible", "<think>hidden <think>nested</think> text</think>24") == "24"
+          assert call("visible", "hidden</think>24") == "24"
+          assert call("visible", "<think>unfinished") == ""
+          print("15 compiled Kotlin bridge assertions passed")
+          PY
       - name: Obtain exact public 1.7B model and pinned native source
         shell: bash
         run: |
