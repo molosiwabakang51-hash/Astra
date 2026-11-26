@@ -67,6 +67,58 @@ internal object AstraCategoricalVerifier {
         return witnesses.distinct()
     }
 
+    /**
+     * Controlled English only: each predicate is a single, explicitly named
+     * class. No stemming, singular/plural guessing, synonyms, or world facts.
+     * The complete input must match a sequence of categorical premises and
+     * an explicit entailment question. Unsupported language falls through.
+     */
+    data class NamedCheck(val check: Check, val mapping: Map<Char, String>)
+
+    private val namedRequest = Regex(
+        """^((?:(?:All|No|Some) [a-zA-Z]{2,24} are (?:not )?[a-zA-Z]{2,24}\. ){1,6})Does it follow that ((?:all|no|some) [a-zA-Z]{2,24} are (?:not )?[a-zA-Z]{2,24})\?(?: Reply YES or NO only\.)?$"""
+    )
+    private val namedStatement = Regex(
+        """^(All|No|Some|all|no|some) ([a-zA-Z]{2,24}) are (not )?([a-zA-Z]{2,24})$"""
+    )
+    private val reserved = setOf("all", "no", "some", "not", "are", "and", "or",
+        "if", "then", "only", "most", "many", "few", "the", "they", "them",
+        "these", "those", "there", "here", "what", "who", "which", "both",
+        "either", "neither", "any", "none", "always", "never", "true", "false")
+
+    fun verifyControlledLanguage(question: String): NamedCheck? {
+        if (question.length !in 35..650 || question.any { it == '\n' || it == '\r' }) return null
+        val match = namedRequest.matchEntire(question.trim()) ?: return null
+        val premises = match.groupValues[1].removeSuffix(". ").split(". ")
+        if (premises.size !in 1..6) return null
+        val mapping = linkedMapOf<String, Char>()
+        fun translate(text: String): String? {
+            val m = namedStatement.matchEntire(text) ?: return null
+            val quantifier = m.groupValues[1].lowercase(java.util.Locale.ROOT)
+            val negative = m.groupValues[3].isNotEmpty()
+            if (negative && quantifier != "some") return null
+            // Preserve lexical identity exactly; never conflate different
+            // capitalizations or infer membership from related word forms.
+            fun symbol(name: String): Char? {
+                if (name.lowercase(java.util.Locale.ROOT) in reserved) return null
+                if (name in mapping) return mapping[name]
+                if (mapping.size >= 8) return null
+                val next = 'A' + mapping.size
+                mapping[name] = next
+                return next
+            }
+            val left = symbol(m.groupValues[2]) ?: return null
+            val right = symbol(m.groupValues[4]) ?: return null
+            val prefix = quantifier.replaceFirstChar { it.uppercaseChar() }
+            return "$prefix $left are " + (if (negative) "not " else "") + right
+        }
+        val translated = premises.map { translate(it) ?: return null }
+        val conclusion = translate(match.groupValues[2]) ?: return null
+        val result = verify("Categorical premises: " + translated.joinToString("; ") +
+            ". Conclusion: $conclusion. Does the conclusion follow?") ?: return null
+        return NamedCheck(result, mapping.entries.associate { it.value to it.key })
+    }
+
     fun verify(question: String): Check? {
         if (question.length !in 40..280) return null
         val match = request.matchEntire(question.trim()) ?: return null
