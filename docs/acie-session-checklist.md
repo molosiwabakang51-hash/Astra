@@ -514,6 +514,40 @@ Owner scope remains general AI quality only under #308/#315; preserve #313 witho
 
 All 119 ACIE master requirements remain 27 checked and 92 outstanding; all 119 canonical release parents remain unchecked at last reconciliation. No independent intelligence score.
 
+
+## Session update — contextual intelligence, evidence integrity and assisted reasoning (26 November)
+
+Reconciliation of subsequent results supersedes pending statuses in older historical session entries, not the 119 master requirement statuses. Owner scope remains general AI only, #308/#315; preserve #313 without expansion. All results below are public synthetic development diagnostics or deterministic/JVM implementation evidence, not independent broad assessment.
+
+- #475 Android 45881609016 passed; merged 98a7e60fb44d6d7063b5c1112aeab2235cae4fb9. Explicit bounded conditional review integrated; #474 closed as superseded after checking its hunks.
+- #476 artifact 15147742553, 16/16 complete: 4/8 to 5/8, omitted latest 0/4 to 1/4, controls 4/4 both, 1258 to 1383 tokens, 158065 to 166133 ms. Host-only merge c65cc662d36bd5897ad593de18c725e0348b34b7; warning alone insufficient.
+- #478 Android 45883702533 and calculator CPU 45883702460 passed; merged 0d5f39180d4b365926c9b4779604a83743c53f16. Exact rational explicit equation audit; CPU artifact 15149250795 was existing calculator suite, not targeted equation-audit A/B.
+- #479 artifact 15149147396, 24/24 complete: 6/12 both, omitted 2/4 to 1/4, unrelated 2/4 to 3/4, controls 2/4 both. Reject scoped warning activation; host-only merge b81b5eb5157d5de0ae60536638bd702f91e2d8a6.
+- #480 Android 45886189679 and CPU 45886189621 passed, merge a6a6b8d0dfa147abdb27db2ce629dd415edead96. Preserve up to two explicitly matched correction chains within existing budget. Targeted #481 artifact 15150782420, 16/16 complete: 3/8 to 5/8, dual 0/4 to 2/4, single 3/4 both, required correction fragments 4/8 to 8/8, 1595 to 1697 tokens, 146876 to 156558 ms. All CI passed; diagnostic merge 5be40157828e45aa307612db3c8a52d43e5f81f1. Retain recovery; residual neural errors.
+- #482 Android 45889285621 and CPU 45889285748 passed; merge db99d6a8acd78fdbacebe6f6fe7994842ed68448. Detect actual incomplete serialized correction rather than mere index presence. #484 corrected Python prefix detector and passed all CI; targeted artifact 15151658105, 24/24 complete, 3/12 to 6/12, latest 0/4 to 2/4, intermediate 0/4 to 1/4, controls 3/4 both, eight correct warning-severity cases, 2376 to 2268 tokens, 215409 to 208845 ms. Diagnostic merge 6900b9fb69358536e7c8e2fec0399c07344ddfc2. Retain safeguard; uncertainty insufficient.
+- #483 artifact 15150843994, 16/16 complete, 5/8 to 4/8, dual 1/4 to 0/4, controls 4/4 both. Reject composition hint; host-only merge 6212b09f82767753ebb5bd9f9802802575734d92.
+- #485 artifact 15151762951, 16/16 complete, 4/8 both, dual 0/4 both, controls 4/4 both, 1271 to 1130 tokens, 176899 to 155144 ms. Reject assistant-excerpt removal activation absent accuracy and routing evidence; host-only merge d8f237757f86ec46e567a68844ba5f2c52d0416c.
+- #486 artifact 15153700937 directly inspected, 26/26 calls complete: 4/10 to 7/10, dual 0/6 to 3/6, single 4/4 both, 9/12 extracted operands, both operands correct 3/6, zero coincidentally correct results, 1859 to 3005 tokens, 168579 to 273359 ms. All three CI passed; host-only merge 45285136783216d92e6fe1a92984e93dcf9b9fb4. Oracle decomposition and arithmetic, not unassisted accuracy; approximately 62% added CPU cost, no live activation.
+- #487 artifact 15154055191 directly inspected, 24/24 complete: 8/12 to 7/12, dual 2/4 to 3/4, missing 2/4 to 0/4, single 4/4 both, one gain/two losses, 2146 to 2272 tokens, 138722 to 145350 ms. Reject live source-membership-only planning. Android 45894455777 failed during KleidiAI download HTTP 504; rerun requested, no acceptance or merge at inspection.
+- #488 head cbc73d0462b531df1a769f0bd40351654cb84a08, 3 commits, 389 additions, 4 regression methods. Compare shared-context vs per-subquestion actual pinned Kotlin retrieval, same oracle operation and subquestions, 10 cases, 32 planned calls (16 each arm), preflight required correction, no omissions, unchanged single controls. Python 45899897776, Android 45899897802 and native 45899897805 queued at inspection. No live routing or score.
+
+### Incremental milestones (not additional master requirements)
+
+- [x] Milestone — ACIE-055/057: conditional and exact rational explicit verification integrated.
+- [x] Milestone — ACIE-043/048/052/098: two-topic recovery and actual excerpt completeness safeguard integrated.
+- [x] Milestone — ACIE-098/110/111: targeted multi-topic improvement measured.
+- [x] Milestone — ACIE-062/113/115: targeted incomplete-evidence warning improvement measured.
+- [x] Milestone — ACIE-030/039/110: reject unsuccessful composition hint and assistant-distraction ablation.
+- [x] Milestone — ACIE-030/082/083: measure oracle fact decomposition and exact assisted composition, separate operand correctness.
+- [x] Milestone — ACIE-078/080/083: reject source-membership-only planning on missing-value regressions.
+- [x] Milestone — ACIE-042/030/110: implement matched equal-call scoped extraction diagnostic.
+- [ ] Milestone — ACIE-117: validate retried #487 Android CI and integrate diagnostic only if green.
+- [ ] Milestone — ACIE-042/030/110: verify #488 Python, Android and actual native comparison.
+- [ ] Milestone — ACIE-030/062/078: reliable autonomous decomposition, semantic evidence validation, uncertainty calibration.
+- [ ] Milestone — ACIE-040/109/118/119: independent protocol freeze and held-out physical-device assessment; earn target score.
+
+Master ACIE 27/119 checked, 92 outstanding. Canonical #166 release acceptance 0/119. No independent intelligence rating.
+
 ## Acceptance
 
 90/100 independent repeated general intelligence score; separate model-only/assisted results; no model substitution, paid API or unsupported capability claims. Freeze protocol before held-out testing. Preserve offline and memory constraints. Recheck any completed engineering item if a later regression invalidates it.
