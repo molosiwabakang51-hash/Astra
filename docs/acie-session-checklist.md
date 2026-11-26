@@ -376,6 +376,25 @@ All 119 sequential requirements reviewed; 27 checked, 92 outstanding. No new mas
 
 All 119 sequential ACIE master requirements reviewed, 27 checked and 92 outstanding. No new broad master acceptance claimed. No independent intelligence rating.
 
+## Session update — measured scalar framing gain and fresh transfer integration
+
+#456 exact head 45273ead2d6f12da9aedc68c014b5f6141f3211a passed Python 45868123125, Android 45868122899, context CPU 45868122902 and actual budget 45868122976. Directly inspected artifact 15142017482, seed 83712049: 768 vs 1792 cap strict correct 6/12 both, completed 11/12 vs 12/12, six both correct and six neither, zero paired gains/losses, 0 wrong scalars both, 5 vs 6 noncanonical ungraded, 4344 vs 4514 tokens and 343327 vs 357344 ms. Domains logic 3/3, quantity 0/3, context 2/3, strategy 1/3 both. Prior 8/12 both in #454 was a different execution of same cases, not independent evidence. No production cap change. #457 head a6cb399a41dd4358f426fa885ddc8255d82ca71a passed Python 45868844045, Android 45868843991 and actual scalar framing 45868844216. Directly inspected artifact 15141622909, seed 79218431: baseline 4/12 vs framing 9/12; arithmetic 0/4 vs 2/4, inverse 0/4 vs 3/4, controls 4/4 both. Both correct 4, candidate-only 5, baseline-only 0, neither 3. Completed 11/12 vs 12/12; 0 wrong scalar both; noncanonical 7 vs 3; tokens 4060 vs 4006, CPU ms 178298 vs 180118. Promising strict-answer improvement, not proof of corrected underlying reasoning on previously noncanonical outputs or independent general intelligence. Do not activate globally until transfer and production-path evidence.
+
+Both completed diagnostic PRs reported nonmergeable after ledger-only main updates. Reconciled six nonledger files from #456/#457 on branch intelligence/acie-validated-framing-transfer from main 1a3652eb5830c228ba2a9b747480d970331332e0; checked original ancestor equality and copied candidate blobs before extending scalar runner/tests/workflow. Initial bulk copy exceeded tool-call limit after branch/first file; resumed and verified six files, no known lost modifications. Added transfer_cases(seed), 12 distinct public developmental tasks (four arithmetic, four inverse, four controls with quoted conflicting directive and missing information); seed 91374521, same matched profile/seed/cap and scoring, original suite retained by default, --suite transfer explicit. Two regression methods check 128 generated reference-key sets and fixed paired denominators/settings. Workflow runs original reproduction and transfer, saves separate JSON files. PR #459 head 1f45958c465d7a2f3d42324853482fcd312cec58 submitted; combined CI pending. No production prompt, routing, weights or default budget change. #458 Android 45870050614 and native calculator 45870050633 still running; preserve evidence. No independent score or release claim.
+
+### Incremental milestones (not additional master requirements)
+
+- [x] Milestone — ACIE-029/110: inspect repeated budget comparison; no strict accuracy benefit from higher cap.
+- [x] Milestone — ACIE-102/111: validate matched scalar framing improvement, 4/12 to 9/12, zero paired losses.
+- [x] Milestone — ACIE-117: reconcile six validated diagnostic files on latest main ancestor.
+- [x] Milestone — ACIE-040/110: implement fresh transfer suite and independent reference tests.
+- [x] Milestone — ACIE-107: submit combined reproduction and transfer workflow (#459).
+- [ ] Milestone — ACIE-102/110/117: verify combined CI and fresh transfer result, then assess narrowly gated production integration.
+- [ ] Milestone — ACIE-057/083/100: validate #458 equation explanations and calculator regression.
+- [ ] Milestone — ACIE-040/118/119: independent broad physical-device assessment and target attainment.
+
+All 119 sequential ACIE master requirements reviewed, 27 checked and 92 outstanding. No new master tick based on a single developmental comparison. No independent intelligence rating.
+
 ## Acceptance
 
 90/100 independent repeated general intelligence score; separate model-only/assisted results; no model substitution, paid API or unsupported capability claims. Freeze protocol before held-out testing. Preserve offline and memory constraints. Recheck any completed engineering item if a later regression invalidates it.
