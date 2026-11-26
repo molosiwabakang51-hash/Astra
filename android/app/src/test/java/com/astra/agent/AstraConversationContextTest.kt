@@ -506,7 +506,7 @@ class AstraConversationContextTest {
         assertTrue(prompt.length <= 3010)
     }
 
-    @Test fun omittedLatestCorrectionInSecondaryTopicIsExplicitlyFlagged() {
+    @Test fun secondaryTopicRetainsLatestCorrectionInsteadOfOnlyWarning() {
         val history = listOf(
             turn("user", "The fictional museum renovation budget is 900 coins."),
             turn("assistant", "Noted."),
@@ -518,13 +518,53 @@ class AstraConversationContextTest {
         val prompt = AstraConversationContext.userPrompt(question, history, true)
         assertTrue(prompt.contains("museum renovation budget is 900 coins"))
         assertTrue(prompt.contains("ferry schedule is 9 am"))
-        // The secondary topic's bare correction is not admitted by the
-        // primary-topic correction filter. Never present 9 am as current.
-        assertFalse(prompt.contains("make it 11 am"))
-        assertTrue(prompt.contains("including a later correction"))
-        assertTrue(prompt.contains("Do not assume the latest value"))
+        assertTrue(prompt.contains("make it 11 am"))
+        assertTrue(prompt.indexOf("ferry schedule is 9 am") < prompt.indexOf("make it 11 am"))
+        assertFalse(prompt.contains("including a later correction"))
         assertTrue(prompt.endsWith(question + "\n/no_think"))
         assertTrue(prompt.length <= 3010)
+    }
+
+    @Test fun bothRelevantLatestCorrectionsSurviveUnrelatedRecentHistory() {
+        val random = java.util.Random(9027183L)
+        repeat(50) {
+            val a = 100 + random.nextInt(100)
+            val b = 300 + random.nextInt(100)
+            val c = 500 + random.nextInt(100)
+            val d = 700 + random.nextInt(100)
+            val history = listOf(
+                turn("user", "The museum renovation budget is $a coins."),
+                turn("assistant", "Noted."),
+                turn("user", "Actually, make it $b coins."),
+                turn("user", "The ferry passenger limit is $c people."),
+                turn("assistant", "Noted."),
+                turn("user", "Actually, make it $d people."),
+                turn("user", "Dinner needs vegetables."),
+                turn("user", "Actually, use spicy rice.")
+            ) + (1..12).map { turn("assistant", "Unrelated recent note $it " + "X".repeat(230)) }
+            val q = "Use the museum renovation budget and ferry passenger limit to plan."
+            val prompt = AstraConversationContext.userPrompt(q, history, true)
+            assertTrue(prompt.contains("budget is $a coins"))
+            assertTrue(prompt.contains("make it $b coins"))
+            assertTrue(prompt.contains("limit is $c people"))
+            assertTrue(prompt.contains("make it $d people"))
+            assertFalse(prompt.contains("Actually, use spicy rice"))
+            assertTrue(prompt.indexOf("budget is $a coins") < prompt.indexOf("make it $b coins"))
+            assertTrue(prompt.indexOf("limit is $c people") < prompt.indexOf("make it $d people"))
+            assertTrue(prompt.endsWith(q + "\n/no_think"))
+            assertTrue(prompt.length <= 3010)
+        }
+    }
+
+    @Test fun singleUnsharedTermDoesNotAuthorizeSecondaryCorrection() {
+        val history = listOf(
+            turn("user", "The museum renovation budget is 900 coins."),
+            turn("user", "The ferry service is at 9 am."),
+            turn("user", "Actually, make it 11 am.")
+        ) + (1..10).map { turn("assistant", "Recent unrelated note $it") }
+        val prompt = AstraConversationContext.userPrompt(
+            "Use the museum renovation budget and ferry to plan.", history, true)
+        assertFalse(prompt.contains("make it 11 am"))
     }
 
     @Test fun retainedNewestCorrectionDoesNotImplyMissingTail() {
