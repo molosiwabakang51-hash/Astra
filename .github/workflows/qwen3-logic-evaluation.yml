@@ -1,0 +1,58 @@
+name: Actual Qwen3 propositional formalization
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/qwen3-logic-evaluation.yml'
+      - 'scripts/quality/run_qwen_logic_probe.py'
+      - 'scripts/quality/AcieLogicProbe.kt'
+      - 'scripts/tests/test_qwen_logic_probe.py'
+      - 'android/app/src/main/java/com/astra/agent/AstraPropositionalVerifier.kt'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: astra-qwen-logic-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  probe:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Verify evaluator and compile production verifier
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m unittest discover -s scripts/tests -p test_qwen_logic_probe.py -v
+          command -v kotlinc
+          mkdir -p evaluation
+          kotlinc android/app/src/main/java/com/astra/agent/AstraPropositionalVerifier.kt scripts/quality/AcieLogicProbe.kt -include-runtime -d evaluation/logic-bridge.jar
+      - name: Obtain exact public 1.7B model and pinned native source
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -c 'import sys; sys.path.insert(0, "scripts"); from prepare_offline_android import prepare_model; prepare_model()'
+          git clone --depth 1 --branch b12248 https://github.com/ggml-org/llama.cpp.git cpu-llama
+          [[ "$(git -C cpu-llama rev-parse HEAD)" == 3837bf0* ]]
+      - name: Compile native CPU inference server
+        shell: bash
+        run: |
+          set -euo pipefail
+          cmake -S cpu-llama -B cpu-build -G Ninja -DCMAKE_BUILD_TYPE=Release -DLLAMA_BUILD_TESTS=OFF -DLLAMA_BUILD_EXAMPLES=OFF -DLLAMA_BUILD_TOOLS=ON -DLLAMA_BUILD_SERVER=ON -DLLAMA_BUILD_UI=OFF -DLLAMA_USE_PREBUILT_UI=OFF -DGGML_CUDA=OFF
+          cmake --build cpu-build --target llama-server --parallel 4
+      - name: Measure formalization fidelity and independent logical verdict
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/quality/run_qwen_logic_probe.py cpu-build/bin/llama-server evaluation/logic-bridge.jar > evaluation/logic-results.json
+          cat evaluation/logic-results.json >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v6
+        with:
+          name: qwen3-logic-cpu-results
+          path: evaluation/logic-results.json
+          if-no-files-found: error
+          retention-days: 14
