@@ -90,7 +90,10 @@ class ScalarFramingTests(unittest.TestCase):
         self.assertEqual(calls[1]["n_predict"],1792)
         self.assertEqual({k:v for k,v in calls[0].items() if k!="prompt"},
                          {k:v for k,v in calls[1].items() if k!="prompt"})
-        self.assertEqual(calls[1]["prompt"].count("/think"),1)
+        for call in calls:
+            user=call["prompt"].split("<|im_start|>user\n",1)[1].split("<|im_end|>",1)[0]
+            self.assertTrue(user.endswith("\n/think"))
+            self.assertEqual(user.count("/think"),1)
 
     def test_only_prompt_changes_and_paired_regression_is_counted(self):
         calls = []
