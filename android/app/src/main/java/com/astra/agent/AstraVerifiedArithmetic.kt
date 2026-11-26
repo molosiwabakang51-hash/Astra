@@ -86,6 +86,8 @@ internal object AstraVerifiedArithmetic {
     fun answer(raw: String): String? {
         val question = raw.trim()
         if (question.length !in 8..180 || question.contains('\n')) return null
+        // Explicit single-variable inverse problems use exact rational algebra.
+        AstraCalculationAssist.solveLinearEquation(question)?.let { return it }
         val match = expression.matchEntire(question) ?: return null
         val left = match.groupValues[1].toBigDecimalOrNull() ?: return null
         val right = match.groupValues[4].toBigDecimalOrNull() ?: return null
