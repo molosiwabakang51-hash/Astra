@@ -84,6 +84,68 @@ internal object AstraVerifiedArithmetic {
         ).toString()
     }
 
+    /**
+     * Explicit review only. Independently compare a bounded scalar or fraction
+     * with the exact result of a complete two-operand owner question.
+     * Do not certify a rounded recurring decimal or parse prose as a number.
+     */
+    fun audit(originalQuestion: String, observedAnswer: String): String? {
+        val question = originalQuestion.trim()
+        if (question.length !in 8..180 || question.any { it == '\r' || it == '\n' }) return null
+        val match = expression.matchEntire(question) ?: return null
+        val left = match.groupValues[1].toBigDecimalOrNull() ?: return null
+        val right = match.groupValues[4].toBigDecimalOrNull() ?: return null
+        val raw = observedAnswer.trim()
+        if (raw.length !in 1..80) return null
+        val fraction = Regex("""([+-]?[0-9]{1,31})/([+-]?[0-9]{1,31})""").matchEntire(raw)
+        val actualNumerator: java.math.BigDecimal
+        val actualDenominator: java.math.BigDecimal
+        if (fraction != null) {
+            actualNumerator = fraction.groupValues[1].toBigDecimalOrNull() ?: return null
+            actualDenominator = fraction.groupValues[2].toBigDecimalOrNull() ?: return null
+            if (actualDenominator.signum() == 0) return null
+        } else {
+            if (!Regex("""[+-]?[0-9]{1,31}(?:\.[0-9]{1,31})?""").matches(raw)) return null
+            actualNumerator = raw.toBigDecimalOrNull() ?: return null
+            actualDenominator = java.math.BigDecimal.ONE
+        }
+        val op = operator(match)
+        val expectedNumerator = when (op) {
+            "plus" -> left.add(right)
+            "minus" -> left.subtract(right)
+            "times", "multiplied by" -> left.multiply(right)
+            "divided by" -> left
+            else -> return null
+        }
+        val expectedDenominator = if (op == "divided by") right else java.math.BigDecimal.ONE
+        if (expectedDenominator.signum() == 0) {
+            return "INDEPENDENT ARITHMETIC CHECK — incorrect; division by zero is undefined. " +
+                "No numerical quotient exists."
+        }
+        val equal = actualNumerator.multiply(expectedDenominator)
+            .compareTo(expectedNumerator.multiply(actualDenominator)) == 0
+        // Preserve the existing exact terminating-decimal display. For a
+        // recurring quotient, convert the original operands to a reduced ratio.
+        val exact = answer(question) ?: run {
+            if (op != "divided by") return null
+            val scale = maxOf(left.scale(), right.scale())
+            var n = left.movePointRight(scale).toBigIntegerExact()
+            var d = right.movePointRight(scale).toBigIntegerExact()
+            val gcd = n.gcd(d)
+            n = n.divide(gcd)
+            d = d.divide(gcd)
+            if (d.signum() < 0) {
+                n = n.negate()
+                d = d.negate()
+            }
+            "$n/$d"
+        }
+        return "INDEPENDENT ARITHMETIC CHECK — " +
+            (if (equal) "correct." else "incorrect; corrected result: $exact.") +
+            "\nComputed from the original operands using exact arithmetic and cross-multiplication. " +
+            "Mathematical equality checked; answer-format compliance was not checked."
+    }
+
     fun answer(raw: String): String? {
         val question = raw.trim()
         if (question.length !in 8..180 || question.contains('\n')) return null
