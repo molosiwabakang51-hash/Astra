@@ -173,6 +173,26 @@ internal object AstraCognitiveReview {
             request.matches(original) || AstraInterruptedReply.isIncomplete(answer) ||
             answer.startsWith(HEADER) || answer.startsWith("ASTRA //")
         ) return Result.Local("No complete original answer to audit. Ask the question again.")
+        // A model may return an explicit trace instead of a scalar. Compute
+        // the proposal, but do not let its own representation certify intent.
+        // Only exact equality with the immediately preceding owner question
+        // can establish that the submitted trace itself was owner supplied.
+        if (answer.startsWith("Trace quantity:", ignoreCase = true)) {
+            val proposal = AstraQuantityProposalAudit.evaluate(answer, original)
+            when (proposal) {
+                AstraQuantityProposalAudit.Outcome.Invalid ->
+                    return Result.Local("The proposed quantity trace is invalid or unsupported. No independent check was performed.")
+                is AstraQuantityProposalAudit.Outcome.Unconfirmed ->
+                    return Result.Local("UNCONFIRMED QUANTITY PROPOSAL — computed result: " +
+                        proposal.computed + "; unit: " + proposal.unit + ". " +
+                        "Arithmetic only: the interpretation of your question is not independently verified. " +
+                        "Review every statement and submit the full corrected trace with Verify this quantity trace: to confirm it.")
+                is AstraQuantityProposalAudit.Outcome.Confirmed -> {
+                    val checked = checkNotNull(AstraQuantityTraceVerifier.verify(answer))
+                    return Result.Local(checkNotNull(AstraQuantityTraceVerifier.report(checked)))
+                }
+            }
+        }
         // Independently recompute a complete, owner-supplied quantity trace.
         // Never infer the trace from unrelated conversation history.
         AstraQuantityTraceVerifier.verify(original)?.let { checked ->
