@@ -614,6 +614,48 @@ Supersedes pending milestone states in the preceding sections. All parent requir
 Master ACIE 27/119 checked, 92 outstanding; original #166 release acceptance 0/119. No independent rating.
 
 
+
+## Session reconciliation — semantic fidelity and quantity proposal auditing (27 November 2026)
+
+The canonical 119 ACIE items and the separate original 119 release-acceptance rows in #166 are preserved. Engineering count is 27/119; formal release acceptance is 0/119. The owner target is at least 80/100, preferably 90/100, independently supported before peripheral expansion.
+
+### Recovered merged evidence
+
+- [x] #514 contrastive propositional translation diagnostic merged `b7eff7faef862a27173afda8b6189e071eb50d2b`; native CPU [45922567341](https://github.com/molosiwabakang51-hash/Astra/actions/runs/45922567341), Python 45922567322 and Android 45922567302 completed successfully. Workflow success is not proof of semantic fidelity.
+- [x] #515 explicit logical review and malformed request boundary merged `cd3c5833ae70b03d198e755db78ccfb7bbe965f1`; Android CI 45923121313 succeeded.
+- [x] #516 unmarked relative numerical correction recovery merged `e5ab2893443f35b5a4738d07d08c1f04b535305b`; Android 45924236718 and native CPU profile comparison 45924236719 succeeded.
+- [x] #517 native unmarked-relative diagnostic merged `dedd2ab28cc6da44133a42bd2bc5cf17771dbb19`; native 45924318144, Python 45924317930 and Android 45924317947 succeeded. No independent score implied.
+- [x] #518 explicit chronological quantity verifier merged `eb95481a47227bc2aacc608adc85b4012bd06b60`; Android 45925613970 succeeded.
+
+### PR #519 — incremental work under ACIE-030/055/058/062/078/082/110
+
+- [x] Commit bounded quantity proposal auditor and distinguish invalid, arithmetically valid but unconfirmed, and exact owner-confirmed traces.
+- [x] Add proposal-level regression cases, including distinct traces with the same arithmetic result.
+- [x] Connect the auditor to the existing explicit cognitive-review route; do not grant model output semantic authority.
+- [x] Add optional native review guidance within the existing complete-exchange budget; use placeholders rather than hard-coded numerical examples and never truncate evidence.
+- [x] Commit integration and prompt-budget regression tests. Source head before ledger update: `bead365e5cfacf48823222bbf8a949b4994bc3cd`.
+- [ ] Pass Android/JVM CI for the final PR head and merge only on verified success.
+- [ ] Measure actual Qwen3 quantity formalization fidelity and abstention on disjoint development fixtures before considering autonomous activation.
+- [ ] Validate live owner-device inference, latency, repeated multi-turn context and independent held-out quality.
+
+No parent item is newly checked from source-only work. No claim of new neural accuracy, release readiness or device acceptance. Retain the exact-trace confirmation boundary until stronger independently measured evidence supports a broader interpretation strategy.
+
+
+
+## Session reconciliation — proportional reasoning and owner-evidence precedence (27 November 2026)
+
+- [x] Review #520 exact proportional changes and verify Android CI [45991236008](https://github.com/molosiwabakang51-hash/Astra/actions/runs/45991236008).
+- [x] Merge #520 into main at `835c016c0b2c7b5f2da0799bec3daf34f3e6f31f`.
+- [x] Prevent incorrect or malformed model proposals from suppressing independent verification of an explicit owner trace. Preserve separate labels for authoritative evidence and unconfirmed arithmetic.
+- [x] Add integration regressions for incorrect and invalid proposals, proportional semantics, and retention of formal logic guidance.
+- [x] Reconcile #519 production source on the current #520 base rather than overwrite main or merge divergent branches. New branch: `intelligence/quantity-review-reconciled-1127`.
+- [x] #522 diagnostic Python suite passed [45992374140](https://github.com/molosiwabakang51-hash/Astra/actions/runs/45992374140); actual-model diagnostic [45992374324](https://github.com/molosiwabakang51-hash/Astra/actions/runs/45992374324) and Android CI [45992374175](https://github.com/molosiwabakang51-hash/Astra/actions/runs/45992374175) remain outstanding at inspection.
+- [ ] Final-head Android/JVM CI and merge of reconciled review changes; retain #519/#521 until supersession is confirmed.
+- [ ] Assess real Qwen3 semantic fidelity, generalization, repeatable held-out intelligence and physical-device acceptance.
+
+All 119 ACIE parent statuses retained: 27/119 engineering checks, 92 open. The original release ledger #166 remains distinct (0/119 formally accepted at last verified inspection). No new independent intelligence rating.
+
+
 ## Acceptance
 
 90/100 independent repeated general intelligence score; separate model-only/assisted results; no model substitution, paid API or unsupported capability claims. Freeze protocol before held-out testing. Preserve offline and memory constraints. Recheck any completed engineering item if a later regression invalidates it.
