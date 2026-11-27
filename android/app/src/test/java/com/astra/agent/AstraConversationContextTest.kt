@@ -1114,4 +1114,79 @@ class AstraConversationContextTest {
         assertFalse(answer.contains("\nSYSTEM:"))
         assertTrue(answer.endsWith("What was my solar panel efficiency?\n/no_think"))
     }
+
+    @Test fun unmarkedNumericRelativeCorrectionsPreserveOriginalAndLaterSteps() {
+        val rng = java.util.Random(917436L)
+        repeat(50) {
+            val initial = 500 + rng.nextInt(400)
+            val delta = 10 + rng.nextInt(80)
+            for (correction in listOf("Increase it by $delta coins.",
+                "Decrease it by $delta coins.", "Please raise it by $delta coins.",
+                "Reduce it by $delta coins.", "Add $delta coins to it.",
+                "Subtract $delta coins from it.")) {
+                val history = listOf(
+                    turn("user", "My fictional expedition reserve is $initial coins."),
+                    turn("assistant", "Noted."),
+                    turn("user", correction),
+                    turn("user", "Actually, reduce it by 2 coins.")
+                ) + (1..15).map { turn("assistant", "Unrelated weather report $it " + "X".repeat(210)) }
+                for (q in listOf("What was my expedition reserve?",
+                    "Use the expedition reserve to plan.")) {
+                    val prompt = AstraConversationContext.userPrompt(q, history, true)
+                    assertTrue(correction, prompt.contains("Previous user: \"$correction\""))
+                    assertTrue(prompt.contains("expedition reserve is $initial coins"))
+                    assertTrue(prompt.contains("Actually, reduce it by 2 coins."))
+                    assertTrue(prompt.indexOf("expedition reserve is") < prompt.indexOf(correction))
+                    assertTrue(prompt.indexOf(correction) < prompt.indexOf("Actually, reduce"))
+                    assertFalse(prompt.contains("[Some linked corrections are omitted"))
+                    assertTrue(prompt.endsWith(q + "\n/no_think"))
+                    assertTrue(prompt.length <= 3010)
+                }
+            }
+        }
+    }
+
+    @Test fun unmarkedDecimalAndFinancialUnitCorrectionsRemainEvidence() {
+        for (correction in listOf("Increase it by 0.25 percentage points.",
+            "Reduce it by .5 percent.", "Raise it by 25 basis points.",
+            "Decrease it by 0.125.", "Add 2.5 to it.", "Subtract 0.5 from it.")) {
+            val history = listOf(
+                turn("user", "My fictional portfolio growth rate is 4 percent."),
+                turn("user", correction)
+            ) + (1..15).map { turn("assistant", "Unrelated weather report $it.") }
+            val prompt = AstraConversationContext.userPrompt(
+                "What was my portfolio growth rate?", history, true)
+            assertTrue(correction, prompt.contains("Previous user: \"$correction\""))
+            assertTrue(prompt.contains("growth rate is 4 percent"))
+        }
+    }
+
+    @Test fun unmarkedRelativeGrammarDoesNotImportQuotedConditionalOrOtherCommands() {
+        for (other in listOf("If you increase it by 20 coins, what happens?",
+            "Increase the dinner budget by 20 coins.",
+            "Increase it by 20 coins, then book a table.",
+            "Increase it by 20 coins tomorrow.",
+            "\"Increase it by 20 coins.\"",
+            "Increase it by 20 unknown objects.",
+            "Increase it by 20 coins?",
+            "Increase it by -20 coins.",
+            "Add 20 coins to it and send it.",
+            "Increase it by 1000000000000 coins.",
+            "Increase it by 2.123456789 coins.",
+            "Increase it by 20\ncoins.")) {
+            val history = listOf(
+                turn("user", "My fictional expedition reserve is 500 coins."),
+                turn("assistant", "Increase it by 999 coins."),
+                turn("user", other),
+                turn("user", "Actually, make it 42 coins.")
+            ) + (1..15).map { turn("assistant", "Unrelated weather report $it.") }
+            val prompt = AstraConversationContext.userPrompt(
+                "What was my expedition reserve?", history, true)
+            assertTrue(prompt.contains("expedition reserve is 500 coins"))
+            assertFalse(other, prompt.contains("make it 42 coins"))
+            assertFalse(prompt.contains("999 coins"))
+            assertFalse(prompt.contains("[Some linked corrections are omitted"))
+        }
+    }
+
 }

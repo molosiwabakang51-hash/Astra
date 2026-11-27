@@ -352,10 +352,22 @@ internal object AstraConversationContext {
             (message.length == phrase.length ||
                 !message[phrase.length].isLetterOrDigit())
 
+    // Retain short, explicit relative numeric follow-ups even without an
+    // "Actually" marker. Full-match grammar excludes named new topics,
+    // conditional requests, multiple commands, quoted text and arbitrary
+    // trailing prose. This is evidence retrieval, not execution or proof
+    // that the pronoun refers to the anchor.
+    private val relativeAmount = """(?:[0-9]{1,12}(?:\.[0-9]{1,8})?|\.[0-9]{1,8})(?:[ ]+(?:coins?|dollars?|pounds?|euros?|pula|rand|years?|months?|weeks?|days?|hours?|minutes?|seconds?|percent(?:age points?)?|basis points?|units?))?"""
+    private val unmarkedRelativeCorrection = Regex(
+        """(?:please[ ]+)?(?:(?:increase|decrease|raise|reduce)[ ]+it[ ]+by[ ]+$relativeAmount|add[ ]+$relativeAmount[ ]+to[ ]+it|subtract[ ]+$relativeAmount[ ]+from[ ]+it)[.!]?"""
+    )
+
     private fun isCorrection(text: String): Boolean {
         val message = text.trim().lowercase(java.util.Locale.ROOT)
         if (listOf("actually", "correction", "instead", "rather", "sorry",
                 "i meant").any { startsWithPhrase(message, it) }) return true
+
+        if (message.length <= 120 && unmarkedRelativeCorrection.matches(message)) return true
 
         if (startsWithPhrase(message, "no")) {
             val rest = message.drop(2).trimStart(' ', ',', ';', ':')
