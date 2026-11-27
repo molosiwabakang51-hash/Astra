@@ -670,6 +670,19 @@ All 119 ACIE parent statuses retained: 27/119 engineering checks, 92 open. The o
 Stacked on #523 head `2e1d3366dfc05b90402c503f856a2e34f80947b7` to avoid interrupting its running CI. All 119 ACIE parent rows retained: 27 checked, 92 open. No new parent acceptance or independent intelligence score.
 
 
+
+## Verified session results — native fidelity, production merge and CI recovery (27 November 2026)
+
+- [x] #522 native Qwen3 diagnostic run 45992374324 completed successfully as an experiment; artifact 15195241887 inspected. Baseline and enhanced prompting each scored 1/12 strict cases; completion 6/12 versus 3/12; zero accepted or faithful traces in either arm. Tokens 5969 versus 7065; elapsed 265906 versus 313064 ms. Neither strategy is approved for automatic routing.
+- [x] #522 diagnostic merged at `e24452bb060f2606c56de860c17b70aa4d05c6e1`.
+- [x] #523 Android CI 45993072290 completed successfully; merged at `4319ea3d27b6f953e65d2481ca76386e403509ff`.
+- [x] #524 initial CI 45994138288 ran 855 Python regression tests with one source-contract failure. Preserve named cross-multiplication operands rather than weakening the guard. Corrective commit `507fcbd2ad7f173e59aeaa0b0a658757582ef327`.
+- [ ] Verify the corrected #524 final head before merging; reconcile overlapping branches and retain actual native results.
+- [ ] Investigate compact structured extraction and constrained decoding on a matched diagnostic; require semantic fidelity, not merely valid syntax, and do not automatically accept model-generated plans.
+
+Engineering parent status unchanged: 27/119 checked; release acceptance remains independent. No independently supported intelligence rating.
+
+
 ## Acceptance
 
 90/100 independent repeated general intelligence score; separate model-only/assisted results; no model substitution, paid API or unsupported capability claims. Freeze protocol before held-out testing. Preserve offline and memory constraints. Recheck any completed engineering item if a later regression invalidates it.
