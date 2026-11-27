@@ -176,4 +176,41 @@ class AstraCognitiveReviewTest {
             history) as AstraCognitiveReview.Result.Local
         assertTrue(invalid.answer.contains("could not parse"))
     }
+
+    @Test fun quantityProposalReviewSeparatesArithmeticFromInterpretation() {
+        val trace = "Trace quantity: initial amount is 10 coins; add 5 coins to it. What is the current amount?"
+        val review = AstraCognitiveReview.resolve("Verify your answer",
+            pair("I had ten coins and then gained five. How many now?", trace))
+            as AstraCognitiveReview.Result.Local
+        assertTrue(review.answer.contains("UNCONFIRMED QUANTITY PROPOSAL"))
+        assertTrue(review.answer.contains("computed result: 15"))
+        assertTrue(review.answer.contains("interpretation of your question is not independently verified"))
+        val checked = AstraCognitiveReview.resolve("Verify your answer", pair(trace, trace))
+            as AstraCognitiveReview.Result.Local
+        assertTrue(checked.answer.contains("INDEPENDENT QUANTITY CHECK"))
+        assertFalse(checked.answer.contains("UNCONFIRMED QUANTITY PROPOSAL"))
+    }
+
+    @Test fun quantityProposalAuditDoesNotAcceptEqualResultDifferentTrace() {
+        val first = "Trace quantity: initial amount is 10 coins; add 5 coins to it. What is the current amount?"
+        val second = "Trace quantity: initial amount is 20 coins; subtract 5 coins from it. What is the current amount?"
+        val review = AstraCognitiveReview.resolve("Verify your answer", pair(first, second))
+            as AstraCognitiveReview.Result.Local
+        assertTrue(review.answer.contains("UNCONFIRMED QUANTITY PROPOSAL"))
+        assertTrue(review.answer.contains("computed result: 15"))
+    }
+
+    @Test fun malformedQuantityProposalFailsClosedAndBareYesCannotAuthorize() {
+        val trace = "Trace quantity: initial amount is 10 coins; add 5 dollars to it. What is the current amount?"
+        val history = pair("How many coins?", trace)
+        val review = AstraCognitiveReview.resolve("Verify your answer", history)
+            as AstraCognitiveReview.Result.Local
+        assertTrue(review.answer.contains("No independent check was performed"))
+        assertFalse(review.answer.contains("computed result:"))
+        assertEquals(AstraCognitiveReview.Result.NotRequested,
+            AstraCognitiveReview.resolve("yes", history))
+        assertEquals(AstraCognitiveReview.Result.NotRequested,
+            AstraCognitiveReview.resolve("Translate verify your answer into French", history))
+    }
+
 }
