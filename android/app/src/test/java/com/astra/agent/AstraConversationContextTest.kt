@@ -887,6 +887,63 @@ class AstraConversationContextTest {
         assertFalse(restored.contains("Previous Astra:"))
     }
 
+    @Test fun signedTopicFreeCorrectionsSurviveRestoration() {
+        val rng = java.util.Random(281749L)
+        repeat(50) {
+            val initial = 100 + rng.nextInt(900)
+            val magnitude = 10 + rng.nextInt(80)
+            for (sign in listOf("-", "+", "−")) {
+                val correction = "No, $sign$magnitude."
+                val history = listOf(
+                    turn("user", "My fictional trial balance is $initial coins."),
+                    turn("assistant", "Noted."),
+                    turn("user", correction)
+                ) + (1..15).map { turn("assistant", "Unrelated weather note $it.") }
+                for (q in listOf("What was my trial balance?",
+                    "Use the trial balance to plan.")) {
+                    val prompt = AstraConversationContext.userPrompt(q, history, true)
+                    assertTrue(prompt.contains("trial balance is $initial coins"))
+                    assertTrue(correction, prompt.contains("Previous user: \"$correction\""))
+                    assertTrue(prompt.indexOf("trial balance is") < prompt.indexOf(correction))
+                    assertTrue(prompt.endsWith(q + "\n/no_think"))
+                }
+            }
+        }
+    }
+
+    @Test fun signedDecimalAndLaterRelativeCorrectionRemainInOrder() {
+        val history = listOf(
+            turn("user", "My fictional portfolio growth rate is 4 percent."),
+            turn("user", "No, -0.5 percent."),
+            turn("assistant", "Noted."),
+            turn("user", "Actually, increase it by 2 percentage points.")
+        ) + (1..15).map { turn("assistant", "Unrelated weather note $it.") }
+        val prompt = AstraConversationContext.userPrompt(
+            "What was my portfolio growth rate?", history, true)
+        assertTrue(prompt.contains("growth rate is 4 percent"))
+        assertTrue(prompt.contains("No, -0.5 percent."))
+        assertTrue(prompt.contains("increase it by 2 percentage points"))
+        assertTrue(prompt.indexOf("No, -0.5 percent.") < prompt.indexOf("increase it by 2"))
+    }
+
+    @Test fun dashProseDoesNotBecomeNumericCorrectionAndAssistantCannotCorrectOwner() {
+        for (unrelated in listOf("No, - not discussing that.", "No, + unrelated.",
+            "No, − tomorrow instead.")) {
+            val history = listOf(
+                turn("user", "My fictional trial balance is 500 coins."),
+                turn("assistant", "No, -20."),
+                turn("user", unrelated),
+                turn("user", "Actually, make it 70.")
+            ) + (1..15).map { turn("assistant", "Unrelated weather note $it.") }
+            val prompt = AstraConversationContext.userPrompt(
+                "What was my trial balance?", history, true)
+            assertTrue(prompt.contains("trial balance is 500 coins"))
+            assertFalse(prompt.contains("No, -20."))
+            assertFalse(prompt.contains(unrelated))
+            assertFalse(prompt.contains("make it 70"))
+        }
+    }
+
     @Test fun shortRecentRepliesRemainAvailableToFollowup() {
         val history = listOf(
             turn("user", "Calculate 2 plus 3."),

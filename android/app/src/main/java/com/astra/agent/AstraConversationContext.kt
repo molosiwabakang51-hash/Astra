@@ -361,7 +361,12 @@ internal object AstraConversationContext {
             val rest = message.drop(2).trimStart(' ', ',', ';', ':')
             if (listOf("make", "change", "use", "it", "that").any {
                     startsWithPhrase(rest, it)
-                } || rest.firstOrNull()?.isDigit() == true) return true
+                } || rest.firstOrNull()?.isDigit() == true ||
+                // Signed values are as valid as unsigned values in a short
+                // owner correction. Require a digit immediately after the
+                // sign, so a dash introducing prose is not a numeric marker.
+                (rest.length >= 2 && rest[0] in "+-−" &&
+                    rest[1].isDigit())) return true
         }
 
         return listOf("make", "change", "update", "set", "use").any { verb ->
