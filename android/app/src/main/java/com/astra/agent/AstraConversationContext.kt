@@ -347,7 +347,7 @@ internal object AstraConversationContext {
             if (selected.isEmpty()) {
                 // Preserve the warning even when reserving its space evicts
                 // all historical quotes. The actual current question stays intact.
-                val warningOnly = CORRECTION_TAIL_NOTICE + CURRENT_HEADER + current
+                val warningOnly = HISTORY_HEADER + CORRECTION_TAIL_NOTICE + CURRENT_HEADER + current
                 if (warningOnly.length <= MAX_USER_PROMPT)
                     return AstraOfflinePolicy.modelPrompt(warningOnly, thinkingRequested)
                 return AstraOfflinePolicy.modelPrompt(current, thinkingRequested)
