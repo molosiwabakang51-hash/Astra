@@ -40,6 +40,27 @@ class AstraQuantityTraceVerifierTest {
         assertTrue(AstraQuantityTraceVerifier.report(precise, precise.result)!!.contains(" — correct."))
     }
 
+    @Test fun explicitProportionalChangesAreExactAndBounded() {
+        assertEquals("108", check("initial amount is 100 coins; increase it by 20 percent relative to its current amount; decrease it by 10 percent relative to its current amount").result)
+        assertEquals("5.4", check("initial amount is 4 percent; increase it by 10 percent relative to its current amount; raise it by 1 percentage point").result)
+        assertEquals("0", check("initial amount is 50 coins; reduce it by 100 percent relative to its current amount").result)
+        val rng = java.util.Random(271126L)
+        repeat(300) {
+            val initial = rng.nextInt(10000)
+            val rate = rng.nextInt(101)
+            val expected = java.math.BigDecimal(initial.toLong() * (100 - rate)).movePointLeft(2).stripTrailingZeros().toPlainString()
+            val actual = check("initial amount is $initial coins; decrease it by $rate percent relative to its current amount")
+            assertEquals(expected, actual.result)
+            assertTrue(AstraQuantityTraceVerifier.report(actual, expected)!!.contains(" — correct."))
+        }
+        for (body in listOf(
+            "initial amount is -4 coins; increase it by 5 percent relative to its current amount",
+            "initial amount is 4 coins; decrease it by 101 percent relative to its current amount",
+            "initial amount is 4 coins; the current amount is unknown; increase it by 5 percent relative to its current amount",
+            "initial amount is .00000001 coins; increase it by .00000001 percent relative to its current amount"
+        )) assertNull(body, AstraQuantityTraceVerifier.verify(q(body)))
+    }
+
     @Test fun invalidOrAmbiguousStepsFailClosed() {
         for (body in listOf(
             "initial amount is 4 percent; increase it by 5 percent",
