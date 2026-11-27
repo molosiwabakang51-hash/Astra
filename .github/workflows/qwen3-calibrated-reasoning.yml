@@ -6,6 +6,7 @@ on:
       - '.github/workflows/qwen3-calibrated-reasoning.yml'
       - 'scripts/quality/qwen_contrastive_curriculum.py'
       - 'scripts/quality/qwen_calibration_loss.py'
+      - 'scripts/quality/qwen_neural_resume.py'
       - 'scripts/quality/train_qwen_calibrated_reasoning.py'
       - 'scripts/tests/test_qwen_calibrated_reasoning.py'
   workflow_dispatch:
@@ -17,7 +18,7 @@ concurrency:
 jobs:
   train:
     runs-on: ubuntu-24.04
-    timeout-minutes: 90
+    timeout-minutes: 65
     env:
       HF_HUB_DISABLE_TELEMETRY: '1'
       TOKENIZERS_PARALLELISM: 'false'
@@ -38,13 +39,25 @@ jobs:
           python -c 'import torch'
           python -m unittest discover -s scripts/tests -p test_qwen_calibrated_reasoning.py -v
       - name: Train and compare ordinary and calibrated neural adapters
+        timeout-minutes: 50
         run: |
           set -euo pipefail
           python scripts/quality/train_qwen_calibrated_reasoning.py evaluation/calibrated
           cat evaluation/calibrated/report.json >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: qwen3-calibrated-resume-checkpoints
+          path: evaluation/calibrated/resume/
+          if-no-files-found: warn
+          retention-days: 14
+      - uses: actions/upload-artifact@v6
+        if: success()
         with:
           name: qwen3-calibrated-neural-reasoning
-          path: evaluation/calibrated/
+          path: |
+            evaluation/calibrated/report.json
+            evaluation/calibrated/ordinary/
+            evaluation/calibrated/calibrated/
           if-no-files-found: error
           retention-days: 14
