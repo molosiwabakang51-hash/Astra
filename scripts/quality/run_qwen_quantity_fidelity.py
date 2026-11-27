@@ -176,7 +176,7 @@ def evaluate(infer, verify, cases=CASES):
                 cases=rows, official_ai_rating=None,
                 scope="Public paired Qwen3 thinking diagnostic, pinned Kotlin verifier #518. Normalized operation sequence and result both required; unsupported cases require NONE. No automatic semantic confirmation, live routing, private prompts or independent release score.")
 
-def run(binary, jar):
+def run(binary, jar, evaluator=evaluate):
     if not native.check_model(native.MODEL_PATH):
         raise RuntimeError("Unverified model")
     opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
@@ -199,7 +199,7 @@ def run(binary, jar):
                 time.sleep(1)
             else:
                 raise RuntimeError("Native startup timed out")
-            result = evaluate(lambda payload: native.request(opener, "/completion", payload),
+            result = evaluator(lambda payload: native.request(opener, "/completion", payload),
                               lambda question: bridge(jar, question))
             if not native.check_model(native.MODEL_PATH):
                 raise RuntimeError("Model identity changed")
