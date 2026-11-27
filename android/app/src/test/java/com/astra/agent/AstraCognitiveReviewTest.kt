@@ -161,6 +161,20 @@ class AstraCognitiveReviewTest {
         assertTrue(invalid.answer.contains("Group chained equivalences explicitly"))
     }
 
+    @Test fun quantityReviewProposesOnlyUnverifiedOwnerConfirmedTrace() {
+        val history = pair("Initially I had 500 coins. I added 20 coins and spent 5 coins. How many are left?", "530")
+        val review = AstraCognitiveReview.resolve("Verify your answer", history) as AstraCognitiveReview.Result.Native
+        assertTrue(review.prompt.contains("unverified trace"))
+        assertTrue(review.prompt.contains("Preserve the original numbers, units, order and withdrawals"))
+        assertTrue(review.prompt.contains("Never claim the quantity check has already run"))
+        assertTrue(review.prompt.contains("Verify this quantity trace:"))
+        assertEquals(AstraCognitiveReview.Result.NotRequested, AstraCognitiveReview.resolve("yes", history))
+        val checked = AstraCognitiveReview.resolve(
+            "Verify this quantity trace: Trace quantity: initial amount is 500 coins; add 20 coins to it; subtract 5 coins from it. What is the current amount?",
+            history) as AstraCognitiveReview.Result.Local
+        assertTrue(checked.answer.contains("result: 515."))
+    }
+
     @Test fun modelProposalCannotAuthorizeIndependentCheck() {
         val history = pair("If rain implies wet roads and roads are wet, must it be raining?", "Yes.")
         val review = AstraCognitiveReview.resolve("Verify your answer", history)
