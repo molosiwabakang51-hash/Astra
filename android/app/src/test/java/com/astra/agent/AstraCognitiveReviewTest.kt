@@ -129,6 +129,38 @@ class AstraCognitiveReviewTest {
             "All cats are animals. Are all animals cats?", "YES")) is AstraCognitiveReview.Result.Native)
     }
 
+    @Test fun explicitArgumentVerificationFailsClosedOnMalformedOrOversizedInput() {
+        for (prefix in listOf("Verify this formal argument:", "Check this formal argument:",
+            "Verify this categorical argument:", "Check this categorical argument:")) {
+            for (body in listOf("", " ", "\nPremises:\nA", "A".repeat(701))) {
+                val result = AstraCognitiveReview.resolve(prefix + body, emptyList())
+                assertTrue(prefix + body.take(30), result is AstraCognitiveReview.Result.Local)
+                val answer = (result as AstraCognitiveReview.Result.Local).answer
+                assertTrue(answer.contains("No independent check was performed."))
+                assertFalse(answer.contains("INDEPENDENT FORMAL CHECK"))
+                assertFalse(answer.contains("INDEPENDENT CATEGORICAL CHECK"))
+            }
+            assertEquals(AstraCognitiveReview.Result.NotRequested,
+                AstraCognitiveReview.resolve("Translate " + prefix, emptyList()))
+        }
+    }
+
+    @Test fun reviewGuidanceMatchesSupportedLogicalOperatorsWithoutAuthorizingTranslation() {
+        val review = AstraCognitiveReview.resolve("Verify your answer",
+            pair("Exactly one lamp is lit. Does the conclusion follow?", "Yes."))
+            as AstraCognitiveReview.Result.Native
+        assertTrue(review.prompt.contains("^ (exclusive OR)"))
+        assertTrue(review.prompt.contains("<-> (if and only if)"))
+        assertTrue(review.prompt.contains("Group chained equivalences explicitly"))
+        assertTrue(review.prompt.contains("mapping as unverified"))
+        assertTrue(review.prompt.contains("Never claim the formal check has already run"))
+        val invalid = AstraCognitiveReview.resolve(
+            "Verify this formal argument: Premises: A <-> B <-> C. Conclusion: A. Does the conclusion follow?",
+            emptyList()) as AstraCognitiveReview.Result.Local
+        assertTrue(invalid.answer.contains("could not parse"))
+        assertTrue(invalid.answer.contains("Group chained equivalences explicitly"))
+    }
+
     @Test fun modelProposalCannotAuthorizeIndependentCheck() {
         val history = pair("If rain implies wet roads and roads are wet, must it be raining?", "Yes.")
         val review = AstraCognitiveReview.resolve("Verify your answer", history)

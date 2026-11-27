@@ -127,7 +127,8 @@ internal object AstraCognitiveReview {
                     ?: return Result.Local(
                         "I could not parse the complete formal argument. Use explicit " +
                             "Premises: and Conclusion: with single-letter propositions, " +
-                            "and the final question Does the conclusion follow?"
+                            "operators !, &, ^, |, ->, <-> and parentheses, " +
+                            "and the final question Does the conclusion follow? Group chained equivalences explicitly."
                     )
                 val result = when (checked.verdict) {
                     AstraPropositionalVerifier.Verdict.ENTAILED ->
@@ -144,6 +145,14 @@ internal object AstraCognitiveReview {
                         "This verifies only the submitted formulas, not their translation from natural language."
                 )
             }
+        }
+        // A malformed or oversized explicit verification request must not
+        // silently become an ordinary generative response. Quoted/translated
+        // requests remain outside this anchored owner-intent boundary.
+        if (listOf("Verify this formal argument:", "Check this formal argument:",
+                "Verify this categorical argument:", "Check this categorical argument:")
+                .any { submitted.startsWith(it, ignoreCase = true) }) {
+            return Result.Local("I could not verify the complete argument within the supported local grammar and input limits. Submit a shorter, complete explicit argument. No independent check was performed.")
         }
         if (!request.matches(raw.trim().replace(Regex("""\s+"""), " "))) {
             return Result.NotRequested
@@ -227,7 +236,9 @@ internal object AstraCognitiveReview {
             "is required, say so. Do not claim independent factual verification. " +
             "For a purely propositional argument only, you may propose a mapping of " +
             "single-letter propositions to the original statements and a candidate formal " +
-            "argument using !, &, |, -> and parentheses. Label the mapping as unverified; " +
+            "argument using ! (NOT), & (AND), ^ (exclusive OR), | (inclusive OR), -> (implication), " +
+            "<-> (if and only if) and parentheses. Group chained equivalences explicitly. " +
+            "Label the mapping as unverified; " +
             "do not formalize quantifiers, uncertain meanings or missing premises. " +
             "If a valid candidate is useful, invite the owner to check the mapping and submit " +
             "Verify this formal argument: Premises: [formulas separated by semicolons]. " +
