@@ -1,0 +1,64 @@
+name: Qwen3 neural choice invariance
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/qwen3-choice-invariance.yml'
+      - 'scripts/quality/qwen_contrastive_curriculum.py'
+      - 'scripts/quality/qwen_calibration_loss.py'
+      - 'scripts/quality/qwen_neural_resume.py'
+      - 'scripts/quality/train_qwen_choice_invariance.py'
+      - 'scripts/quality/qwen_choice_invariance.py'
+      - 'scripts/tests/test_qwen_choice_invariance.py'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: astra-choice-invariance-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  train:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 65
+    env:
+      HF_HUB_DISABLE_TELEMETRY: '1'
+      TOKENIZERS_PARALLELISM: 'false'
+      OMP_NUM_THREADS: '4'
+      MKL_NUM_THREADS: '4'
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Install pinned CPU dependencies
+        run: |
+          python -m pip install --index-url https://download.pytorch.org/whl/cpu torch==2.7.1
+          python -m pip install transformers==4.52.4 peft==0.15.2 accelerate==1.7.0 huggingface-hub==0.32.4 safetensors==0.5.3 numpy==2.2.6
+          python -m pip check
+      - name: Verify curriculum and actual tensor gradients
+        run: |
+          python -c 'import torch'
+          python -m unittest discover -s scripts/tests -p test_qwen_choice_invariance.py -v
+      - name: Train and compare fixed and rotated choice adapters
+        timeout-minutes: 50
+        run: |
+          set -euo pipefail
+          python scripts/quality/train_qwen_choice_invariance.py evaluation/invariance
+          python -c 'import json; r=json.load(open("evaluation/invariance/report.json")); print(json.dumps({"baseline":r["baseline_rotation_summary"]["all"],"adapters":{k:v["rotation_summary"]["all"] for k,v in r["adapters"].items()},"paired":r["paired_rotated_vs_fixed"]},indent=2))' >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: qwen3-invariance-resume-checkpoints
+          path: evaluation/invariance/resume/
+          if-no-files-found: warn
+          retention-days: 14
+      - uses: actions/upload-artifact@v6
+        if: success()
+        with:
+          name: qwen3-choice-invariance-results
+          path: |
+            evaluation/invariance/report.json
+            evaluation/invariance/fixed/
+            evaluation/invariance/rotated/
+          if-no-files-found: error
+          retention-days: 14
