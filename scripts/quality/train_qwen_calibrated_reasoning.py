@@ -1,6 +1,6 @@
 """Paired neural-weight experiment: CE versus conditional label smoothing.
 
-The identical public minimal-pair curriculum, frozen BF16 model, adapter
+The identical public minimal-pair curriculum, frozen FP32 model, adapter
 initialization, training order and optimizer are used in both arms.
 No answer tools, no private evaluation or automatic Android deployment.
 """
@@ -12,6 +12,7 @@ from pathlib import Path
 import time
 
 from qwen_calibration_loss import choice_loss
+import qwen_neural_resume as resume
 from qwen_contrastive_curriculum import training_cases
 from qwen_transfer_choices import cases, prompt, score, summarize, suite_digest, LABELS
 from evaluate_qwen_transfer_logits import MODEL, REVISION, sha, paired
@@ -32,7 +33,8 @@ def state_digest(state):
         h.update(p.detach().float().cpu().contiguous().numpy().tobytes())
     return h.hexdigest()
 
-def run(out):
+def run(out, resume_ordinary=None, resume_calibrated=None):
+    recovery={"ordinary":resume_ordinary,"calibrated":resume_calibrated}
     import torch
     import transformers
     import peft
@@ -49,7 +51,7 @@ def run(out):
     if root.name!=REVISION or hashes!=EXPECTED_BASE:
         raise RuntimeError("Base checkpoint differs from evaluated #537")
     tok=AutoTokenizer.from_pretrained(root,trust_remote_code=False,local_files_only=True)
-    base=AutoModelForCausalLM.from_pretrained(root,torch_dtype=torch.bfloat16,
+    base=AutoModelForCausalLM.from_pretrained(root,torch_dtype=torch.float32,
         trust_remote_code=False,local_files_only=True,low_cpu_mem_usage=True,attn_implementation="sdpa")
     if (base.config.model_type!="qwen3" or base.config.num_hidden_layers!=28 or
             base.config.hidden_size!=2048):
@@ -74,6 +76,14 @@ def run(out):
         return rows
     train_rows=prepare(train)
     dev_rows=prepare(dev)
+    token_identity=hashlib.sha256(json.dumps(
+        [(case.ident,case.correct,ids) for case,ids in train_rows],
+        separators=(",",":")).encode()).hexdigest()
+    code_root=Path(__file__).resolve().parent
+    source_identity={name:sha(code_root/name) for name in (
+        "train_qwen_calibrated_reasoning.py","qwen_calibration_loss.py",
+        "qwen_contrastive_curriculum.py","qwen_transfer_choices.py",
+        "evaluate_qwen_transfer_logits.py","qwen_neural_resume.py")}
     def config():
         return LoraConfig(task_type="CAUSAL_LM",r=8,lora_alpha=16,lora_dropout=0.0,bias="none",
             target_modules=["q_proj","v_proj"],layers_to_transform=LAYERS,layers_pattern="layers")
@@ -117,12 +127,24 @@ def run(out):
         count=sum(p.numel() for _,p in params)
         if count>1_000_000:
             raise RuntimeError("Unexpected adapter size")
-        optimizer=torch.optim.AdamW([p for _,p in params],lr=2e-4,weight_decay=0.0)
+        optimizer=torch.optim.AdamW([p for _,p in params],lr=2e-4,weight_decay=0.0,foreach=False)
         torch.manual_seed(SEED)
         model.train()
+        identity=dict(model=MODEL,revision=REVISION,base_weight_sha256=hashes,
+            dtype="float32",arm=name,smoothing=smoothing,initial_adapter_sha256=initial_hash,
+            train_sha256=suite_digest(train),ordered_tokens_sha256=token_identity,
+            development_sha256=suite_digest(dev),source_sha256=source_identity,
+            seed=SEED,rank=8,target_layers=LAYERS,
+            versions=dict(transformers=transformers.__version__,peft=peft.__version__))
         losses=[]
+        cursor=0
+        if recovery[name] is not None:
+            cursor,losses=resume.restore(recovery[name],params,optimizer,identity)
+            if cursor>len(train_rows):
+                raise RuntimeError("Checkpoint cursor exceeds fixed curriculum")
+        recovered_steps=cursor
         start=time.monotonic()
-        for step,(case,ids) in enumerate(train_rows):
+        for step,(case,ids) in enumerate(train_rows[cursor:],start=cursor):
             optimizer.zero_grad(set_to_none=True)
             loss=choice_loss(logits(ids),label_ids,torch.tensor([case.correct],dtype=torch.long),smoothing)
             if not torch.isfinite(loss).item():
@@ -136,6 +158,9 @@ def run(out):
                 raise RuntimeError("Nonfinite trainable weights")
             losses.append(float(loss.detach()))
             del loss
+            if (step+1)%8==0 or step+1==len(train_rows):
+                resume.save(out/"resume"/name/f"step-{step+1:03d}",params,optimizer,
+                            identity,step+1,losses)
             print(f"{name}: step {step+1}/{len(train_rows)} completed",flush=True)
         elapsed=round((time.monotonic()-start)*1000)
         final_hash=state_digest(get_peft_model_state_dict(model,adapter_name=name))
@@ -144,7 +169,7 @@ def run(out):
         rows=evaluate()
         model.save_pretrained(out/name,selected_adapters=[name],safe_serialization=True)
         outcomes[name]=dict(smoothing=smoothing,train_steps=len(losses),losses=losses,
-            training_ms=elapsed,trainable_parameters=count,initial_adapter_sha256=initial_hash,
+            training_ms_this_session=elapsed,resumed_steps=recovered_steps,trainable_parameters=count,initial_adapter_sha256=initial_hash,
             final_adapter_sha256=final_hash,rows=rows,summary=summarize(rows),
             paired_vs_base=paired(baseline,rows))
         del optimizer
@@ -157,7 +182,7 @@ def run(out):
     if baseline!=repeated:
         raise RuntimeError("Disabled-adapter baseline changed")
     report=dict(status="COMPLETE_CALIBRATED_NEURAL_REASONING",model=MODEL,revision=REVISION,
-        base_weight_sha256=hashes,seed=SEED,train_sha256=suite_digest(train),train_cases=len(train),
+        base_weight_sha256=hashes,training_dtype="float32",seed=SEED,train_sha256=suite_digest(train),train_cases=len(train),
         development_sha256=suite_digest(dev),label_token_ids=label_ids,target_layers=LAYERS,
         baseline=baseline,baseline_summary=summarize(baseline),adapters=outcomes,
         paired_calibrated_vs_ordinary=paired(outcomes["ordinary"]["rows"],outcomes["calibrated"]["rows"]),
@@ -173,4 +198,7 @@ def run(out):
 if __name__=="__main__":
     p=argparse.ArgumentParser(description=__doc__)
     p.add_argument("output",type=Path)
-    run(p.parse_args().output)
+    p.add_argument("--resume-ordinary",type=Path)
+    p.add_argument("--resume-calibrated",type=Path)
+    args=p.parse_args()
+    run(args.output,args.resume_ordinary,args.resume_calibrated)
