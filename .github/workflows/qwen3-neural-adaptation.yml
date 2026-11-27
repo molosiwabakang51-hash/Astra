@@ -16,7 +16,7 @@ concurrency:
 jobs:
   pilot:
     runs-on: ubuntu-24.04
-    timeout-minutes: 75
+    timeout-minutes: 65
     env:
       HF_HUB_DISABLE_TELEMETRY: '1'
       TOKENIZERS_PARALLELISM: 'false'
@@ -35,13 +35,24 @@ jobs:
           python -m pip install transformers==4.52.4 peft==0.15.2 accelerate==1.7.0 huggingface-hub==0.32.4 safetensors==0.5.3 numpy==2.2.6
           python -m pip check
       - name: Train low-rank weights and compare baseline with adapter
+        timeout-minutes: 50
         run: |
           set -euo pipefail
-          python scripts/quality/train_qwen_neural_pilot.py evaluation/neural-pilot --steps 32
+          python scripts/quality/train_qwen_neural_pilot.py evaluation/neural-pilot --steps 4 --dtype float32
           cat evaluation/neural-pilot/report.json >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: qwen3-neural-partial-checkpoints
+          path: evaluation/neural-pilot/partial/step-*/
+          if-no-files-found: warn
+          retention-days: 14
+      - uses: actions/upload-artifact@v6
+        if: success()
         with:
           name: qwen3-neural-adaptation-pilot
-          path: evaluation/neural-pilot/
+          path: |
+            evaluation/neural-pilot/report.json
+            evaluation/neural-pilot/adapter/
           if-no-files-found: error
           retention-days: 14
