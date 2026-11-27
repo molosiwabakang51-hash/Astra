@@ -239,4 +239,37 @@ class AstraCognitiveReviewTest {
         }
     }
 
+
+    @Test fun ownerTraceRemainsAuthoritativeWhenModelProposesWrongTrace() {
+        val owner = "Trace quantity: initial amount is 100 coins; increase it by 20 percent relative to its current amount. What is the current amount?"
+        val model = "Trace quantity: initial amount is 100 coins; add 20 coins to it; add 5 coins to it. What is the current amount?"
+        val result = AstraCognitiveReview.resolve("Verify your answer", pair(owner, model))
+            as AstraCognitiveReview.Result.Local
+        assertTrue(result.answer.contains("UNCONFIRMED QUANTITY PROPOSAL"))
+        assertTrue(result.answer.contains("computed result: 125"))
+        assertTrue(result.answer.contains("INDEPENDENT QUANTITY CHECK"))
+        assertTrue(result.answer.contains("result: 120."))
+        assertTrue(result.answer.contains("from your original submitted trace"))
+        assertTrue(result.answer.contains("not the model's proposal"))
+    }
+
+    @Test fun invalidModelTraceDoesNotSuppressOwnerEvidence() {
+        val owner = "Trace quantity: initial amount is 50 pula; add 10 pula to it. What is the current amount?"
+        val model = "Trace quantity: initial amount is 50 pula; add 10 dollars to it. What is the current amount?"
+        val result = AstraCognitiveReview.resolve("Verify your answer", pair(owner, model))
+            as AstraCognitiveReview.Result.Local
+        assertTrue(result.answer.contains("proposal was not verified"))
+        assertTrue(result.answer.contains("result: 60."))
+        assertFalse(result.answer.contains("No independent check was performed"))
+    }
+
+    @Test fun quantityGuidanceDoesNotRemoveFormalLogicGuidance() {
+        val result = AstraCognitiveReview.resolve("Verify your answer", pair(
+            "If a lamp is lit, does it follow that a switch is pressed?", "Yes."))
+            as AstraCognitiveReview.Result.Native
+        assertTrue(result.prompt.contains("For a purely propositional argument only"))
+        assertTrue(result.prompt.contains("Never claim the formal check has already run"))
+        assertTrue(result.prompt.contains("percent relative to its current amount"))
+    }
+
 }
