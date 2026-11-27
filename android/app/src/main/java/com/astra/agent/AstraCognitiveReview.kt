@@ -86,6 +86,13 @@ internal object AstraCognitiveReview {
             "Only the explicitly supplied single-counter recurrence was verified; no natural-language translation or arbitrary code was executed."
     }
 
+    // A reference is not a verdict about a prose answer. Never extract a
+    // convenient number or YES/NO substring from an arbitrary model reply.
+    private fun referenceOnly(report: String): Result.Local = Result.Local(
+        report + "\nThe preceding response was not compared: it is not a supported standalone answer. " +
+            "This independently establishes the reference result only, not the correctness of the earlier explanation."
+    )
+
     fun resolve(raw: String, history: List<AstraChatArchive.Message>): Result {
         val submitted = raw.trim()
         if (submitted.startsWith("Verify this quantity trace:", ignoreCase = true) ||
@@ -181,7 +188,7 @@ internal object AstraCognitiveReview {
         // the proposal, but do not let its own representation certify intent.
         // Only exact equality with the immediately preceding owner question
         // can establish that the submitted trace itself was owner supplied.
-        if (answer.startsWith("Trace quantity:", ignoreCase = true)) {
+        if (ownerQuantity != null && answer.startsWith("Trace quantity:", ignoreCase = true)) {
             val proposal = AstraQuantityProposalAudit.evaluate(answer, original)
             val ownerReport = ownerQuantity?.let {
                 "\n\n" + checkNotNull(AstraQuantityTraceVerifier.report(it)) +
@@ -206,20 +213,24 @@ internal object AstraCognitiveReview {
         // Never infer the trace from unrelated conversation history.
         ownerQuantity?.let { checked ->
             AstraQuantityTraceVerifier.report(checked, answer)?.let { return Result.Local(it) }
+            return referenceOnly(checkNotNull(AstraQuantityTraceVerifier.report(checked)))
         }
         // Verify an explicit complete recurrence only on an explicit audit.
-        // Unsupported prose and nonnumeric answers retain ordinary review.
+        // For a complete explicit recurrence, provide an independent reference
+        // even when the preceding response is not a standalone integer.
         val conditional = AstraConditionalTraceVerifier.verify(original)
         if (conditional != null) {
             val report = conditionalReport(conditional, answer)
             if (report != null) return Result.Local(report)
+            return referenceOnly(checkNotNull(conditionalReport(conditional, null)))
         }
         // A complete owner-supplied trace can be independently recomputed.
-        // Do not infer a program from prose or replace a nonnumeric response.
+        // Do not infer a program from prose or certify a nonnumeric response.
         val trace = AstraStateTraceVerifier.verify(original)
         if (trace != null) {
             val report = AstraStateTraceVerifier.report(trace, answer)
             if (report != null) return Result.Local(report)
+            return referenceOnly(checkNotNull(AstraStateTraceVerifier.report(trace)))
         }
         // Exact affine equations may have nonterminating decimal solutions.
         // Compare fractions rather than approximations, only on explicit review.
@@ -235,30 +246,47 @@ internal object AstraCognitiveReview {
         // owner-supplied formal argument. Never infer missing formal premises.
         val logical = AstraPropositionalVerifier.verify(original)
         val scalar = answer.trimEnd('.', '!').uppercase(java.util.Locale.ROOT)
-        if (logical != null && scalar in setOf("YES", "NO")) {
+        if (logical != null) {
+            val comparable = scalar in setOf("YES", "NO")
             val detail = when (logical.verdict) {
                 AstraPropositionalVerifier.Verdict.INCONSISTENT_PREMISES ->
                     "The premises are inconsistent. Classical entailment is vacuous here; " +
                         "a substantive yes/no conclusion is not established."
                 AstraPropositionalVerifier.Verdict.ENTAILED ->
-                    (if (scalar == "YES") "correct." else "incorrect; corrected result: YES.") +
+                    (if (!comparable) "YES." else if (scalar == "YES") "correct." else "incorrect; corrected result: YES.") +
                         " Every satisfying assignment makes the conclusion true."
                 AstraPropositionalVerifier.Verdict.COUNTEREXAMPLE ->
-                    (if (scalar == "NO") "correct." else "incorrect; corrected result: NO.") +
+                    (if (!comparable) "NO." else if (scalar == "NO") "correct." else "incorrect; corrected result: NO.") +
                         " Counterexample: " + logical.witness + "."
             }
-            return Result.Local(
-                "INDEPENDENT LOGICAL CHECK — " + detail +
-                    "\nExamined ${logical.assignments} possible truth assignments locally."
-            )
+            val report = "INDEPENDENT LOGICAL CHECK — " + detail +
+                "\nExamined ${logical.assignments} possible truth assignments locally."
+            return if (comparable) Result.Local(report) else referenceOnly(report)
         }
         val categorical = AstraCategoricalVerifier.verify(original)
-        if (categorical != null && scalar in setOf("YES", "NO")) {
-            return Result.Local(categoricalReport(categorical, scalar))
+        if (categorical != null) {
+            return if (scalar in setOf("YES", "NO")) Result.Local(categoricalReport(categorical, scalar))
+            else referenceOnly(categoricalReport(categorical, null))
         }
         val named = AstraCategoricalVerifier.verifyControlledLanguage(original)
-        if (named != null && scalar in setOf("YES", "NO")) {
-            return Result.Local(namedCategoricalReport(named, scalar))
+        if (named != null) {
+            return if (scalar in setOf("YES", "NO")) Result.Local(namedCategoricalReport(named, scalar))
+            else referenceOnly(namedCategoricalReport(named, null))
+        }
+        // Only after all supported owner-authored references have had priority
+        // may an unrelated model-generated quantity proposal be considered.
+        if (answer.startsWith("Trace quantity:", ignoreCase = true)) {
+            return when (val proposal = AstraQuantityProposalAudit.evaluate(answer)) {
+                AstraQuantityProposalAudit.Outcome.Invalid ->
+                    Result.Local("The proposed quantity trace is invalid or unsupported. No independent check was performed.")
+                is AstraQuantityProposalAudit.Outcome.Unconfirmed ->
+                    Result.Local("UNCONFIRMED QUANTITY PROPOSAL — computed result: " +
+                        proposal.computed + "; unit: " + proposal.unit + ". " +
+                        "Arithmetic only: the interpretation of your question is not independently verified. " +
+                        "Review every statement and submit the full corrected trace with Verify this quantity trace: to confirm it.")
+                is AstraQuantityProposalAudit.Outcome.Confirmed ->
+                    error("An unconfirmed proposal cannot be confirmed without an owner trace")
+            }
         }
         if (original.length > MAX_QUESTION || answer.length > MAX_ANSWER) {
             return Result.Local(
