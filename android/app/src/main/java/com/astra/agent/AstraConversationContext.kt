@@ -594,8 +594,15 @@ internal object AstraConversationContext {
         return best
     }
 
+    // Keep archived evidence verbatim in storage, but prevent literal model
+    // template delimiters from becoming control tokens in recovered excerpts.
+    // This is a display-only, same-length substitution; ordinary comparison
+    // operators and HTML-like source text are not modified.
+    private val modelDelimiter = Regex("""<\|[A-Za-z0-9_]+\|>|</?(?:think|tool_call|tool_response)>""")
+
     private fun quote(text: String): String =
         text.trim()
+            .replace(modelDelimiter) { match -> match.value.replace('<', '‹').replace('>', '›') }
             .replace(Regex("""[\r\n\t\u0000-\u001F]+"""), " ")
             .replace(Regex("""\s+"""), " ")
             .replace("\\", "\\\\")
