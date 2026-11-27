@@ -1,6 +1,6 @@
 # ACIE session engineering checklist — 26 November 2026
 
-Owner directive: maintain every item, update at the end of each engineering session using verified evidence, and keep general AI the exclusive priority until independently demonstrated >=90/100. This separate ACIE ledger preserves the original 119 parent release requirements. Engineering completion is not an intelligence score. Existing checked statuses from the owner-approved session checklist denote integrated engineering, not complete capability acceptance. No new item checked merely from a proposed change. 27/119 engineering items checked.
+Owner directive: maintain every item, update at the end of each engineering session using verified evidence, and keep general AI the exclusive priority until independently demonstrated >=90/100. This separate ACIE ledger preserves the original 119 parent release requirements. Engineering completion is not an intelligence score. Existing checked statuses from the owner-approved session checklist denote integrated engineering, not complete capability acceptance. No new item checked merely from a proposed change. 29/119 engineering items checked (includes completed feasibility investigation and evaluation, not successful adaptation).
 
 Newly checked: concept-aware retrieval integration (#409, Android/Python passed); initial verification merge and arithmetic verification integration (#408, Android/Python passed); narrow actual-model CPU baseline (run 45712659939, artifact 15068248646). CPU baseline is exploratory only, not the independent 200-case baseline. Isolated review quality remains unchecked until actual native review outcomes. Sampling optimization is integrated, not demonstrated superior; retain that distinction. #407 workflow successfully executed but merge conflict; reconciled in this PR. Hard direct and compact system experiments completed (run 45715461508); #410 merged. Hard direct 3/6 vs soft 2/6 strict; compact thinking 2/6 vs production 4/6. Retain production prompt pending fresh evidence. No verified /100 rating.
 
@@ -109,7 +109,7 @@ Newly checked: concept-aware retrieval integration (#409, Android/Python passed)
 - [ ] ACIE-083 Independent verification of tool-assisted conclusions
 - [ ] ACIE-084 Separate assisted and unassisted intelligence scores
 
-## 8. Continuous cognitive adaptation (0/11)
+## 8. Continuous cognitive adaptation (2/11)
 
 - [ ] ACIE-085 Structured learning from validated corrections
 - [ ] ACIE-086 Persistent error-pattern analysis
@@ -117,9 +117,9 @@ Newly checked: concept-aware retrieval integration (#409, Android/Python passed)
 - [ ] ACIE-088 Adaptive reasoning strategy selection
 - [ ] ACIE-089 Knowledge consolidation
 - [ ] ACIE-090 Prevent reinforcement of incorrect information
-- [ ] ACIE-091 Investigate zero-cost LoRA adaptation feasibility
+- [x] ACIE-091 Investigate zero-cost LoRA adaptation feasibility
 - [ ] ACIE-092 Investigate knowledge distillation feasibility
-- [ ] ACIE-093 Evaluate neural adaptation where feasible
+- [x] ACIE-093 Evaluate neural adaptation where feasible
 - [ ] ACIE-094 Test for catastrophic forgetting if weights change
 - [ ] ACIE-095 Measure generalisation improvements
 
@@ -710,3 +710,11 @@ All 119 ACIE parent rows preserved. Engineering completion 27/119, formal releas
 ## Acceptance
 
 90/100 independent repeated general intelligence score; separate model-only/assisted results; no model substitution, paid API or unsupported capability claims. Freeze protocol before held-out testing. Preserve offline and memory constraints. Recheck any completed engineering item if a later regression invalidates it.
+
+
+## 27 November 2026 — neural feasibility and negative transfer evidence
+
+- ACIE-091 (engineering investigation only): #536 merged at 38fa46cff9777d607fa07f060cfa6831871fd84f, actual FP32 pilot run 46046748642 (artifact 15222563807) verified four saved updates to 229,376 LoRA parameters, 5.56 seconds of optimisation. #538 merged at a948e8fb23fe97619fae8f5a57debd60fef8a8d3, actual FP32 run 46048340949 (artifact 15223926211) completed 32 updates per matched arm, approximately 112 seconds each. No paid GPU or external teacher API was required; hosted CI billing/quota availability is not independently certified. Feasibility investigation is complete within this CPU workflow scope, not production adaptation or device training.
+- ACIE-093 (engineering evaluation only): #536 generative strict 0/20 before and after; #540 merged at ca2a8ae75e70e1eb7ba02c88bcba860bb0e207bb, actual run 46048480282 (artifact 15223278560) recognition 13/24 before/after, zero gains/losses. #538 matched recognition 13/24 baseline, 11/24 ordinary, 9/24 smoothed; no paired gains; conditional confidence 0.9790 -> 0.7158/0.6552, NLL 5.1138 -> 1.4502/1.3215, Brier 0.9091 -> 0.6532/0.6361. Both exported adapter parameter digests verified. Reject all three adapters for deployment. Evaluation was performed; improvement was not established.
+- ACIE-092/094/095 remain open. Four trivial retention controls are not comprehensive forgetting evidence. #541 rationale supervision and #542 answer-position invariance are public experiments, not independent general intelligence assessments. #542 uses 24 underlying questions with 96 dependent cyclic variants; do not inflate sample size. Full product acceptance is separate and unchanged.
+- All 119 original ACIE IDs preserved, engineering 29/119 (24.37%) once this ledger update merges; 90 open. Original release #166 0/119 accepted. No independent /100 rating or adapted GGUF deployment. Owner minimum 80/100, preferred 90/100, remains a measured acceptance target, not a completion estimate.
