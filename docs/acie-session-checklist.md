@@ -656,6 +656,20 @@ No parent item is newly checked from source-only work. No claim of new neural ac
 All 119 ACIE parent statuses retained: 27/119 engineering checks, 92 open. The original release ledger #166 remains distinct (0/119 formally accepted at last verified inspection). No new independent intelligence rating.
 
 
+
+## Session reconciliation — reference recovery for noncanonical model answers (27 November 2026)
+
+- [x] Audit #519–#523 and confirm #520 remains merged; #521 Android CI 45991505668 succeeded, #522 Android 45992374175 and Python 45992374140 succeeded. Native #522 run 45992374324 and #523 Android 45993072290 were pending at inspection.
+- [x] Implement explicit owner-reference recovery for supported quantity, state, conditional, propositional and categorical questions when the previous reply is not a standalone answer. Do not certify arbitrary model prose or extract a convenient number from it.
+- [x] Preserve authoritative owner evidence ahead of unrelated model-generated quantity proposals; unify proposal reporting and fail closed if confirmation evidence is missing.
+- [x] Extend reference-only recovery to exact elementary arithmetic and affine equation solution sets, including nonterminating rational results, undefined division, identities and inconsistent equations.
+- [x] Add regression coverage spanning these categories, unsupported requests, misleading proposals and explicit-review boundaries. Source and test head before this ledger update: `fbd4448313fe43aeebaea597429d68fb694a45cd`.
+- [ ] Execute final-head Kotlin/Android and applicable Python CI; resolve failures and merge only when justified.
+- [ ] Retrieve actual Qwen3 #522 semantic-fidelity results; independently validate generalization and physical ARM64 inference.
+
+Stacked on #523 head `2e1d3366dfc05b90402c503f856a2e34f80947b7` to avoid interrupting its running CI. All 119 ACIE parent rows retained: 27 checked, 92 open. No new parent acceptance or independent intelligence score.
+
+
 ## Acceptance
 
 90/100 independent repeated general intelligence score; separate model-only/assisted results; no model substitution, paid API or unsupported capability claims. Freeze protocol before held-out testing. Preserve offline and memory constraints. Recheck any completed engineering item if a later regression invalidates it.
