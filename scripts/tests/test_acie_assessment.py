@@ -206,7 +206,8 @@ class ACIEAssessmentTest(unittest.TestCase):
             self.assertEqual(gate.read_private_json(p), {"protocol":"ACIE-v1","runs":[]})
             for invalid in ('{"protocol":"x","protocol":"ACIE-v1"}',
                             '{"runs":[{"credits":0,"credits":2}]}',
-                            '{"a":NaN}', '{"a":Infinity}', '{"a":-Infinity}'):
+                            '{"a":NaN}', '{"a":Infinity}', '{"a":-Infinity}',
+                            '{"a":1e999}', '{"a":-1e999}'):
                 p.write_text(invalid, encoding="utf-8")
                 with self.assertRaises(ValueError):
                     gate.read_private_json(p)
