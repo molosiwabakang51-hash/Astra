@@ -506,6 +506,35 @@ class AstraConversationContextTest {
         assertTrue(prompt.length <= 3010)
     }
 
+
+    @Test fun entirelyEvictedSecondaryCorrectedTopicStillWarnsAboutMissingEvidence() {
+        val history = listOf(
+            turn("user", "The ferry schedule is 9 am."),
+            turn("user", "Actually, make it 11 am."),
+            turn("user", "The museum renovation budget is 900 coins."),
+            turn("user", "Actually, make it 700 coins.")
+        ) + (1..10).map { turn("assistant", "Unrelated weather note $it.") }
+        val question = "Use the museum renovation budget and ferry schedule to plan. "
+        val short = AstraConversationContext.userPrompt(question.trim(),history,true)
+        assertTrue(short.contains("make it 11 am"))
+        assertTrue(short.contains("make it 700 coins"))
+        assertFalse(short.contains("including a later correction"))
+        var fullyEvicted = 0
+        for (size in 2400..2700 step 5) {
+            val current = question + "z".repeat(size-question.length)
+            val prompt = AstraConversationContext.userPrompt(current,history,true)
+            if (prompt.contains("Earlier chat",ignoreCase=true) &&
+                !prompt.contains("Previous user: \"The ferry") &&
+                !prompt.contains("make it 11 am")) {
+                assertTrue(prompt.contains(AstraConversationContext.CORRECTION_TAIL_NOTICE.trim()))
+                fullyEvicted++
+            }
+            assertTrue(prompt.endsWith(current + "\n/no_think"))
+            assertTrue(prompt.length <= 3010)
+        }
+        assertTrue("Must exercise complete eviction, not just clipped evidence",fullyEvicted>0)
+    }
+
     @Test fun secondaryTopicRetainsLatestCorrectionInsteadOfOnlyWarning() {
         val history = listOf(
             turn("user", "The fictional museum renovation budget is 900 coins."),
