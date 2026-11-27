@@ -1,0 +1,29 @@
+name: Qwen3 neural resume integrity
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/qwen3-neural-resume.yml'
+      - 'scripts/quality/qwen_neural_resume.py'
+      - 'scripts/tests/test_qwen_neural_resume.py'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Install pinned CPU tensor dependencies
+        run: |
+          python -m pip install --index-url https://download.pytorch.org/whl/cpu torch==2.7.1
+          python -m pip install safetensors==0.5.3 numpy==2.2.6
+          python -m pip check
+      - name: Verify real interrupted training and checkpoint integrity
+        run: |
+          python -c 'import torch, safetensors, numpy'
+          python -m unittest discover -s scripts/tests -p test_qwen_neural_resume.py -v
