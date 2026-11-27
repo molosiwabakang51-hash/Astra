@@ -93,6 +93,33 @@ internal object AstraCognitiveReview {
             "This independently establishes the reference result only, not the correctness of the earlier explanation."
     )
 
+    private fun quantityProposalReview(
+        answer: String,
+        original: String?,
+        ownerQuantity: AstraQuantityTraceVerifier.Checked?
+    ): Result.Local {
+        val proposal = AstraQuantityProposalAudit.evaluate(answer, original.takeIf { ownerQuantity != null })
+        val ownerReport = ownerQuantity?.let {
+            "\n\n" + checkNotNull(AstraQuantityTraceVerifier.report(it)) +
+                "\nThe result above is from your original submitted trace, not the model's proposal."
+        } ?: ""
+        return when (proposal) {
+            AstraQuantityProposalAudit.Outcome.Invalid ->
+                Result.Local("The proposed quantity trace is invalid or unsupported. " +
+                    (if (ownerQuantity == null) "No independent check was performed." else "The proposal was not verified.") +
+                    ownerReport)
+            is AstraQuantityProposalAudit.Outcome.Unconfirmed ->
+                Result.Local("UNCONFIRMED QUANTITY PROPOSAL — computed result: " +
+                    proposal.computed + "; unit: " + proposal.unit + ". " +
+                    "Arithmetic only: the interpretation of your question is not independently verified. " +
+                    "Review every statement and submit the full corrected trace with Verify this quantity trace: to confirm it." +
+                    ownerReport)
+            is AstraQuantityProposalAudit.Outcome.Confirmed ->
+                if (ownerQuantity != null) Result.Local(checkNotNull(AstraQuantityTraceVerifier.report(ownerQuantity)))
+                else Result.Local("The proposed quantity trace lacks confirmed owner evidence. No independent check was performed.")
+        }
+    }
+
     fun resolve(raw: String, history: List<AstraChatArchive.Message>): Result {
         val submitted = raw.trim()
         if (submitted.startsWith("Verify this quantity trace:", ignoreCase = true) ||
@@ -189,25 +216,7 @@ internal object AstraCognitiveReview {
         // Only exact equality with the immediately preceding owner question
         // can establish that the submitted trace itself was owner supplied.
         if (ownerQuantity != null && answer.startsWith("Trace quantity:", ignoreCase = true)) {
-            val proposal = AstraQuantityProposalAudit.evaluate(answer, original)
-            val ownerReport = ownerQuantity?.let {
-                "\n\n" + checkNotNull(AstraQuantityTraceVerifier.report(it)) +
-                    "\nThe result above is from your original submitted trace, not the model's proposal."
-            } ?: ""
-            when (proposal) {
-                AstraQuantityProposalAudit.Outcome.Invalid ->
-                    return Result.Local("The proposed quantity trace is invalid or unsupported. " +
-                        (if (ownerQuantity == null) "No independent check was performed." else "The proposal was not verified.") +
-                        ownerReport)
-                is AstraQuantityProposalAudit.Outcome.Unconfirmed ->
-                    return Result.Local("UNCONFIRMED QUANTITY PROPOSAL — computed result: " +
-                        proposal.computed + "; unit: " + proposal.unit + ". " +
-                        "Arithmetic only: the interpretation of your question is not independently verified. " +
-                        "Review every statement and submit the full corrected trace with Verify this quantity trace: to confirm it." +
-                        ownerReport)
-                is AstraQuantityProposalAudit.Outcome.Confirmed ->
-                    return Result.Local(checkNotNull(AstraQuantityTraceVerifier.report(checkNotNull(ownerQuantity))))
-            }
+            return quantityProposalReview(answer, original, ownerQuantity)
         }
         // Independently recompute a complete, owner-supplied quantity trace.
         // Never infer the trace from unrelated conversation history.
@@ -273,20 +282,11 @@ internal object AstraCognitiveReview {
             return if (scalar in setOf("YES", "NO")) Result.Local(namedCategoricalReport(named, scalar))
             else referenceOnly(namedCategoricalReport(named, null))
         }
-        // Only after all supported owner-authored references have had priority
+        // Only after supported owner-authored trace and logical references,
+        // and the existing scalar arithmetic audits, have had priority
         // may an unrelated model-generated quantity proposal be considered.
         if (answer.startsWith("Trace quantity:", ignoreCase = true)) {
-            return when (val proposal = AstraQuantityProposalAudit.evaluate(answer)) {
-                AstraQuantityProposalAudit.Outcome.Invalid ->
-                    Result.Local("The proposed quantity trace is invalid or unsupported. No independent check was performed.")
-                is AstraQuantityProposalAudit.Outcome.Unconfirmed ->
-                    Result.Local("UNCONFIRMED QUANTITY PROPOSAL — computed result: " +
-                        proposal.computed + "; unit: " + proposal.unit + ". " +
-                        "Arithmetic only: the interpretation of your question is not independently verified. " +
-                        "Review every statement and submit the full corrected trace with Verify this quantity trace: to confirm it.")
-                is AstraQuantityProposalAudit.Outcome.Confirmed ->
-                    error("An unconfirmed proposal cannot be confirmed without an owner trace")
-            }
+            return quantityProposalReview(answer, null, null)
         }
         if (original.length > MAX_QUESTION || answer.length > MAX_ANSWER) {
             return Result.Local(
