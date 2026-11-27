@@ -327,4 +327,37 @@ class AstraCognitiveReviewTest {
             AstraCognitiveReview.resolve("Explain the topic further", pair(question, "Maybe 0.67.")))
     }
 
+
+    @Test fun exactMathematicalReferencesDoNotRoundOrCertifyProse() {
+        val cases = listOf(
+            "What is 1 divided by 3?" to "reference result: 1/3.",
+            "What is 17 times 13?" to "reference result: 221.",
+            "What is 1 divided by 0?" to "division by zero is undefined.",
+            "Solve for x: 3*x=1" to "reference result: 1/3.",
+            "Solve for x: x=x" to "Infinitely many solutions.",
+            "Solve for x: x=x+1" to "No solution."
+        )
+        for ((question, expected) in cases) {
+            val actual = AstraCognitiveReview.resolve("Verify your answer",
+                pair(question, "I think it is 0.3333, but the explanation may be incomplete."))
+                as AstraCognitiveReview.Result.Local
+            assertTrue(question, actual.answer.contains(expected))
+            assertTrue(question, actual.answer.contains("preceding response was not compared"))
+            assertFalse(question, actual.answer.contains("incorrect;"))
+        }
+    }
+
+    @Test fun unrelatedTraceCannotOverrideAnExactMathematicalReference() {
+        val proposal = "Trace quantity: initial amount is 99 coins; add 1 coins to it. What is the current amount?"
+        for ((question, expected) in listOf(
+            "What is 1 divided by 3?" to "reference result: 1/3.",
+            "Solve for x: 3*x=1" to "reference result: 1/3."
+        )) {
+            val actual = AstraCognitiveReview.resolve("Verify your answer", pair(question, proposal))
+                as AstraCognitiveReview.Result.Local
+            assertTrue(question, actual.answer.contains(expected))
+            assertFalse(question, actual.answer.contains("computed result: 100"))
+        }
+    }
+
 }
