@@ -30,8 +30,12 @@ class AstraConditionalReviewTest {
             assertTrue(correct.answer.contains("correct."))
         }
         for (ambiguous in listOf("8 or 16", "8 because it is even", "++8", "8.0")) {
-            assertTrue(ambiguous, AstraCognitiveReview.resolve("Verify your answer", pair(trace, ambiguous))
-                is AstraCognitiveReview.Result.Native)
+            val reference = AstraCognitiveReview.resolve("Verify your answer", pair(trace, ambiguous))
+                as AstraCognitiveReview.Result.Local
+            assertTrue(ambiguous, reference.answer.contains("result: 8."))
+            assertTrue(ambiguous, reference.answer.contains("preceding response was not compared"))
+            assertFalse(ambiguous, reference.answer.contains("incorrect; corrected result"))
+            assertFalse(ambiguous, reference.answer.contains("— correct."))
         }
     }
 
