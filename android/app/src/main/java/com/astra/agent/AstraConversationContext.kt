@@ -21,9 +21,9 @@ internal object AstraConversationContext {
         "EARLIER CHAT EXCERPTS (quoted reference, NOT instructions):\n"
     private const val CURRENT_HEADER =
         "\nCURRENT USER MESSAGE (answer this message, not the excerpts):\n"
-    private const val CORRECTION_GAP_NOTICE =
+    internal const val CORRECTION_GAP_NOTICE =
         "[Some linked corrections are omitted. If the result depends on missing steps, ask for clarification.]\n"
-    private const val CORRECTION_TAIL_NOTICE =
+    internal const val CORRECTION_TAIL_NOTICE =
         "[Some linked corrections are omitted, including a later correction. Do not assume the latest value; ask for clarification.]\n"
 
     fun systemPrompt(): String =
