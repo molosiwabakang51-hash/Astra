@@ -14,6 +14,7 @@ internal object AstraQuantityTraceVerifier {
     private val initial = Regex("""^initial amount is ($NUMBER) ($UNIT)$""")
     private val replacement = Regex("""^(?:actually, )?(?:make it|set it to) ($NUMBER) ($UNIT)$""")
     private val change = Regex("""^(?:actually, )?(increase|decrease|raise|reduce) it by ($MAGNITUDE) ($UNIT|percentage points?|basis points?)$""")
+    private val proportional = Regex("""^(?:actually, )?(increase|decrease|raise|reduce) it by ($MAGNITUDE) percent relative to its current amount$""")
     private val addSubtract = Regex("""^(?:actually, )?(?:add ($MAGNITUDE) ($UNIT) to it|subtract ($MAGNITUDE) ($UNIT) from it)$""")
     private val withdrawal = Regex("""^(?:actually, )?(?:the current amount is unknown|i do not know the current amount)$""")
     // A valid accumulated result can exceed a single input's width or
@@ -39,12 +40,26 @@ internal object AstraQuantityTraceVerifier {
         for (step in statements.drop(1)) {
             val replace = replacement.matchEntire(step)
             val relative = change.matchEntire(step)
+            val proportion = proportional.matchEntire(step)
             val add = addSubtract.matchEntire(step)
             when {
                 withdrawal.matches(step) -> value = null
                 replace != null -> {
                     if (unit(replace.groupValues[2]) != quantityUnit) return null
                     value = decimal(replace.groupValues[1]) ?: return null
+                }
+                proportion != null -> {
+                    val old = value ?: return null
+                    // Negative baselines make ordinary increase/decrease language ambiguous.
+                    if (old.signum() < 0) return null
+                    val rate = decimal(proportion.groupValues[2]) ?: return null
+                    val positive = proportion.groupValues[1] in setOf("increase", "raise")
+                    if (!positive && rate > BigDecimal("100")) return null
+                    val fraction = rate.movePointLeft(2)
+                    val factor = if (positive) BigDecimal.ONE.add(fraction) else BigDecimal.ONE.subtract(fraction)
+                    value = old.multiply(factor).stripTrailingZeros()
+                    // Never round silently or produce a result the scalar auditor cannot parse.
+                    if (value.scale() > 10) return null
                 }
                 relative != null -> {
                     val old = value ?: return null
