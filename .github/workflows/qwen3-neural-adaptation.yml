@@ -34,6 +34,10 @@ jobs:
           python -m pip install --index-url https://download.pytorch.org/whl/cpu torch==2.7.1
           python -m pip install transformers==4.52.4 peft==0.15.2 accelerate==1.7.0 huggingface-hub==0.32.4 safetensors==0.5.3 numpy==2.2.6
           python -m pip check
+      - name: Verify actual tensor loss and checkpoint contracts
+        run: |
+          python -c 'import torch'
+          python -m unittest discover -s scripts/tests -p test_qwen_neural_pilot.py -v
       - name: Train low-rank weights and compare baseline with adapter
         timeout-minutes: 50
         run: |
