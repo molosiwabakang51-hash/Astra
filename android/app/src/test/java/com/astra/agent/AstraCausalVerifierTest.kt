@@ -71,6 +71,27 @@ class AstraCausalVerifierTest {
         }
     }
 
+
+    @Test fun simultaneousInterventionsReplaceOnlyTheirOwnEquations() {
+        val rules = "C=XOR(A,B); D=AND(C,B)"
+        // Original observations establish A=0, B=1, C=1, D=1.
+        val original = "C=1,D=1"
+        val upstream = AstraCausalVerifier.verify(model(rules,original,"A=1,B=0","C"))!!
+        assertEquals(AstraCausalVerifier.Verdict.YES,upstream.verdict)
+        assertEquals(1,upstream.compatible)
+        val downstream = AstraCausalVerifier.verify(model(rules,original,"A=1,C=1","D"))!!
+        assertEquals(AstraCausalVerifier.Verdict.YES,downstream.verdict)
+        val overridden = AstraCausalVerifier.verify(model(rules,original,"B=0,D=1","D"))!!
+        assertEquals(AstraCausalVerifier.Verdict.YES,overridden.verdict)
+        // An intervention on C does not manufacture evidence for A.
+        val uncertain = AstraCausalVerifier.verify(model(rules,"none","C=1,D=0","A"))!!
+        assertEquals(AstraCausalVerifier.Verdict.UNKNOWN,uncertain.verdict)
+        assertEquals(4,uncertain.compatible)
+        // Interventions cannot make contradictory original observations consistent.
+        val impossible = AstraCausalVerifier.verify(model(rules,"A=0,B=0,C=1","C=1,D=1","D"))!!
+        assertEquals(AstraCausalVerifier.Verdict.INCONSISTENT,impossible.verdict)
+    }
+
     @Test fun malformedGraphsFailClosedAndBoundsAreExplicit() {
         for (bad in listOf(
             model("C=AND(A,C); D=COPY(C)"),
