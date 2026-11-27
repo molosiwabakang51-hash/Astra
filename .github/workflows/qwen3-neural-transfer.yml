@@ -28,6 +28,8 @@ jobs:
       TOKENIZERS_PARALLELISM: 'false'
       OMP_NUM_THREADS: '4'
       MKL_NUM_THREADS: '4'
+      # This branch-specific run compares the first retained pilot; future PRs remain baseline-only.
+      PILOT_RUN_ID: ${{ github.event_name == 'workflow_dispatch' && inputs.pilot_run_id || github.head_ref == 'intelligence/verify-pilot-transfer-1127' && '46046748642' || '' }}
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-python@v6
@@ -36,19 +38,19 @@ jobs:
       - name: Validate neural transfer evaluation contracts
         run: python -m unittest discover -s scripts/tests -p test_qwen_transfer_logits.py -v
       - name: Verify optional pilot workflow identity
-        if: github.event_name == 'workflow_dispatch' && inputs.pilot_run_id != ''
+        if: env.PILOT_RUN_ID != ''
         env:
           GH_TOKEN: ${{ github.token }}
-          RUN_ID: ${{ inputs.pilot_run_id }}
+          RUN_ID: ${{ env.PILOT_RUN_ID }}
         run: |
           set -euo pipefail
           [[ "$RUN_ID" =~ ^[0-9]+$ ]]
           gh api "repos/$GITHUB_REPOSITORY/actions/runs/$RUN_ID" | python -c 'import json,sys; r=json.load(sys.stdin); assert r["path"].split("@")[0]==".github/workflows/qwen3-neural-adaptation.yml" and r["status"]=="completed" and r["conclusion"]=="success"'
       - name: Download verified pilot artifact
-        if: github.event_name == 'workflow_dispatch' && inputs.pilot_run_id != ''
+        if: env.PILOT_RUN_ID != ''
         env:
           GH_TOKEN: ${{ github.token }}
-          RUN_ID: ${{ inputs.pilot_run_id }}
+          RUN_ID: ${{ env.PILOT_RUN_ID }}
         run: |
           set -euo pipefail
           [[ "$RUN_ID" =~ ^[0-9]+$ ]]
@@ -58,13 +60,15 @@ jobs:
           python -m pip install --index-url https://download.pytorch.org/whl/cpu torch==2.7.1
           python -m pip install transformers==4.52.4 peft==0.15.2 accelerate==1.7.0 huggingface-hub==0.32.4 safetensors==0.5.3 numpy==2.2.6
           python -m pip check
+      - name: Verify exported tensor digest contracts
+        run: |
+          python -c 'import torch, safetensors, numpy'
+          python -m unittest discover -s scripts/tests -p test_qwen_transfer_logits.py -v
       - name: Evaluate actual model recognition logits
-        env:
-          PILOT_RUN_ID: ${{ inputs.pilot_run_id }}
         run: |
           set -euo pipefail
           args=()
-          if [[ -n "$PILOT_RUN_ID" ]]; then args+=(--pilot pilot); fi
+          if [[ -n "$PILOT_RUN_ID" ]]; then args+=(--pilot pilot --dtype float32); fi
           python scripts/quality/evaluate_qwen_transfer_logits.py evaluation/neural-transfer.json "${args[@]}"
           cat evaluation/neural-transfer.json >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@v6
