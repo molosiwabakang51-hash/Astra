@@ -112,6 +112,41 @@ class RelativeEvidenceTests(unittest.TestCase):
             self.assertEqual(sum(probe.relative_evidence(v) for v in p["candidate"]),
                              2 if item["case"].startswith("relative_") else 0)
 
+    def test_actual_gate_misses_are_measured_not_excluded(self):
+        suite=probe.cases(19)
+        build=self.builder(suite)
+        def later_owner(q,h):
+            return build(q,h).replace(probe.prior.BOUNDARY,
+                'Previous user: "Dinner needs vegetables."\n'+probe.prior.BOUNDARY)
+        calls=[]
+        def infer(payload):
+            calls.append(payload)
+            return dict(content="UNKNOWN",stop_type="eos",truncated=False,
+                        tokens_predicted=1,generation_settings=payload)
+        with patch.object(probe.native,"system_prompt",return_value="Synthetic system"):
+            result=probe.evaluate(19,infer,later_owner,suite)
+        self.assertEqual(len(calls),56)
+        self.assertEqual(result["gate_admission"],dict(eligible=8,ineligible=20,
+            true_positive=0,false_positive=0,true_negative=20,false_negative=8))
+        self.assertEqual(result["interpretation"],"NO_ADMISSION_NO_EFFECT_ESTIMABLE")
+        self.assertEqual(result["totals"]["evidence"]["rule_applied_calls"],0)
+        self.assertEqual(result["totals"]["baseline"]["correct"],result["totals"]["evidence"]["correct"])
+
+    def test_false_admission_is_recorded_without_oracle_routing(self):
+        item=next(i for i in probe.cases(19) if i["case"]=="absolute_0")
+        build=self.builder([item])
+        def extra_relative(q,h):
+            return build(q,h).replace(probe.prior.BOUNDARY,
+                'Previous user: "Actually, increase it by 17 coins."\n'+probe.prior.BOUNDARY)
+        def infer(payload):
+            return dict(content="UNKNOWN",stop_type="eos",truncated=False,
+                        tokens_predicted=1,generation_settings=payload)
+        with patch.object(probe.native,"system_prompt",return_value="Synthetic system"):
+            result=probe.evaluate(19,infer,extra_relative,[item])
+        self.assertEqual(result["gate_admission"]["false_positive"],2)
+        self.assertEqual(result["interpretation"],"FALSE_ADMISSION_PRESENT")
+        self.assertEqual(result["totals"]["evidence"]["rule_applied_calls"],2)
+
     def test_incomplete_output_and_numeric_guess_not_rewarded(self):
         item=next(i for i in probe.cases(19) if i["case"]=="missing_0")
         known=item["operands"][1]
