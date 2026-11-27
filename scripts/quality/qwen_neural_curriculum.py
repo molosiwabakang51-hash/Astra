@@ -33,7 +33,7 @@ def curriculum(train=True, count=32):
         else:
             q = f"A warehouse has {a} parcels. After shipping {c} parcels, it receives {b} more. Give the ending count."
             r = f"{a}-{c}+{b}={a-c+b}."
-        out.append(Example("quantity",q,r,str(a+b-c)))
+        out.append(Example("quantity",f"Case {i}: "+q,r,str(a+b-c)))
         # Enumerate two independent truth variables. Conditions and targets
         # differ across splits; the training examples never contain dev wording.
         kind = i % 3
@@ -61,12 +61,12 @@ def curriculum(train=True, count=32):
         if train:
             seq = [start+j*delta for j in range(4)]
             target = seq[-1]+delta
-            q = f"Continue the constant-difference sequence: {', '.join(map(str,seq))}. Give the next number."
+            q = f"Sequence P{i}: Continue the constant-difference sequence: {', '.join(map(str,seq))}. Give the next number."
             r = f"Each step adds {delta}; {seq[-1]}+{delta}={target}."
         else:
             seq = [start-j*delta for j in range(4)]
             target = seq[-1]-delta
-            q = f"A sequence decreases by the same amount at each step: {', '.join(map(str,seq))}. What comes next?"
+            q = f"Sequence W{i}: A sequence decreases by the same amount at each step: {', '.join(map(str,seq))}. What comes next?"
             r = f"Each step subtracts {delta}; {seq[-1]}-{delta}={target}."
         out.append(Example("pattern",q,r,str(target)))
         # Corrections include missing/withdrawn information, not just arithmetic.
@@ -79,7 +79,7 @@ def curriculum(train=True, count=32):
             q = f"The earlier stock count was {old}. A later confirmed count supersedes it: {new}." if i%2==0 else f"The previous stock count was {old}. That count is invalid and no new one has been confirmed."
             q += " State the current stock count, or UNKNOWN."
         r = "The latest confirmed value replaces the old one." if i%2==0 else "The earlier value is withdrawn and no replacement is known."
-        out.append(Example("correction",q,r,str(new) if i%2==0 else "UNKNOWN"))
+        out.append(Example("correction",f"Record {i}: "+q,r,str(new) if i%2==0 else "UNKNOWN"))
     if len({e.question for e in out}) != len(out):
         raise RuntimeError("Duplicate curriculum question")
     rng.shuffle(out)
@@ -114,6 +114,8 @@ def token_example(tokenizer, example, maximum=256):
     messages=[{"role":"system","content":"Answer the question accurately. Give one short reasoning sentence, then a final answer on a new line as Answer: VALUE."},
               {"role":"user","content":example.question}]
     prefix=tokenizer.apply_chat_template(messages,tokenize=True,add_generation_prompt=True,enable_thinking=False)
+    if tokenizer.eos_token_id is None:
+        raise ValueError("Missing assistant end token")
     suffix=tokenizer.encode(example.completion,add_special_tokens=False)+[tokenizer.eos_token_id]
     if not prefix or not suffix or tokenizer.eos_token_id is None or len(prefix)+len(suffix)>maximum:
         raise ValueError("Example outside token budget; no truncation")
