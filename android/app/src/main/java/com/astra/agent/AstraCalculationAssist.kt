@@ -191,6 +191,9 @@ internal object AstraCalculationAssist {
     fun auditLinearEquation(question: String, observedAnswer: String): String? =
         solveLinear(question, observedAnswer.trim(), audit = true)
 
+    /** Independent reference only, including exact rational solution sets. */
+    fun referenceLinearEquation(question: String): String? = solveLinear(question, null, audit = true)
+
     private fun auditScalar(text: String): Rational? {
         val fraction = Regex("""([+-]?[0-9]{1,31})/([+-]?[0-9]{1,31})""").matchEntire(text)
         if (fraction != null) {
@@ -222,8 +225,10 @@ internal object AstraCalculationAssist {
                 val identity = constant.numerator.signum() == 0
                 val result = if (identity) "Infinitely many solutions." else "No solution."
                 if (audit) {
+                    if (observedAnswer == null) return "INDEPENDENT EQUATION CHECK — reference result: $result" +
+                        "\n$reduced Exact solution-set verification."
                     if (observedAnswer !in setOf("No solution.", "Infinitely many solutions.") &&
-                        (observedAnswer == null || auditScalar(observedAnswer) == null)) return null
+                        auditScalar(observedAnswer) == null) return null
                     // In an identity, a numeric answer is a valid solution but
                     // does not describe the whole solution set. Avoid calling it false.
                     if (identity && observedAnswer != result &&
@@ -244,7 +249,10 @@ internal object AstraCalculationAssist {
                 val r = right.coefficient.multiply(solution).add(right.constant)
                 if (l.numerator != r.numerator || l.denominator != r.denominator) return null
                 if (audit) {
-                    val scalar = observedAnswer?.let(::auditScalar)
+                    if (observedAnswer == null) return "INDEPENDENT EQUATION CHECK — reference result: ${solution.exactText()}." +
+                        "\n$reduced Substitution: left = ${l.exactText()}, right = ${r.exactText()}. " +
+                        "Computed using exact rational arithmetic."
+                    val scalar = auditScalar(observedAnswer)
                     if (scalar == null && observedAnswer !in setOf("No solution.", "Infinitely many solutions.")) return null
                     val exact = solution.exactText()
                     val equal = scalar?.numerator == solution.numerator &&
