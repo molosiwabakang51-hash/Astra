@@ -46,7 +46,7 @@ def curriculum(train=True, per_domain=16):
 
         # Training AND/XOR; transfer OR/XOR with a different dependency.
         u,v=i%2,(i//2)%2
-        force=(i//4)%2
+        force=((i//4)+(i%2))%2
         if train:
             q=f"Device {i}: U={u}, V={v}. R=U AND V; S=R XOR U. Override R to {force}. What is S, 0 or 1?"
             ans=force^u
@@ -57,7 +57,7 @@ def curriculum(train=True, per_domain=16):
             r=f"X becomes {force}; Y={force} XOR {v}={ans}."
         examples.append(Example("causal",q,r,str(ans)))
 
-        x,y=(i+2,i+9) if train else (i+17,i+29)
+        x,y=(i+2,rng.randrange(4,30)) if train else (i+71,rng.randrange(32,70))
         if train:
             q=f"Map (x,y) to (x+y,y-x) simultaneously. From ({x},{y}), apply it twice. What is the final first coordinate?"
             p,qv=x+y,y-x
@@ -74,11 +74,13 @@ def curriculum(train=True, per_domain=16):
         old=100+i*7 if train else 501+i*11
         new=old+b
         if train:
-            q=f"Ticket {old} belongs to room A. Ticket {old+1} belongs to B. Ticket {old} is transferred to C. What room holds ticket {old}?"
-            r="The later transfer changes the requested ticket to C, not the other ticket."; ans="C"
+            p1,p2,p3=rng.sample(("A","B","C","D","E"),3)
+            q=f"Ticket {old} belongs to room {p1}. Ticket {old+1} belongs to {p2}. Ticket {old} is transferred to {p3}. What room holds ticket {old}?"
+            r=f"The later transfer changes the requested ticket to {p3}, not the other ticket."; ans=p3
         else:
-            q=f"Crate {old} is in zone J. Crate {old+1} moves to zone L. Later crate {old} moves to zone K, then zone M. Where is crate {old} now?"
-            r="Only transfers of the requested crate count; the last transfer is to M."; ans="M"
+            p1,p2,p3,p4=rng.sample(("J","K","L","M","N"),4)
+            q=f"Crate {old} is in zone {p1}. Crate {old+1} moves to zone {p2}. Later crate {old} moves to zone {p3}, then zone {p4}. Where is crate {old} now?"
+            r=f"Only transfers of the requested crate count; the last transfer is to {p4}."; ans=p4
         examples.append(Example("grounding",q,r,ans))
 
         if train:
