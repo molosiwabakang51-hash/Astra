@@ -89,25 +89,31 @@ internal object AstraVerifiedArithmetic {
      * with the exact result of a complete two-operand owner question.
      * Do not certify a rounded recurring decimal or parse prose as a number.
      */
-    fun audit(originalQuestion: String, observedAnswer: String): String? {
+    fun audit(originalQuestion: String, observedAnswer: String): String? =
+        auditOrReference(originalQuestion, observedAnswer)
+
+    /** Independently recompute an explicit owner question without judging a prior answer. */
+    fun reference(originalQuestion: String): String? = auditOrReference(originalQuestion, null)
+
+    private fun auditOrReference(originalQuestion: String, observedAnswer: String?): String? {
         val question = originalQuestion.trim()
         if (question.length !in 8..180 || question.any { it == '\r' || it == '\n' }) return null
         val match = expression.matchEntire(question) ?: return null
         val left = match.groupValues[1].toBigDecimalOrNull() ?: return null
         val right = match.groupValues[4].toBigDecimalOrNull() ?: return null
-        val raw = observedAnswer.trim()
-        if (raw.length !in 1..80) return null
-        val fraction = Regex("""([+-]?[0-9]{1,31})/([+-]?[0-9]{1,31})""").matchEntire(raw)
-        val actualNumerator: java.math.BigDecimal
-        val actualDenominator: java.math.BigDecimal
-        if (fraction != null) {
-            actualNumerator = fraction.groupValues[1].toBigDecimalOrNull() ?: return null
-            actualDenominator = fraction.groupValues[2].toBigDecimalOrNull() ?: return null
-            if (actualDenominator.signum() == 0) return null
-        } else {
-            if (!Regex("""[+-]?[0-9]{1,31}(?:\.[0-9]{1,31})?""").matches(raw)) return null
-            actualNumerator = raw.toBigDecimalOrNull() ?: return null
-            actualDenominator = java.math.BigDecimal.ONE
+        val actual = if (observedAnswer == null) null else {
+            val raw = observedAnswer.trim()
+            if (raw.length !in 1..80) return null
+            val fraction = Regex("""([+-]?[0-9]{1,31})/([+-]?[0-9]{1,31})""").matchEntire(raw)
+            if (fraction != null) {
+                val numerator = fraction.groupValues[1].toBigDecimalOrNull() ?: return null
+                val denominator = fraction.groupValues[2].toBigDecimalOrNull() ?: return null
+                if (denominator.signum() == 0) return null
+                numerator to denominator
+            } else {
+                if (!Regex("""[+-]?[0-9]{1,31}(?:\.[0-9]{1,31})?""").matches(raw)) return null
+                (raw.toBigDecimalOrNull() ?: return null) to java.math.BigDecimal.ONE
+            }
         }
         val op = operator(match)
         val expectedNumerator = when (op) {
@@ -119,11 +125,10 @@ internal object AstraVerifiedArithmetic {
         }
         val expectedDenominator = if (op == "divided by") right else java.math.BigDecimal.ONE
         if (expectedDenominator.signum() == 0) {
-            return "INDEPENDENT ARITHMETIC CHECK — incorrect; division by zero is undefined. " +
+            return "INDEPENDENT ARITHMETIC CHECK — " +
+                (if (actual == null) "reference result: division by zero is undefined. " else "incorrect; division by zero is undefined. ") +
                 "No numerical quotient exists."
         }
-        val equal = actualNumerator.multiply(expectedDenominator)
-            .compareTo(expectedNumerator.multiply(actualDenominator)) == 0
         // Preserve the existing exact terminating-decimal display. For a
         // recurring quotient, convert the original operands to a reduced ratio.
         val exact = answer(question) ?: run {
@@ -140,6 +145,11 @@ internal object AstraVerifiedArithmetic {
             }
             "$n/$d"
         }
+        if (actual == null) return "INDEPENDENT ARITHMETIC CHECK — reference result: $exact." +
+            "\nComputed from the original operands using exact arithmetic."
+        val (actualNumerator, actualDenominator) = actual
+        val equal = actualNumerator.multiply(expectedDenominator)
+            .compareTo(expectedNumerator.multiply(actualDenominator)) == 0
         return "INDEPENDENT ARITHMETIC CHECK — " +
             (if (equal) "correct." else "incorrect; corrected result: $exact.") +
             "\nComputed from the original operands using exact arithmetic and cross-multiplication. " +
