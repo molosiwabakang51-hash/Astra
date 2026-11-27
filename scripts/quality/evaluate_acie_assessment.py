@@ -3,6 +3,7 @@ import argparse
 import hashlib
 import hmac
 import json
+import math
 import re
 from pathlib import Path
 
@@ -229,6 +230,12 @@ def read_private_json(path):
     def reject_constant(_):
         raise ValueError("Nonfinite JSON constant")
 
+    def finite_float(token):
+        value = float(token)
+        if not math.isfinite(value):
+            raise ValueError("Nonfinite JSON number")
+        return value
+
     # The protocol uses compact metadata only, not transcripts or raw answers.
     # Bound input before parsing, without logging private contents.
     with path.open("rb") as stream:
@@ -236,7 +243,7 @@ def read_private_json(path):
     if len(raw) > 4 * 1024 * 1024:
         raise ValueError("Private record exceeds metadata limit")
     return json.loads(raw.decode("utf-8"), object_pairs_hook=unique_object,
-                      parse_constant=reject_constant)
+                      parse_constant=reject_constant, parse_float=finite_float)
 
 
 def main():
