@@ -296,12 +296,19 @@ internal object AstraConversationContext {
         // the original anchor. A relative correction cannot reconstruct a
         // missing base value. Avoid allocating an unbounded escaped copy:
         // anything beyond the excerpt maximum is conservatively incomplete.
+        // An entirely evicted explicitly selected topical chain is still a
+        // missing premise. Do not warn about every lower-ranked historic
+        // match: only the selected primary/secondary corrected topics are
+        // mandatory when answering a specifically grounded question.
+        val requiredAnchors = listOfNotNull(topicalAnchor?.index, secondaryAnchor?.index)
+            .filter { it in correctionChains }.toSet()
         val chainIndices = correctionChains.values.flatten().toSet()
         val completeChainQuotes = valid.asSequence()
             .filter { it.index in chainIndices && it.value.content.length <= MAX_TURN_CHARS }
             .associate { it.index to ("Previous user: \"" + quote(it.value.content) + "\"\n") }
         var selected = selectExcerpts(room)
-        if (selected.isEmpty()) return AstraOfflinePolicy.modelPrompt(current, thinkingRequested)
+        if (selected.isEmpty() && requiredAnchors.isEmpty())
+            return AstraOfflinePolicy.modelPrompt(current, thinkingRequested)
         // Assess the actual selected indices, including a newest correction
         // evicted by excerpt limits rather than only by the scan limit.
         // Re-evaluate after reserving notice space: that reservation itself
@@ -313,7 +320,10 @@ internal object AstraConversationContext {
             }.map { it.first }.toSet()
             var level = 0
             for ((anchorIndex, chain) in correctionChains) {
-                if (chain.none(included::contains)) continue
+                if (chain.none(included::contains)) {
+                    if (anchorIndex in requiredAnchors) return 2
+                    continue
+                }
                 val newest = chain.maxOrNull() ?: continue
                 if (anchorIndex in boundedChains || newest !in included) return 2
                 // An included index does not prove its correction was fully
@@ -334,7 +344,14 @@ internal object AstraConversationContext {
         while (level > 0) {
             notice = if (level == 2) CORRECTION_TAIL_NOTICE else CORRECTION_GAP_NOTICE
             selected = selectExcerpts((room - notice.length).coerceAtLeast(0))
-            if (selected.isEmpty()) return AstraOfflinePolicy.modelPrompt(current, thinkingRequested)
+            if (selected.isEmpty()) {
+                // Preserve the warning even when reserving its space evicts
+                // all historical quotes. The actual current question stays intact.
+                val warningOnly = HISTORY_HEADER + CORRECTION_TAIL_NOTICE + CURRENT_HEADER + current
+                if (warningOnly.length <= MAX_USER_PROMPT)
+                    return AstraOfflinePolicy.modelPrompt(warningOnly, thinkingRequested)
+                return AstraOfflinePolicy.modelPrompt(current, thinkingRequested)
+            }
             val revised = omissionLevel(selected)
             if (revised <= level) break
             level = revised
