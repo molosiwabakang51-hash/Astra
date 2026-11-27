@@ -535,6 +535,32 @@ class AstraConversationContextTest {
         assertTrue("Must exercise complete eviction, not just clipped evidence",fullyEvicted>0)
     }
 
+
+    @Test fun warningOnlyRecoveryRetainsCurrentMessageBoundaryAndThinkingMode() {
+        val history = listOf(
+            turn("user", "The ferry schedule is 9 am."),
+            turn("user", "Actually, make it 11 am."),
+            turn("user", "The museum renovation budget is 900 coins."),
+            turn("user", "Actually, make it 700 coins.")
+        ) + (1..10).map { turn("assistant", "Unrelated weather note $it.") }
+        val question = "Think carefully: use the museum renovation budget and ferry schedule to plan. "
+        var warningOnly = 0
+        for (size in 2700..2780) {
+            val current = question + "z".repeat(size-question.length)
+            val prompt = AstraConversationContext.userPrompt(current,history,true)
+            if (prompt.contains(AstraConversationContext.CORRECTION_TAIL_NOTICE.trim()) &&
+                !prompt.contains("Previous user:") && !prompt.contains("Previous Astra:")) {
+                assertTrue(prompt.startsWith("EARLIER CHAT EXCERPTS"))
+                assertTrue(prompt.contains("\nCURRENT USER MESSAGE (answer this message, not the excerpts):\n"))
+                assertTrue(AstraReasoningMode.enabled(prompt))
+                warningOnly++
+            }
+            assertTrue(prompt.endsWith(current + "\n/think"))
+            assertTrue(prompt.length <= 3010)
+        }
+        assertTrue("Must exercise warning-only recovery",warningOnly>0)
+    }
+
     @Test fun secondaryTopicRetainsLatestCorrectionInsteadOfOnlyWarning() {
         val history = listOf(
             turn("user", "The fictional museum renovation budget is 900 coins."),
