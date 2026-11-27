@@ -71,8 +71,10 @@ class AstraCognitiveReviewTest {
         val right = AstraCognitiveReview.resolve("Verify your answer", pair(q, "NO"))
             as AstraCognitiveReview.Result.Local
         assertTrue(right.answer.contains("correct."))
-        assertTrue(AstraCognitiveReview.resolve("Verify your answer", pair(q, "Maybe YES"))
-            is AstraCognitiveReview.Result.Native)
+        val prose = AstraCognitiveReview.resolve("Verify your answer", pair(q, "Maybe YES"))
+            as AstraCognitiveReview.Result.Local
+        assertTrue(prose.answer.contains("NO."))
+        assertTrue(prose.answer.contains("preceding response was not compared"))
         val inconsistent = AstraCognitiveReview.resolve("Verify your answer", pair(
             "Premises: A; !A. Conclusion: B. Does the conclusion follow?", "YES"))
             as AstraCognitiveReview.Result.Local
@@ -270,6 +272,59 @@ class AstraCognitiveReviewTest {
         assertTrue(result.prompt.contains("For a purely propositional argument only"))
         assertTrue(result.prompt.contains("Never claim the formal check has already run"))
         assertTrue(result.prompt.contains("percent relative to its current amount"))
+    }
+
+
+    @Test fun exactOwnerReferencesSurviveNoncanonicalModelAnswers() {
+        val cases = listOf(
+            Triple("Trace quantity: initial amount is 20 coins; add 5 coins to it. What is the current amount?",
+                "INDEPENDENT QUANTITY CHECK", "result: 25."),
+            Triple("Trace integer assignments: x=2; y=3; x=x+y. What is x?",
+                "INDEPENDENT STATE TRACE", "result: 5."),
+            Triple("Trace conditional counter: x=6; repeat 5 times: if x is even then x=x/2 else x=x*3+1. What is x?",
+                "INDEPENDENT CONDITIONAL CHECK", "result: 8."),
+            Triple("Premises: A -> B; B. Conclusion: A. Does the conclusion follow?",
+                "INDEPENDENT LOGICAL CHECK", "NO."),
+            Triple("Categorical premises: All A are B; Some A are C. Conclusion: Some C are B. Does the conclusion follow?",
+                "INDEPENDENT CATEGORICAL CHECK", "YES."),
+            Triple("All cats are mammals. No mammals are plants. Does it follow that no cats are plants?",
+                "INDEPENDENT CATEGORICAL CHECK", "YES.")
+        )
+        for ((question, label, expected) in cases) {
+            for (response in listOf("Maybe 999. YES and NO.", "The result is 42.", "1,000")) {
+                val actual = AstraCognitiveReview.resolve("Verify your answer", pair(question, response))
+                    as AstraCognitiveReview.Result.Local
+                assertTrue(question, actual.answer.contains(label))
+                assertTrue(question, actual.answer.contains(expected))
+                assertTrue(question, actual.answer.contains("preceding response was not compared"))
+                assertFalse(question, actual.answer.contains("incorrect; corrected result"))
+            }
+        }
+    }
+
+    @Test fun unrelatedQuantityProposalCannotDisplaceOtherOwnerReferences() {
+        val proposal = "Trace quantity: initial amount is 99 coins; add 1 coins to it. What is the current amount?"
+        val cases = listOf(
+            "Trace integer assignments: x=2; y=3; x=x+y. What is x?" to "result: 5.",
+            "Trace conditional counter: x=6; repeat 5 times: if x is even then x=x/2 else x=x*3+1. What is x?" to "result: 8.",
+            "Premises: A -> B; B. Conclusion: A. Does the conclusion follow?" to "NO."
+        )
+        for ((question, expected) in cases) {
+            val actual = AstraCognitiveReview.resolve("Verify your answer", pair(question, proposal))
+                as AstraCognitiveReview.Result.Local
+            assertTrue(question, actual.answer.contains(expected))
+            assertTrue(question, actual.answer.contains("preceding response was not compared"))
+            assertFalse(question, actual.answer.contains("UNCONFIRMED QUANTITY PROPOSAL"))
+            assertFalse(question, actual.answer.contains("computed result: 100"))
+        }
+    }
+
+    @Test fun unsupportedOwnerQuestionsRemainNativeAndExplicitReviewRemainsRequired() {
+        val question = "Trace integer assignments: x=2; x=x/3. What is x?"
+        assertTrue(AstraCognitiveReview.resolve("Verify your answer", pair(question, "Maybe 0.67."))
+            is AstraCognitiveReview.Result.Native)
+        assertEquals(AstraCognitiveReview.Result.NotRequested,
+            AstraCognitiveReview.resolve("Explain the topic further", pair(question, "Maybe 0.67.")))
     }
 
 }
