@@ -246,11 +246,13 @@ internal object AstraCognitiveReview {
         AstraCalculationAssist.auditLinearEquation(original, answer)?.let {
             return Result.Local(it)
         }
+        AstraCalculationAssist.referenceLinearEquation(original)?.let { return referenceOnly(it) }
         // Independently compare exact bounded decimal or fractional answers.
         // No arbitrary-precision exponent or ambiguous prose is interpreted.
         AstraVerifiedArithmetic.audit(original, answer)?.let {
             return Result.Local(it)
         }
+        AstraVerifiedArithmetic.reference(original)?.let { return referenceOnly(it) }
         // Only audit an unambiguous YES/NO answer against the exact
         // owner-supplied formal argument. Never infer missing formal premises.
         val logical = AstraPropositionalVerifier.verify(original)
@@ -283,7 +285,7 @@ internal object AstraCognitiveReview {
             else referenceOnly(namedCategoricalReport(named, null))
         }
         // Only after supported owner-authored trace and logical references,
-        // and the existing scalar arithmetic audits, have had priority
+        // and exact arithmetic/equation references, have had priority
         // may an unrelated model-generated quantity proposal be considered.
         if (answer.startsWith("Trace quantity:", ignoreCase = true)) {
             return quantityProposalReview(answer, null, null)
