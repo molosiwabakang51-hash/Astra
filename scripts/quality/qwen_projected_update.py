@@ -7,8 +7,10 @@ unprojected gradient; the constraint is local, not a global retention guarantee.
 """
 import math
 
-def project(parameters, before, gradients):
+def project(parameters, before, gradients, apply=True):
     import torch
+    if type(apply) is not bool:
+        raise ValueError("Invalid projection mode")
     p=list(parameters)
     if not p or len(p)!=len(before) or len(p)!=len(gradients):
         raise ValueError("Invalid projection operands")
@@ -25,7 +27,7 @@ def project(parameters, before, gradients):
         norm=sum(float(g.double().square().sum()) for g in gradients)
         if not math.isfinite(dot) or not math.isfinite(norm):
             raise ValueError("Invalid projection geometry")
-        coefficient=dot/norm if dot>0 and norm>0 else 0.
+        coefficient=dot/norm if apply and dot>0 and norm>0 else 0.
         candidates=[(b.double()+d-coefficient*g.double()).float()
                     for b,d,g in zip(before,deltas,gradients)]
         if any(not torch.isfinite(t).all().item() for t in candidates):
