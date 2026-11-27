@@ -12,7 +12,7 @@ internal object AstraPropositionalVerifier {
     // Require an entire explicitly structured owner question. Never extract
     // a formula from quoted prose, a document, or a generated model answer.
     private val request = Regex(
-        """^Premises:\s*([A-Z!&|()>\-\s;]+)\.\s*Conclusion:\s*([A-Z!&|()>\-\s]+)\.\s*Does the conclusion follow\?\s*(?:Reply YES or NO only\.)?$"""
+        """^Premises:\s*([A-Z!&|^()<>\-\s;]+)\.\s*Conclusion:\s*([A-Z!&|^()<>\-\s]+)\.\s*Does the conclusion follow\?\s*(?:Reply YES or NO only\.)?$"""
     )
 
     private sealed interface Expr {
@@ -29,6 +29,8 @@ internal object AstraPropositionalVerifier {
             '&' -> left.eval(mask) && right.eval(mask)
             '|' -> left.eval(mask) || right.eval(mask)
             '>' -> !left.eval(mask) || right.eval(mask)
+            '^' -> left.eval(mask) != right.eval(mask)
+            '=' -> left.eval(mask) == right.eval(mask)
             else -> error("Invalid internal operator")
         }
     }
@@ -46,20 +48,31 @@ internal object AstraPropositionalVerifier {
         }
 
         fun parse(): Expr {
-            val expr = implication()
+            val expr = equivalence()
             while (pos < input.length && input[pos].isWhitespace()) pos++
             if (pos != input.length) throw Invalid()
             return expr
         }
 
-        // ! binds strongest, then &, then |, then right-associative ->.
+        // !, &, ^, |, right-associative ->, then <->.
+        // A bare chained biconditional is intentionally rejected: require
+        // parentheses rather than guess an intended reading of equivalence.
+        private fun equivalence(): Expr {
+            val left = implication()
+            return if (consume("<->")) Binary('=', left, implication()) else left
+        }
         private fun implication(): Expr {
             val left = disjunction()
             return if (consume("->")) Binary('>', left, implication()) else left
         }
         private fun disjunction(): Expr {
+            var expr = exclusiveOr()
+            while (consume("|")) expr = Binary('|', expr, exclusiveOr())
+            return expr
+        }
+        private fun exclusiveOr(): Expr {
             var expr = conjunction()
-            while (consume("|")) expr = Binary('|', expr, conjunction())
+            while (consume("^")) expr = Binary('^', expr, conjunction())
             return expr
         }
         private fun conjunction(): Expr {
@@ -70,7 +83,7 @@ internal object AstraPropositionalVerifier {
         private fun atom(): Expr {
             if (consume("!")) return Not(atom())
             if (consume("(")) {
-                val expr = implication()
+                val expr = equivalence()
                 if (!consume(")")) throw Invalid()
                 return expr
             }
