@@ -7,6 +7,7 @@ configuration. Checkpoints are immutable and only represent completed updates.
 import hashlib
 import json
 import math
+import platform
 from pathlib import Path
 
 FORMAT = "ASTRA_CPU_ADAMW_RESUME_V1"
@@ -45,6 +46,24 @@ def contract(named_parameters, optimizer):
         raise ValueError("Explicit foreach=False required for reproducibility")
     settings=json.loads(canonical({k:v for k,v in group.items() if k!="params"}))
     return named,settings
+
+def runtime_contract():
+    import torch
+    return dict(torch_version=str(torch.__version__),machine=platform.machine(),
+        cpu_capability=torch.backends.cpu.get_cpu_capability(),
+        threads=torch.get_num_threads(),interop_threads=torch.get_num_interop_threads(),
+        mkldnn_enabled=torch.backends.mkldnn.enabled,
+        deterministic=torch.are_deterministic_algorithms_enabled())
+
+
+def reject_duplicate_fields(pairs):
+    result={}
+    for key,value in pairs:
+        if key in result:
+            raise ValueError("Duplicate checkpoint field")
+        result[key]=value
+    return result
+
 
 def cursor_check(cursor, losses):
     if (type(cursor) is not int or not 1<=cursor<=MAX_STEPS or
@@ -92,10 +111,12 @@ def save(destination, named_parameters, optimizer, identity, cursor, losses):
     path=stage/"state.safetensors"
     save_file(tensors,str(path))
     manifest=dict(format=FORMAT,status="UNEVALUATED_NEURAL_CHECKPOINT",identity=identity,
-        torch_version=str(torch.__version__),threads=torch.get_num_threads(),
-        optimizer=settings,parameter_names=[name for name,_ in named],
+        runtime=runtime_contract(),optimizer=settings,parameter_names=[name for name,_ in named],
         completed_steps=cursor,losses=losses,state_sha256=digest(path))
-    (stage/"manifest.json").write_text(canonical(manifest)+"\n",encoding="utf-8")
+    encoded=canonical(manifest)+"\n"
+    if len(encoded.encode("utf-8"))>65536 or path.stat().st_size>MAX_BYTES:
+        raise ValueError("Checkpoint exceeds bounded size")
+    (stage/"manifest.json").write_text(encoded,encoding="utf-8")
     stage.rename(dest)
     return manifest
 
@@ -111,12 +132,12 @@ def restore(source, named_parameters, optimizer, expected_identity):
     sf=root/"state.safetensors"
     if not mf.is_file() or not sf.is_file() or mf.stat().st_size>65536 or not 0<sf.stat().st_size<=MAX_BYTES:
         raise ValueError("Missing or oversized checkpoint")
-    m=json.loads(mf.read_text(encoding="utf-8"))
-    fields={"format","status","identity","torch_version","threads","optimizer","parameter_names",
+    m=json.loads(mf.read_text(encoding="utf-8"),object_pairs_hook=reject_duplicate_fields)
+    fields={"format","status","identity","runtime","optimizer","parameter_names",
             "completed_steps","losses","state_sha256"}
     if (set(m)!=fields or m["format"]!=FORMAT or m["status"]!="UNEVALUATED_NEURAL_CHECKPOINT" or
         canonical(m["identity"])!=canonical(expected_identity) or
-        m["torch_version"]!=str(torch.__version__) or m["threads"]!=torch.get_num_threads() or
+        m["runtime"]!=runtime_contract() or
         canonical(m["optimizer"])!=canonical(settings) or
         m["parameter_names"]!=[name for name,_ in named] or m["state_sha256"]!=digest(sf)):
         raise ValueError("Checkpoint identity, runtime, optimizer or digest mismatch")
