@@ -1,4 +1,6 @@
 import json
+import hashlib
+import importlib.util
 import math
 from pathlib import Path
 import re
@@ -89,6 +91,39 @@ class TransferLogitTests(unittest.TestCase):
             (root/"report.json").write_text(json.dumps(report))
             with self.assertRaises(ValueError):
                 evaluator.adapter_manifest(root,hashes)
+
+    @unittest.skipUnless(all(importlib.util.find_spec(m) for m in ("torch","safetensors","numpy")),
+                         "Requires tensor dependencies in dedicated workflow")
+    def test_saved_parameter_digest_detects_actual_tensor_tampering(self):
+        import torch
+        from safetensors.torch import save_file
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp)
+            (root/"adapter").mkdir()
+            state={}
+            for layer in (24,25,26,27):
+                for proj,width in (("q_proj",2048),("v_proj",1024)):
+                    stem=f"base_model.model.model.layers.{layer}.self_attn.{proj}"
+                    state[stem+".lora_A.weight"]=torch.full((8,2048),float(layer))
+                    state[stem+".lora_B.weight"]=torch.zeros((width,8))
+            h=hashlib.sha256()
+            for name,value in sorted(state.items()):
+                h.update(name.replace(".weight",".default.weight").encode())
+                h.update(value.numpy().tobytes())
+            digest=h.hexdigest()
+            sf=root/"adapter"/"adapter_model.safetensors"
+            save_file(state,str(sf))
+            (root/"report.json").write_text(json.dumps({"final_adapter_sha256":digest}))
+            self.assertEqual(evaluator.verify_saved_parameters(root),digest)
+            key=next(iter(state))
+            state[key][0,0]+=1
+            save_file(state,str(sf))
+            with self.assertRaises(ValueError):
+                evaluator.verify_saved_parameters(root)
+            state[key][0,0]=float("nan")
+            save_file(state,str(sf))
+            with self.assertRaises(ValueError):
+                evaluator.verify_saved_parameters(root)
 
 if __name__=="__main__":
     unittest.main()
