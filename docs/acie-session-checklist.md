@@ -694,6 +694,19 @@ Engineering parent status unchanged: 27/119 checked; release acceptance remains 
 All 119 parent rows remain unchanged. Engineering checked: 27/119, 92 outstanding; no independent intelligence rating.
 
 
+
+## Session reconciliation — verified integration and source-anchored extraction (27 November 2026)
+
+- [x] #525 all four workflows passed; merged diagnostic infrastructure at `de9744ee24e12f43ef39683825f7a6c08e70de4b`. Native compact grammar diagnostic 45996598263: direct/grammar both 1/12 strict, syntax 5/12 versus 12/12, incorrect accepted traces 4 versus 10; neither strategy approved for autonomous activation.
+- [x] #526 corrected final-head Android 45997593806 and native calculator 45997593785 passed; merged exact reference recovery at `893960a9e1a10e16ecf2e720ece9d7f6451392c2`. Obsolete #524 closed. Native calculator artifact 15197860672: paired strict direct synthesis 1/8, thinking 7/8; exact rational calculator values 4/4, thinking synthesis 4/4. This does not establish general intelligence.
+- [x] #527 all four CI workflows passed; merged contextual evidence preservation at `b54adfc198fc5d1b396c0799c629af7caeaf4507`. Actual native diagnostic 45997498619, artifact 15196759340: baseline 1/12 versus recovery 2/12; five-step chains 0/4 both, withdrawal 0/4 versus 1/4, controls 1/4 both; elapsed 234402 versus 280372 ms. Preserve the deterministic evidence-recovery fix, not a claim of reliable neural reasoning.
+- [x] #528 source-anchored event-classification candidate: same explicitly segmented scenarios for both arms, model emits chronological labels in the candidate arm, exact operands and units extracted from bounded source spans rather than generated. Reject multiple numeric mentions, detached signs, mismatched label counts and unsupported units. Separate source membership, semantic fidelity and arithmetic checks. Five synthetic test methods and a native comparison workflow; 12 fresh public scenarios, 24 paired calls. Initial source/test/workflow head `2ad4d10306b08064f1bb0ca3e8d99d90edaceb26`.
+- [ ] Verify #528 final-head Python/Android CI and inspect actual native artifact before considering any integration. The protocol uses presegmented clauses and changes instructions and grammar together; it does not measure unrestricted language extraction.
+- [ ] Improve semantic operation classification, calibrated rejection, multi-step synthesis and independent held-out handset assessment. Keep unsuccessful approaches disabled.
+
+All 119 ACIE parent rows preserved. Engineering completion 27/119, formal release acceptance distinct. No independent intelligence score or physical-device acceptance inferred.
+
+
 ## Acceptance
 
 90/100 independent repeated general intelligence score; separate model-only/assisted results; no model substitution, paid API or unsupported capability claims. Freeze protocol before held-out testing. Preserve offline and memory constraints. Recheck any completed engineering item if a later regression invalidates it.
