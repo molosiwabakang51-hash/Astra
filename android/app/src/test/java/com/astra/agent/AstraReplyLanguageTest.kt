@@ -173,10 +173,11 @@ class AstraReplyLanguageTest {
         val history = listOf(AstraConversationContext.Turn("user", "My fictional greenhouse reserve is 900 coins.")) +
             (1..5).map { AstraConversationContext.Turn("user", "Increase it by ${it*11} coins.") } +
             (1..12).map { AstraConversationContext.Turn("assistant", "Unrelated weather note $it.") }
-        val question = "Use the greenhouse reserve to plan. " + "Keep the answer short. ".repeat(90)
+        val question = "Use the greenhouse reserve to plan. " + "Keep the answer short. ".repeat(112)
         val original = AstraConversationContext.userPrompt(question, history, true)
         val result = AstraReplyLanguage.prepare(original, AstraReplyLanguage.Choice.GERMAN)
         assertTrue(original.contains("EARLIER CHAT EXCERPTS"))
+        assertTrue(original.length > 2800)
         assertTrue(result.contains("omitted"))
         assertTrue(result.contains("Do not infer missing premises or corrections") ||
             result.contains("do not infer missing facts"))
