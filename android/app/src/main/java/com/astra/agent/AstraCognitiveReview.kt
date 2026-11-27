@@ -91,7 +91,7 @@ internal object AstraCognitiveReview {
         if (submitted.startsWith("Verify this quantity trace:", ignoreCase = true) ||
             submitted.startsWith("Check this quantity trace:", ignoreCase = true)) {
             val checked = AstraQuantityTraceVerifier.verify(submitted.substringAfter(':').trim())
-                ?: return Result.Local("I could not verify the complete quantity trace. Use: Trace quantity: initial amount is 500 coins; increase it by 20 coins; subtract 5 coins from it. What is the current amount? Use a consistent unit, explicit chronological steps and no more than 24 statements. For changes to rates use percentage points or basis points.")
+                ?: return Result.Local("I could not verify the complete quantity trace. Use: Trace quantity: initial amount is 500 coins; increase it by 20 coins; subtract 5 coins from it. What is the current amount? Use a consistent unit, explicit chronological steps and no more than 24 statements. For additive changes to rates use percentage points or basis points. For relative percentage changes explicitly say: increase it by 10 percent relative to its current amount.")
             return Result.Local(checkNotNull(AstraQuantityTraceVerifier.report(checked)))
         }
         if (submitted.startsWith("Verify this conditional trace:", ignoreCase = true) ||
@@ -173,29 +173,38 @@ internal object AstraCognitiveReview {
             request.matches(original) || AstraInterruptedReply.isIncomplete(answer) ||
             answer.startsWith(HEADER) || answer.startsWith("ASTRA //")
         ) return Result.Local("No complete original answer to audit. Ask the question again.")
+        // Independently recompute owner-supplied evidence even if the model
+        // replaces it with a different or invalid trace. A model proposal
+        // must never displace an explicitly established owner quantity.
+        val ownerQuantity = AstraQuantityTraceVerifier.verify(original)
         // A model may return an explicit trace instead of a scalar. Compute
         // the proposal, but do not let its own representation certify intent.
         // Only exact equality with the immediately preceding owner question
         // can establish that the submitted trace itself was owner supplied.
         if (answer.startsWith("Trace quantity:", ignoreCase = true)) {
             val proposal = AstraQuantityProposalAudit.evaluate(answer, original)
+            val ownerReport = ownerQuantity?.let {
+                "\n\n" + checkNotNull(AstraQuantityTraceVerifier.report(it)) +
+                    "\nThe result above is from your original submitted trace, not the model's proposal."
+            } ?: ""
             when (proposal) {
                 AstraQuantityProposalAudit.Outcome.Invalid ->
-                    return Result.Local("The proposed quantity trace is invalid or unsupported. No independent check was performed.")
+                    return Result.Local("The proposed quantity trace is invalid or unsupported. " +
+                        (if (ownerQuantity == null) "No independent check was performed." else "The proposal was not verified.") +
+                        ownerReport)
                 is AstraQuantityProposalAudit.Outcome.Unconfirmed ->
                     return Result.Local("UNCONFIRMED QUANTITY PROPOSAL — computed result: " +
                         proposal.computed + "; unit: " + proposal.unit + ". " +
                         "Arithmetic only: the interpretation of your question is not independently verified. " +
-                        "Review every statement and submit the full corrected trace with Verify this quantity trace: to confirm it.")
-                is AstraQuantityProposalAudit.Outcome.Confirmed -> {
-                    val checked = checkNotNull(AstraQuantityTraceVerifier.verify(answer))
-                    return Result.Local(checkNotNull(AstraQuantityTraceVerifier.report(checked)))
-                }
+                        "Review every statement and submit the full corrected trace with Verify this quantity trace: to confirm it." +
+                        ownerReport)
+                is AstraQuantityProposalAudit.Outcome.Confirmed ->
+                    return Result.Local(checkNotNull(AstraQuantityTraceVerifier.report(checkNotNull(ownerQuantity))))
             }
         }
         // Independently recompute a complete, owner-supplied quantity trace.
         // Never infer the trace from unrelated conversation history.
-        AstraQuantityTraceVerifier.verify(original)?.let { checked ->
+        ownerQuantity?.let { checked ->
             AstraQuantityTraceVerifier.report(checked, answer)?.let { return Result.Local(it) }
         }
         // Verify an explicit complete recurrence only on an explicit audit.
@@ -282,6 +291,7 @@ internal object AstraCognitiveReview {
         val quantityGuidance = "For a single chronological quantity, you may propose an unverified " +
             "Trace quantity: initial amount is NUMBER UNIT; add NUMBER UNIT to it. What is the current amount? " +
             "Use only the actual values and units in the question, preserve chronology, and do not guess missing referents. " +
+            "Distinguish absolute replacement, additive changes, and percent relative to its current amount. " +
             "The owner can submit the checked trace with Verify this quantity trace:. Do not claim it has been verified.\n"
         val boundary = basePrompt.indexOf("ORIGINAL QUESTION:")
         val prompt = if (boundary >= 0 && basePrompt.length + quantityGuidance.length <= 2_700)
