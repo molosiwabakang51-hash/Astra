@@ -122,6 +122,15 @@ internal object AstraCognitiveReview {
 
     fun resolve(raw: String, history: List<AstraChatArchive.Message>): Result {
         val submitted = raw.trim()
+        if (submitted.startsWith("Verify this causal model:", ignoreCase = true) ||
+            submitted.startsWith("Check this causal model:", ignoreCase = true)) {
+            val checked = AstraCausalVerifier.verify(submitted.substringAfter(':').trim())
+                ?: return Result.Local("I could not verify the complete causal model. Use: " +
+                    "Causal model: inputs A,B; rules C=XOR(A,B); D=AND(C,B); observe C=1,B=1; force B=0. Is D ON? " +
+                    "Declare inputs first and rules in dependency order; use none for empty rules, observations or interventions. " +
+                    "Supported rules: AND, OR, XOR, NOT, COPY. No independent check was performed.")
+            return Result.Local(checkNotNull(AstraCausalVerifier.report(checked)))
+        }
         if (submitted.startsWith("Verify this quantity trace:", ignoreCase = true) ||
             submitted.startsWith("Check this quantity trace:", ignoreCase = true)) {
             val checked = AstraQuantityTraceVerifier.verify(submitted.substringAfter(':').trim())
@@ -207,6 +216,11 @@ internal object AstraCognitiveReview {
             request.matches(original) || AstraInterruptedReply.isIncomplete(answer) ||
             answer.startsWith(HEADER) || answer.startsWith("ASTRA //")
         ) return Result.Local("No complete original answer to audit. Ask the question again.")
+        // Verify only the original owner-authored causal model, not a model proposal.
+        AstraCausalVerifier.verify(original)?.let { checked ->
+            AstraCausalVerifier.report(checked, answer)?.let { return Result.Local(it) }
+            return referenceOnly(checkNotNull(AstraCausalVerifier.report(checked)))
+        }
         // Independently recompute owner-supplied evidence even if the model
         // replaces it with a different or invalid trace. A model proposal
         // must never displace an explicitly established owner quantity.
