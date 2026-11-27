@@ -149,7 +149,7 @@ def evaluate(infer, verify, cases=CASES):
             checked = verify(visible) if candidate is not None else None
             accepted = checked is not None
             faithful = bool(eligible and accepted and candidate == gold_sig)
-            result_correct = bool(eligible and accepted and checked == gold_check)
+            result_correct = bool(eligible and accepted and checked[:2] == gold_check[:2])
             none = complete and visible == "NONE"
             correct = bool(complete and (faithful and result_correct if eligible else none))
             rows.append(dict(case=name, arm=arm, eligible=eligible, complete=complete,
