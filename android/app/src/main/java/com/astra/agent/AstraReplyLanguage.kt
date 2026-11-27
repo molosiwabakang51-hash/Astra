@@ -91,15 +91,30 @@ internal object AstraReplyLanguage {
                 val current = modelPrompt.substring(boundary + CURRENT_HEADER.length)
                 val currentSection = CURRENT_HEADER + current
                 val room = budget - HISTORY_HEADER.length - currentSection.length
+                val history = modelPrompt.substring(HISTORY_HEADER.length, boundary)
+                val candidates = history.lineSequence().filter {
+                    (it.startsWith("Previous user: \"") ||
+                        it.startsWith("Previous Astra: \"")) && it.endsWith("\"")
+                }.toList()
+                // Existing omission notices are trusted only as exact
+                // context-builder lines, never when embedded in a quote.
+                val existingNotice = history.lineSequence().firstOrNull {
+                    it == AstraConversationContext.CORRECTION_TAIL_NOTICE.trimEnd('\n')
+                } ?: history.lineSequence().firstOrNull {
+                    it == AstraConversationContext.CORRECTION_GAP_NOTICE.trimEnd('\n')
+                }
+                val existing = existingNotice?.let { "$it\n" }.orEmpty()
                 if (room >= 35) {
-                    val history = modelPrompt.substring(HISTORY_HEADER.length, boundary)
-                    val candidates = history.lineSequence().filter {
-                        (it.startsWith("Previous user: \"") ||
-                            it.startsWith("Previous Astra: \"")) &&
-                            it.endsWith("\"")
-                    }.toList()
+                    val completeHistory = candidates.joinToString("") { "$it\n" }
+                    if (completeHistory.isNotEmpty() && existing.length + completeHistory.length <= room) {
+                        return directive + HISTORY_HEADER + existing + completeHistory + currentSection
+                    }
+                    // Once a second-stage filter removes evidence, its
+                    // dependencies are no longer known. Preserve the stronger
+                    // original tail warning and explicitly mark new loss.
+                    val notice = existing + LANGUAGE_HISTORY_OMISSION
                     val chosen = mutableListOf<String>()
-                    var space = room
+                    var space = room - notice.length
                     for (line in candidates.asReversed()) {
                         val complete = line + "\n"
                         if (complete.length <= space) {
@@ -108,17 +123,30 @@ internal object AstraReplyLanguage {
                         }
                     }
                     if (chosen.isNotEmpty()) {
-                        val composed = directive + HISTORY_HEADER +
+                        val composed = directive + HISTORY_HEADER + notice +
                             chosen.asReversed().joinToString("") + currentSection
                         check(composed.length <= MAX_PROMPT)
                         return composed
                     }
+                    // No history is safer than a misleading partial history.
+                    // Keep the omission notice even if every quote was evicted.
+                    if (notice.length <= room) {
+                        return directive + HISTORY_HEADER + notice + currentSection
+                    }
                 }
                 // If even the current request is long, exclude previous
                 // chat entirely while retaining its explicit boundary.
-                if (currentSection.length <= budget) return directive + currentSection
-                return directive + CURRENT_HEADER + boundedHeadTail(
-                    current, budget - CURRENT_HEADER.length
+                val notice = existing + LANGUAGE_HISTORY_OMISSION
+                if (notice.length + currentSection.length <= budget)
+                    return directive + notice + currentSection
+                // Keep the complete current request whenever possible. If
+                // there is no room for a full warning, reserve a short one
+                // and bound the question only as the final fallback.
+                val shortNotice = "[Earlier chat omitted; do not infer missing facts.]\n"
+                if (shortNotice.length + currentSection.length <= budget)
+                    return directive + shortNotice + currentSection
+                return directive + shortNotice + CURRENT_HEADER + boundedHeadTail(
+                    current, budget - shortNotice.length - CURRENT_HEADER.length
                 )
             }
         }
@@ -127,6 +155,9 @@ internal object AstraReplyLanguage {
         // any missing middle explicitly. Keep Qwen's trailing /no_think.
         return directive + boundedHeadTail(modelPrompt, budget)
     }
+
+    private const val LANGUAGE_HISTORY_OMISSION =
+        "[Some earlier chat evidence was omitted for the selected language. Do not infer missing premises or corrections.]\n"
 
     private const val OMITTED_MIDDLE =
         "\n[Middle of source omitted to fit selected reply language.]\n"
