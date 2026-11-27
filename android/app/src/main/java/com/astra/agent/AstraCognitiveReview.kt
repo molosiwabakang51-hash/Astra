@@ -280,9 +280,9 @@ internal object AstraCognitiveReview {
         // Include the optional quantity formalization guidance only when the
         // complete exchange still fits; never reduce or truncate owner evidence.
         val quantityGuidance = "For a single chronological quantity, you may propose an unverified " +
-            "Trace quantity: initial amount is 10 coins; add 5 coins to it. What is the current amount? " +
-            "Preserve the exact units, order and withdrawals; do not guess missing referents. " +
-            "Invite the owner to submit the checked trace with Verify this quantity trace:.\n"
+            "Trace quantity: initial amount is NUMBER UNIT; add NUMBER UNIT to it. What is the current amount? " +
+            "Use only the actual values and units in the question, preserve chronology, and do not guess missing referents. " +
+            "The owner can submit the checked trace with Verify this quantity trace:. Do not claim it has been verified.\n"
         val boundary = basePrompt.indexOf("ORIGINAL QUESTION:")
         val prompt = if (boundary >= 0 && basePrompt.length + quantityGuidance.length <= 2_700)
             basePrompt.substring(0, boundary) + quantityGuidance + basePrompt.substring(boundary)
