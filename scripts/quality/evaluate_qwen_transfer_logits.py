@@ -47,8 +47,37 @@ def adapter_manifest(root, weights):
         raise ValueError("Unverified or incompatible adapter pilot")
     return sha(adapter)
 
-def run(out, pilot=None):
+def verify_saved_parameters(pilot):
+    """Recompute the pilot's actual final parameter digest from exported tensors."""
     import torch
+    from safetensors.torch import load_file
+    report=json.loads((pilot/"report.json").read_text())
+    data=load_file(str(pilot/"adapter"/"adapter_model.safetensors"),device="cpu")
+    expected={}
+    for layer in (24,25,26,27):
+        for projection,width in (("q_proj",2048),("v_proj",1024)):
+            stem=f"base_model.model.model.layers.{layer}.self_attn.{projection}"
+            expected[stem+".lora_A.weight"]=(8,2048)
+            expected[stem+".lora_B.weight"]=(width,8)
+    if set(data)!=set(expected):
+        raise ValueError("Unexpected saved adapter tensors")
+    h=hashlib.sha256()
+    for name,tensor in sorted(data.items()):
+        if tuple(tensor.shape)!=expected[name] or tensor.dtype!=torch.float32 or not torch.isfinite(tensor).all().item():
+            raise ValueError("Unexpected adapter tensor shape, dtype or value")
+        # Pilot digests the live PEFT default-adapter parameter names.
+        h.update(name.removesuffix(".weight").encode()+b".default.weight")
+        h.update(tensor.contiguous().numpy().tobytes())
+    digest=h.hexdigest()
+    if digest!=report.get("final_adapter_sha256"):
+        raise ValueError("Saved adapter parameters do not match pilot report")
+    return digest
+
+
+def run(out, pilot=None, dtype="bfloat16"):
+    import torch
+    if dtype not in ("float32","bfloat16"):
+        raise ValueError("Unsupported precision")
     from huggingface_hub import snapshot_download
     from transformers import AutoTokenizer,AutoModelForCausalLM
     torch.manual_seed(91502047)
@@ -62,8 +91,9 @@ def run(out, pilot=None):
         raise RuntimeError("Unexpected weight shard count")
     hashes={p.name:sha(p) for p in shards}
     adapter_hash=adapter_manifest(pilot,hashes) if pilot is not None else None
+    parameter_hash=verify_saved_parameters(pilot) if pilot is not None else None
     tokenizer=AutoTokenizer.from_pretrained(root,trust_remote_code=False,local_files_only=True)
-    model=AutoModelForCausalLM.from_pretrained(root,torch_dtype=torch.bfloat16,
+    model=AutoModelForCausalLM.from_pretrained(root,torch_dtype=getattr(torch,dtype),
         trust_remote_code=False,local_files_only=True,low_cpu_mem_usage=True,attn_implementation="sdpa")
     if model.config.model_type!="qwen3" or model.config.num_hidden_layers!=28 or model.config.hidden_size!=2048:
         raise RuntimeError("Unexpected model architecture")
@@ -94,10 +124,10 @@ def run(out, pilot=None):
         return rows
     baseline=evaluate(model)
     report=dict(status="COMPLETE_NEURAL_TRANSFER_LOGITS",model=MODEL,revision=REVISION,
-        base_weight_sha256=hashes,suite_sha256=suite_digest(suite),label_token_ids=ids,
-        baseline=baseline,baseline_summary=summarize(baseline),adapter_sha256=adapter_hash,
+        base_weight_sha256=hashes,inference_dtype=dtype,suite_sha256=suite_digest(suite),label_token_ids=ids,
+        baseline=baseline,baseline_summary=summarize(baseline),adapter_sha256=adapter_hash,adapter_parameter_sha256=parameter_hash,
         adapted=None,adapted_summary=None,paired=None,official_ai_rating=None,
-        scope="Public 24-case recognition-only diagnostic. Four-option conditional probabilities, not free-generation accuracy or calibrated real-world confidence. BF16 CPU, no tools, not independent or production GGUF assessment.")
+        scope="Public 24-case recognition-only diagnostic. Four-option conditional probabilities, not free-generation accuracy or calibrated real-world confidence. CPU, no tools, not independent or production GGUF assessment.")
     if pilot is not None:
         from peft import PeftModel
         adapted=PeftModel.from_pretrained(model,pilot/"adapter",is_trainable=False)
@@ -117,5 +147,6 @@ if __name__=="__main__":
     p=argparse.ArgumentParser(description=__doc__)
     p.add_argument("output",type=Path)
     p.add_argument("--pilot",type=Path)
+    p.add_argument("--dtype",choices=("float32","bfloat16"),default="bfloat16")
     args=p.parse_args()
-    run(args.output,args.pilot)
+    run(args.output,args.pilot,args.dtype)
