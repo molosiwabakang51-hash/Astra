@@ -3,6 +3,7 @@ import argparse
 import hashlib
 import hmac
 import json
+import math
 import re
 from pathlib import Path
 
@@ -60,7 +61,7 @@ def freeze_matches(record, manifest, expected_digest):
     planned = manifest["runs"]
     if not isinstance(planned, list) or len(planned) != 4:
         return False
-    indexed, seen_variants = {}, set()
+    indexed, seen_variants, seen_rubrics = {}, set(), set()
     for run in planned:
         if not isinstance(run, dict) or set(run) != {"form", "track", "cases"}:
             return False
@@ -79,9 +80,11 @@ def freeze_matches(record, manifest, expected_digest):
             ident, dim, digest = case["variant_id"], case["dimension"], case["rubric_sha256"]
             if (not isinstance(ident, str) or not OPAQUE.fullmatch(ident)
                     or ident in seen_variants or not isinstance(dim, str) or dim not in DIMENSIONS
-                    or not isinstance(digest, str) or not HEX.fullmatch(digest)):
+                    or not isinstance(digest, str) or not HEX.fullmatch(digest)
+                    or digest in seen_rubrics):
                 return False
             seen_variants.add(ident)
+            seen_rubrics.add(digest)
             by_id[ident] = (dim, digest)
         indexed[key] = by_id
     for run in record["runs"]:
@@ -213,6 +216,36 @@ def evaluate(record, manifest=None, expected_freeze_sha256=None):
             "note": "Attestations only. Commitment match does not prove pre-run timing, device behavior, independence, rubric quality or outcomes."}
 
 
+
+def read_private_json(path):
+    """Reject ambiguous duplicate keys and nonfinite numbers at the file boundary."""
+    def unique_object(pairs):
+        obj = {}
+        for key, value in pairs:
+            if key in obj:
+                raise ValueError("Duplicate JSON key")
+            obj[key] = value
+        return obj
+
+    def reject_constant(_):
+        raise ValueError("Nonfinite JSON constant")
+
+    def finite_float(token):
+        value = float(token)
+        if not math.isfinite(value):
+            raise ValueError("Nonfinite JSON number")
+        return value
+
+    # The protocol uses compact metadata only, not transcripts or raw answers.
+    # Bound input before parsing, without logging private contents.
+    with path.open("rb") as stream:
+        raw = stream.read(4 * 1024 * 1024 + 1)
+    if len(raw) > 4 * 1024 * 1024:
+        raise ValueError("Private record exceeds metadata limit")
+    return json.loads(raw.decode("utf-8"), object_pairs_hook=unique_object,
+                      parse_constant=reject_constant, parse_float=finite_float)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("record", type=Path)
@@ -220,8 +253,8 @@ def main():
     parser.add_argument("--expected-freeze-sha256")
     args = parser.parse_args()
     try:
-        manifest = json.loads(args.freeze_manifest.read_text(encoding="utf-8")) if args.freeze_manifest else None
-        result = evaluate(json.loads(args.record.read_text(encoding="utf-8")), manifest, args.expected_freeze_sha256)
+        manifest = read_private_json(args.freeze_manifest) if args.freeze_manifest else None
+        result = evaluate(read_private_json(args.record), manifest, args.expected_freeze_sha256)
     except (OSError, ValueError, RecursionError):
         result = incomplete("unreadable review record")
     print(json.dumps(result, indent=2))

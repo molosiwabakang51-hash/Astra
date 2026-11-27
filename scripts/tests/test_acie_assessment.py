@@ -1,5 +1,7 @@
 """Synthetic validation tests, not actual intelligence measurements."""
+import hashlib
 import importlib.util
+import tempfile
 from pathlib import Path
 import unittest
 
@@ -130,7 +132,7 @@ class ACIEAssessmentTest(unittest.TestCase):
         for run in r["runs"]:
             planned = dict(form=run["form"], track=run["track"], cases=[])
             for case in run["cases"]:
-                case["rubric_sha256"] = "d"*64
+                case["rubric_sha256"] = hashlib.sha256(case["variant_id"].encode()).hexdigest()
                 planned["cases"].append({k: case[k] for k in
                     ("variant_id", "dimension", "rubric_sha256")})
             manifest["runs"].append(planned)
@@ -159,7 +161,7 @@ class ACIEAssessmentTest(unittest.TestCase):
         for run in r["runs"]:
             planned = dict(form=run["form"], track=run["track"], cases=[])
             for case in run["cases"]:
-                case["rubric_sha256"] = "d"*64
+                case["rubric_sha256"] = hashlib.sha256(case["variant_id"].encode()).hexdigest()
                 planned["cases"].append({k: case[k] for k in
                     ("variant_id", "dimension", "rubric_sha256")})
             manifest["runs"].append(planned)
@@ -169,6 +171,52 @@ class ACIEAssessmentTest(unittest.TestCase):
         del case["private_prompt"]
         case["variant_id"] = manifest["runs"][1]["cases"][0]["variant_id"]
         self.assertEqual(gate.evaluate(r, manifest, gate.manifest_digest(manifest))["status"], "INCOMPLETE")
+
+
+    def test_distinct_ids_cannot_hide_reused_private_rubric(self):
+        r = record()
+        manifest = dict(protocol="ACIE-v1-freeze",
+                        configuration=dict(r["runs"][0]["configuration"]), runs=[])
+        for run in r["runs"]:
+            planned = dict(form=run["form"], track=run["track"], cases=[])
+            for case in run["cases"]:
+                case["rubric_sha256"] = hashlib.sha256(case["variant_id"].encode()).hexdigest()
+                planned["cases"].append({k: case[k] for k in
+                    ("variant_id", "dimension", "rubric_sha256")})
+            manifest["runs"].append(planned)
+        self.assertTrue(gate.evaluate(r, manifest, gate.manifest_digest(manifest))
+                        ["acceptance_record_eligible"])
+        # Even a self-consistent new commitment cannot disguise exact rubric
+        # reuse under different IDs, whether within a form or across tracks.
+        for run_idx, case_idx in ((0, 1), (1, 0), (3, 199)):
+            actual = r["runs"][run_idx]["cases"][case_idx]
+            planned = manifest["runs"][run_idx]["cases"][case_idx]
+            old = actual["rubric_sha256"]
+            actual["rubric_sha256"] = planned["rubric_sha256"] = r["runs"][0]["cases"][0]["rubric_sha256"]
+            self.assertEqual(gate.evaluate(r, manifest, gate.manifest_digest(manifest))["status"],
+                             "INCOMPLETE")
+            actual["rubric_sha256"] = planned["rubric_sha256"] = old
+        self.assertTrue(gate.evaluate(r, manifest, gate.manifest_digest(manifest))
+                        ["acceptance_record_eligible"])
+
+    def test_private_json_rejects_duplicate_keys_constants_and_oversize(self):
+        with tempfile.TemporaryDirectory() as directory:
+            p = Path(directory) / "record.json"
+            p.write_text('{"protocol":"ACIE-v1","runs":[]}', encoding="utf-8")
+            self.assertEqual(gate.read_private_json(p), {"protocol":"ACIE-v1","runs":[]})
+            for invalid in ('{"protocol":"x","protocol":"ACIE-v1"}',
+                            '{"runs":[{"credits":0,"credits":2}]}',
+                            '{"a":NaN}', '{"a":Infinity}', '{"a":-Infinity}',
+                            '{"a":1e999}', '{"a":-1e999}'):
+                p.write_text(invalid, encoding="utf-8")
+                with self.assertRaises(ValueError):
+                    gate.read_private_json(p)
+            p.write_bytes(b" " * (4 * 1024 * 1024 + 1))
+            with self.assertRaises(ValueError):
+                gate.read_private_json(p)
+            p.write_bytes(b"\xff")
+            with self.assertRaises(ValueError):
+                gate.read_private_json(p)
 
 
 if __name__ == "__main__":
