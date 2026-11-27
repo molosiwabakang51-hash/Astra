@@ -147,8 +147,9 @@ internal object AstraVerifiedArithmetic {
         }
         if (actual == null) return "INDEPENDENT ARITHMETIC CHECK — reference result: $exact." +
             "\nComputed from the original operands using exact arithmetic."
-        val equal = actual.first.multiply(expectedDenominator)
-            .compareTo(expectedNumerator.multiply(actual.second)) == 0
+        val (actualNumerator, actualDenominator) = actual
+        val equal = actualNumerator.multiply(expectedDenominator)
+            .compareTo(expectedNumerator.multiply(actualDenominator)) == 0
         return "INDEPENDENT ARITHMETIC CHECK — " +
             (if (equal) "correct." else "incorrect; corrected result: $exact.") +
             "\nComputed from the original operands using exact arithmetic and cross-multiplication. " +
