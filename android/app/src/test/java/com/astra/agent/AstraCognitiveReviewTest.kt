@@ -213,4 +213,30 @@ class AstraCognitiveReviewTest {
             AstraCognitiveReview.resolve("Translate verify your answer into French", history))
     }
 
+
+    @Test fun nativeQuantityGuidanceUsesActualValuesAndPreservesEvidence() {
+        val review = AstraCognitiveReview.resolve("Verify your answer", pair(
+            "I received 47 coins, then spent 13. What remains?", "32"))
+            as AstraCognitiveReview.Result.Native
+        assertTrue(review.prompt.contains("unverified Trace quantity:"))
+        assertTrue(review.prompt.contains("Use only the actual values and units"))
+        assertTrue(review.prompt.contains("Do not claim it has been verified"))
+        assertTrue(review.prompt.contains("I received 47 coins, then spent 13. What remains?"))
+        assertTrue(review.prompt.contains("PREVIOUS ANSWER: \"32\""))
+        assertTrue(review.prompt.length <= 2700)
+    }
+
+    @Test fun optionalQuantityGuidanceNeverDisplacesCompleteExchange() {
+        val shortQuestion = "Why does this claim hold?"
+        val answer = "Evidence: " + "abc".repeat(350)
+        val result = AstraCognitiveReview.resolve("Verify your answer", pair(shortQuestion, answer))
+        if (result is AstraCognitiveReview.Result.Native) {
+            assertTrue(result.prompt.contains(answer))
+            assertTrue(result.prompt.length <= 2700)
+        } else {
+            assertTrue(result is AstraCognitiveReview.Result.Local)
+            assertTrue((result as AstraCognitiveReview.Result.Local).answer.contains("budget"))
+        }
+    }
+
 }
