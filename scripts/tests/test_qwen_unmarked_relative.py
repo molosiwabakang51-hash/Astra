@@ -82,3 +82,14 @@ class UnmarkedRelativeTests(unittest.TestCase):
         self.assertEqual(report["totals"]["recovery"]["complete"],12)
         self.assertIsNone(report["official_ai_rating"])
         self.assertNotIn("harbour repair reserve",str(report))
+
+    def test_preflight_rejects_empty_duplicate_and_ambiguous_inputs(self):
+        suite = probe.cases(19)
+        good = self.builders(suite)
+        for invalid in ([], [suite[0], suite[0]]):
+            with self.assertRaises(ValueError):
+                probe.prepare(19, good, invalid)
+        for bad in (lambda q,h: None,
+                    lambda q,h: probe.BOUNDARY + good["recovery"](q,h)):
+            with self.assertRaises(RuntimeError):
+                probe.prepare(19, {"baseline": good["baseline"], "recovery": bad}, suite)
