@@ -48,9 +48,49 @@ def paired_report(before,after):
             "regressed":sum(before[k]["correct"] and not after[k]["correct"] for k in before),
             "both_correct":sum(before[k]["correct"] and after[k]["correct"] for k in before)}
 
-def run(out, steps=32):
+def assistant_loss(model, ids, labels, prefix):
+    """Project only positions predicting assistant tokens; same shifted CE."""
+    import torch
+    import torch.nn.functional as F
+    n=len(ids)-len(prefix)
+    if n<1 or not prefix or ids[:len(prefix)]!=prefix or labels!=[-100]*len(prefix)+ids[len(prefix):]:
+        raise ValueError("Invalid assistant-only training example")
+    x=torch.tensor([ids],dtype=torch.long)
+    result=model(input_ids=x,attention_mask=torch.ones_like(x),use_cache=False,
+                 logits_to_keep=n+1)
+    logits=result.logits
+    if logits.shape[:2]!=(1,n+1):
+        raise RuntimeError("Unexpected suffix projection shape")
+    targets=torch.tensor(ids[len(prefix):],dtype=torch.long)
+    return F.cross_entropy(logits[0,:-1].float(),targets)
+
+
+def save_partial(model, out, step, initial_hash, current_hash, losses, dtype, base_hashes):
+    """Immutable, atomic adapter-only snapshot; not a resumable optimizer or approved model."""
+    partial=out/"partial"
+    partial.mkdir(exist_ok=True)
+    destination=partial/f"step-{step:03d}"
+    staging=partial/f".step-{step:03d}.tmp"
+    if destination.exists() or staging.exists():
+        raise RuntimeError("Checkpoint path already exists")
+    model.save_pretrained(staging,safe_serialization=True)
+    tensor=staging/"adapter_model.safetensors"
+    if not tensor.is_file() or not 0<tensor.stat().st_size<=16*1024*1024:
+        raise RuntimeError("Invalid adapter checkpoint")
+    manifest=dict(status="PARTIAL_NEURAL_ADAPTATION_NOT_EVALUATED",model=MODEL,revision=REVISION,
+        training_dtype=dtype,base_weight_sha256=base_hashes,completed_steps=step,
+        initial_adapter_sha256=initial_hash,current_adapter_sha256=current_hash,
+        adapter_file_sha256=file_digest(tensor),losses=list(losses),official_ai_rating=None,
+        scope="Adapter weights only. Not a completed or resumable training run; no deployment approval.")
+    (staging/"checkpoint.json").write_text(json.dumps(manifest,indent=2,allow_nan=False)+"\n")
+    staging.rename(destination)
+
+
+def run(out, steps=4, dtype="float32"):
     if type(steps) is not int or not 4<=steps<=64 or steps%4:
         raise ValueError("Use 4..64 balanced steps divisible by four")
+    if dtype not in ("float32","bfloat16"):
+        raise ValueError("Unsupported CPU dtype")
     # Keep dependency imports out of lightweight evaluator tests.
     import torch
     import transformers
@@ -76,7 +116,7 @@ def run(out, steps=32):
         raise RuntimeError("Expected pinned two-shard model")
     weight_hashes={p.name:file_digest(p) for p in weights}
     tokenizer=AutoTokenizer.from_pretrained(snapshot,trust_remote_code=False,local_files_only=True)
-    base=AutoModelForCausalLM.from_pretrained(snapshot,torch_dtype=torch.bfloat16,
+    base=AutoModelForCausalLM.from_pretrained(snapshot,torch_dtype=getattr(torch,dtype),
         trust_remote_code=False,local_files_only=True,low_cpu_mem_usage=True,attn_implementation="sdpa")
     if (base.config.model_type!="qwen3" or base.config.num_hidden_layers!=28 or
             base.config.hidden_size!=2048 or tokenizer.eos_token_id!=151645):
@@ -123,6 +163,7 @@ def run(out, steps=32):
         return rows
 
     # Compare the exact same base instance with adapter disabled/enabled.
+    print("Evaluating disabled-adapter baseline",flush=True)
     with model.disable_adapter():
         before=evaluate()
     initial=parameter_digest()
@@ -131,12 +172,10 @@ def run(out, steps=32):
     losses=[]
     model.train()
     start=time.monotonic()
-    for step,(ids,labels,_) in enumerate(encoded):
+    for step,(ids,labels,prefix) in enumerate(encoded):
+        step_start=time.monotonic()
         optimizer.zero_grad(set_to_none=True)
-        x=torch.tensor([ids],dtype=torch.long)
-        y=torch.tensor([labels],dtype=torch.long)
-        result=model(input_ids=x,attention_mask=torch.ones_like(x),labels=y,use_cache=False)
-        loss=result.loss
+        loss=assistant_loss(model,ids,labels,prefix)
         if not torch.isfinite(loss).item():
             raise RuntimeError("Nonfinite training loss")
         loss.backward()
@@ -145,17 +184,21 @@ def run(out, steps=32):
             raise RuntimeError("Nonfinite adapter gradient")
         optimizer.step()
         losses.append(float(loss.detach()))
-        del result,loss
+        del loss
         if any(not torch.isfinite(p).all().item() for _,p in params):
             raise RuntimeError("Nonfinite adapter weights")
-        print(f"adapter step {step+1}/{len(encoded)} completed",flush=True)
+        current=parameter_digest()
+        save_partial(model,out,step+1,initial,current,losses,dtype,weight_hashes)
+        print(f"adapter step {step+1}/{len(encoded)} checkpointed in {time.monotonic()-step_start:.2f}s",flush=True)
     train_ms=round((time.monotonic()-start)*1000)
     final=parameter_digest()
     if initial==final:
         raise RuntimeError("No neural parameter update")
+    print("Evaluating adapted model",flush=True)
     after=evaluate()
     # Verify frozen baseline reproducibility after training, not just
     # requires_grad flags. Any output change fails the experiment closed.
+    print("Repeating disabled-adapter baseline",flush=True)
     with model.disable_adapter():
         repeated=evaluate()
     if any(before[k]["output_sha256"]!=repeated[k]["output_sha256"] or
@@ -164,12 +207,12 @@ def run(out, steps=32):
     model.save_pretrained(out/"adapter",safe_serialization=True)
     report={"status":"COMPLETE_NEURAL_ADAPTATION_PILOT","model":MODEL,"revision":REVISION,
         "base_weight_sha256":weight_hashes,"train_sha256":digest(train),"development_sha256":digest(dev),
-        "train_examples":len(train),"train_steps":len(losses),"losses":losses,"training_ms":train_ms,
+        "training_dtype":dtype,"train_examples":len(train),"train_steps":len(losses),"losses":losses,"training_ms":train_ms,
         "trainable_parameters":param_count,"target_layers":LAYERS,"rank":8,"seed":SEED,
         "initial_adapter_sha256":initial,"final_adapter_sha256":final,"frozen_baseline_reproduced":True,
         "versions":{"torch":torch.__version__,"transformers":transformers.__version__,"peft":peft.__version__},
         "paired":paired_report(before,after),"baseline":before,"adapted":after,"official_ai_rating":None,
-        "scope":"Public synthetic developmental transfer, BF16 CPU, last four attention layers only. "
+        "scope":"Public synthetic developmental transfer, CPU, last four attention layers only. "
                 "Not an independent score, production GGUF test or proof of broad intelligence. "
                 "Final-answer grading does not certify the rationale."}
     (out/"report.json").write_text(json.dumps(report,indent=2,allow_nan=False)+"\n",encoding="utf-8")
@@ -178,6 +221,7 @@ def run(out, steps=32):
 if __name__=="__main__":
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument("output",type=Path)
-    parser.add_argument("--steps",type=int,default=32)
+    parser.add_argument("--steps",type=int,default=4)
+    parser.add_argument("--dtype",choices=("float32","bfloat16"),default="float32")
     args=parser.parse_args()
-    run(args.output,args.steps)
+    run(args.output,args.steps,args.dtype)
