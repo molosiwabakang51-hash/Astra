@@ -157,10 +157,18 @@ internal object AstraConversationContext {
                 correctionChains[anchor.index] = (chain.steps.map { it.index } + anchor.index).toSet()
                 if (chain.continuesBeyondScan) boundedChains.add(anchor.index)
             }
-            return chain.steps.takeLast(3)
+            // Relative adjustments and explicit withdrawals depend on earlier
+            // states. Keep eligible chains available to the existing global
+            // excerpt and turn budgets rather than dropping intermediate
+            // evidence even when there is room. Other correction chains keep
+            // their established last-three policy.
+            return if (chain.steps.any { isQuantityDependency(it.value.content) })
+                chain.steps else chain.steps.takeLast(3)
         }
+        fun prioritizeChain(anchor: IndexedValue<Turn>, steps: List<IndexedValue<Turn>>): List<IndexedValue<Turn>> =
+            steps.takeLast(3).asReversed() + anchor + steps.dropLast(minOf(3, steps.size)).asReversed()
         val retrieved = if (ownerRecall) ranked.flatMap { anchor ->
-            retainedCorrections(anchor).asReversed() + anchor
+            prioritizeChain(anchor, retainedCorrections(anchor))
         } else ranked
         // Questions about what the owner said must never treat an earlier
         // Astra answer as owner testimony, even when keyword matching finds
@@ -175,7 +183,7 @@ internal object AstraConversationContext {
                 // Retain topic-free corrections such as "Actually, make it
                 // three" beside the matched owner statement, in time order
                 // when serializing the selected excerpts.
-                retainedCorrections(anchor).asReversed() + anchor
+                prioritizeChain(anchor, retainedCorrections(anchor))
             }
         // Ordinary reasoning questions also depend on corrected premises,
         // not just explicit requests to recall a memory. Reserve a bounded
@@ -219,7 +227,7 @@ internal object AstraConversationContext {
         } else null
         val secondaryCorrections = secondaryAnchor?.let { retainedCorrections(it) }.orEmpty()
         val topicalCorrections = if (topicalAnchor != null) {
-            if (secondaryAnchor == null) linkedCorrections.asReversed() + topicalAnchor
+            if (secondaryAnchor == null) prioritizeChain(topicalAnchor, linkedCorrections)
             else {
                 // Preserve both original anchors and the latest correction
                 // for each before older steps consume the excerpt budget.
@@ -362,12 +370,30 @@ internal object AstraConversationContext {
         """(?:please[ ]+)?(?:(?:increase|decrease|raise|reduce)[ ]+it[ ]+by[ ]+$relativeAmount|add[ ]+$relativeAmount[ ]+to[ ]+it|subtract[ ]+$relativeAmount[ ]+from[ ]+it)[.!]?"""
     )
 
+    private val explicitWithdrawal = Regex(
+        """(?:the current amount is unknown|i do not know the current amount|i no longer know the current amount)[.!]?"""
+    )
+    private val explicitProportionalCorrection = Regex(
+        """(?:please[ ]+)?(?:increase|decrease|raise|reduce)[ ]+it[ ]+by[ ]+(?:[0-9]{1,12}(?:\.[0-9]{1,8})?|\.[0-9]{1,8})[ ]+percent[ ]+relative[ ]+to[ ]+its[ ]+current[ ]+amount[.!]?"""
+    )
+    private val quantityCorrectionMarker = Regex(
+        """^(?:actually|correction|instead|rather|sorry|i meant|no)[ ]*[,;:][ ]*"""
+    )
+
+    private fun isQuantityDependency(text: String): Boolean {
+        val normalized = text.trim().lowercase(java.util.Locale.ROOT)
+        if (normalized.length > 150 || normalized.any { it.isISOControl() }) return false
+        val body = normalized.replaceFirst(quantityCorrectionMarker, "")
+        return unmarkedRelativeCorrection.matches(body) ||
+            explicitProportionalCorrection.matches(body) || explicitWithdrawal.matches(body)
+    }
+
     private fun isCorrection(text: String): Boolean {
         val message = text.trim().lowercase(java.util.Locale.ROOT)
         if (listOf("actually", "correction", "instead", "rather", "sorry",
                 "i meant").any { startsWithPhrase(message, it) }) return true
 
-        if (message.length <= 120 && unmarkedRelativeCorrection.matches(message)) return true
+        if (isQuantityDependency(message)) return true
 
         if (startsWithPhrase(message, "no")) {
             val rest = message.drop(2).trimStart(' ', ',', ';', ':')
