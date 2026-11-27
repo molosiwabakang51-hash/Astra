@@ -144,7 +144,7 @@ def run(out, resume_ordinary=None, resume_anchored=None):
                              not any(f".layers.{i}." in n for i in LAYERS) for n,p in params):
             raise RuntimeError("Unexpected trainable parameters")
         count=sum(p.numel() for _,p in params)
-        if count>1_000_000:
+        if count!=229376:
             raise RuntimeError("Unexpected adapter size")
         optimizer=torch.optim.AdamW([p for _,p in params],lr=2e-4,weight_decay=0.0,foreach=False)
         torch.manual_seed(SEED)
@@ -210,7 +210,8 @@ def run(out, resume_ordinary=None, resume_anchored=None):
             raise RuntimeError("Training changed another adapter")
     with model.disable_adapter():
         repeated=evaluate()
-    if baseline!=repeated:
+        repeated_retention=retention_evaluate()
+    if baseline!=repeated or base_retention!=repeated_retention:
         raise RuntimeError("Disabled-adapter baseline changed")
     report=dict(status="COMPLETE_RETENTION_ANCHORED_REASONING",model=MODEL,revision=REVISION,
         base_weight_sha256=hashes,training_dtype="float32",seed=SEED,train_sha256=suite_digest(train),train_cases=len(train),
