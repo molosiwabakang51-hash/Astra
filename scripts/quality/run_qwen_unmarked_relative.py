@@ -53,11 +53,16 @@ def cases(seed):
 def prepare(seed,builders,suite):
     if set(builders)!={"baseline","recovery"}:
         raise ValueError("Both pinned compiled Kotlin builders required")
+    if not suite:
+        raise ValueError("Evaluation suite must not be empty")
+    if len({row[0] for row in suite}) != len(suite):
+        raise ValueError("Duplicate case IDs")
     prepared={}
     for case,question,expected,history,required in suite:
         prompts={arm:build(question,history) for arm,build in builders.items()}
         for arm,prompt in prompts.items():
-            if not prompt.endswith(BOUNDARY+question) or len(prompt)>3000:
+            if (not isinstance(prompt, str) or prompt.count(BOUNDARY) != 1
+                    or not prompt.endswith(BOUNDARY+question) or len(prompt)>3000):
                 raise RuntimeError("Current question changed or context bound exceeded")
             head=prompt.rsplit(BOUNDARY,1)[0]
             if required[0] not in head:
