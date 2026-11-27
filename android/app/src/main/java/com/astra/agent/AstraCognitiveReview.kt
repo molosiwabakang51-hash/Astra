@@ -88,6 +88,12 @@ internal object AstraCognitiveReview {
 
     fun resolve(raw: String, history: List<AstraChatArchive.Message>): Result {
         val submitted = raw.trim()
+        if (submitted.startsWith("Verify this quantity trace:", ignoreCase = true) ||
+            submitted.startsWith("Check this quantity trace:", ignoreCase = true)) {
+            val checked = AstraQuantityTraceVerifier.verify(submitted.substringAfter(':').trim())
+                ?: return Result.Local("I could not verify the complete quantity trace. Use: Trace quantity: initial amount is 500 coins; increase it by 20 coins; subtract 5 coins from it. What is the current amount? Use a consistent unit, explicit chronological steps and no more than 24 statements. For changes to rates use percentage points or basis points.")
+            return Result.Local(checkNotNull(AstraQuantityTraceVerifier.report(checked)))
+        }
         if (submitted.startsWith("Verify this conditional trace:", ignoreCase = true) ||
             submitted.startsWith("Check this conditional trace:", ignoreCase = true)) {
             val checked = AstraConditionalTraceVerifier.verify(submitted.substringAfter(':').trim())
@@ -167,6 +173,11 @@ internal object AstraCognitiveReview {
             request.matches(original) || AstraInterruptedReply.isIncomplete(answer) ||
             answer.startsWith(HEADER) || answer.startsWith("ASTRA //")
         ) return Result.Local("No complete original answer to audit. Ask the question again.")
+        // Independently recompute a complete, owner-supplied quantity trace.
+        // Never infer the trace from unrelated conversation history.
+        AstraQuantityTraceVerifier.verify(original)?.let { checked ->
+            AstraQuantityTraceVerifier.report(checked, answer)?.let { return Result.Local(it) }
+        }
         // Verify an explicit complete recurrence only on an explicit audit.
         // Unsupported prose and nonnumeric answers retain ordinary review.
         val conditional = AstraConditionalTraceVerifier.verify(original)
