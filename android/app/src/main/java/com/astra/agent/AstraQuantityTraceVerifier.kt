@@ -16,6 +16,9 @@ internal object AstraQuantityTraceVerifier {
     private val change = Regex("""^(?:actually, )?(increase|decrease|raise|reduce) it by ($MAGNITUDE) ($UNIT|percentage points?|basis points?)$""")
     private val addSubtract = Regex("""^(?:actually, )?(?:add ($MAGNITUDE) ($UNIT) to it|subtract ($MAGNITUDE) ($UNIT) from it)$""")
     private val withdrawal = Regex("""^(?:actually, )?(?:the current amount is unknown|i do not know the current amount)$""")
+    // A valid accumulated result can exceed a single input's width or
+    // precision (basis-point conversion introduces two decimal places).
+    private val resultNumber = Regex("""[+−-]?(?:[0-9]{1,16}(?:\.[0-9]{1,10})?|\.[0-9]{1,10})""")
     private val bound = BigDecimal.TEN.pow(16)
     private fun decimal(text: String): BigDecimal? = text.replace('−', '-').toBigDecimalOrNull()
     private fun unit(text: String): String = when (text) {
@@ -75,7 +78,7 @@ internal object AstraQuantityTraceVerifier {
         val verdict = if (previous == null) "result: " + checked.result + "." else {
             val same = if (previous.equals("UNKNOWN", ignoreCase = true)) checked.result == "UNKNOWN"
             else {
-                if (!Regex(NUMBER).matches(previous)) return null
+                if (!resultNumber.matches(previous)) return null
                 val actual = decimal(previous) ?: return null
                 val expected = decimal(checked.result)
                 expected != null && actual.compareTo(expected) == 0
