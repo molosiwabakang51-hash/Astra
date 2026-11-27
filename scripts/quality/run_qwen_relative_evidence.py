@@ -115,14 +115,9 @@ def prepare(build,item):
             raise RuntimeError("Required source premise or correction missing")
         if "Actually, use spicy rice." in head or "[Some linked corrections are omitted" in head:
             raise RuntimeError("Unrelated or incomplete evidence")
-    # Check the diagnostic actually exercises the intended gate; labels
-    # are used only for fixture validation, never for admission.
-    actual=[relative_evidence(prompt) for prompt in p["candidate"]]
-    if item["case"].startswith("relative_"):
-        if not all(actual):
-            raise RuntimeError("Relative fixture did not trigger evidence gate")
-    elif any(actual):
-        raise RuntimeError("Nonrelative control triggered evidence gate")
+    # Gate admission is a measured outcome, not a precondition.
+    # Real recovery may retain later unrelated owner statements. Keep the
+    # exact original gate and fixtures, and report its misses/false admissions.
     return p
 
 
@@ -132,6 +127,17 @@ def evaluate(seed,infer,build,suite=None):
         raise ValueError("Duplicate cases")
     prepared={i["case"]:prepare(build,i) for i in suite}
     system=native.system_prompt()
+    gate_counts=dict(eligible=0,ineligible=0,true_positive=0,false_positive=0,
+                     true_negative=0,false_negative=0)
+    for item in suite:
+        p=prepared[item["case"]]
+        expected=item["case"].startswith("relative_")
+        for prompt in p["candidate"]:
+            admitted=p["route"]=="scoped" and relative_evidence(prompt)
+            gate_counts["eligible" if expected else "ineligible"]+=1
+            gate_counts["true_positive" if expected and admitted else
+                        "false_negative" if expected else
+                        "false_positive" if admitted else "true_negative"]+=1
     rows=[]
     def call(prompt,system_text,call_seed):
         settings=native.PROFILES["qwen_think"]
@@ -209,11 +215,13 @@ def evaluate(seed,infer,build,suite=None):
                 model_sha256=native.MODEL_SHA256,recovery_commit=RECOVERY_COMMIT,
                 system_prompt_sha256=hashlib.sha256(system.encode()).hexdigest(),
                 evidence_rule_sha256=hashlib.sha256(EVIDENCE_RULE.encode()).hexdigest(),
-                totals=summary(rows),matched=matched,
+                totals=summary(rows),matched=matched,gate_admission=gate_counts,
+                interpretation=("NO_ADMISSION_NO_EFFECT_ESTIMABLE" if gate_counts["true_positive"]+gate_counts["false_positive"]==0 else
+                                "FALSE_ADMISSION_PRESENT" if gate_counts["false_positive"] else "MEASURED_ADMISSION"),
                 by_domain={d:summary([r for r in rows if r["case"].startswith(d+"_")])
                            for d in ("absolute","relative","missing","control")},
                 cases=rows,official_ai_rating=None,
-                scope="Public synthetic fresh topic/value templates, exact contract-derived subquestions and pinned production Kotlin retrieval, same thinking profile, paired seeds and cap. Apply #507 evidence rule only to a scoped prompt whose latest serialized owner line is a narrow relative adjustment in coins. Nonrelative prompts byte-identical. Gate does not establish semantic relevance. Measure accuracy, operand errors, abstention and cost. No live activation or independent assessment; no raw replies retained.")
+                scope="Public synthetic fresh topic/value templates, exact contract-derived subquestions and pinned production Kotlin retrieval, same thinking profile, paired seeds and cap. Apply #507 evidence rule only to a scoped prompt whose latest serialized owner line is a narrow relative adjustment in coins. Unadmitted prompts byte-identical. Gate misses and false admissions measured, not excluded. Zero admissions cannot establish a treatment effect. Gate does not establish semantic relevance. Measure accuracy, operand errors, abstention and cost. No live activation or independent assessment; no raw replies retained.")
 
 
 def run(binary, seed, build):
