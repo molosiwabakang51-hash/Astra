@@ -32,6 +32,12 @@ class AstraQuantityTraceVerifierTest {
         assertTrue(AstraQuantityTraceVerifier.report(actual, "4.2500")!!.contains(" — correct."))
         assertTrue(AstraQuantityTraceVerifier.report(actual, "UNKNOWN")!!.contains("incorrect; corrected result: 4.25."))
         assertNull(AstraQuantityTraceVerifier.report(actual, "About 4.25"))
+        val wide = check("initial amount is 999999999999 coins; add 999999999999 coins to it")
+        assertEquals("1999999999998", wide.result)
+        assertTrue(AstraQuantityTraceVerifier.report(wide, wide.result)!!.contains(" — correct."))
+        val precise = check("initial amount is 4 percent; increase it by 0.00000001 basis points")
+        assertEquals("4.0000000001", precise.result)
+        assertTrue(AstraQuantityTraceVerifier.report(precise, precise.result)!!.contains(" — correct."))
     }
 
     @Test fun invalidOrAmbiguousStepsFailClosed() {
