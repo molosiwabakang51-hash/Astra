@@ -1,5 +1,8 @@
 """Lightweight tests of the neural pilot contracts; no model or GPU needed."""
 import re
+import importlib.util
+import json
+import tempfile
 import sys
 from pathlib import Path
 import unittest
@@ -97,6 +100,48 @@ class NeuralPilotTests(unittest.TestCase):
             pilot.paired_report(before,{"a":after["a"]})
         with self.assertRaises(ValueError):
             pilot.paired_report(before,dict(after,b=row("pattern",True)))
+
+
+    def test_partial_checkpoint_is_immutable_and_not_a_completed_report(self):
+        class FakeModel:
+            def save_pretrained(self,path,**kwargs):
+                path.mkdir()
+                (path/"adapter_model.safetensors").write_bytes(b"test-only tensor")
+        with tempfile.TemporaryDirectory() as directory:
+            out=Path(directory)
+            pilot.save_partial(FakeModel(),out,1,"initial","updated",[1.25],"float32",{"base":"hash"})
+            checkpoint=out/"partial"/"step-001"
+            manifest=json.loads((checkpoint/"checkpoint.json").read_text())
+            self.assertEqual(manifest["status"],"PARTIAL_NEURAL_ADAPTATION_NOT_EVALUATED")
+            self.assertEqual(manifest["completed_steps"],1)
+            self.assertEqual(manifest["adapter_file_sha256"],pilot.file_digest(checkpoint/"adapter_model.safetensors"))
+            self.assertFalse((out/"report.json").exists())
+            with self.assertRaises(RuntimeError):
+                pilot.save_partial(FakeModel(),out,1,"initial","updated",[1.25],"float32",{})
+
+    @unittest.skipUnless(importlib.util.find_spec("torch"),"Requires PyTorch; mandatory in training workflow")
+    def test_suffix_projection_matches_full_shifted_ce_and_gradients(self):
+        import torch
+        import torch.nn.functional as F
+        from types import SimpleNamespace
+        torch.manual_seed(711)
+        for prefix_length in (1,3,9):
+            for suffix_length in (1,2,5):
+                ids=list(range(prefix_length+suffix_length))
+                prefix=ids[:prefix_length]
+                labels=[-100]*prefix_length+ids[prefix_length:]
+                logits=torch.randn(1,len(ids),32,requires_grad=True)
+                def fake_model(**kwargs):
+                    self.assertEqual(kwargs["logits_to_keep"],suffix_length+1)
+                    return SimpleNamespace(logits=logits[:,-kwargs["logits_to_keep"]:,:])
+                actual=pilot.assistant_loss(fake_model,ids,labels,prefix)
+                expected=F.cross_entropy(logits[0,:-1],torch.tensor(labels[1:]))
+                self.assertTrue(torch.allclose(actual,expected))
+                a=torch.autograd.grad(actual,logits,retain_graph=True)[0]
+                b=torch.autograd.grad(expected,logits)[0]
+                self.assertTrue(torch.allclose(a,b))
+        with self.assertRaises(ValueError):
+            pilot.assistant_loss(lambda **kw: self.fail("invalid mask entered model"),[1,2],[1,2],[1])
 
 
 if __name__=="__main__":
