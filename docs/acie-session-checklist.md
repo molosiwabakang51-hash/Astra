@@ -579,6 +579,41 @@ Supersedes pending historical milestone statuses above; preserves the original 1
 
 Master ACIE 27/119 checked, 92 outstanding; original #166 release acceptance 0/119. No independent rating.
 
+
+## Session reconciliation — contextual correction, assessment integrity and selective evidence (27 November local)
+
+Supersedes pending milestone states in the preceding sections. All parent requirements and acceptance criteria are unchanged. Native CPU diagnostics are synthetic development evidence, not independent general intelligence scores or Android device acceptance.
+
+- #499 all CI passed; diagnostic merged b17b1fe69ceba9981ca8b30039a17dc99c88dae2. Artifact 15160576503: 32/32 calls, 8/16 both, classifier CURRENT on all 16, wrong accepted plans 4 unchanged, CPU 30421 + 17358 ms. Reject live gate.
+- #501 production merged e6288481a958131d11e62146f8768900106825e4 after both CI checks. #504 isolated diagnostic merged 2a22c4d84ed1030d7efdf03912d3b3bc2964cc7b; artifact 15160454574: 24/24 complete, 8/12 to 11/12, earlier topic 1/4 to 4/4, later 3/4 and same-topic 4/4 unchanged, disjoint fragments 8 to 0, three gains/no losses. Retain named correction boundary.
+- #502 diagnostic merged ccbfdaa3c68df7f13e3b7504135b0859cfe92c8b; artifact 15160672261: 24/24, 16/24 both, wrong accepted 7 to 0, legitimate paraphrases 3/8 to 0/8. Reject broad structural router.
+- #503 production merged 5d86f1590ab5b55dcc725447c2dfe7fe242ceb40; explicit integer-or-UNKNOWN answer normalization. Both CI checks passed; existing context regression not isolated evidence of neural calibration.
+- #505 diagnostic merged d737b5cc515d0eb062606d894c341563ddd1e8af; artifact 15162000452: 31/32 calls complete, 8/12 both, complete 2/4 to 1/4, missing 3/4 to 4/4, candidate operands 13/16, three false UNKNOWN on complete cases, CPU 275181 to 381150 ms. Reject live scoped routing.
+- #506 diagnostic merged e2459ff9c449cf42b7a299963eb22e3afcac51af; artifact 15162936636: 40/40 calls, thinking 10/12 vs direct 6/12; all 16 direct scoped operands UNKNOWN. Reject direct extraction substitution.
+- #507 diagnostic merged eba2a2d98d6aa6d14ad055186527e2f66d6262aa; artifact 15163477454: 56/56 calls, 12/16 to 13/16, relative 1/4 to 3/4, absolute 4/4 to 3/4, missing 4/4 and controls 3/4 unchanged, operands 23/28 to 25/28, false operand abstention 4 to 2, two gains/one loss, CPU 575949 to 590471 ms. Do not activate broadly.
+- #508 merged ca15f226f5cce92e5ea4de06723f2028f45328ad after Python and Android success. Enforce distinct exact rubric hashes and strict metadata parsing. Does not establish semantic novelty or independent reviewer custody.
+- #509 production merged e1220af13ab752033d0d7bf232a45be0fa02c447; signed owner correction recovery. #511 exact pre/post diagnostic merged b04e9458ee19510cf0bd9330420c2affb3400de8. Direct artifact 15163909128: 24/24 complete, 4/12 to 11/12, signed 0/4 to 4/4, relative 0/4 to 3/4, unsigned controls 4/4 both, complete chains 4/12 to 12/12, superseded answers 8 to 0, seven gains/zero losses, tokens 1235 to 1557, CPU 184063 to 202750 ms. Retain #509.
+- #510 production merged 46de3fa0af463f79087f963894ab82f3387aadd6; explicit XOR and biconditional verification, both CI passed. Direct artifact 15163803183: existing formalization diagnostic 19/20 complete, faithful and correct direct 0/7 vs thinking 1/7. Not an isolated new-operator test; automatic translation remains unsuitable.
+- #512 initial native run 45920165489 failed before inference because actual recovered excerpts did not satisfy assumed gate admission. Updated diagnostic, not gate or fixtures, to measure false positives and missed activations, with explicit no-admission interpretation. Head 42b862744931e0ddd95204ab78b697fbe79d1734, Python 45921000940, Android 45921000909, native 45921000934 pending at inspection.
+
+### Latest incremental checklist (supersedes earlier pending states)
+
+- [x] Milestone — ACIE-016/019/078/110: #499 completed and unreliable live eligibility gate rejected.
+- [x] Milestone — ACIE-042/043/048/098: explicit named correction boundary and isolated improvement integrated.
+- [x] Milestone — ACIE-062/102: explicit UNKNOWN formatting safeguard integrated.
+- [x] Milestone — ACIE-030/078/082: structural corroboration, contract-scoped decomposition and extraction modes evaluated; unsupported live strategies rejected.
+- [x] Milestone — ACIE-030/062/110: scenario-aware instruction evaluated; broad activation rejected.
+- [x] Milestone — ACIE-109: exact rubric uniqueness and strict metadata validation integrated.
+- [x] Milestone — ACIE-043/048/057/098: signed correction recovery integrated and isolated 11/12 diagnostic measured.
+- [x] Milestone — ACIE-055/058: bounded explicit XOR and biconditional verification integrated.
+- [x] Milestone — ACIE-110/117: selective gate preflight failure investigated and evaluation accounting corrected.
+- [ ] Milestone — ACIE-030/062/110: #512 corrected actual-model assessment and admission evaluation.
+- [ ] Milestone — ACIE-030/062/078/082: reliable autonomous decomposition, semantic extraction and uncertainty calibration.
+- [ ] Milestone — ACIE-040/109/118/119: independent reviewer protocol freeze, held-out assessment and physical-device acceptance.
+
+Master ACIE 27/119 checked, 92 outstanding; original #166 release acceptance 0/119. No independent rating.
+
+
 ## Acceptance
 
 90/100 independent repeated general intelligence score; separate model-only/assisted results; no model substitution, paid API or unsupported capability claims. Freeze protocol before held-out testing. Preserve offline and memory constraints. Recheck any completed engineering item if a later regression invalidates it.
