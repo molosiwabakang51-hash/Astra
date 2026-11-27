@@ -656,6 +656,44 @@ No parent item is newly checked from source-only work. No claim of new neural ac
 All 119 ACIE parent statuses retained: 27/119 engineering checks, 92 open. The original release ledger #166 remains distinct (0/119 formally accepted at last verified inspection). No new independent intelligence rating.
 
 
+
+## Session reconciliation — reference recovery for noncanonical model answers (27 November 2026)
+
+- [x] Audit #519–#523 and confirm #520 remains merged; #521 Android CI 45991505668 succeeded, #522 Android 45992374175 and Python 45992374140 succeeded. Native #522 run 45992374324 and #523 Android 45993072290 were pending at inspection.
+- [x] Implement explicit owner-reference recovery for supported quantity, state, conditional, propositional and categorical questions when the previous reply is not a standalone answer. Do not certify arbitrary model prose or extract a convenient number from it.
+- [x] Preserve authoritative owner evidence ahead of unrelated model-generated quantity proposals; unify proposal reporting and fail closed if confirmation evidence is missing.
+- [x] Extend reference-only recovery to exact elementary arithmetic and affine equation solution sets, including nonterminating rational results, undefined division, identities and inconsistent equations.
+- [x] Add regression coverage spanning these categories, unsupported requests, misleading proposals and explicit-review boundaries. Source and test head before this ledger update: `fbd4448313fe43aeebaea597429d68fb694a45cd`.
+- [ ] Execute final-head Kotlin/Android and applicable Python CI; resolve failures and merge only when justified.
+- [ ] Retrieve actual Qwen3 #522 semantic-fidelity results; independently validate generalization and physical ARM64 inference.
+
+Stacked on #523 head `2e1d3366dfc05b90402c503f856a2e34f80947b7` to avoid interrupting its running CI. All 119 ACIE parent rows retained: 27 checked, 92 open. No new parent acceptance or independent intelligence score.
+
+
+
+## Verified session results — native fidelity, production merge and CI recovery (27 November 2026)
+
+- [x] #522 native Qwen3 diagnostic run 45992374324 completed successfully as an experiment; artifact 15195241887 inspected. Baseline and enhanced prompting each scored 1/12 strict cases; completion 6/12 versus 3/12; zero accepted or faithful traces in either arm. Tokens 5969 versus 7065; elapsed 265906 versus 313064 ms. Neither strategy is approved for automatic routing.
+- [x] #522 diagnostic merged at `e24452bb060f2606c56de860c17b70aa4d05c6e1`.
+- [x] #523 Android CI 45993072290 completed successfully; merged at `4319ea3d27b6f953e65d2481ca76386e403509ff`.
+- [x] #524 initial CI 45994138288 ran 855 Python regression tests with one source-contract failure. Preserve named cross-multiplication operands rather than weakening the guard. Corrective commit `507fcbd2ad7f173e59aeaa0b0a658757582ef327`.
+- [ ] Verify the corrected #524 final head before merging; reconcile overlapping branches and retain actual native results.
+- [ ] Investigate compact structured extraction and constrained decoding on a matched diagnostic; require semantic fidelity, not merely valid syntax, and do not automatically accept model-generated plans.
+
+Engineering parent status unchanged: 27/119 checked; release acceptance remains independent. No independently supported intelligence rating.
+
+
+
+## Session reconciliation — compact semantic extraction and branch recovery (27 November 2026)
+
+- [x] Diagnose #524 stale ancestry after #522/#523 squash merges. Recreate the corrected production candidate on the current main, verifying that the four original source/test blobs match #523 before transfer. Preserve #522 diagnostic files.
+- [x] Implement bounded compact chronological event protocol and paired hard-direct grammar experiment in #525 (head `83ab9ebe3c4059e6d96456aeb3a5c2a78567f58b`). New decoder, four evaluator regression methods, static grammar enforcement canary and 12 fresh public cases. Independent semantic fidelity and exact Kotlin result remain distinct.
+- [ ] Final Android and applicable native calculator CI for the reconciled reference recovery candidate.
+- [ ] #525 Python/Android and actual-model diagnostic results; no autonomous activation until strict fidelity and rejection are demonstrated.
+
+All 119 parent rows remain unchanged. Engineering checked: 27/119, 92 outstanding; no independent intelligence rating.
+
+
 ## Acceptance
 
 90/100 independent repeated general intelligence score; separate model-only/assisted results; no model substitution, paid API or unsupported capability claims. Freeze protocol before held-out testing. Preserve offline and memory constraints. Recheck any completed engineering item if a later regression invalidates it.
