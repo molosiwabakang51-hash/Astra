@@ -792,7 +792,7 @@ class AstraConversationContextTest {
         assertFalse(prompt.contains("including a later correction"))
     }
 
-    @Test fun missingRelativeAdjustmentsAreFlaggedRatherThanImpliedComplete() {
+    @Test fun relativeDependenciesAreRecoveredWhenTheEntireChainFits() {
         val history = listOf(turn("user", "The fictional greenhouse budget is 900 coins.")) +
             listOf(11, 22, 33, 44, 55).flatMap {
                 listOf(turn("assistant", "Noted."),
@@ -801,13 +801,25 @@ class AstraConversationContextTest {
         for (question in listOf("What was my greenhouse budget?",
             "Use the greenhouse budget to estimate the remaining funds.")) {
             val prompt = AstraConversationContext.userPrompt(question, history, true)
-            assertTrue(prompt.contains("Some linked corrections are omitted."))
-            assertTrue(prompt.contains("If the result depends on missing steps, ask for clarification."))
-            assertTrue(prompt.contains("900 coins"))
-            assertTrue(prompt.contains("increase it by 55 coins"))
-            assertFalse(prompt.contains("increase it by 11 coins"))
-            assertFalse(prompt.contains("increase it by 22 coins"))
+            val evidence = listOf("900 coins") + listOf(11, 22, 33, 44, 55).map { "increase it by $it coins." }
+            assertTrue(evidence.all { prompt.contains(it) })
+            assertTrue(evidence.zipWithNext().all { (x, y) -> prompt.indexOf(x) < prompt.indexOf(y) })
+            assertFalse(prompt.contains("Some linked corrections are omitted"))
             assertTrue(prompt.endsWith(question + "\n/no_think"))
+            assertTrue(prompt.length <= 3010)
+        }
+    }
+
+    @Test fun oversizedRelativeChainPreservesAnchorLatestStepAndHonestGap() {
+        val history = listOf(turn("user", "My fictional greenhouse budget is 900 coins.")) +
+            (1..10).map { turn("user", "Increase it by ${it * 11} coins.") } +
+            (1..18).map { turn("assistant", "Unrelated weather note $it.") }
+        for (q in listOf("What was my greenhouse budget?", "Use the greenhouse budget to plan.")) {
+            val prompt = AstraConversationContext.userPrompt(q, history, true)
+            assertTrue(prompt.contains("900 coins"))
+            assertTrue(prompt.contains("Increase it by 110 coins."))
+            assertTrue(prompt.contains("Some linked corrections are omitted."))
+            assertFalse(prompt.contains("including a later correction"))
             assertTrue(prompt.length <= 3010)
         }
     }
@@ -1186,6 +1198,49 @@ class AstraConversationContextTest {
             assertFalse(other, prompt.contains("make it 42 coins"))
             assertFalse(prompt.contains("999 coins"))
             assertFalse(prompt.contains("[Some linked corrections are omitted"))
+        }
+    }
+
+
+    @Test fun quantityWithdrawalAndReestablishmentRemainChronological() {
+        val rng = java.util.Random(812730L)
+        repeat(50) {
+            val initial = 100 + rng.nextInt(500)
+            val replacement = 700 + rng.nextInt(200)
+            for (withdrawal in listOf("The current amount is unknown.",
+                "I do not know the current amount.", "I no longer know the current amount.")) {
+                val evidence = listOf("My fictional expedition reserve is $initial coins.",
+                    "Increase it by 12 coins.", withdrawal,
+                    "Set it to $replacement coins.", "Decrease it by 20 percent relative to its current amount.",
+                    "Add 3 coins to it.")
+                val history = evidence.map { turn("user", it) } +
+                    (1..18).map { turn("assistant", "Unrelated weather note $it.") }
+                for (q in listOf("What was my expedition reserve?", "Use the expedition reserve to plan.")) {
+                    val prompt = AstraConversationContext.userPrompt(q, history, true)
+                    assertTrue(withdrawal, evidence.all { prompt.contains("Previous user: \"$it\"") })
+                    assertTrue(evidence.zipWithNext().all { (x,y) -> prompt.indexOf(x) < prompt.indexOf(y) })
+                    assertFalse(prompt.contains("Some linked corrections are omitted"))
+                    assertTrue(prompt.length <= 3010)
+                }
+            }
+        }
+    }
+
+    @Test fun unsupportedWithdrawalAndProportionalStatementsDoNotExtendOldOwnerChain() {
+        for (other in listOf("If the current amount is unknown, what happens?",
+            "\"The current amount is unknown.\"", "The current amount is unknown?",
+            "I do not know the current amount of dinner supplies.",
+            "Increase it by 20 percent relative to its current amount tomorrow.",
+            "Increase it by 20 percent relative to its current amount and send it.")) {
+            val history = listOf(turn("user", "My fictional expedition reserve is 500 coins."),
+                turn("assistant", "The current amount is unknown."),
+                turn("user", other),
+                turn("user", "Actually, make it 42 coins.")) +
+                (1..15).map { turn("assistant", "Unrelated weather report $it.") }
+            val prompt = AstraConversationContext.userPrompt("What was my expedition reserve?", history, true)
+            assertTrue(prompt.contains("500 coins"))
+            assertFalse(other, prompt.contains("make it 42 coins"))
+            assertFalse(prompt.contains("Previous Astra:"))
         }
     }
 
