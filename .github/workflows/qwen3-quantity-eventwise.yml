@@ -1,0 +1,64 @@
+name: Actual Qwen3 eventwise quantity rejection
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/qwen3-quantity-eventwise.yml'
+      - 'scripts/quality/run_qwen_eventwise_quantity.py'
+      - 'scripts/quality/run_qwen_anchored_quantity.py'
+      - 'scripts/quality/run_qwen_quantity_compact.py'
+      - 'scripts/quality/run_qwen_quantity_fidelity.py'
+      - 'scripts/quality/AcieQuantityProbe.kt'
+      - 'scripts/tests/test_qwen_eventwise_quantity.py'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: astra-qwen-quantity-eventwise-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  probe:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Validate quantity pairing and evaluation contracts
+        run: python -m unittest discover -s scripts/tests -p test_qwen_eventwise_quantity.py -v
+      - name: Compile pinned production quantity verifier
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p evaluation
+          git show eb95481a47227bc2aacc608adc85b4012bd06b60:android/app/src/main/java/com/astra/agent/AstraQuantityTraceVerifier.kt > evaluation/AstraQuantityTraceVerifier.kt
+          kotlinc evaluation/AstraQuantityTraceVerifier.kt scripts/quality/AcieQuantityProbe.kt -include-runtime -d evaluation/quantity-bridge.jar
+      - name: Obtain pinned model and native source
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -c 'import sys; sys.path.insert(0, "scripts"); from prepare_offline_android import prepare_model; prepare_model()'
+          git clone --depth 1 --branch b12248 https://github.com/ggml-org/llama.cpp.git cpu-llama
+          [[ "$(git -C cpu-llama rev-parse HEAD)" == 3837bf0* ]]
+      - name: Compile native CPU inference server
+        shell: bash
+        run: |
+          set -euo pipefail
+          cmake -S cpu-llama -B cpu-build -G Ninja -DCMAKE_BUILD_TYPE=Release -DLLAMA_BUILD_TESTS=OFF -DLLAMA_BUILD_EXAMPLES=OFF -DLLAMA_BUILD_TOOLS=ON -DLLAMA_BUILD_SERVER=ON -DLLAMA_BUILD_UI=OFF -DLLAMA_USE_PREBUILT_UI=OFF -DGGML_CUDA=OFF
+          cmake --build cpu-build --target llama-server --parallel 4
+      - name: Compare global abstention with fixed-count eventwise labels
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p evaluation
+          python scripts/quality/run_qwen_eventwise_quantity.py cpu-build/bin/llama-server evaluation/quantity-bridge.jar > evaluation/quantity-eventwise.json
+          cat evaluation/quantity-eventwise.json >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v6
+        with:
+          name: qwen3-quantity-eventwise-results
+          path: evaluation/quantity-eventwise.json
+          if-no-files-found: error
+          retention-days: 14
