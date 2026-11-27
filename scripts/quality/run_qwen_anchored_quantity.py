@@ -46,7 +46,8 @@ NUM = r"-?" + compact.NUMBER
 SPAN = re.compile(r"(?<![\w.+−-])(" + NUM + r") (" +
                   "|".join(re.escape(u) for u in sorted(UNITS, key=len, reverse=True)) +
                   r")(?![\w])", re.I)
-DIGITS = re.compile(r"[0-9]+(?:\.[0-9]+)?")
+DIGITS = re.compile(r"\d+(?:\.\d+)?")
+DETACHED_SIGN = re.compile(r"(?:\b(?:minus|negative|plus|positive)|[+−\-±])\s*$", re.I)
 LABEL_PROMPT = (
     "Classify each numbered chronological event for one quantity. Output only NONE "
     "or one label per numbered event separated by semicolons. I=initial value, "
@@ -82,6 +83,9 @@ def anchored_plan(labels, clauses):
         # One unambiguous numeric literal in the entire event, not merely
         # the first recognizable value/unit pair.
         if len(hits) != 1 or len(DIGITS.findall(clause)) != 1:
+            return None
+        # A sign written separately must not be silently discarded.
+        if DETACHED_SIGN.search(clause[:hits[0].start()]):
             return None
         value, unit = hits[0].groups()
         unit = UNITS[unit.lower()]
