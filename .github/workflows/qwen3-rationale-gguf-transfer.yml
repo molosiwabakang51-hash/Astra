@@ -1,0 +1,67 @@
+name: Qwen3 native GGUF rationale transfer
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/qwen3-rationale-gguf-transfer.yml'
+      - 'scripts/quality/evaluate_qwen_rationale_gguf.py'
+      - 'scripts/tests/test_qwen_rationale_gguf.py'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: astra-rationale-gguf-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  evaluate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 80
+    env:
+      HF_HUB_DISABLE_TELEMETRY: '1'
+      TOKENIZERS_PARALLELISM: 'false'
+      OMP_NUM_THREADS: '4'
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Validate native scoring and adapter identity
+        run: python -m unittest discover -s scripts/tests -p test_qwen_rationale_gguf.py -v
+      - name: Obtain exact runtime and verified GGUF
+        run: |
+          set -euo pipefail
+          python -c 'import sys; sys.path.insert(0,"scripts"); from prepare_offline_android import prepare_model; prepare_model()'
+          git clone --depth 1 --branch b12248 https://github.com/ggml-org/llama.cpp.git cpu-llama
+          [[ "$(git -C cpu-llama rev-parse HEAD)" == 3837bf0* ]]
+          cmake -S cpu-llama -B cpu-build -G Ninja -DCMAKE_BUILD_TYPE=Release -DLLAMA_BUILD_TESTS=OFF -DLLAMA_BUILD_EXAMPLES=OFF -DLLAMA_BUILD_TOOLS=ON -DLLAMA_BUILD_SERVER=ON -DLLAMA_BUILD_UI=OFF -DLLAMA_USE_PREBUILT_UI=OFF -DGGML_CUDA=OFF
+          cmake --build cpu-build --target llama-server --parallel 4
+      - name: Install converter dependencies
+        run: |
+          python -m pip install --index-url https://download.pytorch.org/whl/cpu torch==2.11.0
+          printf 'torch==2.11.0\n' > cpu-constraints.txt
+          python -m pip install -c cpu-constraints.txt -r cpu-llama/requirements/requirements-convert_lora_to_gguf.txt
+          python -m pip check
+      - name: Recover pinned original neural checkpoint
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/46049366258" | python -c 'import json,sys; r=json.load(sys.stdin); assert r["id"]==46049366258 and r["status"]=="completed"'
+          gh run download 46049366258 --repo "$GITHUB_REPOSITORY" --name qwen3-rationale-resume-checkpoints --dir checkpoints
+      - name: Export and execute native matched trial
+        timeout-minutes: 45
+        run: |
+          python scripts/quality/evaluate_qwen_rationale_gguf.py evaluation/rationale-gguf checkpoints cpu-llama cpu-build/bin/llama-server
+          python -c 'import json; r=json.load(open("evaluation/rationale-gguf/report.json")); print(json.dumps({k:r[k] for k in ("baseline_summary","candidate_summary","paired")},indent=2))' >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: qwen3-rationale-native-gguf
+          path: |
+            evaluation/rationale-gguf/export.json
+            evaluation/rationale-gguf/rationale.f32.gguf
+            evaluation/rationale-gguf/report.json
+            evaluation/rationale-gguf/native.log
+          if-no-files-found: warn
+          retention-days: 14
