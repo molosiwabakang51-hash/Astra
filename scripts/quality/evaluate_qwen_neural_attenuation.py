@@ -63,14 +63,14 @@ def run(out,checkpoints):
     # Fixed, preregistered 50% strength; no per-case or outcome-based selection.
     full={k:v.detach().clone() for k,v in get_peft_model_state_dict(model,adapter_name="rationale").items()}
     candidate=attenuate(full)
-    model.add_adapter("half",config())
-    set_peft_model_state_dict(model,candidate,adapter_name="half")
-    loaded=get_peft_model_state_dict(model,adapter_name="half")
+    model.add_adapter("attenuated",config())
+    set_peft_model_state_dict(model,candidate,adapter_name="attenuated")
+    loaded=get_peft_model_state_dict(model,adapter_name="attenuated")
     verification=verify(full,loaded)
     count=0
     for module in model.modules():
-        if hasattr(module,"lora_A") and "half" in module.lora_A:
-            if module.scaling.get("half")!=2. or module.scaling.get("rationale")!=2.:
+        if hasattr(module,"lora_A") and "attenuated" in module.lora_A:
+            if module.scaling.get("attenuated")!=2. or module.scaling.get("rationale")!=2.:
                 raise RuntimeError("Actual PEFT scaling mismatch")
             count+=1
     if count!=8 or sum(t.numel() for t in loaded.values())!=229376:
@@ -78,8 +78,8 @@ def run(out,checkpoints):
     half_hash=state_digest(loaded)
     if half_hash==PINS["rationale"][1]:
         raise RuntimeError("Candidate equals source")
-    model.save_pretrained(out/"candidate",selected_adapters=["half"],safe_serialization=True)
-    path=out/"candidate"/"half"/"adapter_model.safetensors"
+    model.save_pretrained(out/"candidate",selected_adapters=["attenuated"],safe_serialization=True)
+    path=out/"candidate"/"attenuated"/"adapter_model.safetensors"
     from safetensors.torch import load_file
     if state_digest(load_file(str(path),device="cpu"))!=half_hash:
         raise RuntimeError("Saved weights differ")
@@ -120,13 +120,13 @@ def run(out,checkpoints):
     with model.disable_adapter():
         baseline=evaluate()
     results={}
-    for arm in ("rationale","half"):
+    for arm in ("rationale","attenuated"):
         model.set_adapter(arm)
         rows=evaluate()
         results[arm]=dict(rows=rows,summary=summarize(rows),paired_vs_base=paired(baseline,rows),
-            parameter_sha256=half_hash if arm=="half" else PINS[arm][1])
-    for arm in (*ARMS,"half"):
-        expected=half_hash if arm=="half" else PINS[arm][1]
+            parameter_sha256=half_hash if arm=="attenuated" else PINS[arm][1])
+    for arm in (*ARMS,"attenuated"):
+        expected=half_hash if arm=="attenuated" else PINS[arm][1]
         if state_digest(get_peft_model_state_dict(model,adapter_name=arm))!=expected:
             raise RuntimeError("Evaluation altered factors")
     with model.disable_adapter():
@@ -138,7 +138,7 @@ def run(out,checkpoints):
     report=dict(status="COMPLETE_FIXED_NEURAL_DELTA_ATTENUATION",source_run=46049366258,
         model=MODEL,revision=REVISION,base_weight_sha256=hashes,development_sha256=digest(dev),
         generation_cap=CAP,batch_size=BATCH,baseline=baseline,baseline_summary=summarize(baseline),
-        adapters=results,paired_half_vs_full=paired(results["rationale"]["rows"],results["half"]["rows"]),
+        adapters=results,paired_half_vs_full=paired(results["rationale"]["rows"],results["attenuated"]["rows"]),
         intervention=json.loads((out/"intervention.json").read_text()),frozen_baseline_reproduced=True,
         official_ai_rating=None,scope="Fixed 50% rank-8 weight-delta attenuation, reused public 52-case suite, same 128-token cap across arms. No retraining, held-out score, general retention or deployment qualification.")
     (out/"report.json").write_text(json.dumps(report,indent=2,allow_nan=False)+"\n")
