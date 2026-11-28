@@ -55,20 +55,20 @@ class DeltaTest(unittest.TestCase):
             def forward(self,x): return self.proj(x)
         cfg=LoraConfig(r=8,lora_alpha=16,lora_dropout=0,target_modules=["proj"])
         m=get_peft_model(Net(),cfg,adapter_name="full")
-        m.add_adapter("half",cfg)
+        m.add_adapter("attenuated",cfg)
         with torch.no_grad():
             for n,p in m.named_parameters():
                 if ".full.weight" in n:p.copy_(torch.arange(p.numel()).reshape(p.shape)*.0007+.01)
         full=get_peft_model_state_dict(m,adapter_name="full")
         half=attenuate(full)
-        set_peft_model_state_dict(m,half,adapter_name="half")
-        verify(full,get_peft_model_state_dict(m,adapter_name="half"))
+        set_peft_model_state_dict(m,half,adapter_name="attenuated")
+        verify(full,get_peft_model_state_dict(m,adapter_name="attenuated"))
         x=torch.randn(2,11)
         m.eval()
         with torch.no_grad():
             with m.disable_adapter(): base=m(x)
             m.set_adapter("full"); y=m(x)
-            m.set_adapter("half"); z=m(x)
+            m.set_adapter("attenuated"); z=m(x)
         self.assertTrue(torch.allclose(z-base,(y-base)*.5,rtol=2e-4,atol=2e-7))
 
 if __name__=="__main__":
