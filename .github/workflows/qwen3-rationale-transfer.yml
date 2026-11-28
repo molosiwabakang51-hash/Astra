@@ -18,6 +18,8 @@ concurrency:
   cancel-in-progress: true
 jobs:
   train:
+    # Budget-only PR runs the dedicated saved-weight evaluation, not duplicate training.
+    if: github.event_name != 'pull_request' || github.head_ref != 'intelligence/rationale-budget-transfer-1128'
     runs-on: ubuntu-24.04
     timeout-minutes: 65
     env:
