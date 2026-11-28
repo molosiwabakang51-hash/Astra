@@ -1,0 +1,90 @@
+name: Qwen3 rationale supervision transfer
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/qwen3-rationale-transfer.yml'
+      - 'scripts/quality/qwen_rationale_curriculum.py'
+      - 'scripts/quality/train_qwen_rationale_transfer.py'
+      - 'scripts/tests/test_qwen_rationale_transfer.py'
+      - 'scripts/quality/evaluate_qwen_rationale_checkpoints.py'
+      - 'scripts/tests/test_qwen_rationale_recovery.py'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: astra-rationale-transfer-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  train:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 65
+    env:
+      HF_HUB_DISABLE_TELEMETRY: '1'
+      TOKENIZERS_PARALLELISM: 'false'
+      OMP_NUM_THREADS: '4'
+      MKL_NUM_THREADS: '4'
+      RECOVER_PINNED: ${{ github.event_name == 'pull_request' && github.head_ref == 'intelligence/rationale-distillation-transfer-1127' && 'true' || 'false' }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Validate curriculum and grading contracts
+        run: python -m unittest discover -s scripts/tests -p test_qwen_rationale_transfer.py -v
+      - name: Install pinned CPU dependencies
+        run: |
+          python -m pip install --index-url https://download.pytorch.org/whl/cpu torch==2.7.1
+          python -m pip install transformers==4.52.4 peft==0.15.2 accelerate==1.7.0 huggingface-hub==0.32.4 safetensors==0.5.3 numpy==2.2.6
+          python -m pip check
+      - name: Verify recovery contracts
+        run: |
+          python -c 'import torch, safetensors'
+          python -m unittest discover -s scripts/tests -p test_qwen_rationale_recovery.py -v
+      - name: Recover the completed neural checkpoints
+        if: env.RECOVER_PINNED == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/46049366258" | python -c 'import json,sys; r=json.load(sys.stdin); assert r["head_sha"]=="660c30a6ef0b87d0e1e11f7ff7a84ab4f576a2bc" and r["status"]=="completed" and r["conclusion"]=="failure" and r["path"].split("@")[0]==".github/workflows/qwen3-rationale-transfer.yml"'
+          gh run download 46049366258 --repo "$GITHUB_REPOSITORY" --name qwen3-rationale-resume-checkpoints --dir recovered
+      - name: Evaluate recovered weights without retraining
+        if: env.RECOVER_PINNED == 'true'
+        timeout-minutes: 50
+        run: |
+          set -euo pipefail
+          python scripts/quality/evaluate_qwen_rationale_checkpoints.py evaluation/recovered recovered
+          python -c 'import json; r=json.load(open("evaluation/recovered/report.json")); print(json.dumps({"baseline":r["baseline_summary"],"adapters":{k:v["summary"] for k,v in r["adapters"].items()},"paired":r["paired_rationale_vs_answer_only"]},indent=2))' >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v6
+        if: success() && env.RECOVER_PINNED == 'true'
+        with:
+          name: qwen3-rationale-recovered-results
+          path: evaluation/recovered/report.json
+          if-no-files-found: error
+          retention-days: 14
+      - name: Train and compare answer-only and rationale adapters
+        if: env.RECOVER_PINNED != 'true'
+        timeout-minutes: 50
+        run: |
+          set -euo pipefail
+          python scripts/quality/train_qwen_rationale_transfer.py evaluation/rationale --per-domain 16
+          python -c 'import json; r=json.load(open("evaluation/rationale/report.json")); print(json.dumps({"baseline":r["baseline_summary"],"adapters":{k:v["summary"] for k,v in r["adapters"].items()},"paired":r["paired_rationale_vs_answer_only"]},indent=2))' >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v6
+        if: always() && env.RECOVER_PINNED != 'true'
+        with:
+          name: qwen3-rationale-resume-checkpoints
+          path: evaluation/rationale/resume/
+          if-no-files-found: warn
+          retention-days: 14
+      - uses: actions/upload-artifact@v6
+        if: success() && env.RECOVER_PINNED != 'true'
+        with:
+          name: qwen3-rationale-transfer-results
+          path: |
+            evaluation/rationale/report.json
+            evaluation/rationale/answer_only/
+            evaluation/rationale/rationale/
+          if-no-files-found: error
+          retention-days: 14
