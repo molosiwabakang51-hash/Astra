@@ -16,12 +16,13 @@ def targeted(train=True):
     n=32 if train else 8
     for i in range(n):
         # Signs and direction vary independently, with new quantities in dev.
-        start=rng.randrange(50,180) if train else rng.randrange(320,550)
+        start=rng.randrange(100,220) if train else rng.randrange(320,550)
         a,b,c=rng.sample(range(2,29),3)
         changes=(a if i&1 else -a,b if i&2 else -b,c if i&4 else -c)
         total=start+sum(changes)
         events=", then ".join(("receive " if d>0 else "send ")+str(abs(d)) for d in changes)
-        if i%2==0:
+        inverse=bool(i&8) if train else bool(i%2)
+        if not inverse:
             q=f"A stock ledger starts at {start}. The operations are {events}. How many remain?"
             x=start
             trace=[]
