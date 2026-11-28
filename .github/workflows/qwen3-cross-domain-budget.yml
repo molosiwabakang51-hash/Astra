@@ -1,0 +1,58 @@
+name: Qwen3 cross-domain budget transfer
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/qwen3-cross-domain-budget.yml'
+      - 'scripts/quality/qwen_cross_domain_transfer.py'
+      - 'scripts/quality/evaluate_qwen_cross_domain_budget.py'
+      - 'scripts/tests/test_qwen_cross_domain_transfer.py'
+      - 'scripts/tests/test_qwen_rationale_budget.py'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: astra-cross-domain-budget-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  probe:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 105
+    env:
+      HF_HUB_DISABLE_TELEMETRY: '1'
+      TOKENIZERS_PARALLELISM: 'false'
+      OMP_NUM_THREADS: '4'
+      MKL_NUM_THREADS: '4'
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Verify reasoning oracles and paired scoring
+        run: |
+          python -m unittest discover -s scripts/tests -p test_qwen_cross_domain_transfer.py -v
+          python -m unittest discover -s scripts/tests -p test_qwen_rationale_budget.py -v
+      - name: Install pinned CPU dependencies
+        run: |
+          python -m pip install --index-url https://download.pytorch.org/whl/cpu torch==2.7.1
+          python -m pip install transformers==4.52.4 peft==0.15.2 accelerate==1.7.0 huggingface-hub==0.32.4 safetensors==0.5.3 numpy==2.2.6
+          python -m pip check
+      - name: Download pinned completed neural checkpoints
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/46049366258" | python -c 'import json,sys; r=json.load(sys.stdin); assert r["head_sha"]=="660c30a6ef0b87d0e1e11f7ff7a84ab4f576a2bc" and r["status"]=="completed" and r["conclusion"]=="failure" and r["path"].split("@")[0]==".github/workflows/qwen3-rationale-transfer.yml"'
+          gh run download 46049366258 --repo "$GITHUB_REPOSITORY" --name qwen3-rationale-resume-checkpoints --dir recovered
+      - name: Evaluate actual frozen and adapted models on paired cross-domain prompts
+        timeout-minutes: 90
+        run: |
+          python scripts/quality/evaluate_qwen_cross_domain_budget.py evaluation/cross-domain-budget recovered
+          python -c 'import json; r=json.load(open("evaluation/cross-domain-budget/report.json")); print(json.dumps({"baseline":r["baseline"]["long_summary"],"adapters":{k:v["long_summary"] for k,v in r["adapters"].items()},"paired":r["paired_at_long_cap"]},indent=2))' >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v6
+        with:
+          name: qwen3-cross-domain-budget-results
+          path: evaluation/cross-domain-budget/report.json
+          if-no-files-found: error
+          retention-days: 14
