@@ -1,0 +1,68 @@
+name: Qwen3 public math neural transfer
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/qwen3-public-math-transfer.yml'
+      - 'scripts/quality/qwen_gsm8k_curriculum.py'
+      - 'scripts/quality/train_qwen_gsm8k.py'
+      - 'scripts/tests/test_qwen_gsm8k.py'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: astra-public-math-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  train:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 85
+    env:
+      HF_HUB_DISABLE_TELEMETRY: '1'
+      TOKENIZERS_PARALLELISM: 'false'
+      OMP_NUM_THREADS: '4'
+      MKL_NUM_THREADS: '4'
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Verify sample and grading contracts
+        run: python -m unittest discover -s scripts/tests -p test_qwen_gsm8k.py -v
+      - name: Install pinned CPU dependencies
+        run: |
+          python -m pip install --index-url https://download.pytorch.org/whl/cpu torch==2.7.1
+          python -m pip install transformers==4.52.4 peft==0.15.2 accelerate==1.7.0 huggingface-hub==0.32.4 safetensors==0.5.3 numpy==2.2.6 pyarrow==20.0.0
+          python -m pip check
+      - name: Train on pinned public training split
+        timeout-minutes: 30
+        run: python scripts/quality/train_qwen_gsm8k.py train evaluation/public-math
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: qwen3-public-math-resume
+          path: evaluation/public-math/resume/
+          if-no-files-found: warn
+          retention-days: 14
+      - uses: actions/upload-artifact@v6
+        if: success()
+        with:
+          name: qwen3-public-math-trained
+          path: |
+            evaluation/public-math/training.json
+            evaluation/public-math/adapter/
+          if-no-files-found: error
+          retention-days: 14
+      - name: Compare frozen and adapted model on separate public test split
+        timeout-minutes: 45
+        run: |
+          set -euo pipefail
+          python scripts/quality/train_qwen_gsm8k.py evaluate evaluation/public-math
+          python -c 'import json; r=json.load(open("evaluation/public-math/report.json")); print(json.dumps({k:r[k] for k in ("baseline_summary","adapted_summary","paired")},indent=2))' >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v6
+        if: success()
+        with:
+          name: qwen3-public-math-results
+          path: evaluation/public-math/report.json
+          if-no-files-found: error
+          retention-days: 14
