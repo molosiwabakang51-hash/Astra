@@ -76,7 +76,20 @@ def recover(root,arm,expected_identity,initial):
         raise ValueError("Saved adapter digest mismatch")
     return state,m
 
-def run(out,checkpoints):
+def budget_pair(short,long,eos,short_cap=96,long_cap=256):
+    """Verify a longer greedy run preserves the actual short-run trajectory."""
+    if type(short_cap) is not int or type(long_cap) is not int or not 1<=short_cap<long_cap:
+        raise ValueError("Invalid caps")
+    st,sc=completion_tokens(short,eos,short_cap)
+    lt,lc=completion_tokens(long,eos,long_cap)
+    if (not sc and len(st)!=short_cap) or (not lc and len(lt)!=long_cap):
+        raise ValueError("Incomplete run did not reach its declared cap")
+    # EOS can terminate the short run before the nominal cap.
+    stable=st==lt[:short_cap] and (not sc or lc and st==lt)
+    return st,sc,lt,lc,stable
+
+
+def run(out,checkpoints,budget_probe=False):
     import torch
     import transformers
     import peft
@@ -122,9 +135,15 @@ def run(out,checkpoints):
         if state_digest(get_peft_model_state_dict(model,adapter_name=arm))!=PINS[arm][1]:
             raise RuntimeError("Loaded weights do not match saved weights")
         manifests[arm]=manifest
+    # Select a predeclared diagnostic subset; no selection by model output.
+    # Identity validation above still uses the complete original dev suite.
+    original_dev=dev
+    indices=[i for i,e in enumerate(dev) if not budget_probe or e.domain in
+             ("quantity","abstraction","control")]
+    dev=tuple(original_dev[i] for i in indices)
     development=[encode(tok,e,False)[2] for e in dev]
 
-    def evaluate():
+    def evaluate(cap=CAP):
         model.eval()
         rows=[]
         for start in range(0,len(dev),BATCH):
@@ -135,21 +154,61 @@ def run(out,checkpoints):
             before=time.monotonic()
             with torch.inference_mode():
                 output=model.generate(input_ids=x,attention_mask=attn,
-                    do_sample=False,temperature=None,top_p=None,top_k=None,max_new_tokens=CAP,
+                    do_sample=False,temperature=None,top_p=None,top_k=None,max_new_tokens=cap,
                     pad_token_id=tok.eos_token_id,eos_token_id=tok.eos_token_id,use_cache=True)
             elapsed=round((time.monotonic()-before)*1000)
             for j,prefix in enumerate(prefixes):
-                tokens,complete=completion_tokens(output[j,x.shape[1]:].tolist(),tok.eos_token_id)
+                tokens,complete=completion_tokens(output[j,x.shape[1]:].tolist(),tok.eos_token_id,cap)
                 content=visible(tok.decode(tokens,skip_special_tokens=True))
                 e=dev[start+j]
                 correct,terminal=grade(content,e.answer)
-                rows.append(dict(ident=str(start+j),domain=e.domain,complete=complete,
+                rows.append(dict(ident=str(indices[start+j]),domain=e.domain,complete=complete,
                     correct=complete and correct,terminal_format=complete and terminal,
-                    tokens=len(tokens),batch_elapsed_ms=elapsed,expected=e.answer,visible_output=content[:2000],
+                    tokens=len(tokens),batch_elapsed_ms=elapsed,expected=e.answer,visible_output=content[:4000] if budget_probe else content[:2000],
+                    **({"token_ids":tokens} if budget_probe else {}),
                     output_sha256=hashlib.sha256(content.encode()).hexdigest(),
                     prompt_sha256=hashlib.sha256(json.dumps(prefix,separators=(",",":")).encode()).hexdigest()))
             print(f"evaluated {len(rows)}/{len(dev)}",flush=True)
         return rows
+    if budget_probe:
+        def compare_caps():
+            short=evaluate(96)
+            long=evaluate(256)
+            checks=[]
+            for a,b in zip(short,long):
+                if a["ident"]!=b["ident"] or a["prompt_sha256"]!=b["prompt_sha256"]:
+                    raise RuntimeError("Prompt changed between budget arms")
+                *_,stable=budget_pair(a["token_ids"],b["token_ids"],tok.eos_token_id)
+                checks.append(dict(ident=a["ident"],prefix_reproduced=stable))
+            return dict(short=short,long=long,short_summary=summarize(short),
+                long_summary=summarize(long),paired=paired(short,long),
+                prefix_checks=checks,prefix_reproduced=sum(c["prefix_reproduced"] for c in checks))
+        with model.disable_adapter():
+            baseline=compare_caps()
+        results={}
+        for arm in ARMS:
+            model.set_adapter(arm)
+            results[arm]=compare_caps()
+            results[arm]["parameter_sha256"]=PINS[arm][1]
+        with model.disable_adapter():
+            repeated=evaluate(256)
+        def stable(rows):
+            return [{k:v for k,v in r.items() if k!="batch_elapsed_ms"} for r in rows]
+        if stable(baseline["long"])!=stable(repeated):
+            raise RuntimeError("Frozen long-budget baseline changed")
+        report=dict(status="COMPLETE_RATIONALE_BUDGET_PROBE",source_run=46049366258,
+            model=MODEL,revision=REVISION,base_weight_sha256=hashes,
+            development_sha256=digest(original_dev),selected_indices=indices,
+            selected_domains=["quantity","abstraction","control"],
+            caps=[96,256],batch_size=BATCH,baseline=baseline,adapters=results,
+            paired_at_long_cap={arm:paired(baseline["long"],r["long"]) for arm,r in results.items()},
+            frozen_baseline_reproduced=True,official_ai_rating=None,
+            scope="Public targeted developmental subset with changed batching versus #541. "
+                "Compare actual 96 and 256 token greedy runs within this experiment. "
+                "Prefix differences are disclosed, not silently treated as cap-only continuations. "
+                "No retraining, independent rating or handset performance claim.")
+        (out/"report.json").write_text(json.dumps(report,indent=2,allow_nan=False)+"\n")
+        return
     with model.disable_adapter():
         baseline=evaluate()
     results={}
@@ -176,5 +235,6 @@ if __name__=="__main__":
     p=argparse.ArgumentParser(description=__doc__)
     p.add_argument("output",type=Path)
     p.add_argument("checkpoints",type=Path)
+    p.add_argument("--budget-probe",action="store_true")
     a=p.parse_args()
-    run(a.output,a.checkpoints)
+    run(a.output,a.checkpoints,a.budget_probe)
