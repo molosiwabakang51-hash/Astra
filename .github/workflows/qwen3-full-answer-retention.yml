@@ -1,0 +1,58 @@
+name: Qwen3 full-answer retention
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/qwen3-full-answer-retention.yml'
+      - 'scripts/quality/qwen_full_answer_retention.py'
+      - 'scripts/quality/evaluate_qwen_full_answer_retention.py'
+      - 'scripts/tests/test_qwen_full_answer_retention.py'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  assess:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      HF_HUB_DISABLE_TELEMETRY: '1'
+      TOKENIZERS_PARALLELISM: 'false'
+      OMP_NUM_THREADS: '4'
+      MKL_NUM_THREADS: '4'
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Install pinned CPU dependencies
+        run: |
+          python -m pip install --index-url https://download.pytorch.org/whl/cpu torch==2.7.1
+          python -m pip install transformers==4.52.4 peft==0.15.2 accelerate==1.7.0 huggingface-hub==0.32.4 safetensors==0.5.3 numpy==2.2.6
+          python -m pip check
+      - name: Verify full-answer and tensor contracts
+        run: |
+          python -c 'import torch, safetensors'
+          python -m unittest discover -s scripts/tests -p test_qwen_full_answer_retention.py -v
+      - name: Recover verified retention adapters
+        if: github.event_name == 'workflow_dispatch' || github.head_ref == 'intelligence/full-answer-retention-1127'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/46052741186" | python -c 'import json,sys; r=json.load(sys.stdin); assert r["head_sha"]=="529b62934c2e07a52594ff256ceaae08521f263d" and r["status"]=="completed" and r["conclusion"]=="success" and r["path"].split("@")[0]==".github/workflows/qwen3-retention-anchored.yml"'
+          gh run download 46052741186 --repo "$GITHUB_REPOSITORY" --name qwen3-retention-anchored-results --dir recovered
+      - name: Evaluate complete answers without retraining
+        if: github.event_name == 'workflow_dispatch' || github.head_ref == 'intelligence/full-answer-retention-1127'
+        timeout-minutes: 35
+        run: |
+          set -euo pipefail
+          python scripts/quality/evaluate_qwen_full_answer_retention.py evaluation/full-retention.json recovered
+          python -c 'import json; r=json.load(open("evaluation/full-retention.json")); print(json.dumps({"baseline":r["baseline_summary"],"adapters":{k:v["summary"] for k,v in r["adapters"].items()}},indent=2))' >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v6
+        if: success() && (github.event_name == 'workflow_dispatch' || github.head_ref == 'intelligence/full-answer-retention-1127')
+        with:
+          name: qwen3-full-answer-retention-results
+          path: evaluation/full-retention.json
+          if-no-files-found: error
+          retention-days: 14
