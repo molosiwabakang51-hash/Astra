@@ -5,6 +5,27 @@ sys.path.insert(0,str(pathlib.Path(__file__).resolve().parents[1]/"quality"))
 from evaluate_qwen_rationale_gguf import shapes,check_adapters,score_reply,CAP
 
 class NativeTransferTests(unittest.TestCase):
+    def test_conversion_base_requires_exact_shards(self):
+        import hashlib
+        import tempfile
+        from unittest.mock import patch
+        import evaluate_qwen_rationale_gguf as gguf
+        with tempfile.TemporaryDirectory() as tmp:
+            root=pathlib.Path(tmp)/gguf.REVISION
+            root.mkdir()
+            pins={"a.safetensors":hashlib.sha256(b"a").hexdigest(),
+                  "b.safetensors":hashlib.sha256(b"b").hexdigest()}
+            with patch.object(gguf,"BASE_HASHES",pins):
+                with self.assertRaises(RuntimeError):gguf.verify_conversion_base(root)
+                (root/"a.safetensors").write_bytes(b"a")
+                with self.assertRaises(RuntimeError):gguf.verify_conversion_base(root)
+                (root/"b.safetensors").write_bytes(b"b")
+                self.assertEqual(gguf.verify_conversion_base(root),pins)
+                (root/"b.safetensors").write_bytes(b"changed")
+                with self.assertRaises(RuntimeError):gguf.verify_conversion_base(root)
+                (root/"b.safetensors").write_bytes(b"b")
+                (root/"extra.safetensors").write_bytes(b"extra")
+                with self.assertRaises(RuntimeError):gguf.verify_conversion_base(root)
     def test_shapes(self):
         s=shapes()
         self.assertEqual(len(s),16)
