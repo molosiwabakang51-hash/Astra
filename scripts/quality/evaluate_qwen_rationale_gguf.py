@@ -52,6 +52,16 @@ def score_reply(reply,expected):
         tokens=count,stop_type=stop,truncated=truncated,visible_output=text[:4000],
         output_sha256=hashlib.sha256(text.encode()).hexdigest())
 
+def verify_conversion_base(local):
+    """The pinned converter indexes actual safetensors, not only configuration."""
+    if local.name!=REVISION:
+        raise RuntimeError("Wrong base config revision")
+    actual={p.name:file_digest(p) for p in sorted(local.glob("*.safetensors"))}
+    if actual!=BASE_HASHES:
+        raise RuntimeError("Missing or mismatched conversion base weight shards")
+    return actual
+
+
 def prepare(out,checkpoints,upstream):
     import torch
     from safetensors.torch import save_file,load_file
@@ -67,8 +77,8 @@ def prepare(out,checkpoints,upstream):
         raise RuntimeError("Wrong training identity")
     if any(file_digest(Path(__file__).resolve().parent/n)!=h for n,h in identity["source_sha256"].items()):
         raise RuntimeError("Training source drift")
-    local=Path(snapshot_download(repo_id=MODEL,revision=REVISION,allow_patterns=["*.json","*.txt","*.model"]))
-    if local.name!=REVISION: raise RuntimeError("Wrong base config revision")
+    local=Path(snapshot_download(repo_id=MODEL,revision=REVISION,allow_patterns=["*.json","*.txt","*.model",*BASE_HASHES]))
+    conversion_hashes=verify_conversion_base(local)
     cfg=AutoConfig.from_pretrained(local,trust_remote_code=False,local_files_only=True)
     if (cfg.model_type,cfg.hidden_size,cfg.num_hidden_layers,cfg.num_attention_heads,cfg.num_key_value_heads,cfg.head_dim)!=("qwen3",2048,28,16,8,128):
         raise RuntimeError("Unexpected base architecture")
@@ -96,7 +106,7 @@ def prepare(out,checkpoints,upstream):
     evidence=dict(status="EXPORTED_UNEVALUATED_GGUF_ADAPTER",source_manifest_sha256=PINS["rationale"][0],
         source_parameter_sha256=PINS["rationale"][1],source_state_sha256=m["state_sha256"],
         peft_file_sha256=file_digest(raw),gguf_sha256=file_digest(gguf),gguf_bytes=gguf.stat().st_size,
-        model=MODEL,revision=REVISION,quantized_base_sha256=native.MODEL_SHA256)
+        model=MODEL,revision=REVISION,conversion_base_sha256=conversion_hashes,quantized_base_sha256=native.MODEL_SHA256)
     (out/"export.json").write_text(json.dumps(evidence,indent=2,allow_nan=False)+"\n")
     selected=[(i,e) for i,e in enumerate(dev) if e.domain in ("quantity","abstraction","control")]
     prompts=[(i,e,encode(tok,e,False)[2]) for i,e in selected]
