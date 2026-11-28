@@ -38,8 +38,8 @@ jobs:
           cmake --build cpu-build --target llama-server --parallel 4
       - name: Install converter dependencies
         run: |
-          python -m pip install --index-url https://download.pytorch.org/whl/cpu torch==2.7.1
-          printf 'torch==2.7.1\n' > cpu-constraints.txt
+          python -m pip install --index-url https://download.pytorch.org/whl/cpu torch==2.11.0
+          printf 'torch==2.11.0\n' > cpu-constraints.txt
           python -m pip install -c cpu-constraints.txt -r cpu-llama/requirements/requirements-convert_lora_to_gguf.txt
           python -m pip check
       - name: Recover pinned original neural checkpoint
